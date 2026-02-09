@@ -161,6 +161,7 @@ function App() {
         {view === 'devices' && <DeviceManager onBack={() => setView('dashboard')} />}
         {(view === 'new-report' || view === 'details') && (
           <DamageForm
+            key={selectedReport ? selectedReport.id : 'new'}
             onCancel={handleCancelEntry}
             onSave={handleSaveReport}
             initialData={selectedReport}

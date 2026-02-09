@@ -174,6 +174,9 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
 
     // Ref to hold latest formData for unmount cleanup
     const latestFormData = useRef(formData);
+    // Ref to hold last successfully saved data to prevent loops
+    const lastSavedData = useRef(formData);
+
     useEffect(() => {
         latestFormData.current = formData;
     }, [formData]);
@@ -181,9 +184,15 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
     useEffect(() => {
         const timeoutId = setTimeout(() => {
             if (onSave) {
-                console.log("Auto-Save triggered (Debounced). Equipment count:", formData.equipment.length);
-                // Pass true as second argument to indicate "silent" save (no navigation/alert if applicable)
-                onSave(formData, true);
+                // DIRTY CHECK: Only save if data has actually changed
+                if (JSON.stringify(formData) !== JSON.stringify(lastSavedData.current)) {
+                    console.log("Auto-Save triggered (Data Changed). Equipment:", formData.equipment.length);
+                    // Pass true as second argument to indicate "silent" save
+                    onSave(formData, true);
+                    lastSavedData.current = formData;
+                } else {
+                    console.log("Auto-Save skipped (No structural changes)");
+                }
             }
         }, 1000);
 
@@ -193,8 +202,8 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
     // Save on Unmount
     useEffect(() => {
         return () => {
-            console.log("Component Unmounting - Saving final state...", latestFormData.current.equipment.length);
-            if (onSave) {
+            console.log("Component Unmounting - Saving final state...");
+            if (onSave && JSON.stringify(latestFormData.current) !== JSON.stringify(lastSavedData.current)) {
                 onSave(latestFormData.current, true);
             }
         };

@@ -42,13 +42,8 @@ export default function DeviceManager({ onBack }) {
                     throw new Error("Invalid format");
                 }
             } else {
-                // Initial Seed
-                const initial = [
-                    { id: '1', number: '1', type: 'Kondenstrockner', model: 'Trotec TTK 100', status: 'Verfügbar' },
-                    { id: '2', number: '2', type: 'Seitenkanalverdichter', model: 'Trotec VE 4', status: 'Verfügbar' }
-                ];
-                setDevices(initial);
-                localStorage.setItem('qservice_devices', JSON.stringify(initial));
+                setDevices([]);
+                // localStorage.setItem('qservice_devices', JSON.stringify([])); // Optional: create empty key
             }
         } catch (e) {
             console.error("Error loading devices:", e);
