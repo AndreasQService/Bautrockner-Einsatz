@@ -1197,21 +1197,20 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
 
                         <div style={{ display: 'flex', gap: '0.5rem' }}>
                             {/* PLZ */}
-                            <div style={{ flex: '0 0 80px' }}>
+                            <div style={{ flex: '0 0 100px' }}>
                                 <input
                                     type="text"
                                     name="zip"
+                                    list="plz-list"
                                     className="form-input"
                                     placeholder="PLZ"
                                     value={formData.zip}
                                     onChange={(e) => {
                                         const val = e.target.value;
-                                        console.log('PLZ input:', val);
 
                                         // Auto-fill City if PLZ known
                                         const match = swissPLZ.find(entry => entry.plz === val.trim());
                                         if (match) {
-                                            console.log('PLZ match found:', match);
                                             setFormData(prev => ({ ...prev, zip: val, city: match.city }));
                                         } else {
                                             setFormData(prev => ({ ...prev, zip: val }));
@@ -1219,6 +1218,11 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                                     }}
                                     required
                                 />
+                                <datalist id="plz-list">
+                                    {swissPLZ.map((entry, idx) => (
+                                        <option key={idx} value={entry.plz}>{entry.city}</option>
+                                    ))}
+                                </datalist>
                             </div>
 
                             {/* Ort */}
@@ -1232,21 +1236,18 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                                     value={formData.city}
                                     onChange={(e) => {
                                         const val = e.target.value;
-                                        console.log('City input:', val);
 
-                                        // Auto-fill PLZ based on City
-                                        const match = swissPLZ.find(entry => entry.city.toLowerCase() === val.trim().toLowerCase());
-                                        if (match) {
-                                            console.log('City match found:', match);
-                                            // Check if current zip is valid for this city
-                                            const isValidZip = swissPLZ.some(entry =>
-                                                entry.city.toLowerCase() === val.trim().toLowerCase() &&
-                                                entry.plz === formData.zip
-                                            );
+                                        // Try to find a match for the city
+                                        // We find ALL matches to check if current ZIP is valid
+                                        const matches = swissPLZ.filter(entry => entry.city.toLowerCase() === val.trim().toLowerCase());
 
-                                            if (!isValidZip) {
-                                                console.log('Updating PLZ to:', match.plz);
-                                                setFormData(prev => ({ ...prev, city: val, zip: match.plz }));
+                                        if (matches.length > 0) {
+                                            // Check if current zip is among the matches
+                                            const currentZipIsValid = matches.some(m => m.plz === formData.zip);
+
+                                            // If current zip is not valid for this city, take the first one
+                                            if (!currentZipIsValid) {
+                                                setFormData(prev => ({ ...prev, city: val, zip: matches[0].plz }));
                                             } else {
                                                 setFormData(prev => ({ ...prev, city: val }));
                                             }
