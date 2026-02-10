@@ -1,16 +1,54 @@
-# React + Vite
+# Bautrockner-Einsatz Dashboard
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Eine React-Anwendung zur Verwaltung von Bautrockner-Einsätzen und Schadensberichten.
 
-Currently, two official plugins are available:
+## Voraussetzungen
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+Stellen Sie sicher, dass folgende Software auf Ihrem Computer installiert ist:
+- [Node.js](https://nodejs.org/) (Version 18 oder höher empfohlen)
+- [Git](https://git-scm.com/)
 
-## React Compiler
+## Installation auf einem anderen Rechner
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Follow these steps to set up the project on a new machine:
 
-## Expanding the ESLint configuration
+1.  **Repository klonen**
+    Öffnen Sie ein Terminal (Eingabeaufforderung, PowerShell oder Git Bash) und führen Sie folgenden Befehl aus:
+    ```bash
+    git clone https://github.com/AndreasQService/Bautrockner-Einsatz.git
+    ```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+2.  **In das Projektverzeichnis wechseln**
+    ```bash
+    cd Bautrockner-Einsatz
+    ```
+
+3.  **Abhängigkeiten installieren**
+    Installieren Sie alle notwendigen Pakete mit npm:
+    ```bash
+    npm install
+    ```
+
+4.  **Umgebungsvariablen konfigurieren**
+    Erstellen Sie eine neue Datei namens `.env` im Hauptverzeichnis des Projekts und fügen Sie Ihre Supabase-Zugangsdaten hinzu:
+    
+    ```env
+    VITE_SUPABASE_URL=Ihre_Supabase_URL
+    VITE_SUPABASE_ANON_KEY=Ihr_Supabase_Anon_Key
+    ```
+    *(Diese Daten finden Sie in Ihrem Supabase Dashboard unter Project Settings > API)*
+
+5.  **Anwendung starten**
+    Starten Sie den Entwicklungsserver:
+    ```bash
+    npm run dev
+    ```
+    Die Anwendung ist nun unter `http://localhost:5173` (oder einem ähnlichen Port) erreichbar.
+
+## Build für Produktion
+
+Um eine optimierte Version für die Veröffentlichung zu erstellen:
+```bash
+npm run build
+```
+Die Dateien befinden sich anschließend im `dist`-Ordner.
