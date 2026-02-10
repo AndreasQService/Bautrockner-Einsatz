@@ -311,14 +311,14 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                     const fileName = `${formData.id || 'temp'}/${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
 
                     const { data, error } = await supabase.storage
-                        .from('images')
+                        .from('damage-images')
                         .upload(fileName, file);
 
                     if (error) throw error;
 
                     // Get Public URL
                     const { data: { publicUrl } } = supabase.storage
-                        .from('images')
+                        .from('damage-images')
                         .getPublicUrl(fileName);
 
                     // Update state with real URL and remove uploading flag

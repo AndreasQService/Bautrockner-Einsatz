@@ -30,16 +30,19 @@ function App() {
 
     const fetchReports = async () => {
       const { data, error } = await supabase
-        .from('reports')
-        .select('content'); // Select only the JSON content
+        .from('damage_reports')
+        .select('report_data')
+        .order('created_at', { ascending: false });
 
       if (error) {
         console.error('Error fetching reports from Supabase:', error);
-      } else if (data && data.length > 0) {
-        // Unwrap the content
-        const loadedReports = data.map(row => row.content);
-        setReports(loadedReports);
-        localStorage.setItem('qservice_reports_prod', JSON.stringify(loadedReports)); // Update storage key
+      } else if (data) {
+        // Unwrap the JSONB content
+        const loadedReports = data.map(row => row.report_data);
+        if (loadedReports.length > 0) {
+          setReports(loadedReports);
+          localStorage.setItem('qservice_reports_prod', JSON.stringify(loadedReports));
+        }
       }
     };
 
@@ -58,7 +61,7 @@ function App() {
     setSelectedReport(null)
   }
 
-  const handleSaveReport = (updatedReport, silent = false) => {
+  const handleSaveReport = async (updatedReport, silent = false) => {
     let newReports;
 
     // Check if it's an existing report
@@ -66,48 +69,63 @@ function App() {
 
     if (exists) {
       newReports = reports.map(r => r.id === updatedReport.id ? updatedReport : r);
-      setReports(newReports);
-      setSelectedReport(updatedReport); // Update selected report to reflect changes
     } else {
       // New report
-      const newReport = {
-        ...updatedReport,
-        id: `WS-${new Date().getFullYear()}-${Math.floor(Math.random() * 10000)}`,
-        date: new Date().toISOString().split('T')[0],
-        lat: 52.52 + (Math.random() - 0.5) * 0.1, // Mock coords
-        lng: 13.40 + (Math.random() - 0.5) * 0.1
-      };
+      // Ensure we have an ID. If not provided, generate one or use Project Title
+      const newId = updatedReport.id || updatedReport.projectTitle || `TMP-${Date.now()}`;
+      const newReport = { ...updatedReport, id: newId };
+
+      // If we didn't have ID before, update it
+      updatedReport = newReport;
+
       newReports = [newReport, ...reports];
-      setReports(newReports);
-      setSelectedReport(newReport); // Select the new report
+    }
+
+    // Update State
+    setReports(newReports);
+    if (!silent) {
+      setSelectedReport(updatedReport);
     }
 
     // Persist to LocalStorage
-    localStorage.setItem('qservice_reports_prod', JSON.stringify(newReports)); // Update storage key
+    localStorage.setItem('qservice_reports_prod', JSON.stringify(newReports));
 
     // Persist to Supabase
     if (supabase) {
-      const reportToSave = exists ? updatedReport : newReports[0];
+      const reportToSave = updatedReport;
 
-      // We perform an upsert with the JSONwrapper
-      supabase
-        .from('reports')
-        .upsert({
-          id: reportToSave.id,
-          content: reportToSave,
-          updated_at: new Date().toISOString()
-        })
-        .then(({ error }) => {
-          if (error) console.error('Error saving to Supabase:', error);
-          else console.log('Successfully saved to Supabase');
-        });
+      // Map fields to columns for easier filtering
+      const rowData = {
+        id: reportToSave.id, // Primary Key
+        project_title: reportToSave.projectTitle,
+        client: reportToSave.client,
+        address: reportToSave.address,
+        status: reportToSave.status,
+        assigned_to: reportToSave.assignedTo,
+        date: reportToSave.date,
+        drying_started: reportToSave.dryingStarted,
+        report_data: reportToSave, // Full JSON
+        updated_at: new Date().toISOString()
+      };
+
+      const { error } = await supabase
+        .from('damage_reports')
+        .upsert(rowData);
+
+      if (error) {
+        console.error('Error saving to Supabase:', error);
+        alert('Fehler beim Speichern in die Cloud: ' + error.message);
+      } else {
+        console.log('Successfully saved to Supabase');
+      }
     }
 
     if (!silent) {
-      setView('details'); // Stay in details view, do not go back to dashboard
+      setView('details');
     }
-    // setSelectedReport(null); // Removed reset
   }
+
+
 
   return (
     <div className="app">
