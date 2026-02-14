@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, LayoutDashboard, Settings } from 'lucide-react'
+import { Plus, LayoutDashboard, Settings, User } from 'lucide-react'
 import { supabase } from './supabaseClient'
 import Dashboard from './components/Dashboard'
 import DamageForm from './components/DamageForm'
@@ -49,6 +49,20 @@ function App() {
 
     fetchReports();
   }, []);
+
+  /* ---------------------------------------------------------------------------
+   * User Role Management (Mock Implementation)
+   * --------------------------------------------------------------------------- */
+  const [userRole, setUserRole] = useState('admin'); // 'admin' | 'user'
+
+  const toggleUserRole = () => {
+    const newRole = userRole === 'admin' ? 'user' : 'admin';
+    setUserRole(newRole);
+    if (newRole === 'user') {
+      setIsTechnicianMode(true);
+    }
+    showToast(`Rolle gewechselt zu: ${newRole.toUpperCase()}`, 'success');
+  };
 
   const [isTechnicianMode, setIsTechnicianMode] = useState(false); // New state for Technician View
 
@@ -184,26 +198,55 @@ function App() {
               </button>
             )}
             {view === 'dashboard' && (
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <button
-                  className="btn btn-outline"
-                  onClick={() => setView('devices')}
-                >
-                  <Settings size={18} style={{ marginRight: '0.5rem' }} />
-                  {i18n.t('devices')}
-                </button>
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
 
-                <button
-                  className={`btn ${isTechnicianMode ? 'btn-primary' : 'btn-outline'}`}
-                  onClick={() => setIsTechnicianMode(!isTechnicianMode)}
-                  title={i18n.t('toggleTechnicianView')}
-                >
-                  {isTechnicianMode ? i18n.t('technicianView') : i18n.t('desktopView')}
-                </button>
+                {/* Admin Only: Device Manager */}
+                {userRole === 'admin' && (
+                  <button
+                    className="btn btn-outline"
+                    onClick={() => setView('devices')}
+                    title={i18n.t('devices')}
+                  >
+                    <Settings size={18} style={{ marginRight: '0.5rem' }} />
+                    <span className="hide-mobile">{i18n.t('devices')}</span>
+                  </button>
+                )}
+
+                {userRole === 'admin' && (
+                  <button
+                    className={`btn ${isTechnicianMode ? 'btn-primary' : 'btn-outline'}`}
+                    onClick={() => setIsTechnicianMode(!isTechnicianMode)}
+                    title={i18n.t('toggleTechnicianView')}
+                  >
+                    {isTechnicianMode ? i18n.t('technicianView') : i18n.t('desktopView')}
+                  </button>
+                )}
                 <button className="btn btn-primary" onClick={() => { setSelectedReport(null); setView('new-report'); }}>
                   <Plus size={18} />
                   {i18n.t('newOrder')}
                 </button>
+
+                {/* User Role Switcher (Demo) */}
+                <div
+                  style={{
+                    marginLeft: '1rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    padding: '0.5rem',
+                    borderRadius: 'var(--radius)',
+                    backgroundColor: userRole === 'admin' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(56, 189, 248, 0.1)',
+                    border: `1px solid ${userRole === 'admin' ? 'var(--danger)' : 'var(--primary)'}`
+                  }}
+                  onClick={toggleUserRole}
+                  title={`Aktuelle Rolle: ${userRole}. Klicken zum Wechseln.`}
+                >
+                  <User size={18} color={userRole === 'admin' ? 'var(--danger)' : 'var(--primary)'} />
+                  <span style={{ fontSize: '0.8rem', fontWeight: 600, color: userRole === 'admin' ? 'var(--danger)' : 'var(--primary)' }}>
+                    {userRole === 'admin' ? 'ADMIN' : 'USER'}
+                  </span>
+                </div>
               </div>
             )}
           </nav>

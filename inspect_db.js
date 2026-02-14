@@ -1,3 +1,4 @@
+
 import { createClient } from '@supabase/supabase-js'
 
 const supabaseUrl = 'https://yxdoecdqttgdncgbzyus.supabase.co'
@@ -6,29 +7,34 @@ const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS
 const supabase = createClient(supabaseUrl, supabaseKey)
 
 async function inspectData() {
-    console.log('Checking reports count...')
+    console.log('Checking Supabase connection...')
 
-    const { count, error: countError } = await supabase
-        .from('reports')
-        .select('*', { count: 'exact', head: true })
+    // Check Tables
+    const { data: tables, error: tableError } = await supabase
+        .from('damage_reports')
+        .select('*')
+        .limit(1);
 
-    if (countError) {
-        console.error('Error counting:', countError)
-        return
-    }
+    if (tableError) console.error('Error fetching tables:', tableError);
+    else console.log('Tables check: damage_reports exists.')
 
-    console.log(`Total rows in 'reports': ${count}`)
+    // Check Buckets
+    // Note: listBuckets is usually an administrative function
+    // But let's try via storage API
+    const { data: buckets, error: bucketError } = await supabase
+        .storage
+        .listBuckets();
 
-    if (count > 0) {
-        const { data, error } = await supabase
-            .from('reports')
-            .select('id, content')
-            .limit(3)
-
-        if (error) {
-            console.error('Error fetching sample:', error)
+    if (bucketError) {
+        console.error('Error fetching buckets (rls or missing):', bucketError);
+    } else {
+        console.log('Buckets found:', buckets ? buckets.map(b => b.name) : 'None');
+        const damageImages = buckets ? buckets.find(b => b.name === 'damage-images') : null;
+        if (damageImages) {
+            console.log('✅ Bucket "damage-images" exists.');
+            console.log('   Public:', damageImages.public);
         } else {
-            console.log('Sample data:', JSON.stringify(data, null, 2))
+            console.error('❌ Bucket "damage-images" NOT found. Images will NOT upload properly.');
         }
     }
 }

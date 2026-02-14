@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Camera, Image, Trash, X, Plus, Edit3, Save, Upload, FileText, CheckCircle, AlertTriangle, Play, HelpCircle, ArrowLeft, Mail, Map, Folder, Mic, Paperclip, Table, Download, Check } from 'lucide-react'
+import { Camera, Image, Trash, X, Plus, Edit3, Save, Upload, FileText, CheckCircle, AlertTriangle, Play, HelpCircle, ArrowLeft, Mail, Map, MapPin, Folder, Mic, Paperclip, Table, Download, Check } from 'lucide-react'
 import { supabase } from '../supabaseClient';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
@@ -2446,9 +2446,18 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                                                                             gap: '0.25rem'
                                                                         }}
                                                                         onClick={() => {
+                                                                            // Correctly find index in current state
+                                                                            const currentIndex = formData.equipment.findIndex(i => i.id === item.id);
+                                                                            if (currentIndex === -1) return;
+
                                                                             const newEquipment = [...formData.equipment];
                                                                             // Set End Date to today
-                                                                            newEquipment[originalIndex].endDate = new Date().toISOString().split('T')[0];
+                                                                            const today = new Date().toISOString().split('T')[0];
+                                                                            newEquipment[currentIndex] = {
+                                                                                ...newEquipment[currentIndex],
+                                                                                endDate: today
+                                                                            };
+
                                                                             setFormData(prev => ({ ...prev, equipment: newEquipment }));
 
                                                                             // Focus Zähler Ende input
@@ -2456,15 +2465,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                                                                                 const input = document.getElementById(`counter-end-${item.id}`);
                                                                                 if (input) {
                                                                                     input.focus();
-                                                                                    input.select(); // Select content if any
-                                                                                    // Visual feedback
-                                                                                    const originalBorder = input.style.borderColor;
-                                                                                    input.style.borderColor = 'var(--primary)';
-                                                                                    input.style.boxShadow = '0 0 0 2px rgba(14, 165, 233, 0.2)';
-                                                                                    setTimeout(() => {
-                                                                                        input.style.borderColor = originalBorder;
-                                                                                        input.style.boxShadow = 'none';
-                                                                                    }, 2000);
+                                                                                    input.select();
                                                                                 }
                                                                             }, 100);
                                                                         }}
@@ -2721,121 +2722,123 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
 
                     </div>
 
-                    {/* Arbeitsrapporte Section */}
-                    <div style={{ marginTop: '2rem' }}>
-                        <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--primary)', marginBottom: '1rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem' }}>
-                            Arbeitsrapporte
-                        </h2>
+                    {/* Arbeitsrapporte Section - Only for Technician Mode */}
+                    {mode !== 'desktop' && (
+                        <div style={{ marginTop: '2rem' }}>
+                            <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--primary)', marginBottom: '1rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem' }}>
+                                Arbeitsrapporte
+                            </h2>
 
-                        <div className="card" style={{ border: '1px solid var(--border)', padding: '1.5rem' }}>
-                            <div
-                                style={{
-                                    border: '2px dashed var(--border)',
-                                    borderRadius: 'var(--radius)',
-                                    padding: '2rem 1rem',
-                                    textAlign: 'center',
-                                    cursor: 'pointer',
-                                    backgroundColor: 'rgba(255,255,255,0.02)',
-                                    transition: 'all 0.2s',
-                                    marginBottom: '1rem',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    color: 'var(--text-muted)'
-                                }}
-                                onClick={() => document.getElementById('file-upload-Arbeitsrappporte').click()}
-                                onDragOver={(e) => {
-                                    e.preventDefault();
-                                    e.currentTarget.style.borderColor = 'var(--primary)';
-                                    e.currentTarget.style.backgroundColor = 'rgba(56, 189, 248, 0.1)';
-                                    e.currentTarget.style.color = 'var(--primary)';
-                                }}
-                                onDragLeave={(e) => {
-                                    e.preventDefault();
-                                    e.currentTarget.style.borderColor = 'var(--border)';
-                                    e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.02)';
-                                    e.currentTarget.style.color = 'var(--text-muted)';
-                                }}
-                                onDrop={(e) => handleCategoryDrop(e, 'Arbeitsrappporte')}
-                            >
-                                <Plus size={24} style={{ marginBottom: '0.5rem', opacity: 0.5 }} />
-                                <span style={{ fontSize: '0.85rem' }}>Arbeitsrapport hochladen / Drop</span>
+                            <div className="card" style={{ border: '1px solid var(--border)', padding: '1.5rem' }}>
+                                <div
+                                    style={{
+                                        border: '2px dashed var(--border)',
+                                        borderRadius: 'var(--radius)',
+                                        padding: '2rem 1rem',
+                                        textAlign: 'center',
+                                        cursor: 'pointer',
+                                        backgroundColor: 'rgba(255,255,255,0.02)',
+                                        transition: 'all 0.2s',
+                                        marginBottom: '1rem',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        color: 'var(--text-muted)'
+                                    }}
+                                    onClick={() => document.getElementById('file-upload-Arbeitsrappporte').click()}
+                                    onDragOver={(e) => {
+                                        e.preventDefault();
+                                        e.currentTarget.style.borderColor = 'var(--primary)';
+                                        e.currentTarget.style.backgroundColor = 'rgba(56, 189, 248, 0.1)';
+                                        e.currentTarget.style.color = 'var(--primary)';
+                                    }}
+                                    onDragLeave={(e) => {
+                                        e.preventDefault();
+                                        e.currentTarget.style.borderColor = 'var(--border)';
+                                        e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.02)';
+                                        e.currentTarget.style.color = 'var(--text-muted)';
+                                    }}
+                                    onDrop={(e) => handleCategoryDrop(e, 'Arbeitsrappporte')}
+                                >
+                                    <Plus size={24} style={{ marginBottom: '0.5rem', opacity: 0.5 }} />
+                                    <span style={{ fontSize: '0.85rem' }}>Arbeitsrapport hochladen / Drop</span>
 
-                                <input
-                                    id="file-upload-Arbeitsrappporte"
-                                    type="file"
-                                    multiple
-                                    accept="image/*,application/pdf"
-                                    style={{ display: 'none' }}
-                                    onChange={(e) => handleCategorySelect(e, 'Arbeitsrappporte')}
-                                />
-                            </div>
+                                    <input
+                                        id="file-upload-Arbeitsrappporte"
+                                        type="file"
+                                        multiple
+                                        accept="image/*,application/pdf"
+                                        style={{ display: 'none' }}
+                                        onChange={(e) => handleCategorySelect(e, 'Arbeitsrappporte')}
+                                    />
+                                </div>
 
-                            {/* List of Arbeitsrappporte */}
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                                {formData.images.filter(img => img.assignedTo === 'Arbeitsrappporte').map((item, idx) => (
-                                    <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem', backgroundColor: '#1E293B', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
-                                        {/* Icon/Preview */}
-                                        {(item.file && item.file.type === 'application/pdf') || (item.name && item.name.toLowerCase().endsWith('.pdf')) ? (
-                                            <div
-                                                style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '1rem', cursor: 'pointer' }}
-                                                onClick={() => {
-                                                    if (item.file) {
-                                                        const pdfUrl = URL.createObjectURL(item.file);
-                                                        window.open(pdfUrl, '_blank');
-                                                    } else if (item.preview) {
-                                                        window.open(item.preview, '_blank');
-                                                    } else {
-                                                        alert("PDF Vorschau nicht verfügbar (wurde gespeichert).");
-                                                    }
+                                {/* List of Arbeitsrappporte */}
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                    {formData.images.filter(img => img.assignedTo === 'Arbeitsrappporte').map((item, idx) => (
+                                        <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem', backgroundColor: '#1E293B', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
+                                            {/* Icon/Preview */}
+                                            {(item.file && item.file.type === 'application/pdf') || (item.name && item.name.toLowerCase().endsWith('.pdf')) ? (
+                                                <div
+                                                    style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '1rem', cursor: 'pointer' }}
+                                                    onClick={() => {
+                                                        if (item.file) {
+                                                            const pdfUrl = URL.createObjectURL(item.file);
+                                                            window.open(pdfUrl, '_blank');
+                                                        } else if (item.preview) {
+                                                            window.open(item.preview, '_blank');
+                                                        } else {
+                                                            alert("PDF Vorschau nicht verfügbar (wurde gespeichert).");
+                                                        }
+                                                    }}
+                                                >
+                                                    <div style={{ padding: '0.5rem', backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: '4px' }}>
+                                                        <FileText size={24} color="var(--text-main)" />
+                                                    </div>
+                                                    <div style={{ fontSize: '1rem', color: 'var(--text-main)', fontWeight: 500, textDecoration: 'underline' }}>
+                                                        {item.name}
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div style={{ width: '80px', height: '80px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: '4px' }}>
+                                                    <img src={item.preview} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '4px' }} />
+                                                </div>
+                                            )}
+
+                                            {/* Name for images if not PDF */}
+                                            {!((item.file && item.file.type === 'application/pdf') || (item.name && item.name.toLowerCase().endsWith('.pdf'))) && (
+                                                <div style={{ flex: 1, fontWeight: 500, color: 'var(--text-main)' }}>{item.name}</div>
+                                            )}
+
+                                            {/* Delete Action */}
+                                            <button
+                                                type="button"
+                                                className="btn btn-ghost"
+                                                onClick={() => setFormData(prev => ({ ...prev, images: prev.images.filter(i => i !== item) }))}
+                                                style={{
+                                                    color: '#EF4444',
+                                                    padding: '0.5rem',
+                                                    borderRadius: '50%',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    backgroundColor: 'rgba(239, 68, 68, 0.1)'
                                                 }}
                                             >
-                                                <div style={{ padding: '0.5rem', backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: '4px' }}>
-                                                    <FileText size={24} color="var(--text-main)" />
-                                                </div>
-                                                <div style={{ fontSize: '1rem', color: 'var(--text-main)', fontWeight: 500, textDecoration: 'underline' }}>
-                                                    {item.name}
-                                                </div>
-                                            </div>
-                                        ) : (
-                                            <div style={{ width: '80px', height: '80px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: '4px' }}>
-                                                <img src={item.preview} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '4px' }} />
-                                            </div>
-                                        )}
-
-                                        {/* Name for images if not PDF */}
-                                        {!((item.file && item.file.type === 'application/pdf') || (item.name && item.name.toLowerCase().endsWith('.pdf'))) && (
-                                            <div style={{ flex: 1, fontWeight: 500, color: 'var(--text-main)' }}>{item.name}</div>
-                                        )}
-
-                                        {/* Delete Action */}
-                                        <button
-                                            type="button"
-                                            className="btn btn-ghost"
-                                            onClick={() => setFormData(prev => ({ ...prev, images: prev.images.filter(i => i !== item) }))}
-                                            style={{
-                                                color: '#EF4444',
-                                                padding: '0.5rem',
-                                                borderRadius: '50%',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                backgroundColor: 'rgba(239, 68, 68, 0.1)'
-                                            }}
-                                        >
-                                            <Trash size={18} />
-                                        </button>
-                                    </div>
-                                ))}
-                                {formData.images.filter(img => img.assignedTo === 'Arbeitsrappporte').length === 0 && (
-                                    <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.9rem', fontStyle: 'italic' }}>
-                                        Keine Arbeitsrapporte vorhanden.
-                                    </div>
-                                )}
+                                                <Trash size={18} />
+                                            </button>
+                                        </div>
+                                    ))}
+                                    {formData.images.filter(img => img.assignedTo === 'Arbeitsrappporte').length === 0 && (
+                                        <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.9rem', fontStyle: 'italic' }}>
+                                            Keine Arbeitsrapporte vorhanden.
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         </div>
-                    </div>
+                    )}
 
                     {/* Document Categories */}
                     <div style={{ marginTop: '2rem' }}>
