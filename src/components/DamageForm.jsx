@@ -34,13 +34,16 @@ const ROOM_OPTIONS = [
     "Keller",
     "Garage",
     "Küche",
-    "Abstellkammer",
+    "Abstellraum",
     "Gäste-WC",
-    "Kinderzimmer",
+    "Kinderzimmer 1",
+    "Kinderzimmer 2",
     "Esszimmer",
     "Arbeitszimmer / Büro",
     "Hauswirtschaftsraum (HWR)",
-    "Dachboden"
+    "Reduit",
+    "Estrich",
+    "Sonstiges / Eigener Name"
 ];
 
 const getDaysDiff = (start, end) => {
@@ -182,7 +185,8 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
 
     const [newRoom, setNewRoom] = useState({
         name: '',
-        apartment: ''
+        apartment: '',
+        customName: ''
     })
 
     const [showImageSelector, setShowImageSelector] = useState(false);
@@ -202,13 +206,67 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
     const [isRecording, setIsRecording] = useState(false); // false | 'modal' | image.preview
     const [isTranscribing, setIsTranscribing] = useState(false);
     const [audioLevel, setAudioLevel] = useState(0);
+    const [audioDevices, setAudioDevices] = useState([]);
+    const [selectedDeviceId, setSelectedDeviceId] = useState('');
     const mediaRecorderRef = useRef(null);
     const audioContextRef = useRef(null);
     const animationFrameRef = useRef(null);
 
-    const startRecording = async (targetId = 'modal') => {
+    // Load available microphones
+    const [deviceError, setDeviceError] = useState(null);
+
+    const refreshAudioDevices = async () => {
+        setDeviceError(null);
         try {
+            // Request permission first to get labels and force discovery
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+            // Important: Stop the stream immediately so we don't lock the default device
+            stream.getTracks().forEach(track => track.stop());
+
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const audioInputs = devices.filter(device => device.kind === 'audioinput');
+            setAudioDevices(audioInputs);
+
+            // Set default if not set
+            if (audioInputs.length > 0 && !selectedDeviceId) {
+                const defaultDevice = audioInputs.find(d => d.deviceId === 'default') || audioInputs[0];
+                setSelectedDeviceId(defaultDevice.deviceId);
+            }
+        } catch (err) {
+            console.error("Error fetching audio devices:", err);
+            setDeviceError(err.toString()); // Capture error for UI
+        }
+    };
+
+    // UI State for Technician Mode "Add Room" toggle
+    const [isAddRoomExpanded, setIsAddRoomExpanded] = useState(false);
+
+    useEffect(() => {
+        // Initial load
+        refreshAudioDevices();
+
+        // Listen for device changes (plugging in/out)
+        navigator.mediaDevices.ondevicechange = () => {
+            console.log("Audio devices changed, refreshing list...");
+            refreshAudioDevices();
+        };
+
+        return () => {
+            navigator.mediaDevices.ondevicechange = null;
+        };
+    }, []);
+
+    const startRecording = async (targetId = 'modal') => {
+        if (!navigator.mediaDevices) {
+            return;
+        }
+
+        try {
+            const constraints = {
+                audio: selectedDeviceId ? { deviceId: { exact: selectedDeviceId } } : true
+            };
+            const stream = await navigator.mediaDevices.getUserMedia(constraints);
             mediaRecorderRef.current = new MediaRecorder(stream);
             const audioChunks = [];
 
@@ -231,6 +289,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                     }
                 } catch (error) {
                     console.error("Transcription error inside onstop:", error);
+                    alert("Fehler bei der Transkription: " + error.message);
                 } finally {
                     setIsTranscribing(false);
                     // Stop all tracks
@@ -338,6 +397,34 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
             if (data.text) {
                 // Clean up the new text: removing leading dots/whitespace
                 let newText = data.text.trim();
+
+                // Filter known Whisper hallucinations (remove them but keep valid text)
+                // We use Regex for more robust matching of "Amara.org" variations
+                let cleanText = newText;
+
+                // 1. Aggressive removal of Amara.org related phrases
+                cleanText = cleanText.replace(/Untertitel\s+der\s+Amara\.org-Community/gi, '');
+                cleanText = cleanText.replace(/Untertitel\s+der\s+Amara\.org/gi, '');
+                cleanText = cleanText.replace(/Amara\.org/gi, '');
+
+                // 2. Remove isolated "Untertitel" which is a common artifact
+                cleanText = cleanText.replace(/\bUntertitel\b/gi, '');
+
+                // 3. Remove "Pfadfinder" or similar known artifacts if they appear alone? 
+                // (Keeping it simple for now, focusing on the Amara issue)
+
+                cleanText = cleanText.trim();
+
+                // If nothing remains (or just a dot), it was effectively silence
+                if (cleanText === '' || cleanText === '.') {
+                    console.warn("Whisper hallucination detected (likely silence):", newText);
+                    alert("Keine Sprache erkannt (Stille). Bitte lauter sprechen.");
+                    return;
+                }
+
+                // Use the cleaned text
+                newText = cleanText;
+
                 // Remove a leading dot if it exists (e.g. ". Hello")
                 if (newText.startsWith('.')) {
                     newText = newText.substring(1).trim();
@@ -455,6 +542,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
 
 
     const [showReportModal, setShowReportModal] = useState(false);
+    const [openSettingsDirectly, setOpenSettingsDirectly] = useState(false);
     const [showCameraModal, setShowCameraModal] = useState(false);
     const [cameraContext, setCameraContext] = useState(null);
     const [reportCause, setReportCause] = useState(initialData && initialData.cause ? initialData.cause : '');
@@ -948,11 +1036,22 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
     };
 
     const handleAddRoom = () => {
-        if (!newRoom.name) return;
+        let finalRoomName = newRoom.name;
+
+        // Handle custom room name
+        if (newRoom.name === "Sonstiges / Eigener Name") {
+            if (!newRoom.customName || newRoom.customName.trim() === "") {
+                alert("Bitte geben Sie einen Namen für den Raum ein.");
+                return;
+            }
+            finalRoomName = newRoom.customName.trim();
+        }
+
+        if (!finalRoomName) return;
 
         const roomEntry = {
             id: Date.now(),
-            name: newRoom.name,
+            name: finalRoomName,
             apartment: newRoom.apartment
         };
 
@@ -961,7 +1060,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
             rooms: [...prev.rooms, roomEntry]
         }));
 
-        setNewRoom({ name: '', apartment: '' });
+        setNewRoom({ name: '', apartment: '', customName: '' });
     }
 
     const handleRemoveRoom = (id) => {
@@ -1250,7 +1349,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
             const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
 
             // Use handleImageUpload to add it to state correctly
-            await handleImageUpload([file], { assignedTo: 'Sonstiges' });
+            await handleImageUpload([file], { assignedTo: 'Schadensbericht' });
 
         } catch (error) {
             console.error("PDF Export failed", error);
@@ -1491,7 +1590,18 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                                 <option key={status} value={status}>{status}</option>
                             ))}
                         </select>
-
+                        <button
+                            type="button"
+                            className="btn btn-outline"
+                            onClick={() => {
+                                setOpenSettingsDirectly(true);
+                                setShowEmailImport(true);
+                            }}
+                            title="Einstellungen (Mikrofon & API)"
+                            style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', padding: '0.5rem', borderColor: '#94A3B8', marginLeft: '0.5rem' }}
+                        >
+                            <Settings size={20} />
+                        </button>
                     </div>
                 </div>
 
@@ -2598,14 +2708,26 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                 {
                     showEmailImport && (
                         <EmailImportModal
-                            onClose={() => setShowEmailImport(false)}
+                            onClose={() => {
+                                setShowEmailImport(false);
+                                setOpenSettingsDirectly(false);
+                            }}
                             onImport={handleEmailImport}
+                            audioDevices={audioDevices}
+                            selectedDeviceId={selectedDeviceId}
+                            onSelectDeviceId={setSelectedDeviceId}
+                            initialShowSettings={openSettingsDirectly}
                         />
                     )
                 }
             </div >
         )
     }
+
+    // Calculate drying summary
+    const finishedDrying = formData.equipment.filter(d => d.endDate && d.counterEnd);
+    const totalDryingHours = finishedDrying.reduce((acc, curr) => acc + (parseFloat(curr.hours) || 0), 0);
+    const totalDryingKwh = finishedDrying.reduce((acc, curr) => acc + ((parseFloat(curr.counterEnd) || 0) - (parseFloat(curr.counterStart) || 0)), 0);
 
     return (
         <>
@@ -2639,6 +2761,18 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                         </div>
                     </div>
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <button
+                            type="button"
+                            className="btn btn-outline"
+                            onClick={() => {
+                                setOpenSettingsDirectly(true);
+                                setShowEmailImport(true);
+                            }}
+                            title="Einstellungen (Mikrofon & API)"
+                            style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', padding: '0.5rem', borderColor: '#94A3B8' }}
+                        >
+                            <Settings size={20} />
+                        </button>
                         <button
                             type="button"
                             className="btn btn-outline"
@@ -3682,46 +3816,98 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
 
 
                             {/* Dynamic Room Categories for Erste Begehung & Leckortung & Trocknung */}
-                            {(formData.status === 'Schadenaufnahme' || formData.status === 'Leckortung' || formData.status === 'Trocknung') && (
+                            {(formData.status === 'Schadenaufnahme' || formData.status === 'Leckortung' || formData.status === 'Trocknung') && (<>
                                 <div style={{ gridColumn: '1 / -1', marginBottom: '1rem' }}>
                                     {/* Room Management UI */}
                                     <div style={{ backgroundColor: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: 'var(--radius)', border: '1px solid var(--border)', marginBottom: '2rem' }}>
                                         <h4 style={{ fontSize: '0.9rem', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--primary)' }}>Räume verwalten</h4>
-                                        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', alignItems: 'flex-end' }}>
-                                            <div style={{ flex: 1 }}>
-                                                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.25rem' }}>Raum auswählen</label>
-                                                <select
-                                                    className="form-input"
-                                                    value={newRoom.name}
-                                                    onChange={(e) => setNewRoom(prev => ({ ...prev, name: e.target.value }))}
-                                                >
-                                                    <option value="">Bitte wählen...</option>
-                                                    {ROOM_OPTIONS.map(opt => (
-                                                        <option key={opt} value={opt}>{opt}</option>
-                                                    ))}
-                                                </select>
-                                            </div>
-                                            <div style={{ flex: 1 }}>
-                                                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.25rem' }}>Wohnung (Optional)</label>
-                                                <input
-                                                    type="text"
-                                                    className="form-input"
-                                                    placeholder="z.B. EG Links"
-                                                    value={newRoom.apartment}
-                                                    onChange={(e) => setNewRoom(prev => ({ ...prev, apartment: e.target.value }))}
-                                                />
-                                            </div>
+
+                                        {/* Toggle Button for Add Room (Technician Mode optimization) */}
+                                        {!isAddRoomExpanded && (
                                             <button
                                                 type="button"
                                                 className="btn btn-primary"
-                                                onClick={handleAddRoom}
-                                                disabled={!newRoom.name}
-                                                style={{ height: '38px' }}
+                                                style={{ width: '100%', marginBottom: '1rem', display: 'flex', justifyContent: 'center', gap: '0.5rem' }}
+                                                onClick={() => setIsAddRoomExpanded(true)}
                                             >
-                                                <Plus size={18} />
-                                                Raum hinzufügen
+                                                <Plus size={18} /> Raum hinzufügen
                                             </button>
-                                        </div>
+                                        )}
+
+                                        {/* Collapsible Input Area */}
+                                        {isAddRoomExpanded && (
+                                            <div style={{
+                                                display: 'flex',
+                                                gap: '0.5rem',
+                                                marginBottom: '1rem',
+                                                alignItems: 'flex-end',
+                                                backgroundColor: 'rgba(15, 23, 42, 0.5)',
+                                                padding: '1rem',
+                                                borderRadius: '8px',
+                                                border: '1px solid var(--border)',
+                                                flexWrap: 'wrap'
+                                            }}>
+                                                <div style={{ flex: 1, minWidth: '150px' }}>
+                                                    <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.25rem' }}>Raum auswählen</label>
+                                                    <select
+                                                        className="form-input"
+                                                        value={newRoom.name}
+                                                        onChange={(e) => setNewRoom(prev => ({ ...prev, name: e.target.value }))}
+                                                    >
+                                                        <option value="">Bitte wählen...</option>
+                                                        {ROOM_OPTIONS.map(opt => (
+                                                            <option key={opt} value={opt}>{opt}</option>
+                                                        ))}
+                                                    </select>
+                                                    {/* Conditional Custom Room Input */}
+                                                    {newRoom.name === "Sonstiges / Eigener Name" && (
+                                                        <input
+                                                            type="text"
+                                                            className="form-input"
+                                                            placeholder="Name des Raums eingeben..."
+                                                            style={{ marginTop: '0.5rem' }}
+                                                            value={newRoom.customName}
+                                                            onChange={(e) => setNewRoom(prev => ({ ...prev, customName: e.target.value }))}
+                                                        />
+                                                    )}
+                                                </div>
+                                                <div style={{ flex: 1, minWidth: '150px' }}>
+                                                    <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.25rem' }}>Wohnung (Optional)</label>
+                                                    <input
+                                                        type="text"
+                                                        className="form-input"
+                                                        placeholder="z.B. EG Links"
+                                                        value={newRoom.apartment}
+                                                        onChange={(e) => setNewRoom(prev => ({ ...prev, apartment: e.target.value }))}
+                                                    />
+                                                </div>
+                                                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                                    <button
+                                                        type="button"
+                                                        className="btn btn-primary"
+                                                        onClick={() => {
+                                                            handleAddRoom();
+                                                            // Optional: Close after adding? Let's keep it open for multiple adds for now, or maybe close it?
+                                                            // User request was focused on *opening* it. 
+                                                            setIsAddRoomExpanded(false);
+                                                        }}
+                                                        disabled={!newRoom.name}
+                                                        style={{ height: '38px', whiteSpace: 'nowrap' }}
+                                                    >
+                                                        <Check size={18} /> OK
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        className="btn btn-outline"
+                                                        onClick={() => setIsAddRoomExpanded(false)}
+                                                        style={{ height: '38px' }}
+                                                        title="Abbrechen"
+                                                    >
+                                                        <X size={18} />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
 
                                         {/* List of Added Rooms */}
                                         {formData.rooms.length > 0 && (
@@ -3982,48 +4168,76 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                                         })}
                                     </div>
                                 </div>
-                            )}
 
-                            {/* Messprotokolle Special Section (Goodnotes / Measurement) */}
-                            <div className="card" style={{ border: '1px solid var(--border)' }}>
-                                <div style={{ marginBottom: '1.5rem', borderBottom: '1px solid var(--border)', paddingBottom: '1rem' }}>
-                                    <h3 style={{ fontSize: '1.25rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-main)', margin: 0 }}>
-                                        <FileText size={20} />
-                                        Messprotokolle
-                                    </h3>
-                                </div>
 
-                                {/* Section 1: Messen */}
-                                <div style={{ marginBottom: '2rem' }}>
-                                    <h4 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--primary)' }}>Messen</h4>
-                                    <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
-                                        Erfassen Sie hier die Messwerte für jeden Raum.
-                                    </p>
+                                {/* Messprotokolle Special Section (Goodnotes / Measurement) */}
+                                <div className="card" style={{ border: '1px solid var(--border)' }}>
+                                    <div style={{ marginBottom: '1.5rem', borderBottom: '1px solid var(--border)', paddingBottom: '1rem' }}>
+                                        <h3 style={{ fontSize: '1.25rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-main)', margin: 0 }}>
+                                            <FileText size={20} />
+                                            Messprotokolle
+                                        </h3>
+                                    </div>
 
-                                    {/* List of Room Measurements */}
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                                        {formData.rooms.length > 0 ? (
-                                            formData.rooms.map(room => {
-                                                const hasMeasurement = !!room.measurementData;
-                                                const date = hasMeasurement ? (room.measurementData.globalSettings?.date ? new Date(room.measurementData.globalSettings.date).toLocaleDateString('de-CH') : 'Kein Datum') : '-';
+                                    {/* Section 1: Messen */}
+                                    <div style={{ marginBottom: '2rem' }}>
+                                        <h4 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--primary)' }}>Messen</h4>
+                                        <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
+                                            Erfassen Sie hier die Messwerte für jeden Raum.
+                                        </p>
 
-                                                return (
-                                                    <div key={room.id} style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem', backgroundColor: 'rgba(255, 255, 255, 0.02)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', gap: '0.5rem' }}>
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', minWidth: '200px', flex: '1 1 auto' }}>
-                                                            <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: hasMeasurement ? 'rgba(16, 185, 129, 0.1)' : 'rgba(255, 255, 255, 0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                                                                <Folder size={16} color={hasMeasurement ? '#10B981' : 'var(--text-muted)'} />
-                                                            </div>
-                                                            <div>
-                                                                <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{room.name}</div>
-                                                                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                                                                    {hasMeasurement ? `Letzte Messung: ${date}` : 'Keine Messdaten'}
+                                        {/* List of Room Measurements */}
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                            {formData.rooms.length > 0 ? (
+                                                formData.rooms.map(room => {
+                                                    const hasMeasurement = !!room.measurementData;
+                                                    const date = hasMeasurement ? (room.measurementData.globalSettings?.date ? new Date(room.measurementData.globalSettings.date).toLocaleDateString('de-CH') : 'Kein Datum') : '-';
+
+                                                    return (
+                                                        <div key={room.id} style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem', backgroundColor: 'rgba(255, 255, 255, 0.02)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', gap: '0.5rem' }}>
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', minWidth: '200px', flex: '1 1 auto' }}>
+                                                                <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: hasMeasurement ? 'rgba(16, 185, 129, 0.1)' : 'rgba(255, 255, 255, 0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                                                    <Folder size={16} color={hasMeasurement ? '#10B981' : 'var(--text-muted)'} />
+                                                                </div>
+                                                                <div>
+                                                                    <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{room.name}</div>
+                                                                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                                                                        {hasMeasurement ? `Letzte Messung: ${date}` : 'Keine Messdaten'}
+                                                                    </div>
                                                                 </div>
                                                             </div>
-                                                        </div>
 
-                                                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                                                            {hasMeasurement ? (
-                                                                <>
+                                                            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                                                {hasMeasurement ? (
+                                                                    <>
+                                                                        <button
+                                                                            type="button"
+                                                                            className="btn btn-outline"
+                                                                            onClick={() => {
+                                                                                setActiveRoomForMeasurement(room);
+                                                                                setIsNewMeasurement(false);
+                                                                                setShowMeasurementModal(true);
+                                                                            }}
+                                                                            style={{ fontSize: '0.8rem', padding: '0.25rem 0.5rem', color: 'var(--text-muted)', borderColor: 'var(--border)', gap: '0.25rem' }}
+                                                                            title="Ansehen / Bearbeiten"
+                                                                        >
+                                                                            <FileText size={14} /> Ansehen
+                                                                        </button>
+                                                                        <button
+                                                                            type="button"
+                                                                            className="btn btn-outline"
+                                                                            onClick={() => {
+                                                                                setActiveRoomForMeasurement(room);
+                                                                                setIsNewMeasurement(true);
+                                                                                setShowMeasurementModal(true);
+                                                                            }}
+                                                                            style={{ fontSize: '0.8rem', padding: '0.25rem 0.5rem', color: 'var(--success)', borderColor: 'var(--success)' }}
+                                                                            title="Neue Messung basierend auf diesem Protokoll"
+                                                                        >
+                                                                            <Plus size={14} style={{ marginRight: '0.25rem' }} /> Neu
+                                                                        </button>
+                                                                    </>
+                                                                ) : (
                                                                     <button
                                                                         type="button"
                                                                         className="btn btn-outline"
@@ -4032,122 +4246,86 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                                                                             setIsNewMeasurement(false);
                                                                             setShowMeasurementModal(true);
                                                                         }}
-                                                                        style={{ fontSize: '0.8rem', padding: '0.25rem 0.5rem', color: 'var(--text-muted)', borderColor: 'var(--border)', gap: '0.25rem' }}
-                                                                        title="Ansehen / Bearbeiten"
+                                                                        style={{ fontSize: '0.8rem', padding: '0.25rem 0.5rem' }}
                                                                     >
-                                                                        <FileText size={14} /> Ansehen
+                                                                        <Edit3 size={14} style={{ marginRight: '0.25rem' }} /> Messung starten
                                                                     </button>
-                                                                    <button
-                                                                        type="button"
-                                                                        className="btn btn-outline"
-                                                                        onClick={() => {
-                                                                            setActiveRoomForMeasurement(room);
-                                                                            setIsNewMeasurement(true);
-                                                                            setShowMeasurementModal(true);
-                                                                        }}
-                                                                        style={{ fontSize: '0.8rem', padding: '0.25rem 0.5rem', color: 'var(--success)', borderColor: 'var(--success)' }}
-                                                                        title="Neue Messung basierend auf diesem Protokoll"
-                                                                    >
-                                                                        <Plus size={14} style={{ marginRight: '0.25rem' }} /> Neu
-                                                                    </button>
-                                                                </>
-                                                            ) : (
-                                                                <button
-                                                                    type="button"
-                                                                    className="btn btn-outline"
-                                                                    onClick={() => {
-                                                                        setActiveRoomForMeasurement(room);
-                                                                        setIsNewMeasurement(false);
-                                                                        setShowMeasurementModal(true);
-                                                                    }}
-                                                                    style={{ fontSize: '0.8rem', padding: '0.25rem 0.5rem' }}
-                                                                >
-                                                                    <Edit3 size={14} style={{ marginRight: '0.25rem' }} /> Messung starten
-                                                                </button>
-                                                            )}
+                                                                )}
+                                                            </div>
                                                         </div>
-                                                    </div>
-                                                );
-                                            })
-                                        ) : (
-                                            <div style={{ padding: '1rem', fontStyle: 'italic', color: 'var(--text-muted)', textAlign: 'center' }}>
-                                                Noch keine Räume erstellt.
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-
-                                {/* Divider */}
-                                <div style={{ borderTop: '1px solid var(--border)', margin: '0 -1.5rem 1.5rem -1.5rem' }}></div>
-
-                                {/* Section 2: Protokolle */}
-                                <div>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '1rem' }}>
-                                        <div>
-                                            <h4 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '0.25rem', color: 'var(--primary)' }}>Protokolle</h4>
-                                            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: 0 }}>
-                                                Exportierte Protokolle (PDF/Excel)
-                                            </p>
+                                                    );
+                                                })
+                                            ) : (
+                                                <div style={{ padding: '1rem', fontStyle: 'italic', color: 'var(--text-muted)', textAlign: 'center' }}>
+                                                    Noch keine Räume erstellt.
+                                                </div>
+                                            )}
                                         </div>
-                                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                        <div style={{ marginTop: '1rem', display: 'flex', justifyContent: 'flex-end' }}>
                                             <button
                                                 type="button"
                                                 className="btn btn-outline"
                                                 onClick={generateExcelExport}
-                                                style={{ fontSize: '0.75rem', padding: '0.25rem 0.75rem', gap: '0.4rem', borderColor: '#10B981', color: '#10B981', display: 'flex', alignItems: 'center' }}
+                                                style={{ fontSize: '0.85rem', padding: '0.5rem 1rem', gap: '0.4rem', borderColor: '#10B981', color: '#10B981', display: 'flex', alignItems: 'center' }}
                                                 title="Excel Export aller Messräume"
                                             >
-                                                <Table size={14} />
+                                                <Table size={16} />
                                                 Excel Export
-                                            </button>
-                                            <button
-                                                type="button"
-                                                className="btn btn-outline"
-                                                onClick={generatePDFExport}
-                                                style={{ fontSize: '0.75rem', padding: '0.25rem 0.75rem', gap: '0.4rem', borderColor: '#EF4444', color: '#EF4444', display: 'flex', alignItems: 'center' }}
-                                                title="PDF Export (Pro Raum eine Seite)"
-                                            >
-                                                <FileText size={14} />
-                                                PDF Export
                                             </button>
                                         </div>
                                     </div>
 
-                                    {/* Calculated / Generated Files List */}
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                                        {formData.images
-                                            .filter(img => img.assignedTo === 'Messprotokolle')
-                                            .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0))
-                                            .map((item, idx) => (
-                                                <div
-                                                    key={idx}
-                                                    onClick={() => {
-                                                        if (item.file) {
-                                                            const url = URL.createObjectURL(item.file);
-                                                            const a = document.createElement('a');
-                                                            a.href = url;
-                                                            a.download = item.name;
-                                                            a.click();
-                                                        } else if (item.preview) {
-                                                            window.open(item.preview, '_blank');
-                                                        }
-                                                    }}
-                                                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.08)'}
-                                                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.02)'}
-                                                    style={{
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        gap: '0.75rem',
-                                                        padding: '0.75rem',
-                                                        backgroundColor: 'rgba(255,255,255,0.02)',
-                                                        border: '1px solid var(--border)',
-                                                        borderRadius: 'var(--radius)',
-                                                        cursor: 'pointer',
-                                                        transition: 'background-color 0.2s ease'
-                                                    }}
-                                                    title="Klicken zum Öffnen"
-                                                >
-                                                    {(item.file && item.file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') || (item.name && item.name.endsWith('.xlsx')) ? (
+                                    {/* Divider */}
+                                    <div style={{ borderTop: '1px solid var(--border)', margin: '0 -1.5rem 1.5rem -1.5rem' }}></div>
+
+                                    {/* Section 2: Messprotokolle (Excel) */}
+                                    <div>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '1rem' }}>
+                                            <div>
+                                                <h4 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '0.25rem', color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                    <Table size={18} className="text-emerald-500" />
+                                                    Messprotokolle
+                                                </h4>
+                                                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: 0 }}>
+                                                    Excel-Exporte der Messdaten
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        {/* Calculated / Generated Files List */}
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '2rem' }}>
+                                            {formData.images
+                                                .filter(img => img.assignedTo === 'Messprotokolle')
+                                                .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0))
+                                                .map((item, idx) => (
+                                                    <div
+                                                        key={idx}
+                                                        onClick={() => {
+                                                            if (item.file) {
+                                                                const url = URL.createObjectURL(item.file);
+                                                                const a = document.createElement('a');
+                                                                a.href = url;
+                                                                a.download = item.name;
+                                                                a.click();
+                                                            } else if (item.preview) {
+                                                                window.open(item.preview, '_blank');
+                                                            }
+                                                        }}
+                                                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.08)'}
+                                                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.02)'}
+                                                        style={{
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            gap: '0.75rem',
+                                                            padding: '0.75rem',
+                                                            backgroundColor: 'rgba(255,255,255,0.02)',
+                                                            border: '1px solid var(--border)',
+                                                            borderRadius: 'var(--radius)',
+                                                            cursor: 'pointer',
+                                                            transition: 'background-color 0.2s ease'
+                                                        }}
+                                                        title="Klicken zum Öffnen"
+                                                    >
                                                         <div style={{ padding: '0.25rem', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                                             {/* Excel Icon */}
                                                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="28" height="28">
@@ -4156,7 +4334,78 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                                                                 <path fill="#fff" d="M8.5 17L11 13 8.5 9h2l1.3 2.5L13.1 9h2l-2.5 4 2.5 4h-2l-1.3-2.5-1.3 2.5h-2z" />
                                                             </svg>
                                                         </div>
-                                                    ) : (item.file && item.file.type === 'application/pdf') || (item.name && item.name.toLowerCase().endsWith('.pdf')) ? (
+
+                                                        <div style={{ flex: 1, overflow: 'hidden' }}>
+                                                            <div style={{ fontSize: '0.95rem', color: 'var(--text-main)', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.name}</div>
+                                                            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '2px' }}>{item.date ? new Date(item.date).toLocaleDateString('de-CH') : '-'}</div>
+                                                        </div>
+
+                                                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                                            <div style={{ color: 'var(--primary)', opacity: 0.8 }}>
+                                                                <Download size={18} />
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            {formData.images.filter(img => img.assignedTo === 'Messprotokolle').length === 0 && (
+                                                <div style={{ padding: '1rem', fontStyle: 'italic', color: 'var(--text-muted)', textAlign: 'center', fontSize: '0.85rem' }}>
+                                                    Keine Messprotokolle vorhanden.
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Divider */}
+                                    <div style={{ borderTop: '1px solid var(--border)', margin: '0 -1.5rem 1.5rem -1.5rem' }}></div>
+
+                                    {/* Section 3: Schadensbericht (PDF) */}
+                                    <div>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '1rem' }}>
+                                            <div>
+                                                <h4 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '0.25rem', color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                    <FileText size={18} className="text-rose-500" style={{ color: '#EF4444' }} />
+                                                    Schadensbericht
+                                                </h4>
+                                                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: 0 }}>
+                                                    PDF-Exporte des Berichts
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        {/* Calculated / Generated Files List */}
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                            {formData.images
+                                                .filter(img => img.assignedTo === 'Schadensbericht') // Now distinct!
+                                                .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0))
+                                                .map((item, idx) => (
+                                                    <div
+                                                        key={idx}
+                                                        onClick={() => {
+                                                            if (item.file) {
+                                                                const url = URL.createObjectURL(item.file);
+                                                                const a = document.createElement('a');
+                                                                a.href = url;
+                                                                a.download = item.name;
+                                                                a.click();
+                                                            } else if (item.preview) {
+                                                                window.open(item.preview, '_blank');
+                                                            }
+                                                        }}
+                                                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.08)'}
+                                                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.02)'}
+                                                        style={{
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            gap: '0.75rem',
+                                                            padding: '0.75rem',
+                                                            backgroundColor: 'rgba(255,255,255,0.02)',
+                                                            border: '1px solid var(--border)',
+                                                            borderRadius: 'var(--radius)',
+                                                            cursor: 'pointer',
+                                                            transition: 'background-color 0.2s ease'
+                                                        }}
+                                                        title="Klicken zum Öffnen"
+                                                    >
                                                         <div style={{ padding: '0.25rem', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                                             {/* PDF Icon */}
                                                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="28" height="28">
@@ -4165,237 +4414,228 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                                                                 <text x="50%" y="70%" dominantBaseline="middle" textAnchor="middle" fill="#fff" fontSize="6" fontWeight="bold">PDF</text>
                                                             </svg>
                                                         </div>
-                                                    ) : (
-                                                        <div style={{ padding: '0.5rem', backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                                            <FileText size={18} color="var(--text-muted)" />
+
+                                                        <div style={{ flex: 1, overflow: 'hidden' }}>
+                                                            <div style={{ fontSize: '0.95rem', color: 'var(--text-main)', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.name}</div>
+                                                            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '2px' }}>{item.date ? new Date(item.date).toLocaleDateString('de-CH') : '-'}</div>
                                                         </div>
-                                                    )}
 
-                                                    <div style={{ flex: 1, overflow: 'hidden' }}>
-                                                        <div style={{ fontSize: '0.95rem', color: 'var(--text-main)', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.name}</div>
-                                                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '2px' }}>{item.date ? new Date(item.date).toLocaleDateString('de-CH') : '-'}</div>
-                                                    </div>
-
-                                                    <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                                        <div style={{ color: 'var(--primary)', opacity: 0.8 }}>
-                                                            <Download size={18} />
+                                                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                                            <div style={{ color: 'var(--primary)', opacity: 0.8 }}>
+                                                                <Download size={18} />
+                                                            </div>
                                                         </div>
                                                     </div>
+                                                ))}
+                                            {formData.images.filter(img => img.assignedTo === 'Schadensbericht').length === 0 && (
+                                                <div style={{ padding: '1rem', fontStyle: 'italic', color: 'var(--text-muted)', textAlign: 'center', fontSize: '0.85rem' }}>
+                                                    Keine Schadensberichte vorhanden.
                                                 </div>
-                                            ))}
-                                        {formData.images.filter(img => img.assignedTo === 'Messprotokolle').length === 0 && (
-                                            <div style={{ padding: '1rem', fontStyle: 'italic', color: 'var(--text-muted)', textAlign: 'center', fontSize: '0.85rem' }}>
-                                                Keine Protokolle vorhanden.
-                                            </div>
-                                        )}
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
 
-                            {
-                                ['Emails', 'Pläne', 'Sonstiges'].map(category => (
-                                    <div key={category} className="card" style={{ border: '1px solid var(--border)' }}>
-                                        <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                            {category === 'Schadenfotos' && <Image size={18} />}
-                                            {category === 'Messprotokolle' && <FileText size={18} />}
-                                            {category === 'Emails' && <Mail size={18} />}
-                                            {category === 'Pläne' && <Map size={18} />}
-                                            {category === 'Sonstiges' && <Folder size={18} />}
-                                            {category}
-                                        </h3>
+                                {
+                                    ['Emails', 'Pläne', 'Sonstiges'].map(category => (
+                                        <div key={category} className="card" style={{ border: '1px solid var(--border)' }}>
+                                            <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                {category === 'Schadenfotos' && <Image size={18} />}
+                                                {category === 'Messprotokolle' && <FileText size={18} />}
+                                                {category === 'Emails' && <Mail size={18} />}
+                                                {category === 'Pläne' && <Map size={18} />}
+                                                {category === 'Sonstiges' && <Folder size={18} />}
+                                                {category}
+                                            </h3>
 
-                                        <div
-                                            style={{
-                                                border: '2px dashed var(--border)',
-                                                borderRadius: 'var(--radius)',
-                                                padding: '2rem 1rem',
-                                                textAlign: 'center',
-                                                cursor: 'pointer',
-                                                backgroundColor: 'rgba(255,255,255,0.02)',
-                                                transition: 'all 0.2s',
-                                                marginBottom: '1rem',
-                                                display: 'flex',
-                                                flexDirection: 'column',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                color: 'var(--text-muted)'
-                                            }}
-                                            onClick={() => document.getElementById(`file-upload-${category}`).click()}
-                                            onDragOver={(e) => {
-                                                e.preventDefault();
-                                                e.currentTarget.style.borderColor = 'var(--primary)';
-                                                e.currentTarget.style.backgroundColor = 'rgba(56, 189, 248, 0.1)';
-                                                e.currentTarget.style.color = 'var(--primary)';
-                                            }}
-                                            onDragLeave={(e) => {
-                                                e.preventDefault();
-                                                e.currentTarget.style.borderColor = 'var(--border)';
-                                                e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.02)';
-                                                e.currentTarget.style.color = 'var(--text-muted)';
-                                            }}
-                                            onDrop={(e) => handleCategoryDrop(e, category)}
-                                        >
-                                            <Plus size={24} style={{ marginBottom: '0.5rem', opacity: 0.5 }} />
-                                            <span style={{ fontSize: '0.85rem' }}>Upload / Drop</span>
+                                            <div
+                                                style={{
+                                                    border: '2px dashed var(--border)',
+                                                    borderRadius: 'var(--radius)',
+                                                    padding: '2rem 1rem',
+                                                    textAlign: 'center',
+                                                    cursor: 'pointer',
+                                                    backgroundColor: 'rgba(255,255,255,0.02)',
+                                                    transition: 'all 0.2s',
+                                                    marginBottom: '1rem',
+                                                    display: 'flex',
+                                                    flexDirection: 'column',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    color: 'var(--text-muted)'
+                                                }}
+                                                onClick={() => document.getElementById(`file-upload-${category}`).click()}
+                                                onDragOver={(e) => {
+                                                    e.preventDefault();
+                                                    e.currentTarget.style.borderColor = 'var(--primary)';
+                                                    e.currentTarget.style.backgroundColor = 'rgba(56, 189, 248, 0.1)';
+                                                    e.currentTarget.style.color = 'var(--primary)';
+                                                }}
+                                                onDragLeave={(e) => {
+                                                    e.preventDefault();
+                                                    e.currentTarget.style.borderColor = 'var(--border)';
+                                                    e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.02)';
+                                                    e.currentTarget.style.color = 'var(--text-muted)';
+                                                }}
+                                                onDrop={(e) => handleCategoryDrop(e, category)}
+                                            >
+                                                <Plus size={24} style={{ marginBottom: '0.5rem', opacity: 0.5 }} />
+                                                <span style={{ fontSize: '0.85rem' }}>Upload / Drop</span>
 
-                                            <input
-                                                id={`file-upload-${category}`}
-                                                type="file"
-                                                multiple
-                                                accept="image/*,application/pdf"
-                                                style={{ display: 'none' }}
-                                                onChange={(e) => handleCategorySelect(e, category)}
-                                            />
-                                        </div>
+                                                <input
+                                                    id={`file-upload-${category}`}
+                                                    type="file"
+                                                    multiple
+                                                    accept="image/*,application/pdf"
+                                                    style={{ display: 'none' }}
+                                                    onChange={(e) => handleCategorySelect(e, category)}
+                                                />
+                                            </div>
 
-                                        {/* Preview for this category */}
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                                            {formData.images.filter(img => img.assignedTo === category).map((item, idx) => (
-                                                <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem', backgroundColor: '#1E293B', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
-                                                    {/* Icon/Preview */}
-                                                    {(item.file && item.file.type === 'application/pdf') || (item.name && item.name.toLowerCase().endsWith('.pdf')) ? (
-                                                        // PDF / Document Layout
-                                                        <div
-                                                            style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '1rem', cursor: 'pointer', minWidth: 0 }}
-                                                            onClick={() => {
-                                                                if (item.file) {
-                                                                    const pdfUrl = URL.createObjectURL(item.file);
-                                                                    window.open(pdfUrl, '_blank');
-                                                                } else if (item.preview) {
-                                                                    window.open(item.preview, '_blank');
-                                                                } else {
-                                                                    // Fallback for PDF without preview URL (e.g. just generated but lost blob)
-                                                                    alert("PDF Vorschau nicht verfügbar (wurde gespeichert).");
-                                                                }
-                                                            }}
-                                                        >
-                                                            <div style={{ padding: '0.25rem', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                                                {/* PDF Icon */}
-                                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="28" height="28">
-                                                                    <path fill="#EF4444" d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" />
-                                                                    <path fill="rgba(255,255,255,0.5)" d="M14 2v6h6" />
-                                                                    <text x="50%" y="70%" dominantBaseline="middle" textAnchor="middle" fill="#fff" fontSize="6" fontWeight="bold">PDF</text>
-                                                                </svg>
-                                                            </div>
-                                                            <div style={{ fontSize: '1rem', color: 'var(--text-main)', fontWeight: 500, textDecoration: 'underline', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                                                {item.name}
-                                                            </div>
-                                                        </div>
-                                                    ) : (
-                                                        // Image Layout
-                                                        <>
-                                                            <div style={{ width: '80px', height: '80px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#F1F5F9', borderRadius: '4px', overflow: 'hidden' }}>
-                                                                <img
-                                                                    src={item.preview}
-                                                                    alt=""
-                                                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                                                                    onClick={() => setActiveImageMeta(item)} // Allow re-opening modal by clicking image
-                                                                />
-                                                            </div>
-                                                            <div style={{ flex: 1, padding: '0 0.5rem', minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                                                                <div
-                                                                    style={{ fontSize: '0.95rem', color: 'var(--text-main)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-                                                                    title={item.name}
-                                                                >
+                                            {/* Preview for this category */}
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                                {formData.images.filter(img => img.assignedTo === category).map((item, idx) => (
+                                                    <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem', backgroundColor: '#1E293B', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
+                                                        {/* Icon/Preview */}
+                                                        {(item.file && item.file.type === 'application/pdf') || (item.name && item.name.toLowerCase().endsWith('.pdf')) ? (
+                                                            // PDF / Document Layout
+                                                            <div
+                                                                style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '1rem', cursor: 'pointer', minWidth: 0 }}
+                                                                onClick={() => {
+                                                                    if (item.file) {
+                                                                        const pdfUrl = URL.createObjectURL(item.file);
+                                                                        window.open(pdfUrl, '_blank');
+                                                                    } else if (item.preview) {
+                                                                        window.open(item.preview, '_blank');
+                                                                    } else {
+                                                                        // Fallback for PDF without preview URL (e.g. just generated but lost blob)
+                                                                        alert("PDF Vorschau nicht verfügbar (wurde gespeichert).");
+                                                                    }
+                                                                }}
+                                                            >
+                                                                <div style={{ padding: '0.25rem', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                                    {/* PDF Icon */}
+                                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="28" height="28">
+                                                                        <path fill="#EF4444" d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" />
+                                                                        <path fill="rgba(255,255,255,0.5)" d="M14 2v6h6" />
+                                                                        <text x="50%" y="70%" dominantBaseline="middle" textAnchor="middle" fill="#fff" fontSize="6" fontWeight="bold">PDF</text>
+                                                                    </svg>
+                                                                </div>
+                                                                <div style={{ fontSize: '1rem', color: 'var(--text-main)', fontWeight: 500, textDecoration: 'underline', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                                                     {item.name}
                                                                 </div>
-                                                                {item.description && (
-                                                                    <div style={{ fontSize: '0.85rem', color: '#94A3B8', display: 'flex', alignItems: 'flex-start', gap: '0.25rem' }}>
-                                                                        <span style={{ marginTop: '2px', flexShrink: 0 }}>📝</span>
-                                                                        <span style={{ fontStyle: 'italic', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
-                                                                            {item.description}
-                                                                        </span>
-                                                                    </div>
-                                                                )}
                                                             </div>
-                                                        </>
-                                                    )}
+                                                        ) : (
+                                                            // Image Layout
+                                                            <>
+                                                                <div style={{ width: '80px', height: '80px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#F1F5F9', borderRadius: '4px', overflow: 'hidden' }}>
+                                                                    <img
+                                                                        src={item.preview}
+                                                                        alt=""
+                                                                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                                                        onClick={() => setActiveImageMeta(item)} // Allow re-opening modal by clicking image
+                                                                    />
+                                                                </div>
+                                                                <div style={{ flex: 1, padding: '0 0.5rem', minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                                                                    <div
+                                                                        style={{ fontSize: '0.95rem', color: 'var(--text-main)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                                                                        title={item.name}
+                                                                    >
+                                                                        {item.name}
+                                                                    </div>
+                                                                    {item.description && (
+                                                                        <div style={{ fontSize: '0.85rem', color: '#94A3B8', display: 'flex', alignItems: 'flex-start', gap: '0.25rem' }}>
+                                                                            <span style={{ marginTop: '2px', flexShrink: 0 }}>📝</span>
+                                                                            <span style={{ fontStyle: 'italic', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+                                                                                {item.description}
+                                                                            </span>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            </>
+                                                        )}
 
-                                                    {/* Edit - Hide for PDFs */}
-                                                    {!((item.file && item.file.type === 'application/pdf') || (item.name && item.name.toLowerCase().endsWith('.pdf'))) && (
+                                                        {/* Edit - Hide for PDFs */}
+                                                        {!((item.file && item.file.type === 'application/pdf') || (item.name && item.name.toLowerCase().endsWith('.pdf'))) && (
+                                                            <button
+                                                                type="button"
+                                                                title="Bearbeiten"
+                                                                style={{ border: 'none', background: 'transparent', color: 'var(--primary)', cursor: 'pointer', padding: '4px' }}
+                                                                onClick={() => setEditingImage(item)}
+                                                            >
+                                                                <Edit3 size={16} />
+                                                            </button>
+                                                        )}
+
+                                                        {/* Delete */}
                                                         <button
                                                             type="button"
-                                                            title="Bearbeiten"
-                                                            style={{ border: 'none', background: 'transparent', color: 'var(--primary)', cursor: 'pointer', padding: '4px' }}
-                                                            onClick={() => setEditingImage(item)}
+                                                            onClick={() => {
+                                                                if (window.confirm('Möchten Sie diese Datei wirklich löschen?')) {
+                                                                    setFormData(prev => ({ ...prev, images: prev.images.filter(img => img !== item) }));
+                                                                }
+                                                            }}
+                                                            style={{ border: 'none', background: 'transparent', color: '#EF4444', cursor: 'pointer', padding: '4px' }}
                                                         >
-                                                            <Edit3 size={16} />
+                                                            <X size={16} />
                                                         </button>
-                                                    )}
-
-                                                    {/* Delete */}
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => {
-                                                            if (window.confirm('Möchten Sie diese Datei wirklich löschen?')) {
-                                                                setFormData(prev => ({ ...prev, images: prev.images.filter(img => img !== item) }));
-                                                            }
-                                                        }}
-                                                        style={{ border: 'none', background: 'transparent', color: '#EF4444', cursor: 'pointer', padding: '4px' }}
-                                                    >
-                                                        <X size={16} />
-                                                    </button>
-                                                </div>
-                                            ))}
+                                                    </div>
+                                                ))}
+                                            </div>
                                         </div>
-                                    </div>
-                                ))
-                            }
+                                    ))
+                                }
+
+                            </>)}
                         </div>
                     </div>
 
 
                     {/* Summary Table (Moved to bottom) */}
-                    {formData.equipment.some(d => d.endDate && d.counterEnd) && (
-                        <div style={{ marginTop: '3rem', borderTop: '2px solid var(--border)', paddingTop: '2rem' }}>
-                            <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--primary)', marginBottom: '1rem' }}>Zusammenfassung Trocknung</h2>
-                            <div className="table-container">
-                                <table className="data-table" style={{ width: '100%', fontSize: '0.9rem' }}>
-                                    <thead>
-                                        <tr>
-                                            <th style={{ textAlign: 'left', padding: '0.75rem' }}>Wohnung</th>
-                                            <th style={{ textAlign: 'left', padding: '0.75rem' }}>Raum</th>
-                                            <th style={{ textAlign: 'left', padding: '0.75rem' }}>Geräte-Nr.</th>
-                                            <th style={{ textAlign: 'right', padding: '0.75rem' }}>Dauer</th>
-                                            <th style={{ textAlign: 'right', padding: '0.75rem' }}>Betriebsstd.</th>
-                                            <th style={{ textAlign: 'right', padding: '0.75rem' }}>Verbrauch</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {formData.equipment
-                                            .filter(d => d.endDate && d.counterEnd)
-                                            .map(item => {
-                                                const days = getDaysDiff(item.startDate, item.endDate);
-                                                const consumption = (parseFloat(item.counterEnd) - parseFloat(item.counterStart)).toFixed(2);
-                                                return (
-                                                    <tr key={item.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                                                        <td style={{ padding: '0.75rem' }}>{item.apartment || '-'}</td>
-                                                        <td style={{ padding: '0.75rem' }}>{item.room}</td>
-                                                        <td style={{ padding: '0.75rem', fontWeight: 'bold' }}>#{item.deviceNumber}</td>
-                                                        <td style={{ padding: '0.75rem', textAlign: 'right' }}>{days} Tage</td>
-                                                        <td style={{ padding: '0.75rem', textAlign: 'right' }}>{item.hours} h</td>
-                                                        <td style={{ padding: '0.75rem', textAlign: 'right' }}>{consumption} kWh</td>
-                                                    </tr>
-                                                );
-                                            })}
-                                        {(() => {
-                                            const finished = formData.equipment.filter(d => d.endDate && d.counterEnd);
-                                            const totalHours = finished.reduce((acc, curr) => acc + (parseFloat(curr.hours) || 0), 0);
-                                            const totalKwh = finished.reduce((acc, curr) => acc + ((parseFloat(curr.counterEnd) || 0) - (parseFloat(curr.counterStart) || 0)), 0);
-
-                                            return (
-                                                <tr style={{ backgroundColor: 'var(--bg-muted)', fontWeight: 'bold', borderTop: '2px solid var(--border)' }}>
-                                                    <td style={{ padding: '0.75rem' }} colSpan={4}>Gesamt</td>
-                                                    <td style={{ padding: '0.75rem', textAlign: 'right' }}>{totalHours} h</td>
-                                                    <td style={{ padding: '0.75rem', textAlign: 'right' }}>{totalKwh.toFixed(2)} kWh</td>
-                                                </tr>
-                                            );
-                                        })()}
-                                    </tbody>
-                                </table>
+                    {
+                        formData.equipment.some(d => d.endDate && d.counterEnd) && (
+                            <div style={{ marginTop: '3rem', borderTop: '2px solid var(--border)', paddingTop: '2rem' }}>
+                                <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--primary)', marginBottom: '1rem' }}>Zusammenfassung Trocknung</h2>
+                                <div className="table-container">
+                                    <table className="data-table" style={{ width: '100%', fontSize: '0.9rem' }}>
+                                        <thead>
+                                            <tr>
+                                                <th style={{ textAlign: 'left', padding: '0.75rem' }}>Wohnung</th>
+                                                <th style={{ textAlign: 'left', padding: '0.75rem' }}>Raum</th>
+                                                <th style={{ textAlign: 'left', padding: '0.75rem' }}>Geräte-Nr.</th>
+                                                <th style={{ textAlign: 'right', padding: '0.75rem' }}>Dauer</th>
+                                                <th style={{ textAlign: 'right', padding: '0.75rem' }}>Betriebsstd.</th>
+                                                <th style={{ textAlign: 'right', padding: '0.75rem' }}>Verbrauch</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {formData.equipment
+                                                .filter(d => d.endDate && d.counterEnd)
+                                                .map(item => {
+                                                    const days = getDaysDiff(item.startDate, item.endDate);
+                                                    const consumption = (parseFloat(item.counterEnd) - parseFloat(item.counterStart)).toFixed(2);
+                                                    return (
+                                                        <tr key={item.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                                                            <td style={{ padding: '0.75rem' }}>{item.apartment || '-'}</td>
+                                                            <td style={{ padding: '0.75rem' }}>{item.room}</td>
+                                                            <td style={{ padding: '0.75rem', fontWeight: 'bold' }}>#{item.deviceNumber}</td>
+                                                            <td style={{ padding: '0.75rem', textAlign: 'right' }}>{days} Tage</td>
+                                                            <td style={{ padding: '0.75rem', textAlign: 'right' }}>{item.hours} h</td>
+                                                            <td style={{ padding: '0.75rem', textAlign: 'right' }}>{consumption} kWh</td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            <tr style={{ backgroundColor: 'var(--bg-muted)', fontWeight: 'bold', borderTop: '2px solid var(--border)' }}>
+                                                <td style={{ padding: '0.75rem' }} colSpan={4}>Gesamt</td>
+                                                <td style={{ padding: '0.75rem', textAlign: 'right' }}>{totalDryingHours} h</td>
+                                                <td style={{ padding: '0.75rem', textAlign: 'right' }}>{totalDryingKwh.toFixed(2)} kWh</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
-                        </div>
-                    )}
+                        )
+                    }
 
                     <div style={{ marginTop: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
 
@@ -4471,266 +4711,270 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                 }
 
                 {/* Image Selector Modal */}
-                {showImageSelector && (
-                    <div style={{
-                        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-                        backgroundColor: 'rgba(0,0,0,0.85)', zIndex: 10000,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        padding: '2rem'
-                    }} onClick={() => setShowImageSelector(false)}>
+                {
+                    showImageSelector && (
                         <div style={{
-                            backgroundColor: '#1E293B',
-                            borderRadius: '12px',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            width: '900px',
-                            maxWidth: '95%',
-                            height: '80vh',
-                            maxHeight: '800px',
-                            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
-                            border: '1px solid #334155'
-                        }} onClick={e => e.stopPropagation()}>
-
-                            {/* Header */}
+                            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                            backgroundColor: 'rgba(0,0,0,0.85)', zIndex: 10000,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            padding: '2rem'
+                        }} onClick={() => setShowImageSelector(false)}>
                             <div style={{
-                                padding: '1.5rem',
-                                borderBottom: '1px solid #334155',
+                                backgroundColor: '#1E293B',
+                                borderRadius: '12px',
                                 display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'center',
-                                backgroundColor: '#0F172A',
-                                borderTopLeftRadius: '12px',
-                                borderTopRightRadius: '12px'
-                            }}>
-                                <div>
-                                    <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 600, color: 'white' }}>Bild aus Projekt wählen</h3>
-                                    <p style={{ margin: '0.25rem 0 0 0', color: '#94A3B8', fontSize: '0.875rem' }}>
-                                        Wählen Sie ein Bild aus den vorhandenen Raumbildern.
-                                    </p>
-                                </div>
-                                <button
-                                    onClick={() => setShowImageSelector(false)}
-                                    className="btn btn-ghost"
-                                    style={{ color: '#94A3B8', padding: '0.5rem' }}
-                                >
-                                    <X size={24} />
-                                </button>
-                            </div>
+                                flexDirection: 'column',
+                                width: '900px',
+                                maxWidth: '95%',
+                                height: '80vh',
+                                maxHeight: '800px',
+                                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+                                border: '1px solid #334155'
+                            }} onClick={e => e.stopPropagation()}>
 
-                            {/* Grid */}
-                            <div style={{
-                                flex: 1,
-                                overflowY: 'auto',
-                                padding: '1.5rem',
-                                display: 'grid',
-                                gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
-                                gap: '1rem',
-                                alignContent: 'start'
-                            }}>
-                                {formData.images.length === 0 ? (
-                                    <div style={{
-                                        gridColumn: '1/-1',
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        height: '300px',
-                                        color: '#64748B',
-                                        gap: '1rem'
-                                    }}>
-                                        <Image size={48} strokeWidth={1.5} />
-                                        <p>Keine Bilder im Projekt vorhanden.</p>
+                                {/* Header */}
+                                <div style={{
+                                    padding: '1.5rem',
+                                    borderBottom: '1px solid #334155',
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
+                                    backgroundColor: '#0F172A',
+                                    borderTopLeftRadius: '12px',
+                                    borderTopRightRadius: '12px'
+                                }}>
+                                    <div>
+                                        <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 600, color: 'white' }}>Bild aus Projekt wählen</h3>
+                                        <p style={{ margin: '0.25rem 0 0 0', color: '#94A3B8', fontSize: '0.875rem' }}>
+                                            Wählen Sie ein Bild aus den vorhandenen Raumbildern.
+                                        </p>
                                     </div>
-                                ) : (
-                                    formData.images.map((img, idx) => (
-                                        <div
-                                            key={idx}
-                                            onClick={() => {
-                                                setFormData(prev => ({ ...prev, damageTypeImage: img.preview }));
-                                                setShowImageSelector(false);
-                                            }}
-                                            style={{
-                                                aspectRatio: '4/3',
-                                                borderRadius: '8px',
-                                                overflow: 'hidden',
-                                                cursor: 'pointer',
-                                                border: '2px solid transparent',
-                                                transition: 'all 0.2s',
-                                                position: 'relative',
-                                                backgroundColor: '#0F172A',
-                                                group: 'item'
-                                            }}
-                                            onMouseEnter={e => {
-                                                e.currentTarget.style.borderColor = '#0EA5E9';
-                                                e.currentTarget.style.transform = 'translateY(-2px)';
-                                                e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.1)';
-                                            }}
-                                            onMouseLeave={e => {
-                                                e.currentTarget.style.borderColor = 'transparent';
-                                                e.currentTarget.style.transform = 'none';
-                                                e.currentTarget.style.boxShadow = 'none';
-                                            }}
-                                        >
-                                            <img
-                                                src={img.preview}
-                                                alt={`Bild ${idx + 1}`}
-                                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                                            />
-                                            <div style={{
-                                                position: 'absolute', bottom: 0, left: 0, right: 0,
-                                                background: 'linear-gradient(to top, rgba(0,0,0,0.9), transparent)',
-                                                padding: '2rem 0.75rem 0.5rem',
-                                                pointerEvents: 'none'
-                                            }}>
-                                                <div style={{ color: 'white', fontSize: '0.75rem', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                                    {img.assignedTo || 'Unzugewiesen'}
-                                                </div>
-                                                {img.description && (
-                                                    <div style={{ color: '#94A3B8', fontSize: '0.7rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                                        {img.description}
-                                                    </div>
-                                                )}
-                                            </div>
+                                    <button
+                                        onClick={() => setShowImageSelector(false)}
+                                        className="btn btn-ghost"
+                                        style={{ color: '#94A3B8', padding: '0.5rem' }}
+                                    >
+                                        <X size={24} />
+                                    </button>
+                                </div>
+
+                                {/* Grid */}
+                                <div style={{
+                                    flex: 1,
+                                    overflowY: 'auto',
+                                    padding: '1.5rem',
+                                    display: 'grid',
+                                    gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+                                    gap: '1rem',
+                                    alignContent: 'start'
+                                }}>
+                                    {formData.images.length === 0 ? (
+                                        <div style={{
+                                            gridColumn: '1/-1',
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            height: '300px',
+                                            color: '#64748B',
+                                            gap: '1rem'
+                                        }}>
+                                            <Image size={48} strokeWidth={1.5} />
+                                            <p>Keine Bilder im Projekt vorhanden.</p>
                                         </div>
-                                    ))
-                                )}
+                                    ) : (
+                                        formData.images.map((img, idx) => (
+                                            <div
+                                                key={idx}
+                                                onClick={() => {
+                                                    setFormData(prev => ({ ...prev, damageTypeImage: img.preview }));
+                                                    setShowImageSelector(false);
+                                                }}
+                                                style={{
+                                                    aspectRatio: '4/3',
+                                                    borderRadius: '8px',
+                                                    overflow: 'hidden',
+                                                    cursor: 'pointer',
+                                                    border: '2px solid transparent',
+                                                    transition: 'all 0.2s',
+                                                    position: 'relative',
+                                                    backgroundColor: '#0F172A',
+                                                    group: 'item'
+                                                }}
+                                                onMouseEnter={e => {
+                                                    e.currentTarget.style.borderColor = '#0EA5E9';
+                                                    e.currentTarget.style.transform = 'translateY(-2px)';
+                                                    e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.1)';
+                                                }}
+                                                onMouseLeave={e => {
+                                                    e.currentTarget.style.borderColor = 'transparent';
+                                                    e.currentTarget.style.transform = 'none';
+                                                    e.currentTarget.style.boxShadow = 'none';
+                                                }}
+                                            >
+                                                <img
+                                                    src={img.preview}
+                                                    alt={`Bild ${idx + 1}`}
+                                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                                />
+                                                <div style={{
+                                                    position: 'absolute', bottom: 0, left: 0, right: 0,
+                                                    background: 'linear-gradient(to top, rgba(0,0,0,0.9), transparent)',
+                                                    padding: '2rem 0.75rem 0.5rem',
+                                                    pointerEvents: 'none'
+                                                }}>
+                                                    <div style={{ color: 'white', fontSize: '0.75rem', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                        {img.assignedTo || 'Unzugewiesen'}
+                                                    </div>
+                                                    {img.description && (
+                                                        <div style={{ color: '#94A3B8', fontSize: '0.7rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                            {img.description}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
                             </div>
                         </div>
-                    </div>
-                )}
+                    )
+                }
 
                 {/* Status Message (Success/Error) */
                     /* ... existing status message code ... */
                 }
 
                 {/* Image Selector Modal */}
-                {showImageSelector && (
-                    <div style={{
-                        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-                        backgroundColor: 'rgba(0,0,0,0.85)', zIndex: 10000,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        padding: '2rem'
-                    }} onClick={() => setShowImageSelector(false)}>
+                {
+                    showImageSelector && (
                         <div style={{
-                            backgroundColor: '#1E293B',
-                            borderRadius: '12px',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            width: '900px',
-                            maxWidth: '95%',
-                            height: '80vh',
-                            maxHeight: '800px',
-                            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
-                            border: '1px solid #334155'
-                        }} onClick={e => e.stopPropagation()}>
-
-                            {/* Header */}
+                            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                            backgroundColor: 'rgba(0,0,0,0.85)', zIndex: 10000,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            padding: '2rem'
+                        }} onClick={() => setShowImageSelector(false)}>
                             <div style={{
-                                padding: '1.5rem',
-                                borderBottom: '1px solid #334155',
+                                backgroundColor: '#1E293B',
+                                borderRadius: '12px',
                                 display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'center',
-                                backgroundColor: '#0F172A',
-                                borderTopLeftRadius: '12px',
-                                borderTopRightRadius: '12px'
-                            }}>
-                                <div>
-                                    <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 600, color: 'white' }}>Bild aus Projekt wählen</h3>
-                                    <p style={{ margin: '0.25rem 0 0 0', color: '#94A3B8', fontSize: '0.875rem' }}>
-                                        Wählen Sie ein Bild aus den vorhandenen Raumbildern.
-                                    </p>
-                                </div>
-                                <button
-                                    onClick={() => setShowImageSelector(false)}
-                                    className="btn btn-ghost"
-                                    style={{ color: '#94A3B8', padding: '0.5rem' }}
-                                >
-                                    <X size={24} />
-                                </button>
-                            </div>
+                                flexDirection: 'column',
+                                width: '900px',
+                                maxWidth: '95%',
+                                height: '80vh',
+                                maxHeight: '800px',
+                                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+                                border: '1px solid #334155'
+                            }} onClick={e => e.stopPropagation()}>
 
-                            {/* Grid */}
-                            <div style={{
-                                flex: 1,
-                                overflowY: 'auto',
-                                padding: '1.5rem',
-                                display: 'grid',
-                                gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
-                                gap: '1rem',
-                                alignContent: 'start'
-                            }}>
-                                {formData.images.length === 0 ? (
-                                    <div style={{
-                                        gridColumn: '1/-1',
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        height: '300px',
-                                        color: '#64748B',
-                                        gap: '1rem'
-                                    }}>
-                                        <Image size={48} strokeWidth={1.5} />
-                                        <p>Keine Bilder im Projekt vorhanden.</p>
+                                {/* Header */}
+                                <div style={{
+                                    padding: '1.5rem',
+                                    borderBottom: '1px solid #334155',
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
+                                    backgroundColor: '#0F172A',
+                                    borderTopLeftRadius: '12px',
+                                    borderTopRightRadius: '12px'
+                                }}>
+                                    <div>
+                                        <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 600, color: 'white' }}>Bild aus Projekt wählen</h3>
+                                        <p style={{ margin: '0.25rem 0 0 0', color: '#94A3B8', fontSize: '0.875rem' }}>
+                                            Wählen Sie ein Bild aus den vorhandenen Raumbildern.
+                                        </p>
                                     </div>
-                                ) : (
-                                    formData.images.map((img, idx) => (
-                                        <div
-                                            key={idx}
-                                            onClick={() => {
-                                                setFormData(prev => ({ ...prev, damageTypeImage: img.preview }));
-                                                setShowImageSelector(false);
-                                            }}
-                                            style={{
-                                                aspectRatio: '4/3',
-                                                borderRadius: '8px',
-                                                overflow: 'hidden',
-                                                cursor: 'pointer',
-                                                border: '2px solid transparent',
-                                                transition: 'all 0.2s',
-                                                position: 'relative',
-                                                backgroundColor: '#0F172A',
-                                                group: 'item'
-                                            }}
-                                            onMouseEnter={e => {
-                                                e.currentTarget.style.borderColor = '#0EA5E9';
-                                                e.currentTarget.style.transform = 'translateY(-2px)';
-                                                e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.1)';
-                                            }}
-                                            onMouseLeave={e => {
-                                                e.currentTarget.style.borderColor = 'transparent';
-                                                e.currentTarget.style.transform = 'none';
-                                                e.currentTarget.style.boxShadow = 'none';
-                                            }}
-                                        >
-                                            <img
-                                                src={img.preview}
-                                                alt={`Bild ${idx + 1}`}
-                                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                                            />
-                                            <div style={{
-                                                position: 'absolute', bottom: 0, left: 0, right: 0,
-                                                background: 'linear-gradient(to top, rgba(0,0,0,0.9), transparent)',
-                                                padding: '2rem 0.75rem 0.5rem',
-                                                pointerEvents: 'none'
-                                            }}>
-                                                <div style={{ color: 'white', fontSize: '0.75rem', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                                    {img.assignedTo || 'Unzugewiesen'}
-                                                </div>
-                                                {img.description && (
-                                                    <div style={{ color: '#94A3B8', fontSize: '0.7rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                                        {img.description}
-                                                    </div>
-                                                )}
-                                            </div>
+                                    <button
+                                        onClick={() => setShowImageSelector(false)}
+                                        className="btn btn-ghost"
+                                        style={{ color: '#94A3B8', padding: '0.5rem' }}
+                                    >
+                                        <X size={24} />
+                                    </button>
+                                </div>
+
+                                {/* Grid */}
+                                <div style={{
+                                    flex: 1,
+                                    overflowY: 'auto',
+                                    padding: '1.5rem',
+                                    display: 'grid',
+                                    gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+                                    gap: '1rem',
+                                    alignContent: 'start'
+                                }}>
+                                    {formData.images.length === 0 ? (
+                                        <div style={{
+                                            gridColumn: '1/-1',
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            height: '300px',
+                                            color: '#64748B',
+                                            gap: '1rem'
+                                        }}>
+                                            <Image size={48} strokeWidth={1.5} />
+                                            <p>Keine Bilder im Projekt vorhanden.</p>
                                         </div>
-                                    ))
-                                )}
+                                    ) : (
+                                        formData.images.map((img, idx) => (
+                                            <div
+                                                key={idx}
+                                                onClick={() => {
+                                                    setFormData(prev => ({ ...prev, damageTypeImage: img.preview }));
+                                                    setShowImageSelector(false);
+                                                }}
+                                                style={{
+                                                    aspectRatio: '4/3',
+                                                    borderRadius: '8px',
+                                                    overflow: 'hidden',
+                                                    cursor: 'pointer',
+                                                    border: '2px solid transparent',
+                                                    transition: 'all 0.2s',
+                                                    position: 'relative',
+                                                    backgroundColor: '#0F172A',
+                                                    group: 'item'
+                                                }}
+                                                onMouseEnter={e => {
+                                                    e.currentTarget.style.borderColor = '#0EA5E9';
+                                                    e.currentTarget.style.transform = 'translateY(-2px)';
+                                                    e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.1)';
+                                                }}
+                                                onMouseLeave={e => {
+                                                    e.currentTarget.style.borderColor = 'transparent';
+                                                    e.currentTarget.style.transform = 'none';
+                                                    e.currentTarget.style.boxShadow = 'none';
+                                                }}
+                                            >
+                                                <img
+                                                    src={img.preview}
+                                                    alt={`Bild ${idx + 1}`}
+                                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                                />
+                                                <div style={{
+                                                    position: 'absolute', bottom: 0, left: 0, right: 0,
+                                                    background: 'linear-gradient(to top, rgba(0,0,0,0.9), transparent)',
+                                                    padding: '2rem 0.75rem 0.5rem',
+                                                    pointerEvents: 'none'
+                                                }}>
+                                                    <div style={{ color: 'white', fontSize: '0.75rem', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                        {img.assignedTo || 'Unzugewiesen'}
+                                                    </div>
+                                                    {img.description && (
+                                                        <div style={{ color: '#94A3B8', fontSize: '0.7rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                            {img.description}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
                             </div>
                         </div>
-                    </div>
-                )}
+                    )
+                }
 
                 {/* New Image Metadata Modal */}
                 {
@@ -4922,8 +5166,15 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                 {
                     showEmailImport && (
                         <EmailImportModal
-                            onClose={() => setShowEmailImport(false)}
+                            onClose={() => {
+                                setShowEmailImport(false);
+                                setOpenSettingsDirectly(false);
+                            }}
                             onImport={handleEmailImport}
+                            audioDevices={audioDevices}
+                            selectedDeviceId={selectedDeviceId}
+                            onSelectDeviceId={setSelectedDeviceId}
+                            initialShowSettings={openSettingsDirectly}
                         />
                     )
                 }

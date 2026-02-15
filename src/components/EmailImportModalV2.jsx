@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import OpenAI from "openai";
-import { X, ArrowRight, Mail, Settings, Check } from 'lucide-react';
+import { X, ArrowRight, Mail, Settings, Check, RotateCw } from 'lucide-react';
 import { swissPLZ } from '../data/swiss_plz';
 
-const EmailImportModalV2 = ({ onClose, onImport }) => {
+const EmailImportModalV2 = ({ onClose, onImport, audioDevices, selectedDeviceId, onSelectDeviceId, initialShowSettings = false, onRefreshDevices, deviceError }) => {
     const [text, setText] = useState('');
     const [apiKey, setApiKey] = useState('');
-    const [showSettings, setShowSettings] = useState(false);
+    const [showSettings, setShowSettings] = useState(initialShowSettings);
     const [loading, setLoading] = useState(false);
     const [useAI, setUseAI] = useState(true);
 
@@ -503,6 +503,50 @@ const EmailImportModalV2 = ({ onClose, onImport }) => {
                         <div style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                             Der Key wird lokal in deinem Browser gespeichert und nur an OpenAI gesendet.
                         </div>
+
+                        {/* Microphone Selection */}
+                        <div style={{ marginTop: '1rem', borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>
+                            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--text-main)' }}>Mikrofon auswählen</label>
+                            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                <select
+                                    className="form-input"
+                                    value={selectedDeviceId || ''}
+                                    onChange={(e) => onSelectDeviceId && onSelectDeviceId(e.target.value)}
+                                    style={{ flex: 1 }}
+                                >
+                                    {audioDevices && audioDevices.length > 0 ? (
+                                        audioDevices.map(device => (
+                                            <option key={device.deviceId} value={device.deviceId}>
+                                                {device.label || `Mikrofon ${device.deviceId.slice(0, 5)}...`}
+                                            </option>
+                                        ))
+                                    ) : (
+                                        <option value="">Keine Mikrofone gefunden</option>
+                                    )}
+                                </select>
+                                <button
+                                    type="button"
+                                    onClick={onRefreshDevices}
+                                    className="btn btn-outline"
+                                    title="Liste aktualisieren"
+                                    style={{ padding: '0.5rem' }}
+                                >
+                                    <RotateCw size={18} />
+                                </button>
+                            </div>
+                        </div>
+
+                        <div style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: '#f59e0b' }}>
+                            <small>
+                                Fehlt ein Gerät? Klicken Sie oben in der Adressleiste auf das 🔒 oder 📷 Symbol und prüfen Sie die Berechtigungen.
+                            </small>
+                        </div>
+
+                        {deviceError && (
+                            <div style={{ marginTop: '1rem', padding: '0.75rem', backgroundColor: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '4px', fontSize: '0.85rem', color: '#ef4444' }}>
+                                <strong>Fehler beim Mikrofon-Zugriff:</strong> {deviceError}
+                            </div>
+                        )}
                     </div>
                 )}
 
@@ -560,7 +604,7 @@ const EmailImportModalV2 = ({ onClose, onImport }) => {
                     </button>
                 </div>
             </div>
-        </div>
+        </div >
     );
 };
 
