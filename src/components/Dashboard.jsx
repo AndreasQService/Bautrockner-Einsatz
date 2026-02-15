@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Filter, MapPin, Calendar, ArrowRight, Camera, Search } from 'lucide-react'
+import { Filter, MapPin, Calendar, ArrowRight, Search, Trash2 } from 'lucide-react'
 
 // Helper to calculate days difference
 const getDaysDiff = (startDate) => {
@@ -179,13 +179,12 @@ const DryingMonitor = ({ reports, onSelectReport }) => {
     )
 }
 
-export default function Dashboard({ reports, onSelectReport }) {
+export default function Dashboard({ reports, onSelectReport, onDeleteReport }) {
     const [searchTerm, setSearchTerm] = useState('')
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 20;
     const [showArchive, setShowArchive] = useState(false);
 
-    // Filter Logic
     // Filter Logic
     const filteredReports = useMemo(() => reports.filter(r => {
         // Archive Filter
@@ -330,21 +329,16 @@ export default function Dashboard({ reports, onSelectReport }) {
                                 <th style={{ minWidth: '140px', position: 'sticky', top: 0, zIndex: 20, backgroundColor: 'var(--background)', textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.05em' }}>Schaden</th>
                                 <th style={{ width: '130px', position: 'sticky', top: 0, zIndex: 20, backgroundColor: 'var(--background)', textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.05em' }}>Status</th>
                                 <th style={{ minWidth: '120px', position: 'sticky', top: 0, zIndex: 20, backgroundColor: 'var(--background)', textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.05em' }}>Kunde von</th>
-                                <th style={{ width: '80px', textAlign: 'center', position: 'sticky', top: 0, zIndex: 20, backgroundColor: 'var(--background)', textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.05em' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
-                                        <Camera size={14} />
-                                        Bilder
-                                    </div>
-                                </th>
+
                                 <th style={{ width: '80px', textAlign: 'center', position: 'sticky', top: 0, zIndex: 20, backgroundColor: 'var(--background)', textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.05em' }}>Geräte</th>
-                                <th style={{ width: '40px', position: 'sticky', top: 0, zIndex: 20, backgroundColor: 'var(--background)' }}></th>
+                                <th style={{ width: '80px', position: 'sticky', top: 0, zIndex: 20, backgroundColor: 'var(--background)' }}></th>
                             </tr>
                         </thead>
                         <tbody>
                             {paginatedReports.map((report) => {
                                 const activeDevices = report.equipment ? report.equipment.length : 0;
                                 return (
-                                    <tr key={report.id} onClick={() => onSelectReport(report)}>
+                                    <tr key={report.id} onClick={() => onSelectReport(report)} style={{ cursor: 'pointer' }}>
                                         <td style={{ fontWeight: 600, fontSize: '0.9rem' }}>{report.projectTitle || report.id}</td>
                                         <td style={{ fontSize: '0.875rem', whiteSpace: 'nowrap' }}>{formatDate(report.date)}</td>
                                         <td style={{ fontWeight: 500 }}>{report.locationDetails || '-'}</td>
@@ -396,16 +390,10 @@ export default function Dashboard({ reports, onSelectReport }) {
                                                 )}
                                             </div>
                                         </td>
-                                        <td style={{ textAlign: 'center' }}>
-                                            {report.imageCount && report.imageCount > 0 ? (
-                                                <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)' }}>{report.imageCount}</span>
-                                            ) : (
-                                                <span style={{ color: 'var(--border)' }}>-</span>
-                                            )}
-                                        </td>
+
                                         <td style={{ textAlign: 'center' }}>
                                             {activeDevices > 0 ? (
-                                                <span style={{ backgroundColor: 'rgba(56, 189, 248, 0.1)', color: 'var(--primary)', padding: '2px 6px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600 }}>
+                                                <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>
                                                     {activeDevices}
                                                 </span>
                                             ) : (
@@ -413,7 +401,22 @@ export default function Dashboard({ reports, onSelectReport }) {
                                             )}
                                         </td>
                                         <td>
-                                            <ArrowRight size={16} className="text-muted" />
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.5rem' }}>
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        if (window.confirm(`Möchten Sie den Bericht "${report.projectTitle || report.id}" wirklich unwiderruflich löschen?`)) {
+                                                            onDeleteReport(report.id);
+                                                        }
+                                                    }}
+                                                    className="btn btn-sm btn-ghost"
+                                                    style={{ color: '#EF4444', padding: '0.25rem' }}
+                                                    title="Bericht löschen"
+                                                >
+                                                    <Trash2 size={16} />
+                                                </button>
+                                                <ArrowRight size={16} className="text-muted" />
+                                            </div>
                                         </td>
                                     </tr>
                                 )
@@ -466,4 +469,3 @@ export default function Dashboard({ reports, onSelectReport }) {
         </div>
     )
 }
-

@@ -105,7 +105,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
 
     const initialAddressParts = parseAddress(initialData?.address);
 
-    const [formData, setFormData] = useState(initialData ? {
+    const [formData, setFormData] = useState(() => (initialData ? {
         id: initialData.id, // Keep ID if editing
         projectTitle: initialData.projectTitle || initialData.id || '', // Include projectTitle
         client: initialData.client || '',
@@ -161,7 +161,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         equipment: [],
         images: [],
         rooms: []
-    })
+    }));
 
     // --- Device Selection Logic ---
     const [availableDevices, setAvailableDevices] = useState([]);
@@ -186,6 +186,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
     const [newRoom, setNewRoom] = useState({
         name: '',
         apartment: '',
+        stockwerk: '',
         customName: ''
     })
 
@@ -244,16 +245,18 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
 
     useEffect(() => {
         // Initial load
-        refreshAudioDevices();
+        // refreshAudioDevices(); // Potentially blocking if hardware issue
 
         // Listen for device changes (plugging in/out)
+        /*
         navigator.mediaDevices.ondevicechange = () => {
             console.log("Audio devices changed, refreshing list...");
             refreshAudioDevices();
         };
+        */
 
         return () => {
-            navigator.mediaDevices.ondevicechange = null;
+            // navigator.mediaDevices.ondevicechange = null;
         };
     }, []);
 
@@ -559,29 +562,31 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         latestFormData.current = formData;
     }, [formData]);
 
+    /*
     useEffect(() => {
         const timeoutId = setTimeout(() => {
             if (onSave) {
                 // DIRTY CHECK: Only save if data has actually changed
-                if (JSON.stringify(formData) !== JSON.stringify(lastSavedData.current)) {
-                    console.log("Auto-Save triggered (Data Changed). Equipment:", formData.equipment.length);
-                    // Pass true as second argument to indicate "silent" save
+                // Performance optimization: Avoid JSON.stringify on large objects (images)
+                // We trust that state updates create new object references.
+                if (formData !== lastSavedData.current) {
+                    // console.log("Auto-Save triggered. Equipment:", formData.equipment.length);
                     onSave(formData, true);
                     lastSavedData.current = formData;
-                } else {
-                    console.log("Auto-Save skipped (No structural changes)");
                 }
             }
         }, 1000);
 
         return () => clearTimeout(timeoutId);
     }, [formData, onSave]);
+    */
 
     // Save on Unmount
     useEffect(() => {
         return () => {
             console.log("Component Unmounting - Saving final state...");
-            if (onSave && JSON.stringify(latestFormData.current) !== JSON.stringify(lastSavedData.current)) {
+            // Optimization: Use reference check instead of JSON.stringify
+            if (onSave && latestFormData.current !== lastSavedData.current) {
                 onSave(latestFormData.current, true);
             }
         };
@@ -1052,7 +1057,8 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         const roomEntry = {
             id: Date.now(),
             name: finalRoomName,
-            apartment: newRoom.apartment
+            apartment: newRoom.apartment,
+            stockwerk: newRoom.stockwerk
         };
 
         setFormData(prev => ({
@@ -1060,7 +1066,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
             rooms: [...prev.rooms, roomEntry]
         }));
 
-        setNewRoom({ name: '', apartment: '', customName: '' });
+        setNewRoom({ name: '', apartment: '', stockwerk: '', customName: '' });
     }
 
     const handleRemoveRoom = (id) => {
@@ -1077,7 +1083,8 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
 
     // --- PDF Export (Unified Vector Report) ---
     // --- PDF Export (Unified Vector Report) ---
-    const generatePDFExport = async () => {
+    const generatePDFExport = async (customFormData = null) => {
+        const dataToUse = customFormData || formData;
         setIsGeneratingPDF(true);
         try {
             const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
@@ -1117,14 +1124,21 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                 } catch (e) { console.warn("Logo add failed", e); }
             }
 
+            // Company Address Header
+            doc.setFontSize(10);
+            doc.setTextColor(100, 116, 139); // Slate-500
+            doc.text("Q-Service AG", pageWidth - 14, 15, { align: 'right' });
+            doc.text("Kriesbachstrasse 30", pageWidth - 14, 20, { align: 'right' });
+            doc.text("8600 Dübendorf", pageWidth - 14, 25, { align: 'right' });
+
             doc.setFontSize(22);
             doc.setTextColor(14, 165, 233); // Primary Color (Sky-500 equivalent)
             doc.text("Schadensbericht", 14, 50);
 
             doc.setFontSize(16);
             doc.setTextColor(0, 0, 0);
-            if (formData.projectTitle) {
-                doc.text(formData.projectTitle, 14, 65);
+            if (dataToUse.projectTitle) {
+                doc.text(dataToUse.projectTitle, 14, 65);
             }
 
             doc.setFontSize(11);
@@ -1141,14 +1155,13 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                 }
             };
 
-            addLine("Kunde", formData.client);
-            addLine("Strasse", formData.street);
-            addLine("Ort", `${formData.zip} ${formData.city}`);
-            if (formData.locationDetails) {
-                addLine("Schadenort", formData.locationDetails);
+            addLine("Strasse", dataToUse.street);
+            addLine("Ort", `${dataToUse.zip} ${dataToUse.city}`);
+            if (dataToUse.locationDetails) {
+                addLine("Lage / Details", dataToUse.locationDetails);
             }
             addLine("Datum", new Date().toLocaleDateString('de-CH'));
-            addLine("Sachbearbeiter", formData.clientSource || 'Unbekannt');
+            addLine("Sachbearbeiter", dataToUse.clientSource || 'Unbekannt');
 
             yPos += 5; // Extra spacing
 
@@ -1157,45 +1170,71 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
             doc.rect(14, yPos, pageWidth - 28, 0.5, 'F');
             yPos += 10; // Spacing after line
 
-            // Add Schadenursache below line
-            if (formData.damageType) {
+            // Add Schadenursache (Detailed Description) if present
+            // Note: dataToUse.cause is the detailed text from the modal
+            if (dataToUse.cause) {
                 doc.setFont(undefined, 'bold');
                 doc.text("Schadenursache:", 14, yPos);
                 yPos += 6;
                 doc.setFont(undefined, 'normal');
-                const splitDamageType = doc.splitTextToSize(formData.damageType, pageWidth - 30);
+
+                // Background box for cause
+                doc.setFillColor(241, 245, 249); // Slate-100
+                doc.setDrawColor(203, 213, 225); // Slate-300
+
+                const splitCause = doc.splitTextToSize(dataToUse.cause, pageWidth - 38); // slightly narrower for padding
+                const boxHeight = (splitCause.length * 5) + 10;
+
+                // Check page break
+                if (yPos + boxHeight > pageHeight - 20) {
+                    doc.addPage();
+                    yPos = 20;
+                }
+
+                doc.roundedRect(14, yPos, pageWidth - 28, boxHeight, 3, 3, 'FD');
+                doc.text(splitCause, 19, yPos + 7); // Padding left/top
+
+                yPos += boxHeight + 10;
+            }
+
+            // Damage Type (Art)
+            // Damage Type (Art)
+            if (dataToUse.damageType) {
+                doc.setFont(undefined, 'bold');
+                doc.text("Schadenart:", 14, yPos);
+                yPos += 6;
+                doc.setFont(undefined, 'normal');
+                const splitDamageType = doc.splitTextToSize(dataToUse.damageType, pageWidth - 30);
                 doc.text(splitDamageType, 14, yPos);
                 yPos += (splitDamageType.length * 6) + 4;
+            }
 
-                // Image for Schadenursache
-                if (formData.damageTypeImage) {
-                    try {
-                        const imgProps = doc.getImageProperties(formData.damageTypeImage);
-                        const imgWidth = 80;
-                        const imgHeight = (imgProps.height * imgWidth) / imgProps.width;
+            // Image for Schadenursache / Type
+            if (dataToUse.damageTypeImage) {
+                try {
+                    const imgProps = doc.getImageProperties(dataToUse.damageTypeImage);
+                    const imgWidth = 80;
+                    const imgHeight = (imgProps.height * imgWidth) / imgProps.width;
 
-                        if (yPos + imgHeight > pageHeight - 20) {
-                            doc.addPage();
-                            yPos = 20;
-                        }
-
-                        doc.addImage(formData.damageTypeImage, imgProps.fileType, 14, yPos, imgWidth, imgHeight);
-                        yPos += imgHeight + 10;
-                    } catch (e) {
-                        console.warn("Could not add damage type image", e);
+                    if (yPos + imgHeight > pageHeight - 20) {
+                        doc.addPage();
+                        yPos = 20;
                     }
-                } else {
-                    yPos += 2;
+
+                    doc.addImage(dataToUse.damageTypeImage, imgProps.fileType, 14, yPos, imgWidth, imgHeight);
+                    yPos += imgHeight + 10;
+                } catch (e) {
+                    console.warn("Could not add damage type image", e);
                 }
             }
 
-            if (formData.description) {
+            if (dataToUse.description) {
                 doc.setFont(undefined, 'bold');
                 doc.text("Beschreibung:", 14, yPos);
                 yPos += 6;
                 doc.setFont(undefined, 'normal');
 
-                const splitDesc = doc.splitTextToSize(formData.description, pageWidth - 30);
+                const splitDesc = doc.splitTextToSize(dataToUse.description, pageWidth - 30);
                 doc.text(splitDesc, 14, yPos);
                 yPos += (splitDesc.length * 6) + 10;
             }
@@ -1205,11 +1244,26 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
             // Actually user wants "Messprotokoll", so mainly measurements. 
             // BUT: "Schadensbericht" implies images too. 
             // Logic: Iterate all rooms that have ANY data.
-            const roomsWithContent = formData.rooms.filter(room =>
-                formData.images.some(img => (img.roomId === room.id || img.assignedTo === room.name) && img.includeInReport !== false)
+            const roomsWithContent = dataToUse.rooms.filter(room =>
+                dataToUse.images.some(img => (img.roomId === room.id || img.assignedTo === room.name) && img.includeInReport !== false)
             );
 
             if (roomsWithContent.length > 0) {
+                // Sort rooms: Apartment -> Stockwerk -> Name
+                roomsWithContent.sort((a, b) => {
+                    const aptA = (a.apartment || '').toLowerCase();
+                    const aptB = (b.apartment || '').toLowerCase();
+                    if (aptA < aptB) return -1;
+                    if (aptA > aptB) return 1;
+
+                    const floorA = (a.stockwerk || '').toLowerCase();
+                    const floorB = (b.stockwerk || '').toLowerCase();
+                    if (floorA < floorB) return -1;
+                    if (floorA > floorB) return 1;
+
+                    return (a.name || '').localeCompare(b.name || '');
+                });
+
                 // Ensure we start after the cover page content
                 if (yPos > pageHeight - 50) {
                     doc.addPage();
@@ -1218,11 +1272,55 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                     yPos += 20; // Some spacing after cover
                 }
 
+                let currentApartment = null;
+                let currentFloor = null;
+
                 for (let i = 0; i < roomsWithContent.length; i++) {
                     const room = roomsWithContent[i];
 
+                    // Check Apartment Change
+                    if (room.apartment !== currentApartment) {
+                        currentApartment = room.apartment;
+                        currentFloor = null; // Reset floor when apartment changes
+
+                        if (currentApartment) {
+                            if (yPos + 40 > pageHeight) {
+                                doc.addPage();
+                                yPos = 20;
+                            }
+                            doc.setFontSize(16);
+                            doc.setTextColor(14, 165, 233); // Primary Blue
+                            doc.setFont(undefined, 'bold');
+                            doc.text(`Wohnung: ${currentApartment}`, 14, yPos);
+                            yPos += 10;
+
+                            // Draw divider line for apartment
+                            doc.setDrawColor(14, 165, 233);
+                            doc.setLineWidth(0.5);
+                            doc.line(14, yPos - 2, pageWidth - 14, yPos - 2);
+                            yPos += 5;
+                        }
+                    }
+
+                    // Check Floor Change
+                    if (room.stockwerk !== currentFloor) {
+                        currentFloor = room.stockwerk;
+
+                        if (currentFloor) {
+                            if (yPos + 30 > pageHeight) {
+                                doc.addPage();
+                                yPos = 20;
+                            }
+                            doc.setFontSize(13);
+                            doc.setTextColor(71, 85, 105); // Slate-600
+                            doc.setFont(undefined, 'bold');
+                            doc.text(`Stockwerk: ${currentFloor}`, 14, yPos);
+                            yPos += 8;
+                        }
+                    }
+
                     // Header for Room
-                    doc.setFontSize(14);
+                    doc.setFontSize(12); // Slightly smaller as it's now nested
                     doc.setTextColor(0, 0, 0); // Black
                     doc.setFont(undefined, 'bold');
 
@@ -1230,9 +1328,15 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                     if (yPos + 80 > pageHeight) {
                         doc.addPage();
                         yPos = 20;
+                        // Repeat headers if logic dictates, but for now just continue
+                        if (currentApartment) {
+                            doc.setFontSize(10);
+                            doc.setTextColor(150, 150, 150);
+                            doc.text(`(Fortsetzung ${currentApartment})`, 14, yPos - 5);
+                        }
                     }
 
-                    // Draw Room Header
+                    // Draw Room Header (Indented slightly?)
                     doc.text(room.name, 14, yPos);
 
                     // Optional Date on right
@@ -1241,9 +1345,9 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                     // doc.text(`Datum: ${new Date().toLocaleDateString('de-CH')}`, pageWidth - 14, yPos, { align: 'right' }); 
                     // Date per room might be redundant if report has date. Remove to save space? User request "unnötig viele seiten".
 
-                    yPos += 10; // Space below header
+                    yPos += 8; // Space below header
 
-                    const roomImages = formData.images.filter(img =>
+                    const roomImages = dataToUse.images.filter(img =>
                         (img.roomId === room.id || img.assignedTo === room.name) &&
                         img.includeInReport !== false
                     );
@@ -1255,10 +1359,9 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                         const gutter = 10;
 
                         // Check if we need new page for first row
-                        if (yPos + imgHeight + 20 > pageHeight) {
+                        if (yPos + imgHeight + 20 > pageHeight - 20) {
                             doc.addPage();
                             yPos = 20;
-                            // Redraw header if split? Maybe just continue images.
                         }
 
                         // Grid Layout
@@ -1274,7 +1377,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                                 rowMaxH = 0;
 
                                 // Check Y overflow -> new page
-                                if (yPos + imgHeight + 20 > pageHeight) {
+                                if (yPos + imgHeight + 20 > pageHeight - 20) {
                                     doc.addPage();
                                     yPos = 20;
                                 }
@@ -1316,11 +1419,14 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                     // Add divider between rooms? Optional.
                     // If not last room
                     if (i < roomsWithContent.length - 1) {
-                        if (yPos + 20 < pageHeight) {
-                            doc.setDrawColor(200, 200, 200);
-                            doc.setLineWidth(0.1);
-                            doc.line(14, yPos - 5, pageWidth - 14, yPos - 5);
-                            yPos += 5;
+                        // Only add small divider if we are NOT changing apartment next
+                        if (roomsWithContent[i + 1].apartment === currentApartment) {
+                            if (yPos + 20 < pageHeight) {
+                                doc.setDrawColor(200, 200, 200);
+                                doc.setLineWidth(0.1);
+                                doc.line(14, yPos - 5, pageWidth - 14, yPos - 5);
+                                yPos += 5;
+                            }
                         }
                     }
                 }
@@ -1329,7 +1435,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                 // For now, if no rooms, we just leave cover and done.
             }
 
-            const fileName = `Export_${formData.projectTitle || 'Projekt'}.pdf`;
+            const fileName = `Export_${dataToUse.projectTitle || 'Projekt'}.pdf`;
 
             // Footer for all pages
             const pageCount = doc.internal.getNumberOfPages();
@@ -1340,6 +1446,9 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                 const footerText = "Q-Service AG, Kriesbachstrasse 30, 8600 Dübendorf, www.q-service.ch, info@q-service.ch Tel. 043 819 14 18";
                 const footerWidth = doc.getTextWidth(footerText);
                 doc.text(footerText, (pageWidth - footerWidth) / 2, pageHeight - 10);
+
+                // Page Number
+                doc.text(`Seite ${i} von ${pageCount}`, pageWidth - 14, pageHeight - 10, { align: 'right' });
             }
 
             doc.save(fileName);
@@ -1454,8 +1563,8 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
             role: c.role || 'Mieter'
         }));
 
-        // Debug Alert
-        alert(`Formular hat Daten erhalten:\nKunde: ${data.client || 'Unbekannt'}\nKontakte: ${finalContacts.length} imported.`);
+        // Debug Alert removed
+        // console.log("Setting State Contacts:", finalContacts);
 
         console.log("Setting State Contacts:", finalContacts);
 
@@ -3872,7 +3981,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                                                     )}
                                                 </div>
                                                 <div style={{ flex: 1, minWidth: '150px' }}>
-                                                    <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.25rem' }}>Wohnung (Optional)</label>
+                                                    <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.25rem' }}>Wohnung (Pflicht)</label>
                                                     <input
                                                         type="text"
                                                         className="form-input"
@@ -3881,17 +3990,25 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                                                         onChange={(e) => setNewRoom(prev => ({ ...prev, apartment: e.target.value }))}
                                                     />
                                                 </div>
+                                                <div style={{ flex: 1, minWidth: '150px' }}>
+                                                    <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.25rem' }}>Stockwerk (Pflicht)</label>
+                                                    <input
+                                                        type="text"
+                                                        className="form-input"
+                                                        placeholder="z.B. 1. OG"
+                                                        value={newRoom.stockwerk}
+                                                        onChange={(e) => setNewRoom(prev => ({ ...prev, stockwerk: e.target.value }))}
+                                                    />
+                                                </div>
                                                 <div style={{ display: 'flex', gap: '0.5rem' }}>
                                                     <button
                                                         type="button"
                                                         className="btn btn-primary"
                                                         onClick={() => {
                                                             handleAddRoom();
-                                                            // Optional: Close after adding? Let's keep it open for multiple adds for now, or maybe close it?
-                                                            // User request was focused on *opening* it. 
                                                             setIsAddRoomExpanded(false);
                                                         }}
-                                                        disabled={!newRoom.name}
+                                                        disabled={!newRoom.name || !newRoom.apartment || !newRoom.stockwerk}
                                                         style={{ height: '38px', whiteSpace: 'nowrap' }}
                                                     >
                                                         <Check size={18} /> OK
@@ -3945,7 +4062,8 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                                                             <Folder size={18} />
                                                             {roomLabel}
                                                         </h3>
-                                                        {!room.measurementData && (
+                                                        {/* Measurement Button (New/View) */}
+                                                        {!room.measurementData ? (
                                                             <button
                                                                 type="button"
                                                                 className="btn btn-outline"
@@ -3956,9 +4074,24 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                                                                     setShowMeasurementModal(true);
                                                                 }}
                                                                 style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem', gap: '0.25rem', color: 'var(--success)', borderColor: 'var(--success)' }}
-                                                                title="Messprotokoll"
+                                                                title="Messprotokoll erstellen"
                                                             >
                                                                 <Edit3 size={14} /> Messung
+                                                            </button>
+                                                        ) : (
+                                                            <button
+                                                                type="button"
+                                                                className="btn btn-outline"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setActiveRoomForMeasurement(room);
+                                                                    setIsNewMeasurement(false);
+                                                                    setShowMeasurementModal(true);
+                                                                }}
+                                                                style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem', gap: '0.25rem', color: 'var(--primary)', borderColor: 'var(--primary)' }}
+                                                                title="Messprotokoll ansehen"
+                                                            >
+                                                                <FileText size={14} /> Ansehen
                                                             </button>
                                                         )}
 
@@ -4008,160 +4141,195 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                                                         />
                                                     </div>
 
-                                                    {/* Previews */}
+                                                    {/* Previews with Pagination */}
                                                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '1rem' }}>
-                                                        {formData.images.filter(img => img.roomId === room.id).map((item, idx) => (
-                                                            <div key={idx} style={{
-                                                                position: 'relative',
-                                                                borderRadius: 'var(--radius)',
-                                                                overflow: 'hidden',
-                                                                border: '1px solid var(--border)',
-                                                                backgroundColor: 'rgba(255,255,255,0.02)',
-                                                                display: 'flex',
-                                                                flexDirection: 'column'
-                                                            }}
-                                                                className="group"
-                                                            >
-                                                                {/* Image Container */}
-                                                                <div style={{ position: 'relative', aspectRatio: '4/3', backgroundColor: 'black' }}>
-                                                                    <img
-                                                                        src={item.preview}
-                                                                        alt=""
-                                                                        style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-                                                                    />
+                                                        {(() => {
+                                                            const roomImages = formData.images.filter(img => img.roomId === room.id);
+                                                            const visibleCount = room.visibleImages || 12; // Default 12 images
+                                                            const visibleImages = roomImages.slice(0, visibleCount);
 
-                                                                    {/* Overlay Actions */}
-                                                                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2"
-                                                                        style={{
-                                                                            position: 'absolute', top: 0, right: 0, bottom: 0, left: 0,
-                                                                            backgroundColor: 'rgba(0,0,0,0.4)',
-                                                                            opacity: 0,
-                                                                            transition: 'opacity 0.2s',
-                                                                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem'
+                                                            return (
+                                                                <>
+                                                                    {visibleImages.map((item, idx) => (
+                                                                        <div key={idx} style={{
+                                                                            position: 'relative',
+                                                                            borderRadius: 'var(--radius)',
+                                                                            overflow: 'hidden',
+                                                                            border: '1px solid var(--border)',
+                                                                            backgroundColor: 'rgba(255,255,255,0.02)',
+                                                                            display: 'flex',
+                                                                            flexDirection: 'column'
                                                                         }}
-                                                                        onMouseEnter={(e) => e.currentTarget.style.opacity = 1}
-                                                                        onMouseLeave={(e) => e.currentTarget.style.opacity = 0}
-                                                                    >
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() => setActiveImageMeta(item)}
-                                                                            style={{
-                                                                                backgroundColor: 'white', border: 'none', borderRadius: '50%', width: '36px', height: '36px',
-                                                                                display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--primary)'
-                                                                            }}
-                                                                            title="Bearbeiten"
+                                                                            className="group"
                                                                         >
-                                                                            <Edit3 size={18} />
-                                                                        </button>
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() => {
-                                                                                if (window.confirm('Bild löschen?')) {
-                                                                                    setFormData(prev => ({ ...prev, images: prev.images.filter(img => img !== item) }))
-                                                                                }
-                                                                            }}
-                                                                            style={{
-                                                                                backgroundColor: 'white', border: 'none', borderRadius: '50%', width: '36px', height: '36px',
-                                                                                display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#EF4444'
-                                                                            }}
-                                                                            title="Löschen"
-                                                                        >
-                                                                            <Trash size={18} />
-                                                                        </button>
-                                                                    </div>
-                                                                </div>
+                                                                            {/* Image Container */}
+                                                                            <div style={{ position: 'relative', aspectRatio: '4/3', backgroundColor: 'black' }}>
+                                                                                <img
+                                                                                    src={item.preview}
+                                                                                    alt=""
+                                                                                    loading="lazy"
+                                                                                    decoding="async"
+                                                                                    style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                                                                                />
 
-                                                                {/* Footer: Description & Actions */}
-                                                                <div style={{
-                                                                    padding: '0.5rem',
-                                                                    borderTop: '1px solid var(--border)',
-                                                                    backgroundColor: 'rgba(0,0,0,0.1)',
-                                                                    display: 'flex',
-                                                                    flexDirection: 'column',
-                                                                    gap: '0.5rem'
-                                                                }}>
-                                                                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
-                                                                        <textarea
-                                                                            placeholder="Beschreibung..."
-                                                                            rows={2}
-                                                                            className="form-input"
-                                                                            value={item.description || ''}
-                                                                            onChange={(e) => {
-                                                                                const newDesc = e.target.value;
-                                                                                setFormData(prev => ({
-                                                                                    ...prev,
-                                                                                    images: prev.images.map(i => i === item ? { ...i, description: newDesc } : i)
-                                                                                }));
-                                                                            }}
-                                                                            onClick={(e) => e.stopPropagation()}
-                                                                            style={{
-                                                                                fontSize: '0.8rem',
-                                                                                lineHeight: '1.2',
-                                                                                padding: '0.4rem',
-                                                                                minHeight: '40px',
-                                                                                flex: 1,
-                                                                                width: '100%',
-                                                                                resize: 'vertical',
-                                                                                backgroundColor: isRecording === item.preview ? '#450a0a' : 'rgba(0,0,0,0.2)',
-                                                                                borderColor: isRecording === item.preview ? '#EF4444' : 'var(--border)'
-                                                                            }}
-                                                                        />
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={(e) => {
-                                                                                e.stopPropagation();
-                                                                                isRecording === item.preview ? stopRecording() : startRecording(item.preview);
-                                                                            }}
-                                                                            style={{
-                                                                                width: '32px',
-                                                                                height: '32px',
-                                                                                borderRadius: '50%',
-                                                                                border: isRecording === item.preview ? 'none' : '1px solid var(--border)',
-                                                                                backgroundColor: isRecording === item.preview ? '#EF4444' : 'transparent',
-                                                                                color: isRecording === item.preview ? 'white' : 'var(--text-muted)',
-                                                                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                                                                cursor: 'pointer',
-                                                                                flexShrink: 0
-                                                                            }}
-                                                                        >
-                                                                            <Mic size={14} className={isRecording === item.preview ? 'animate-pulse' : ''} />
-                                                                        </button>
-                                                                    </div>
+                                                                                {/* Overlay Actions */}
+                                                                                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2"
+                                                                                    style={{
+                                                                                        position: 'absolute', top: 0, right: 0, bottom: 0, left: 0,
+                                                                                        backgroundColor: 'rgba(0,0,0,0.4)',
+                                                                                        opacity: 0,
+                                                                                        transition: 'opacity 0.2s',
+                                                                                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem'
+                                                                                    }}
+                                                                                    onMouseEnter={(e) => e.currentTarget.style.opacity = 1}
+                                                                                    onMouseLeave={(e) => e.currentTarget.style.opacity = 0}
+                                                                                >
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        onClick={() => setActiveImageMeta(item)}
+                                                                                        style={{
+                                                                                            backgroundColor: 'white', border: 'none', borderRadius: '50%', width: '36px', height: '36px',
+                                                                                            display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--primary)'
+                                                                                        }}
+                                                                                        title="Bearbeiten"
+                                                                                    >
+                                                                                        <Edit3 size={18} />
+                                                                                    </button>
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        onClick={() => {
+                                                                                            if (window.confirm('Bild löschen?')) {
+                                                                                                setFormData(prev => ({ ...prev, images: prev.images.filter(img => img !== item) }))
+                                                                                            }
+                                                                                        }}
+                                                                                        style={{
+                                                                                            backgroundColor: 'white', border: 'none', borderRadius: '50%', width: '36px', height: '36px',
+                                                                                            display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#EF4444'
+                                                                                        }}
+                                                                                        title="Löschen"
+                                                                                    >
+                                                                                        <Trash size={18} />
+                                                                                    </button>
+                                                                                </div>
+                                                                            </div>
 
-                                                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={(e) => {
-                                                                                e.stopPropagation();
-                                                                                const newVal = item.includeInReport === false;
-                                                                                setFormData(prev => ({
-                                                                                    ...prev,
-                                                                                    images: prev.images.map(i => i === item ? { ...i, includeInReport: newVal } : i)
-                                                                                }));
-                                                                            }}
-                                                                            style={{
-                                                                                background: 'transparent',
-                                                                                border: 'none',
-                                                                                cursor: 'pointer',
-                                                                                padding: '4px',
+                                                                            {/* Footer: Description & Actions */}
+                                                                            <div style={{
+                                                                                padding: '0.5rem',
+                                                                                borderTop: '1px solid var(--border)',
+                                                                                backgroundColor: 'rgba(0,0,0,0.1)',
                                                                                 display: 'flex',
-                                                                                alignItems: 'center',
-                                                                                justifyContent: 'center',
+                                                                                flexDirection: 'column',
                                                                                 gap: '0.5rem'
-                                                                            }}
-                                                                            title={item.includeInReport !== false ? "Im Bericht enthalten" : "Nicht im Bericht"}
-                                                                        >
-                                                                            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Bild im Bericht verwenden</span>
-                                                                            {item.includeInReport !== false ? (
-                                                                                <CheckCircle size={18} color="#22C55E" />
-                                                                            ) : (
-                                                                                <Circle size={18} color="var(--text-muted)" />
-                                                                            )}
-                                                                        </button>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        ))}
+                                                                            }}>
+                                                                                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
+                                                                                    <textarea
+                                                                                        key={item.description || 'empty'}
+                                                                                        placeholder="Beschreibung..."
+                                                                                        rows={2}
+                                                                                        className="form-input"
+                                                                                        defaultValue={item.description || ''}
+                                                                                        onBlur={(e) => {
+                                                                                            const newDesc = e.target.value;
+                                                                                            if (newDesc !== item.description) {
+                                                                                                setFormData(prev => ({
+                                                                                                    ...prev,
+                                                                                                    images: prev.images.map(i => i === item ? { ...i, description: newDesc } : i)
+                                                                                                }));
+                                                                                            }
+                                                                                        }}
+                                                                                        onClick={(e) => e.stopPropagation()}
+                                                                                        style={{
+                                                                                            fontSize: '0.8rem',
+                                                                                            lineHeight: '1.2',
+                                                                                            padding: '0.4rem',
+                                                                                            minHeight: '40px',
+                                                                                            flex: 1,
+                                                                                            width: '100%',
+                                                                                            resize: 'vertical',
+                                                                                            backgroundColor: isRecording === item.preview ? '#450a0a' : 'rgba(0,0,0,0.2)',
+                                                                                            borderColor: isRecording === item.preview ? '#EF4444' : 'var(--border)'
+                                                                                        }}
+                                                                                    />
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        onClick={(e) => {
+                                                                                            e.stopPropagation();
+                                                                                            isRecording === item.preview ? stopRecording() : startRecording(item.preview);
+                                                                                        }}
+                                                                                        style={{
+                                                                                            width: '32px',
+                                                                                            height: '32px',
+                                                                                            borderRadius: '50%',
+                                                                                            border: isRecording === item.preview ? 'none' : '1px solid var(--border)',
+                                                                                            backgroundColor: isRecording === item.preview ? '#EF4444' : 'transparent',
+                                                                                            color: isRecording === item.preview ? 'white' : 'var(--text-muted)',
+                                                                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                                                            cursor: 'pointer',
+                                                                                            flexShrink: 0
+                                                                                        }}
+                                                                                    >
+                                                                                        <Mic size={14} className={isRecording === item.preview ? 'animate-pulse' : ''} />
+                                                                                    </button>
+                                                                                </div>
+
+                                                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        onClick={(e) => {
+                                                                                            e.stopPropagation();
+                                                                                            const newVal = item.includeInReport === false;
+                                                                                            setFormData(prev => ({
+                                                                                                ...prev,
+                                                                                                images: prev.images.map(i => i === item ? { ...i, includeInReport: newVal } : i)
+                                                                                            }));
+                                                                                        }}
+                                                                                        style={{
+                                                                                            background: 'transparent',
+                                                                                            border: 'none',
+                                                                                            cursor: 'pointer',
+                                                                                            padding: '4px',
+                                                                                            display: 'flex',
+                                                                                            alignItems: 'center',
+                                                                                            justifyContent: 'center',
+                                                                                            gap: '0.5rem'
+                                                                                        }}
+                                                                                        title={item.includeInReport !== false ? "Im Bericht enthalten" : "Nicht im Bericht"}
+                                                                                    >
+                                                                                        <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Bild im Bericht verwenden</span>
+                                                                                        {item.includeInReport !== false ? (
+                                                                                            <CheckCircle size={18} color="#22C55E" />
+                                                                                        ) : (
+                                                                                            <Circle size={18} color="var(--text-muted)" />
+                                                                                        )}
+                                                                                    </button>
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    ))}
+
+                                                                    {/* Show More Button */}
+                                                                    {roomImages.length > visibleCount && (
+                                                                        <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'center', marginTop: '1rem' }}>
+                                                                            <button
+                                                                                type="button"
+                                                                                className="btn btn-outline"
+                                                                                onClick={() => {
+                                                                                    const newLimit = visibleCount + 24;
+                                                                                    setFormData(prev => ({
+                                                                                        ...prev,
+                                                                                        rooms: prev.rooms.map(r => r.id === room.id ? { ...r, visibleImages: newLimit } : r)
+                                                                                    }));
+                                                                                }}
+                                                                                style={{ width: '100%', padding: '0.75rem', backgroundColor: 'rgba(255,255,255,0.05)' }}
+                                                                            >
+                                                                                {roomImages.length - visibleCount} weitere Bilder anzeigen ({roomImages.length} gesamt)
+                                                                            </button>
+                                                                        </div>
+                                                                    )}
+                                                                </>
+                                                            );
+                                                        })()}
                                                     </div>
                                                 </div>
                                             )
@@ -4330,30 +4498,54 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                                                             {/* Excel Icon */}
                                                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="28" height="28">
                                                                 <path fill="#10B981" d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" />
-                                                                <path fill="rgba(255,255,255,0.5)" d="M14 2v6h6" />
-                                                                <path fill="#fff" d="M8.5 17L11 13 8.5 9h2l1.3 2.5L13.1 9h2l-2.5 4 2.5 4h-2l-1.3-2.5-1.3 2.5h-2z" />
+                                                                <path fill="#047857" d="M14 2v6h6" />
+                                                                <path fill="#FFF" d="M10 10h4v2h-4zm0 4h4v2h-4z" />
                                                             </svg>
                                                         </div>
-
-                                                        <div style={{ flex: 1, overflow: 'hidden' }}>
-                                                            <div style={{ fontSize: '0.95rem', color: 'var(--text-main)', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.name}</div>
-                                                            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '2px' }}>{item.date ? new Date(item.date).toLocaleDateString('de-CH') : '-'}</div>
-                                                        </div>
-
-                                                        <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                                            <div style={{ color: 'var(--primary)', opacity: 0.8 }}>
-                                                                <Download size={18} />
+                                                        <div style={{ flex: 1 }}>
+                                                            <div style={{ fontWeight: 500, fontSize: '0.9rem' }}>{item.name}</div>
+                                                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                                                {item.date ? new Date(item.date).toLocaleDateString('de-CH') : 'Kein Datum'}
                                                             </div>
                                                         </div>
+
+                                                        {/* Delete Button */}
+                                                        <button
+                                                            type="button"
+                                                            className="btn btn-ghost"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                if (window.confirm(`Möchten Sie das Protokoll "${item.name}" wirklich löschen?`)) {
+                                                                    setFormData(prev => ({
+                                                                        ...prev,
+                                                                        images: prev.images.filter(img => img !== item)
+                                                                    }));
+                                                                }
+                                                            }}
+                                                            style={{
+                                                                color: '#EF4444',
+                                                                padding: '0.5rem',
+                                                                borderRadius: '50%',
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                justifyContent: 'center',
+                                                                backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                                                                marginLeft: 'auto'
+                                                            }}
+                                                            title="Löschen"
+                                                        >
+                                                            <Trash size={18} />
+                                                        </button>
                                                     </div>
                                                 ))}
                                             {formData.images.filter(img => img.assignedTo === 'Messprotokolle').length === 0 && (
-                                                <div style={{ padding: '1rem', fontStyle: 'italic', color: 'var(--text-muted)', textAlign: 'center', fontSize: '0.85rem' }}>
+                                                <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.9rem', fontStyle: 'italic' }}>
                                                     Keine Messprotokolle vorhanden.
                                                 </div>
                                             )}
                                         </div>
                                     </div>
+
 
                                     {/* Divider */}
                                     <div style={{ borderTop: '1px solid var(--border)', margin: '0 -1.5rem 1.5rem -1.5rem' }}></div>
@@ -4433,8 +4625,8 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                                                 </div>
                                             )}
                                         </div>
-                                    </div>
-                                </div>
+                                    </div >
+                                </div >
 
                                 {
                                     ['Emails', 'Pläne', 'Sonstiges'].map(category => (
@@ -4585,14 +4777,12 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                                         </div>
                                     ))
                                 }
-
-                            </>)}
+                            </>
+                            )}
                         </div>
-                    </div>
-
-
-                    {/* Summary Table (Moved to bottom) */}
+                    </div>                                {/* Summary Table (Moved to bottom) */}
                     {
+                        !['Schadenaufnahme', 'Leckortung'].includes(formData.status) &&
                         formData.equipment.some(d => d.endDate && d.counterEnd) && (
                             <div style={{ marginTop: '3rem', borderTop: '2px solid var(--border)', paddingTop: '2rem' }}>
                                 <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--primary)', marginBottom: '1rem' }}>Zusammenfassung Trocknung</h2>
@@ -4686,7 +4876,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                             </button>
                         </div>
                     </div>
-                </form >
+                </form>
 
                 {editingImage && (
                     <ImageEditor
@@ -4815,6 +5005,8 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                                                 <img
                                                     src={img.preview}
                                                     alt={`Bild ${idx + 1}`}
+                                                    loading="lazy"
+                                                    decoding="async"
                                                     style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                                                 />
                                                 <div style={{
@@ -5272,115 +5464,14 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                                     <textarea
                                         className="form-input"
                                         rows={3}
-                                        value={reportCause}
-                                        onChange={(e) => setReportCause(e.target.value)}
+                                        value={formData.cause || ''}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, cause: e.target.value }))}
                                         placeholder="Beschreiben Sie hier die Ursache des Schadens..."
                                         style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', fontSize: '1rem' }}
                                     />
                                 </div>
 
-                                {/* 2. Image Selection Grid */}
-                                <div style={{ marginBottom: '1rem' }}>
-                                    <h4 style={{ fontSize: '1.1rem', fontWeight: 'bold', color: '#0EA5E9', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                        <Image size={20} />
-                                        Bilder auswählen & beschreiben ({formData.images.filter(img => img.includeInReport !== false).length})
-                                    </h4>
 
-                                    <div style={{
-                                        display: 'grid',
-                                        gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-                                        gap: '1rem'
-                                    }}>
-                                        {formData.images.map((img, idx) => (
-                                            <div key={idx} style={{
-                                                border: img.includeInReport !== false ? '2px solid #0EA5E9' : '1px solid var(--border)',
-                                                borderRadius: '8px',
-                                                overflow: 'hidden',
-                                                backgroundColor: impl.includeInReport !== false ? 'rgba(14, 165, 233, 0.05)' : 'transparent',
-                                                opacity: img.includeInReport === false ? 0.6 : 1,
-                                                transition: 'all 0.2s'
-                                            }}>
-                                                {/* Header: Checkbox & Filename */}
-                                                <div style={{ padding: '0.75rem', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '0.75rem', backgroundColor: '#1E293B' }}>
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={img.includeInReport !== false}
-                                                        onChange={(e) => {
-                                                            const isChecked = e.target.checked;
-                                                            setFormData(prev => ({
-                                                                ...prev,
-                                                                images: prev.images.map(i => i === img ? { ...i, includeInReport: isChecked } : i)
-                                                            }));
-                                                        }}
-                                                        style={{ width: '1.2rem', height: '1.2rem', accentColor: '#0EA5E9', cursor: 'pointer' }}
-                                                    />
-                                                    <span style={{ fontSize: '0.9rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={img.name}>
-                                                        {img.name}
-                                                    </span>
-                                                </div>
-
-                                                {/* Preview Image */}
-                                                <div style={{ height: '180px', backgroundColor: 'black', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
-                                                    {img.preview ? (
-                                                        <img
-                                                            src={img.preview}
-                                                            alt={img.name}
-                                                            style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
-                                                            onClick={() => {
-                                                                // Toggle selection on image click too
-                                                                const newVal = !(img.includeInReport !== false);
-                                                                setFormData(prev => ({
-                                                                    ...prev,
-                                                                    images: prev.images.map(i => i === img ? { ...i, includeInReport: newVal } : i)
-                                                                }));
-                                                            }}
-                                                        />
-                                                    ) : (
-                                                        <div style={{ color: '#64748B' }}>Keine Vorschau</div>
-                                                    )}
-
-                                                    {/* Badge if Selected */}
-                                                    {img.includeInReport !== false && (
-                                                        <div style={{ position: 'absolute', top: '0.5rem', right: '0.5rem', backgroundColor: '#0EA5E9', borderRadius: '50%', padding: '0.2rem' }}>
-                                                            <Check size={16} color="white" />
-                                                        </div>
-                                                    )}
-                                                </div>
-
-                                                {/* Footer: Description Input */}
-                                                <div style={{ padding: '0.75rem' }}>
-                                                    <textarea
-                                                        placeholder="Bildbeschreibung für Bericht..."
-                                                        value={img.description || ''}
-                                                        onChange={(e) => {
-                                                            const newDesc = e.target.value;
-                                                            setFormData(prev => ({
-                                                                ...prev,
-                                                                images: prev.images.map(i => i === img ? { ...i, description: newDesc } : i)
-                                                            }));
-                                                        }}
-                                                        rows={2}
-                                                        style={{
-                                                            width: '100%',
-                                                            fontSize: '0.85rem',
-                                                            padding: '0.5rem',
-                                                            backgroundColor: '#0F172A',
-                                                            border: '1px solid var(--border)',
-                                                            color: 'white',
-                                                            borderRadius: '4px',
-                                                            resize: 'vertical'
-                                                        }}
-                                                    />
-                                                </div>
-                                            </div>
-                                        ))}
-                                        {formData.images.length === 0 && (
-                                            <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '2rem', color: '#94A3B8', fontStyle: 'italic' }}>
-                                                Noch keine Bilder hochgeladen.
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
                             </div>
 
                             <div style={{ padding: '1.5rem', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', gap: '1rem', backgroundColor: '#1E293B' }}>
@@ -5393,14 +5484,10 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                                 </button>
                                 <button
                                     className="btn btn-primary"
-                                    onClick={() => {
-                                        // Save cause to form data state implicitly via closure? 
-                                        // No, update form data state so it persists
-                                        setFormData(prev => ({ ...prev, cause: reportCause }));
-                                        // Trigger PDF logic (Original HTML Screenshot Report for Insurance)
-                                        generatePDFContent();
-                                        setShowReportModal(false); // Close modal only after starting generation (or keep open for progress?)
-                                        // Usually better to keep open or show spinner, but let's follow existing pattern
+                                    onClick={async () => {
+                                        // Trigger PDF logic (Unified Vector Report)
+                                        await generatePDFExport(formData);
+                                        setShowReportModal(false);
                                     }}
                                     style={{ padding: '0.75rem 2rem', fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
                                 >
@@ -5413,162 +5500,166 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                 )
             }
 
-            {/* Print Report Template - Hidden on Screen unless generating */}
-            <div
-                id="print-report"
-                className="print-only"
-                style={{
-                    display: isGeneratingPDF ? 'block' : 'none',
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    width: '210mm', // A4 width
-                    minHeight: '297mm', // A4 height
-                    backgroundColor: 'white',
-                    zIndex: -1000, // Hide behind everything
-                    padding: '20mm', // Print margins
-                    color: 'black',
-                    fontFamily: 'Arial, sans-serif'
-                }}
-            >
-                <div className="pdf-section" style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    marginBottom: '2rem',
-                    borderBottom: '4px solid #0EA5E9',
-                    paddingBottom: '1.5rem'
-                }}>
-                    <div>
-                        <h1 style={{ fontSize: '28pt', fontWeight: '800', margin: 0, color: '#0F172A', letterSpacing: '-0.5px' }}>Schadensbericht</h1>
-                        <div style={{ fontSize: '11pt', marginTop: '0.5rem', color: '#64748B' }}>Erstellt am: {new Date().toLocaleDateString('de-DE')}</div>
-                    </div>
-                    <div style={{ textAlign: 'right' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '1rem', marginBottom: '0.5rem' }}>
-                            <img src="/logo.png" style={{ height: '50px', objectFit: 'contain' }} alt="Logo" />
-                            <div style={{ textAlign: 'right' }}>
-                                <div style={{ fontWeight: 'bold', fontSize: '16pt', color: '#0F172A' }}>Q-Service AG</div>
-
+            {/* Print Report Template - Only render when generating to save performance */}
+            {
+                isGeneratingPDF && (
+                    <div
+                        id="print-report"
+                        className="print-only"
+                        style={{
+                            display: 'block',
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            width: '210mm', // A4 width
+                            minHeight: '297mm', // A4 height
+                            backgroundColor: 'white',
+                            zIndex: -1000, // Hide behind everything
+                            padding: '20mm', // Print margins
+                            color: 'black',
+                            fontFamily: 'Arial, sans-serif'
+                        }}
+                    >
+                        <div className="pdf-section" style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            marginBottom: '2rem',
+                            borderBottom: '4px solid #0EA5E9',
+                            paddingBottom: '1.5rem'
+                        }}>
+                            <div>
+                                <h1 style={{ fontSize: '28pt', fontWeight: '800', margin: 0, color: '#0F172A', letterSpacing: '-0.5px' }}>Schadensbericht</h1>
+                                <div style={{ fontSize: '11pt', marginTop: '0.5rem', color: '#64748B' }}>Erstellt am: {new Date().toLocaleDateString('de-DE')}</div>
                             </div>
-                        </div>
-                        <div style={{ fontSize: '9pt', color: '#475569', lineHeight: 1.4 }}>
-                            Kriesbachstrasse 30, 8600 Dübendorf<br />
-                            Tel: 043 819 14 18 | www.q-service.ch
-                        </div>
-                    </div>
-                </div>
+                            <div style={{ textAlign: 'right' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '1rem', marginBottom: '0.5rem' }}>
+                                    <img src="/logo.png" style={{ height: '50px', objectFit: 'contain' }} alt="Logo" />
+                                    <div style={{ textAlign: 'right' }}>
+                                        <div style={{ fontWeight: 'bold', fontSize: '16pt', color: '#0F172A' }}>Q-Service AG</div>
 
-                <div className="pdf-section" style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '2rem', marginBottom: '2.5rem' }}>
-                    <div style={{ backgroundColor: '#F8FAFC', padding: '1.5rem', borderRadius: '12px', border: '1px solid #E2E8F0' }}>
-                        <h3 style={{ color: '#0EA5E9', marginBottom: '1rem', fontSize: '12pt', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 'bold' }}>Projektdaten</h3>
-                        <div style={{ display: 'grid', gridTemplateColumns: '110px 1fr', gap: '0.75rem', fontSize: '10pt', color: '#334155' }}>
-                            {formData.projectTitle && (
-                                <>
-                                    <strong style={{ color: '#64748B' }}>Projekt:</strong> <span style={{ fontWeight: 600, color: '#0F172A' }}>{formData.projectTitle}</span>
-                                </>
-                            )}
-                            <strong style={{ color: '#64748B' }}>Auftraggeber:</strong> <span style={{ fontWeight: 600, color: '#0F172A' }}>{formData.client}</span>
-                            <strong style={{ color: '#64748B' }}>Zuständig:</strong> <span style={{ fontWeight: 600, color: '#0F172A' }}>{formData.assignedTo}</span>
-                            <strong style={{ color: '#64748B' }}>Ort:</strong> <span style={{ fontWeight: 600, color: '#0F172A' }}>{formData.street}, {formData.zip} {formData.city}</span>
-                        </div>
-                    </div>
-
-                    <div style={{ backgroundColor: '#F8FAFC', padding: '1.5rem', borderRadius: '12px', border: '1px solid #E2E8F0' }}>
-                        <h3 style={{ color: '#0EA5E9', marginBottom: '1rem', fontSize: '12pt', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 'bold' }}>Schaden</h3>
-                        <div style={{ display: 'grid', gridTemplateColumns: '60px 1fr', gap: '0.75rem', fontSize: '10pt', color: '#334155' }}>
-                            <strong style={{ color: '#64748B' }}>Art:</strong> <span style={{ fontWeight: 600, color: '#0F172A' }}>{formData.damageType}</span>
-                        </div>
-                    </div>
-                </div>
-
-                {formData.description && (
-                    <div className="pdf-section" style={{ marginBottom: '2.5rem' }}>
-                        <h3 style={{ borderLeft: '4px solid #0EA5E9', paddingLeft: '1rem', marginBottom: '1rem', fontSize: '14pt', color: '#0F172A', fontWeight: 'bold' }}>Beschreibung / Feststellungen</h3>
-                        <div style={{ whiteSpace: 'pre-wrap', fontSize: '11pt', lineHeight: 1.6, color: '#334155', backgroundColor: 'white', padding: '0 0.5rem' }}>
-                            {formData.description}
-                        </div>
-                    </div>
-                )}
-
-                {/* Cause Section */}
-                {reportCause && (
-                    <div className="pdf-section" style={{ marginBottom: '2.5rem', breakInside: 'avoid' }}>
-                        <h3 style={{ borderLeft: '4px solid #0EA5E9', paddingLeft: '1rem', marginBottom: '1rem', fontSize: '14pt', color: '#0F172A', fontWeight: 'bold' }}>Schadenursache</h3>
-                        <div style={{ whiteSpace: 'pre-wrap', fontSize: '11pt', lineHeight: 1.6, color: '#334155', backgroundColor: '#F1F5F9', padding: '1.5rem', borderRadius: '8px', borderLeft: '4px solid #CBD5E1' }}>
-                            {reportCause}
-                        </div>
-                    </div>
-                )}
-
-                <div className="print-break-inside-avoid">
-                    <h3 className="pdf-section" style={{
-                        backgroundColor: '#0F172A',
-                        color: 'white',
-                        padding: '0.75rem 1.5rem',
-                        fontSize: '14pt',
-                        fontWeight: 'bold',
-                        marginBottom: '2rem',
-                        borderRadius: '8px'
-                    }}>
-                        Dokumentation & Bilder
-                    </h3>
-
-                    {/* Loop through rooms */}
-                    {formData.rooms
-                        .filter(room => formData.images.some(img => img.roomId === room.id && img.includeInReport !== false))
-                        .map(room => (
-                            <div key={room.id} style={{ marginBottom: '2rem' }}>
-                                <h4 className="pdf-section" style={{
-                                    fontSize: '13pt',
-                                    color: '#0EA5E9',
-                                    fontWeight: 'bold',
-                                    marginBottom: '1rem',
-                                    paddingBottom: '0.5rem',
-                                    borderBottom: '1px solid #E2E8F0',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '0.5rem'
-                                }}>
-                                    <span style={{ display: 'inline-block', width: '8px', height: '8px', backgroundColor: '#0EA5E9', borderRadius: '50%' }}></span>
-                                    {room.apartment ? `${room.apartment} - ` : ''}{room.name}
-                                </h4>
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
-                                    {formData.images
-                                        .filter(img => img.roomId === room.id && img.includeInReport !== false)
-                                        .map((img, idx) => (
-                                            <div key={idx} className="pdf-section" style={{
-                                                breakInside: 'avoid',
-                                                backgroundColor: '#fff',
-                                                borderRadius: '8px',
-                                                overflow: 'hidden',
-                                                boxShadow: '0 2px 5px rgba(0,0,0,0.05)',
-                                                border: '1px solid #E2E8F0'
-                                            }}>
-                                                <div style={{
-                                                    height: '350px',
-                                                    overflow: 'hidden',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'center',
-                                                    backgroundColor: '#F8FAFC',
-                                                    borderBottom: '1px solid #E2E8F0'
-                                                }}>
-                                                    <img src={img.preview} alt="" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
-                                                </div>
-                                                {img.description && (
-                                                    <div style={{ fontSize: '10pt', padding: '0.25rem', fontStyle: 'italic', color: '#555' }}>
-                                                        {img.description}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        ))}
+                                    </div>
+                                </div>
+                                <div style={{ fontSize: '9pt', color: '#475569', lineHeight: 1.4 }}>
+                                    Kriesbachstrasse 30, 8600 Dübendorf<br />
+                                    Tel: 043 819 14 18 | www.q-service.ch
                                 </div>
                             </div>
-                        ))}
+                        </div>
+
+                        <div className="pdf-section" style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '2rem', marginBottom: '2.5rem' }}>
+                            <div style={{ backgroundColor: '#F8FAFC', padding: '1.5rem', borderRadius: '12px', border: '1px solid #E2E8F0' }}>
+                                <h3 style={{ color: '#0EA5E9', marginBottom: '1rem', fontSize: '12pt', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 'bold' }}>Projektdaten</h3>
+                                <div style={{ display: 'grid', gridTemplateColumns: '110px 1fr', gap: '0.75rem', fontSize: '10pt', color: '#334155' }}>
+                                    {formData.projectTitle && (
+                                        <>
+                                            <strong style={{ color: '#64748B' }}>Projekt:</strong> <span style={{ fontWeight: 600, color: '#0F172A' }}>{formData.projectTitle}</span>
+                                        </>
+                                    )}
+                                    <strong style={{ color: '#64748B' }}>Auftraggeber:</strong> <span style={{ fontWeight: 600, color: '#0F172A' }}>{formData.client}</span>
+                                    <strong style={{ color: '#64748B' }}>Zuständig:</strong> <span style={{ fontWeight: 600, color: '#0F172A' }}>{formData.assignedTo}</span>
+                                    <strong style={{ color: '#64748B' }}>Ort:</strong> <span style={{ fontWeight: 600, color: '#0F172A' }}>{formData.street}, {formData.zip} {formData.city}</span>
+                                </div>
+                            </div>
+
+                            <div style={{ backgroundColor: '#F8FAFC', padding: '1.5rem', borderRadius: '12px', border: '1px solid #E2E8F0' }}>
+                                <h3 style={{ color: '#0EA5E9', marginBottom: '1rem', fontSize: '12pt', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 'bold' }}>Schaden</h3>
+                                <div style={{ display: 'grid', gridTemplateColumns: '60px 1fr', gap: '0.75rem', fontSize: '10pt', color: '#334155' }}>
+                                    <strong style={{ color: '#64748B' }}>Art:</strong> <span style={{ fontWeight: 600, color: '#0F172A' }}>{formData.damageType}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {formData.description && (
+                            <div className="pdf-section" style={{ marginBottom: '2.5rem' }}>
+                                <h3 style={{ borderLeft: '4px solid #0EA5E9', paddingLeft: '1rem', marginBottom: '1rem', fontSize: '14pt', color: '#0F172A', fontWeight: 'bold' }}>Beschreibung / Feststellungen</h3>
+                                <div style={{ whiteSpace: 'pre-wrap', fontSize: '11pt', lineHeight: 1.6, color: '#334155', backgroundColor: 'white', padding: '0 0.5rem' }}>
+                                    {formData.description}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Cause Section */}
+                        {reportCause && (
+                            <div className="pdf-section" style={{ marginBottom: '2.5rem', breakInside: 'avoid' }}>
+                                <h3 style={{ borderLeft: '4px solid #0EA5E9', paddingLeft: '1rem', marginBottom: '1rem', fontSize: '14pt', color: '#0F172A', fontWeight: 'bold' }}>Schadenursache</h3>
+                                <div style={{ whiteSpace: 'pre-wrap', fontSize: '11pt', lineHeight: 1.6, color: '#334155', backgroundColor: '#F1F5F9', padding: '1.5rem', borderRadius: '8px', borderLeft: '4px solid #CBD5E1' }}>
+                                    {reportCause}
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="print-break-inside-avoid">
+                            <h3 className="pdf-section" style={{
+                                backgroundColor: '#0F172A',
+                                color: 'white',
+                                padding: '0.75rem 1.5rem',
+                                fontSize: '14pt',
+                                fontWeight: 'bold',
+                                marginBottom: '2rem',
+                                borderRadius: '8px'
+                            }}>
+                                Dokumentation & Bilder
+                            </h3>
+
+                            {/* Loop through rooms */}
+                            {formData.rooms
+                                .filter(room => formData.images.some(img => img.roomId === room.id && img.includeInReport !== false))
+                                .map(room => (
+                                    <div key={room.id} style={{ marginBottom: '2rem' }}>
+                                        <h4 className="pdf-section" style={{
+                                            fontSize: '13pt',
+                                            color: '#0EA5E9',
+                                            fontWeight: 'bold',
+                                            marginBottom: '1rem',
+                                            paddingBottom: '0.5rem',
+                                            borderBottom: '1px solid #E2E8F0',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '0.5rem'
+                                        }}>
+                                            <span style={{ display: 'inline-block', width: '8px', height: '8px', backgroundColor: '#0EA5E9', borderRadius: '50%' }}></span>
+                                            {room.apartment ? `${room.apartment} - ` : ''}{room.name}
+                                        </h4>
+                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+                                            {formData.images
+                                                .filter(img => img.roomId === room.id && img.includeInReport !== false)
+                                                .map((img, idx) => (
+                                                    <div key={idx} className="pdf-section" style={{
+                                                        breakInside: 'avoid',
+                                                        backgroundColor: '#fff',
+                                                        borderRadius: '8px',
+                                                        overflow: 'hidden',
+                                                        boxShadow: '0 2px 5px rgba(0,0,0,0.05)',
+                                                        border: '1px solid #E2E8F0'
+                                                    }}>
+                                                        <div style={{
+                                                            height: '350px',
+                                                            overflow: 'hidden',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
+                                                            backgroundColor: '#F8FAFC',
+                                                            borderBottom: '1px solid #E2E8F0'
+                                                        }}>
+                                                            <img src={img.preview} alt="" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+                                                        </div>
+                                                        {img.description && (
+                                                            <div style={{ fontSize: '10pt', padding: '0.25rem', fontStyle: 'italic', color: '#555' }}>
+                                                                {img.description}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                        </div>
+                                    </div>
+                                ))}
 
 
-                </div>
-            </div >
+                        </div>
+                    </div >
+                )
+            }
         </>
     )
 }

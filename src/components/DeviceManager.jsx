@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Trash, Edit, X, Search, Monitor, Fan, Wind, Thermometer, Wrench, Download, Loader2, LogOut } from 'lucide-react';
+import { Plus, Trash, Edit, X, Search, Monitor, Fan, Wind, Thermometer, Wrench, Download, Loader2, LogOut, ExternalLink } from 'lucide-react';
 import generatedDevices from '../data/imported_devices.json';
 import { supabase } from '../supabaseClient';
 
@@ -33,7 +33,7 @@ const DEVICE_ICONS = {
     'Wasserabscheider': <Wrench size={20} />
 };
 
-export default function DeviceManager({ onBack }) {
+export default function DeviceManager({ onBack, onNavigateToReport }) {
     const [devices, setDevices] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [isEditing, setIsEditing] = useState(false);
@@ -279,9 +279,29 @@ export default function DeviceManager({ onBack }) {
                                         </td>
                                         <td style={{ fontSize: '0.9rem' }}>
                                             {device.current_project ? (
-                                                <span style={{ color: 'var(--primary)', fontWeight: 500 }}>
+                                                <button
+                                                    onClick={() => onNavigateToReport && onNavigateToReport(device.current_project)}
+                                                    className="btn-ghost"
+                                                    style={{
+                                                        color: 'var(--primary)',
+                                                        fontWeight: 500,
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: '0.5rem',
+                                                        padding: '0.25rem 0.5rem',
+                                                        borderRadius: '4px',
+                                                        cursor: 'pointer',
+                                                        textAlign: 'left',
+                                                        width: '100%',
+                                                        background: 'transparent',
+                                                        border: 'none',
+                                                        fontSize: 'inherit'
+                                                    }}
+                                                    title={`Zum Auftrag "${device.current_project}" springen`}
+                                                >
                                                     {device.current_project}
-                                                </span>
+                                                    <ExternalLink size={14} />
+                                                </button>
                                             ) : (
                                                 <span style={{ color: 'var(--text-muted)' }}>-</span>
                                             )}

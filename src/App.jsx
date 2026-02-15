@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Plus, LayoutDashboard, Settings, User } from 'lucide-react'
 import { supabase } from './supabaseClient'
 import Dashboard from './components/Dashboard'
@@ -78,70 +78,144 @@ function App() {
     setSelectedReport(null)
   }
 
-  const handleSaveReport = async (updatedReport, silent = false) => {
-    let newReports;
+  const handleSaveReport = useCallback(async (updatedReport, silent = false) => {
+    // Use functional update to access latest reports without adding it to dependency array
+    setReports(currentReports => {
+      let newReports;
+      const exists = currentReports.find(r => r.id === updatedReport.id);
 
-    // Check if it's an existing report
-    const exists = reports.find(r => r.id === updatedReport.id);
+      if (exists) {
+        newReports = currentReports.map(r => r.id === updatedReport.id ? updatedReport : r);
+      } else {
+        // New report
+        const newId = updatedReport.id || updatedReport.projectTitle || `TMP-${Date.now()}`;
+        // We must mutate the updatedReport copy in the outer scope ideally, but here we just ensure consistency
+        if (!updatedReport.id) updatedReport = { ...updatedReport, id: newId };
 
-    if (exists) {
-      newReports = reports.map(r => r.id === updatedReport.id ? updatedReport : r);
-    } else {
-      // New report
-      // Ensure we have an ID. If not provided, generate one or use Project Title
-      const newId = updatedReport.id || updatedReport.projectTitle || `TMP-${Date.now()}`;
-      const newReport = { ...updatedReport, id: newId };
+        newReports = [updatedReport, ...currentReports];
+      }
 
-      // If we didn't have ID before, update it
-      updatedReport = newReport;
+      // Persist to LocalStorage (Sanitized)
+      try {
+        const sanitizedReports = newReports.map(r => ({
+          ...r,
+          images: r.images ? r.images.map(img => ({
+            ...img,
+            // Don't save blob URLs to LS (they expire). Keep keys if they are real URLs or base64 (though base64 is heavy)
+            preview: (img.preview && img.preview.startsWith('blob:')) ? null : img.preview
+          })) : []
+        }));
+        localStorage.setItem('qservice_reports_prod', JSON.stringify(sanitizedReports));
+      } catch (e) {
+        console.error("LocalStorage Save Failed (Quota/Size?):", e);
+      }
+      return newReports;
+    });
 
-      newReports = [newReport, ...reports];
-    }
-
-    // Update State
-    setReports(newReports);
+    // Update selection if not silent (UI feedback)
     if (!silent) {
-      setSelectedReport(updatedReport);
+      setSelectedReport(prev => {
+        // Only update if ID matches or it's a new one, to avoid heavy re-renders if unrelated
+        if (!prev || prev.id === updatedReport.id || !updatedReport.id) return updatedReport;
+        return prev;
+      });
+      setView('details');
     }
 
-    // Persist to LocalStorage
-    localStorage.setItem('qservice_reports_prod', JSON.stringify(newReports));
-
-    // Persist to Supabase
+    // Persist to Supabase (Background)
     if (supabase) {
-      const reportToSave = updatedReport;
-
-      // Map fields to columns for easier filtering
+      // ... Supabase logic (can run safely with captured updatedReport) ...
       const rowData = {
-        id: reportToSave.id, // Primary Key
-        project_title: reportToSave.projectTitle,
-        client: reportToSave.client,
-        address: reportToSave.address,
-        status: reportToSave.status,
-        assigned_to: reportToSave.assignedTo,
-        date: reportToSave.date,
-        drying_started: reportToSave.dryingStarted,
-        report_data: reportToSave, // Full JSON
+        id: updatedReport.id,
+        project_title: updatedReport.projectTitle,
+        client: updatedReport.client,
+        address: updatedReport.address,
+        status: updatedReport.status,
+        assigned_to: updatedReport.assignedTo,
+        date: updatedReport.date,
+        drying_started: updatedReport.dryingStarted,
+        report_data: updatedReport,
         updated_at: new Date().toISOString()
       };
 
+      supabase.from('damage_reports').upsert(rowData).then(({ error }) => {
+        if (error) {
+          const errMsg = error.message || JSON.stringify(error);
+          if (errMsg.toLowerCase().includes('abort') || errMsg.toLowerCase().includes('signal is aborted')) {
+            console.warn('Save aborted (likely harmless):', error);
+          } else {
+            console.error('Error saving to Supabase:', error);
+            showToast('Fehler beim Speichern: ' + errMsg, 'error');
+          }
+        } else {
+          console.log('Successfully saved to Supabase');
+          if (!silent) showToast('Erfolgreich gespeichert!', 'success');
+        }
+      });
+    }
+  }, [supabase]);
+
+  const handleNavigateToReport = (identifier) => {
+    if (!identifier) return;
+
+    // Try to find by ID first, then by Project Title
+    const report = reports.find(r => r.id === identifier || r.projectTitle === identifier);
+
+    if (report) {
+      handleSelectReport(report);
+      showToast(`Auftrag "${report.projectTitle || report.id}" geöffnet`, 'success');
+    } else {
+      showToast(`Auftrag "${identifier}" nicht gefunden`, 'error');
+    }
+  };
+
+  const handleDeleteReport = async (reportId) => {
+    // 1. Optimistic UI Update
+    const reportToDelete = reports.find(r => r.id === reportId);
+    if (!reportToDelete) return;
+
+    setReports(prev => {
+      const newReports = prev.filter(r => r.id !== reportId);
+      // Sync to LocalStorage
+      try {
+        const sanitizedReports = newReports.map(r => ({
+          ...r,
+          images: r.images ? r.images.map(img => ({
+            ...img,
+            preview: (img.preview && img.preview.startsWith('blob:')) ? null : img.preview
+          })) : []
+        }));
+        localStorage.setItem('qservice_reports_prod', JSON.stringify(sanitizedReports));
+      } catch (e) {
+        console.error("LocalStorage Update Failed after Delete:", e);
+      }
+      return newReports;
+    });
+
+    if (selectedReport && selectedReport.id === reportId) {
+      setSelectedReport(null);
+      setView('dashboard');
+    }
+
+    // 2. Supabase Deletion
+    if (supabase) {
       const { error } = await supabase
         .from('damage_reports')
-        .upsert(rowData);
+        .delete()
+        .eq('id', reportId);
 
       if (error) {
-        console.error('Error saving to Supabase:', error);
-        alert('Fehler beim Speichern in die Cloud: ' + error.message);
+        console.error('Error deleting from Supabase:', error);
+        showToast('Fehler beim Löschen aus der Datenbank (Lokal gelöscht)', 'warning');
+        // Optionally revert state here if strict consistency is needed, 
+        // but for now we prioritize UI responsiveness and assume success/eventual consistency
       } else {
-        console.log('Successfully saved to Supabase');
-        if (!silent) showToast('Erfolgreich gespeichert!', 'success');
+        showToast('Bericht erfolgreich gelöscht', 'success');
       }
+    } else {
+      showToast('Bericht lokal gelöscht', 'success');
     }
-
-    if (!silent) {
-      setView('details');
-    }
-  }
+  };
 
   // Toast Notification System
   const [toast, setToast] = useState(null); // { message, type }
@@ -256,8 +330,8 @@ function App() {
       </header>
 
       <main className="container" style={{ marginTop: '2rem' }}>
-        {view === 'dashboard' && <Dashboard reports={reports} onSelectReport={handleSelectReport} mode={isTechnicianMode ? 'technician' : 'desktop'} />}
-        {view === 'devices' && <DeviceManager onBack={() => setView('dashboard')} />}
+        {view === 'dashboard' && <Dashboard reports={reports} onSelectReport={handleSelectReport} onDeleteReport={handleDeleteReport} mode={isTechnicianMode ? 'technician' : 'desktop'} />}
+        {view === 'devices' && <DeviceManager onBack={() => setView('dashboard')} onNavigateToReport={handleNavigateToReport} />}
         {(view === 'new-report' || view === 'details') && (
           <DamageForm
             key={selectedReport ? selectedReport.id : 'new'}
