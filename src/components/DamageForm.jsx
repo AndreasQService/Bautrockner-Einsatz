@@ -1855,8 +1855,8 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                         </div>
                     </div>
 
-                    {/* 1b. Exterior Photo (Aussenaufnahme) - Technician Mode */}
-                    {(mode === 'desktop' || (formData.status !== 'Trocknung' && formData.status !== 'Leckortung')) && (
+                    {/* 1b. Exterior Photo (Aussenaufnahme) */}
+                    {(formData.exteriorPhoto || (formData.status !== 'Trocknung' && formData.status !== 'Leckortung')) && (
                         <div style={{ flex: '1 1 350px', backgroundColor: 'var(--surface)', padding: '1rem', borderRadius: '8px', color: 'var(--text-main)' }}>
                             <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-main)' }}>
                                 <Camera size={18} /> Aussenaufnahme
