@@ -2900,18 +2900,14 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                                     className="btn btn-outline"
                                     onClick={async () => {
                                         try {
-                                            const result = await generateMeasurementExcel(formData);
-                                            if (result) {
-                                                const file = new File([result.blob], result.fileName, { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-                                                await handleImageUpload([file], { assignedTo: 'Messprotokolle' });
-                                            }
+                                            await generateMeasurementExcel(formData);
                                         } catch (error) {
                                             console.error("Excel Export failed:", error);
                                             alert("Fehler beim Erstellen des Excel-Protokolls.");
                                         }
                                     }}
                                     style={{ fontSize: '0.85rem', padding: '0.5rem 1rem', gap: '0.4rem', borderColor: '#10B981', color: '#10B981', display: 'flex', alignItems: 'center' }}
-                                    title="Excel Export aller Messräume (wird in Liste gespeichert)"
+                                    title="Excel Export aller Messräume (Download)"
                                 >
                                     <Table size={16} />
                                     Excel Export
@@ -2919,17 +2915,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                             </div>
 
                             {/* Measurement Excel List */}
-                            <div>
-                                <h4 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '0.25rem', color: 'var(--primary)' }}>Messprotokolle (Excel)</h4>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '2rem' }}>
-                                    {formData.images.filter(img => img.assignedTo === 'Messprotokolle').map((item, idx) => (
-                                        <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem', backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
-                                            <div style={{ fontWeight: 500, fontSize: '0.9rem' }}>{item.name}</div>
-                                            <button type="button" className="btn btn-ghost" onClick={() => setFormData(prev => ({ ...prev, images: prev.images.filter(img => img !== item) }))} style={{ color: '#EF4444', marginLeft: 'auto' }}><Trash size={18} /></button>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
+
                         </div>
 
                     </div>
