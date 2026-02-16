@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Camera, Image, Trash, X, Plus, Edit3, Save, Upload, FileText, CheckCircle, Circle, AlertTriangle, Play, HelpCircle, ArrowLeft, Mail, Map, MapPin, Folder, Mic, Paperclip, Table, Download, Check, Settings } from 'lucide-react'
+import { Camera, Image, Trash, X, Plus, Edit3, Save, Upload, FileText, CheckCircle, Circle, AlertTriangle, Play, HelpCircle, ArrowLeft, Mail, Map, MapPin, Folder, Mic, Paperclip, Table, Download, Check, Settings, RotateCcw } from 'lucide-react'
 import { supabase } from '../supabaseClient';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
@@ -13,6 +13,7 @@ import EmailImportModal from './EmailImportModalV2';
 import OpenAI from "openai";
 import CameraCaptureModal from './CameraCaptureModal';
 import MeasurementModal from './MeasurementModal';
+import { generateMeasurementExcel } from '../utils/MeasurementExcelExporter';
 
 const STEPS = ['Schadenaufnahme', 'Leckortung', 'Trocknung', 'Instandsetzung']
 
@@ -153,6 +154,8 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         contacts: [
             { apartment: '', name: '', phone: '', role: 'Mieter' }
         ],
+        notes: '',
+        documents: [],
         damageType: '',
         damageTypeImage: null,
         status: 'Schadenaufnahme',
@@ -163,6 +166,33 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         images: [],
         rooms: []
     }));
+
+    const [isSaving, setIsSaving] = useState(false);
+    const [lastSaved, setLastSaved] = useState(null);
+
+    // Auto-Save Effect
+    useEffect(() => {
+        // Skip auto-save if it's the very first render/empty (optional check)
+        if (!formData.projectTitle && !formData.id) return;
+
+        setIsSaving(true);
+        const timer = setTimeout(() => {
+            // Prepare data similar to handleSubmit
+            const fullAddress = `${formData.street}, ${formData.zip} ${formData.city}`;
+            const reportData = {
+                ...formData,
+                address: fullAddress, // Save standardized address string
+                type: formData.damageType, // Map back to 'type'
+                imageCount: formData.images.length
+            };
+
+            onSave(reportData, true); // silent=true
+            setIsSaving(false);
+            setLastSaved(new Date());
+        }, 2000); // 2 second debounce
+
+        return () => clearTimeout(timer);
+    }, [formData, onSave]);
 
     // --- Device Selection Logic ---
     const [availableDevices, setAvailableDevices] = useState([]);
@@ -200,8 +230,10 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
 
     const [showMeasurementModal, setShowMeasurementModal] = useState(false);
     const [isNewMeasurement, setIsNewMeasurement] = useState(false);
+    const [isMeasurementReadOnly, setIsMeasurementReadOnly] = useState(false); // Explicit read-only mode for modal
     const [activeRoomForMeasurement, setActiveRoomForMeasurement] = useState(null); // Track which room we are editing
     const [showAddDeviceForm, setShowAddDeviceForm] = useState(false);
+    const [showAddRoomForm, setShowAddRoomForm] = useState(false);
     const [unsubscribeStates, setUnsubscribeStates] = useState({}); // { [idx]: { endDate, counterEnd, hours } }
 
     // Audio Recording State
@@ -1067,7 +1099,8 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
             rooms: [...prev.rooms, roomEntry]
         }));
 
-        setNewRoom({ name: '', apartment: '', stockwerk: '', customName: '' });
+        // Keep apartment, only clear name/customName
+        setNewRoom(prev => ({ ...prev, name: '', stockwerk: '', customName: '' }));
     }
 
     const handleRemoveRoom = (id) => {
@@ -1588,7 +1621,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         // Debug Alert removed
         // console.log("Setting State Contacts:", finalContacts);
 
-        console.log("Setting State Contacts:", finalContacts);
+
 
         setFormData(prev => ({
             ...prev,
@@ -1697,7 +1730,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
     }
 
     const handlePDFClick = () => {
-        console.log("PDF Button Clicked - Opening Modal");
+
         setShowReportModal(true);
     }
 
@@ -1721,18 +1754,6 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                                 <option key={status} value={status}>{status}</option>
                             ))}
                         </select>
-                        <button
-                            type="button"
-                            className="btn btn-outline"
-                            onClick={() => {
-                                setOpenSettingsDirectly(true);
-                                setShowEmailImport(true);
-                            }}
-                            title="Einstellungen (Mikrofon & API)"
-                            style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', padding: '0.5rem', borderColor: '#94A3B8', marginLeft: '0.5rem' }}
-                        >
-                            <Settings size={20} />
-                        </button>
                     </div>
                 </div>
 
@@ -1853,6 +1874,122 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                     <br />
                 </div>
 
+                {/* Pläne & Grundrisse Section - Inserted for Technician View */}
+                <div style={{ marginBottom: '2rem' }}>
+                    <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--primary)', marginBottom: '1rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem' }}>
+                        Pläne & Grundrisse
+                    </h2>
+
+                    <div className="card" style={{ border: '1px solid var(--border)', padding: '1.5rem' }}>
+                        <div
+                            style={{
+                                border: '2px dashed var(--border)',
+                                borderRadius: 'var(--radius)',
+                                padding: '2rem 1rem',
+                                textAlign: 'center',
+                                cursor: 'pointer',
+                                backgroundColor: 'rgba(255,255,255,0.02)',
+                                transition: 'all 0.2s',
+                                marginBottom: '1rem',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                color: 'var(--text-muted)'
+                            }}
+                            onClick={() => document.getElementById('file-upload-Pläne-tech').click()}
+                            onDragOver={(e) => {
+                                e.preventDefault();
+                                e.currentTarget.style.borderColor = 'var(--primary)';
+                                e.currentTarget.style.backgroundColor = 'rgba(56, 189, 248, 0.1)';
+                                e.currentTarget.style.color = 'var(--primary)';
+                            }}
+                            onDragLeave={(e) => {
+                                e.preventDefault();
+                                e.currentTarget.style.borderColor = 'var(--border)';
+                                e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.02)';
+                                e.currentTarget.style.color = 'var(--text-muted)';
+                            }}
+                            onDrop={(e) => handleCategoryDrop(e, 'Pläne')}
+                        >
+                            <Plus size={24} style={{ marginBottom: '0.5rem', opacity: 0.5 }} />
+                            <span style={{ fontSize: '0.85rem' }}>Plan / Grundriss hochladen (PDF / Bild)</span>
+
+                            <input
+                                id="file-upload-Pläne-tech"
+                                type="file"
+                                multiple
+                                accept="image/*,application/pdf"
+                                style={{ display: 'none' }}
+                                onChange={(e) => handleCategorySelect(e, 'Pläne')}
+                            />
+                        </div>
+
+                        {/* List of Pläne */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                            {formData.images.filter(img => img.assignedTo === 'Pläne').map((item, idx) => (
+                                <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem', backgroundColor: '#1E293B', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
+                                    {/* Icon/Preview */}
+                                    {(item.file && item.file.type === 'application/pdf') || (item.name && item.name.toLowerCase().endsWith('.pdf')) ? (
+                                        <div
+                                            style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '1rem', cursor: 'pointer' }}
+                                            onClick={() => {
+                                                if (item.file) {
+                                                    const pdfUrl = URL.createObjectURL(item.file);
+                                                    window.open(pdfUrl, '_blank');
+                                                } else if (item.preview) {
+                                                    window.open(item.preview, '_blank');
+                                                } else {
+                                                    alert("PDF Vorschau nicht verfügbar (wurde gespeichert).");
+                                                }
+                                            }}
+                                        >
+                                            <div style={{ padding: '0.5rem', backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: '4px' }}>
+                                                <FileText size={24} color="var(--text-main)" />
+                                            </div>
+                                            <div style={{ fontSize: '1rem', color: 'var(--text-main)', fontWeight: 500, textDecoration: 'underline' }}>
+                                                {item.name}
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flex: 1, cursor: 'pointer' }}
+                                            onClick={() => window.open(item.preview, '_blank')}
+                                        >
+                                            <div style={{ width: '80px', height: '80px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: '4px' }}>
+                                                <img src={item.preview} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '4px' }} />
+                                            </div>
+                                            <div style={{ fontSize: '1rem', fontWeight: 500, color: 'var(--text-main)' }}>{item.name}</div>
+                                        </div>
+                                    )}
+
+                                    {/* Delete Action */}
+                                    <button
+                                        type="button"
+                                        className="btn btn-ghost"
+                                        onClick={() => setFormData(prev => ({ ...prev, images: prev.images.filter(i => i !== item) }))}
+                                        style={{
+                                            color: '#EF4444',
+                                            padding: '0.5rem',
+                                            borderRadius: '50%',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            backgroundColor: 'rgba(239, 68, 68, 0.1)'
+                                        }}
+                                    >
+                                        <Trash size={18} />
+                                    </button>
+                                </div>
+                            ))}
+                            {formData.images.filter(img => img.assignedTo === 'Pläne').length === 0 && (
+                                <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.9rem', fontStyle: 'italic' }}>
+                                    Keine Pläne vorhanden.
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+
                 {/* 3. Rooms & Photos */}
                 <div style={{ marginBottom: '2rem' }}>
                     {(
@@ -1865,33 +2002,64 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                                 <button
                                     type="button"
-                                    className="btn btn-primary"
-                                    onClick={handleAddRoom}
-                                    disabled={!newRoom.name}
-                                    style={{ width: '100%', padding: '0.5rem', marginBottom: '0.5rem' }}
+                                    className={`btn ${showAddRoomForm ? 'btn-ghost' : 'btn-primary'}`}
+                                    onClick={() => setShowAddRoomForm(!showAddRoomForm)}
+                                    style={{ width: '100%', padding: '0.5rem', marginBottom: '0.5rem', color: showAddRoomForm ? '#EF4444' : undefined, borderColor: showAddRoomForm ? '#EF4444' : undefined }}
                                 >
-                                    <Plus size={16} /> Raum hinzufügen
+                                    {showAddRoomForm ? <X size={16} /> : <Plus size={16} />}
+                                    {showAddRoomForm ? " Abbrechen" : " Raum hinzufügen"}
                                 </button>
-                                <select
-                                    value={newRoom.name}
-                                    onChange={(e) => setNewRoom(prev => ({ ...prev, name: e.target.value }))}
-                                    className="form-input"
-                                    style={{ padding: '0.5rem', fontSize: '0.9rem' }}
-                                >
-                                    <option value="">Raum wählen...</option>
-                                    {ROOM_OPTIONS.map(opt => (
-                                        <option key={opt} value={opt}>{opt}</option>
-                                    ))}
-                                    <option value="Sonstiges">Sonstiges</option>
-                                </select>
-                                <input
-                                    type="text"
-                                    placeholder="Wohnung (Optional)"
-                                    value={newRoom.apartment}
-                                    onChange={(e) => setNewRoom(prev => ({ ...prev, apartment: e.target.value }))}
-                                    className="form-input"
-                                    style={{ padding: '0.5rem', fontSize: '0.9rem' }}
-                                />
+
+                                {showAddRoomForm && (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '0.5rem', backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                                        <input
+                                            type="text"
+                                            placeholder="Wohnung"
+                                            value={newRoom.apartment}
+                                            onChange={(e) => setNewRoom(prev => ({ ...prev, apartment: e.target.value }))}
+                                            className="form-input"
+                                            style={{ padding: '0.5rem', fontSize: '0.9rem' }}
+                                        />
+
+                                        <select
+                                            value={newRoom.name}
+                                            onChange={(e) => setNewRoom(prev => ({ ...prev, name: e.target.value }))}
+                                            className="form-input"
+                                            style={{ padding: '0.5rem', fontSize: '0.9rem' }}
+                                        >
+                                            <option value="">Raum wählen...</option>
+                                            {ROOM_OPTIONS.map(opt => (
+                                                <option key={opt} value={opt}>{opt}</option>
+                                            ))}
+                                            <option value="Sonstiges">Sonstiges</option>
+                                        </select>
+
+                                        {/* Custom Room Input if 'Sonstiges' or not in list */}
+                                        {((newRoom.name === 'Sonstiges') || (newRoom.name && !ROOM_OPTIONS.includes(newRoom.name))) && (
+                                            <input
+                                                type="text"
+                                                placeholder="Raum-Name eingeben"
+                                                value={newRoom.name === 'Sonstiges' ? '' : newRoom.name}
+                                                onChange={(e) => setNewRoom(prev => ({ ...prev, name: e.target.value }))}
+                                                className="form-input"
+                                                style={{ padding: '0.5rem', fontSize: '0.9rem' }}
+                                            />
+                                        )}
+
+                                        <button
+                                            type="button"
+                                            className="btn btn-primary"
+                                            onClick={() => {
+                                                handleAddRoom();
+                                                setShowAddRoomForm(false); // Auto-close after add
+                                            }}
+                                            disabled={!newRoom.name || newRoom.name === 'Sonstiges'}
+                                            style={{ marginTop: '0.5rem' }}
+                                        >
+                                            <Check size={16} /> Speichern
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                             {mode === 'technician' && (
                                 <h3 style={{ fontSize: '1rem', fontWeight: 600, marginTop: '2rem', marginBottom: '0.5rem' }}>
@@ -1917,8 +2085,10 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                                                         type="button"
                                                         onClick={(e) => {
                                                             e.stopPropagation();
+
                                                             setActiveRoomForMeasurement(room);
                                                             setIsNewMeasurement(false);
+                                                            setIsMeasurementReadOnly(true);
                                                             setShowMeasurementModal(true);
                                                         }}
                                                         style={{
@@ -1935,7 +2105,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                                                         }}
                                                     >
                                                         <FileText size={14} />
-                                                        Ansehen
+                                                        Messung ansehen
                                                     </button>
                                                     <button
                                                         type="button"
@@ -1943,6 +2113,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                                                             e.stopPropagation();
                                                             setActiveRoomForMeasurement(room);
                                                             setIsNewMeasurement(true);
+                                                            setIsMeasurementReadOnly(false);
                                                             setShowMeasurementModal(true);
                                                         }}
                                                         style={{
@@ -1959,7 +2130,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                                                         }}
                                                     >
                                                         <Plus size={14} />
-                                                        Neue Messung
+                                                        Messung beginnen
                                                     </button>
                                                 </>
                                             ) : (
@@ -1967,8 +2138,10 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                                                     type="button"
                                                     onClick={(e) => {
                                                         e.stopPropagation();
+
                                                         setActiveRoomForMeasurement(room);
-                                                        setIsNewMeasurement(false);
+                                                        setIsNewMeasurement(true);
+                                                        setIsMeasurementReadOnly(false);
                                                         setShowMeasurementModal(true);
                                                     }}
                                                     style={{
@@ -1984,8 +2157,8 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                                                         cursor: 'pointer'
                                                     }}
                                                 >
-                                                    <Edit3 size={14} />
-                                                    Messung
+                                                    <Plus size={14} />
+                                                    Messung beginnen
                                                 </button>
                                             )}
                                             {mode !== 'technician' && (
@@ -2571,28 +2744,48 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                 }
 
                 {/* Spacer to prevent overlap */}
-                <div style={{ height: '100px' }} />
+                {/* Spacer to prevent overlap */}
+                <div style={{ height: '80px' }} />
 
-                {/* Save Button for Mobile */}
+                {/* Mobile / Technician Fixed Footer - AutoSave Version */}
                 <div style={{
-                    position: 'sticky',
+                    position: 'fixed',
                     bottom: 0,
-                    left: 0,
-                    right: 0,
-                    marginTop: '0',
-                    zIndex: 50,
-                    padding: '1rem',
-                    backgroundColor: '#0F172A', // Match page background
-                    borderTop: '1px solid var(--border)',
-                    boxShadow: '0 -4px 6px -1px rgba(0, 0, 0, 0.1)'
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    width: '100%',
+                    maxWidth: '600px',
+                    padding: '0.75rem',
+                    backgroundColor: '#0F172A',
+                    borderTop: '1px solid #334155',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '1rem',
+                    zIndex: 100,
+                    boxShadow: '0 -4px 12px rgba(0, 0, 0, 0.5)'
                 }}>
+                    {/* Status Indicator */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: isSaving ? '#fbbf24' : '#10B981', transition: 'color 0.3s' }}>
+                        {isSaving ? (
+                            <>
+                                <RotateCcw size={14} className="spin" /> Speichert...
+                            </>
+                        ) : (
+                            <>
+                                <CheckCircle size={14} /> Gespeichert
+                            </>
+                        )}
+                    </div>
+
                     <button
-                        type="submit"
-                        onClick={handleSubmit}
+                        type="button"
                         className="btn btn-primary"
-                        style={{ width: '100%', padding: '0.75rem', fontSize: '1rem', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
+                        onClick={onCancel}
+                        style={{ padding: '0.5rem 1.5rem', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
                     >
-                        Speichern
+                        <CheckCircle size={16} />
+                        Fertig
                     </button>
                 </div>
                 {
@@ -2780,7 +2973,11 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                     onClose={() => {
                         setShowMeasurementModal(false);
                         setActiveRoomForMeasurement(null);
+                        setIsNewMeasurement(false);
+                        setIsMeasurementReadOnly(false);
                     }}
+                    readOnly={isMeasurementReadOnly}
+                    measurementHistory={activeRoomForMeasurement?.measurementHistory || []}
                     rooms={activeRoomForMeasurement ? [activeRoomForMeasurement] : []}
                     projectTitle={formData.projectTitle}
                     initialData={formData.rooms.reduce((acc, r) => {
@@ -2817,14 +3014,30 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                             category: 'report'
                         }));
 
-                        // 2. Update room data (Json only)
+                        // 2. Update room data (Latest & History)
                         if (activeRoomForMeasurement) {
                             setFormData(prev => ({
                                 ...prev,
-                                rooms: prev.rooms.map(r => r.id === activeRoomForMeasurement.id ? {
-                                    ...r,
-                                    measurementData: { measurements, globalSettings, canvasImage }
-                                } : r)
+                                rooms: prev.rooms.map(r => {
+                                    if (r.id === activeRoomForMeasurement.id) {
+                                        // History Entry
+                                        const newHistoryEntry = {
+                                            id: `hist_${Date.now()}`,
+                                            date: globalSettings.date || new Date().toISOString(),
+                                            measurements: measurements.map(m => ({ ...m })), // Deep clone
+                                            globalSettings: { ...globalSettings },
+                                            canvasImage: canvasImage
+                                        };
+                                        const history = r.measurementHistory ? [...r.measurementHistory] : [];
+
+                                        return {
+                                            ...r,
+                                            measurementData: { measurements, globalSettings, canvasImage },
+                                            measurementHistory: [...history, newHistoryEntry]
+                                        };
+                                    }
+                                    return r;
+                                })
                             }));
                         }
 
@@ -3917,6 +4130,122 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
 
                     </div>
 
+                    {/* Pläne & Grundrisse Section - Visible in Both Modes */}
+                    <div style={{ marginTop: '2rem' }}>
+                        <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--primary)', marginBottom: '1rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem' }}>
+                            Pläne & Grundrisse
+                        </h2>
+
+                        <div className="card" style={{ border: '1px solid var(--border)', padding: '1.5rem' }}>
+                            <div
+                                style={{
+                                    border: '2px dashed var(--border)',
+                                    borderRadius: 'var(--radius)',
+                                    padding: '2rem 1rem',
+                                    textAlign: 'center',
+                                    cursor: 'pointer',
+                                    backgroundColor: 'rgba(255,255,255,0.02)',
+                                    transition: 'all 0.2s',
+                                    marginBottom: '1rem',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    color: 'var(--text-muted)'
+                                }}
+                                onClick={() => document.getElementById('file-upload-Pläne').click()}
+                                onDragOver={(e) => {
+                                    e.preventDefault();
+                                    e.currentTarget.style.borderColor = 'var(--primary)';
+                                    e.currentTarget.style.backgroundColor = 'rgba(56, 189, 248, 0.1)';
+                                    e.currentTarget.style.color = 'var(--primary)';
+                                }}
+                                onDragLeave={(e) => {
+                                    e.preventDefault();
+                                    e.currentTarget.style.borderColor = 'var(--border)';
+                                    e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.02)';
+                                    e.currentTarget.style.color = 'var(--text-muted)';
+                                }}
+                                onDrop={(e) => handleCategoryDrop(e, 'Pläne')}
+                            >
+                                <Plus size={24} style={{ marginBottom: '0.5rem', opacity: 0.5 }} />
+                                <span style={{ fontSize: '0.85rem' }}>Plan / Grundriss hochladen (PDF / Bild)</span>
+
+                                <input
+                                    id="file-upload-Pläne"
+                                    type="file"
+                                    multiple
+                                    accept="image/*,application/pdf"
+                                    style={{ display: 'none' }}
+                                    onChange={(e) => handleCategorySelect(e, 'Pläne')}
+                                />
+                            </div>
+
+                            {/* List of Pläne */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                {formData.images.filter(img => img.assignedTo === 'Pläne').map((item, idx) => (
+                                    <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem', backgroundColor: '#1E293B', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
+                                        {/* Icon/Preview */}
+                                        {(item.file && item.file.type === 'application/pdf') || (item.name && item.name.toLowerCase().endsWith('.pdf')) ? (
+                                            <div
+                                                style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '1rem', cursor: 'pointer' }}
+                                                onClick={() => {
+                                                    if (item.file) {
+                                                        const pdfUrl = URL.createObjectURL(item.file);
+                                                        window.open(pdfUrl, '_blank');
+                                                    } else if (item.preview) {
+                                                        window.open(item.preview, '_blank');
+                                                    } else {
+                                                        alert("PDF Vorschau nicht verfügbar (wurde gespeichert).");
+                                                    }
+                                                }}
+                                            >
+                                                <div style={{ padding: '0.5rem', backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: '4px' }}>
+                                                    <FileText size={24} color="var(--text-main)" />
+                                                </div>
+                                                <div style={{ fontSize: '1rem', color: 'var(--text-main)', fontWeight: 500, textDecoration: 'underline' }}>
+                                                    {item.name}
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flex: 1, cursor: 'pointer' }}
+                                                onClick={() => window.open(item.preview, '_blank')}
+                                            >
+                                                <div style={{ width: '80px', height: '80px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: '4px' }}>
+                                                    <img src={item.preview} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '4px' }} />
+                                                </div>
+                                                <div style={{ fontSize: '1rem', fontWeight: 500, color: 'var(--text-main)' }}>{item.name}</div>
+                                            </div>
+                                        )}
+
+                                        {/* Delete Action */}
+                                        <button
+                                            type="button"
+                                            className="btn btn-ghost"
+                                            onClick={() => setFormData(prev => ({ ...prev, images: prev.images.filter(i => i !== item) }))}
+                                            style={{
+                                                color: '#EF4444',
+                                                padding: '0.5rem',
+                                                borderRadius: '50%',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                backgroundColor: 'rgba(239, 68, 68, 0.1)'
+                                            }}
+                                        >
+                                            <Trash size={18} />
+                                        </button>
+                                    </div>
+                                ))}
+                                {formData.images.filter(img => img.assignedTo === 'Pläne').length === 0 && (
+                                    <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.9rem', fontStyle: 'italic' }}>
+                                        Keine Pläne vorhanden.
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
                     {/* Arbeitsrapporte Section - Only for Technician Mode */}
                     {mode !== 'desktop' && (
                         <div style={{ marginTop: '2rem' }}>
@@ -4190,29 +4519,49 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                                                                 onClick={(e) => {
                                                                     e.stopPropagation();
                                                                     setActiveRoomForMeasurement(room);
-                                                                    setIsNewMeasurement(false);
+                                                                    setIsNewMeasurement(true);
+                                                                    setIsMeasurementReadOnly(false);
                                                                     setShowMeasurementModal(true);
                                                                 }}
                                                                 style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem', gap: '0.25rem', color: 'var(--success)', borderColor: 'var(--success)' }}
                                                                 title="Messprotokoll erstellen"
                                                             >
-                                                                <Edit3 size={14} /> Messung
+                                                                <Plus size={14} /> Messung beginnen
                                                             </button>
                                                         ) : (
-                                                            <button
-                                                                type="button"
-                                                                className="btn btn-outline"
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    setActiveRoomForMeasurement(room);
-                                                                    setIsNewMeasurement(false);
-                                                                    setShowMeasurementModal(true);
-                                                                }}
-                                                                style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem', gap: '0.25rem', color: 'var(--primary)', borderColor: 'var(--primary)' }}
-                                                                title="Messprotokoll ansehen"
-                                                            >
-                                                                <FileText size={14} /> Ansehen
-                                                            </button>
+                                                            <>
+                                                                <button
+                                                                    type="button"
+                                                                    className="btn btn-outline"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+
+                                                                        setActiveRoomForMeasurement(room);
+                                                                        setIsNewMeasurement(false);
+                                                                        setIsMeasurementReadOnly(true);
+                                                                        setShowMeasurementModal(true);
+                                                                    }}
+                                                                    style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem', gap: '0.25rem', color: 'var(--text-muted)', borderColor: 'var(--border)' }}
+                                                                    title="Messprotokoll ansehen"
+                                                                >
+                                                                    <FileText size={14} /> Messung ansehen
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    className="btn btn-outline"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        setActiveRoomForMeasurement(room);
+                                                                        setIsNewMeasurement(true);
+                                                                        setIsMeasurementReadOnly(false);
+                                                                        setShowMeasurementModal(true);
+                                                                    }}
+                                                                    style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem', gap: '0.25rem', color: 'var(--success)', borderColor: 'var(--success)' }}
+                                                                    title="Neue Messung beginnen"
+                                                                >
+                                                                    <Plus size={14} /> Messung beginnen
+                                                                </button>
+                                                            </>
                                                         )}
 
                                                     </div>
@@ -4578,6 +4927,15 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                                                     Excel-Exporte der Messdaten
                                                 </p>
                                             </div>
+
+                                            <button
+                                                type="button"
+                                                className="btn btn-outline"
+                                                onClick={() => generateMeasurementExcel(formData)}
+                                                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', borderColor: '#10B981', color: '#10B981', padding: '0.5rem 1rem' }}
+                                            >
+                                                <Table size={16} /> Excel Export
+                                            </button>
                                         </div>
 
                                         {/* Calculated / Generated Files List */}
@@ -4990,12 +5348,60 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                                 Bericht konfigurieren
                             </button>
                             <button type="button" className="btn btn-outline" onClick={onCancel}>Abbrechen</button>
-                            <button type="submit" className="btn btn-primary">
+                            {mode === 'desktop' && (
+                                <button type="submit" className="btn btn-primary">
+                                    <Save size={18} />
+                                    Speichern
+                                </button>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Spacer for Fixed Footer */}
+                    {mode !== 'desktop' && <div style={{ height: '80px' }} />}
+
+                    {/* Mobile / Technician Fixed Footer */}
+                    {mode !== 'desktop' && (
+                        <div style={{
+                            position: 'fixed',
+                            bottom: 0,
+                            left: 0,
+                            right: 0,
+                            padding: '1rem',
+                            backgroundColor: '#0F172A',
+                            borderTop: '1px solid #334155',
+                            display: 'flex',
+                            gap: '0.75rem',
+                            zIndex: 100,
+                            boxShadow: '0 -4px 12px rgba(0, 0, 0, 0.5)'
+                        }}>
+                            <button
+                                type="button"
+                                className="btn btn-outline"
+                                onClick={onCancel}
+                                style={{ flex: 1, padding: '0.75rem', fontSize: '0.95rem', justifyContent: 'center' }}
+                            >
+                                Abbrechen
+                            </button>
+                            <button
+                                type="submit"
+                                className="btn btn-primary"
+                                style={{
+                                    flex: 2,
+                                    padding: '0.75rem',
+                                    fontSize: '0.95rem',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '0.5rem',
+                                    backgroundColor: '#0EA5E9'
+                                }}
+                            >
                                 <Save size={18} />
                                 Speichern
                             </button>
                         </div>
-                    </div>
+                    )}
                 </form>
 
                 {editingImage && (
@@ -5500,6 +5906,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                     }}
                     rooms={activeRoomForMeasurement ? [activeRoomForMeasurement] : []} // Only pass the active room
                     projectTitle={formData.projectTitle}
+                    readOnly={isMeasurementReadOnly}
                     initialData={formData.rooms.reduce((acc, r) => {
                         let mData = r.measurementData;
                         // If this is the active room AND we are starting a NEW measurement based on old one
