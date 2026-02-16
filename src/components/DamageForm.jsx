@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Camera, Image, Trash, X, Plus, Edit3, Save, Upload, FileText, CheckCircle, Circle, AlertTriangle, Play, HelpCircle, ArrowLeft, Mail, Map, MapPin, Folder, Mic, Paperclip, Table, Download, Check, Settings, RotateCcw, ChevronDown, ChevronUp } from 'lucide-react'
+import { Camera, Image, Trash, X, Plus, Edit3, Save, Upload, FileText, CheckCircle, Circle, AlertTriangle, Play, HelpCircle, ArrowLeft, Mail, Map, MapPin, Folder, Mic, Paperclip, Table, Download, Check, Settings, RotateCcw, ChevronDown, ChevronUp, Briefcase } from 'lucide-react'
 import { supabase } from '../supabaseClient';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
@@ -170,6 +170,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
     const [isSaving, setIsSaving] = useState(false);
     const [lastSaved, setLastSaved] = useState(null);
     const [visibleRoomImages, setVisibleRoomImages] = useState({}); // Stores roomId -> boolean for toggle
+    const [showEmailImportModal, setShowEmailImportModal] = useState(false);
 
 
     // Auto-Save Effect
@@ -1625,40 +1626,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         }));
     };
 
-    const handleEmailImport = (data) => {
-        const importedContacts = data.contacts || [];
 
-        // Dynamic Contacts: Use imported or default to 1 empty
-        let finalContacts = importedContacts.length > 0
-            ? importedContacts
-            : [{ name: '', phone: '', apartment: '', role: 'Mieter' }];
-
-        // Ensure fields exist and role is set
-        finalContacts = finalContacts.map(c => ({
-            name: c.name || '',
-            phone: c.phone || '',
-            apartment: c.apartment || '',
-            role: c.role || 'Mieter'
-        }));
-
-        // Debug Alert removed
-        // console.log("Setting State Contacts:", finalContacts);
-
-
-
-        setFormData(prev => ({
-            ...prev,
-            projectTitle: data.projectTitle || prev.projectTitle,
-            client: data.client || prev.client,
-            street: data.street || prev.street,
-            zip: data.zip || prev.zip,
-            city: data.city || prev.city,
-            description: data.description || prev.description,
-            damageType: data.damageType || prev.damageType,
-            contacts: finalContacts
-        }));
-        setShowEmailImport(false);
-    };
 
     const generatePDFContent = async () => {
         setIsGeneratingPDF(true);
@@ -1752,6 +1720,20 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         }, 500); // 500ms delay to ensure render
     }
 
+    const handleEmailImport = (data) => {
+        setFormData(prev => ({
+            ...prev,
+            projectTitle: data.projectTitle || prev.projectTitle,
+            client: data.client || prev.client,
+            description: data.description ? (prev.description ? prev.description + '\n\n' + data.description : data.description) : prev.description,
+            street: data.street || prev.street,
+            zip: data.zip || prev.zip,
+            city: data.city || prev.city,
+            contacts: data.contacts && data.contacts.length > 0 ? [...prev.contacts, ...data.contacts] : prev.contacts
+        }));
+        setShowEmailImportModal(false);
+    };
+
     const handlePDFClick = () => {
 
         setShowReportModal(true);
@@ -1767,6 +1749,16 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                         {formData.projectTitle || 'Projekt'}
                     </h2>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <button
+                            type="button"
+                            onClick={() => setShowEmailImportModal(true)}
+                            className="btn btn-outline"
+                            style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem', display: 'flex', gap: '0.5rem', alignItems: 'center', marginRight: '0.5rem' }}
+                            title="Daten aus Email importieren"
+                        >
+                            <Mail size={16} />
+                            <span className="hide-mobile">Email Import</span>
+                        </button>
                         <select
                             className="form-input"
                             style={{ padding: '0.25rem 0.5rem', fontSize: '0.9rem', width: 'auto' }}
@@ -1800,6 +1792,38 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                         ) : (
                             formData.address || 'Keine Adresse'
                         )}
+                    </div>
+                </div>
+
+                {/* 1a. Project Details (Client / Manager) */}
+                <div style={{ marginBottom: '1.5rem', backgroundColor: 'var(--surface)', padding: '1rem', borderRadius: '8px', color: 'var(--text-main)' }}>
+                    <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-main)' }}>
+                        <Briefcase size={18} /> Auftrag & Verwaltung
+                    </h3>
+
+                    <div style={{ display: 'flex', flexDirection: 'row', gap: '1rem', flexWrap: 'wrap' }}>
+                        <div style={{ flex: 1, minWidth: '200px' }}>
+                            <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.25rem', display: 'block' }}>Auftraggeber</label>
+                            <input
+                                type="text"
+                                className="form-input"
+                                value={formData.client || ''}
+                                onChange={(e) => setFormData(prev => ({ ...prev, client: e.target.value }))}
+                                placeholder="Auftraggeber eingeben"
+                                style={{ width: '100%' }}
+                            />
+                        </div>
+                        <div style={{ flex: 1, minWidth: '200px' }}>
+                            <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.25rem', display: 'block' }}>Zuständige Bewirtschaftung</label>
+                            <input
+                                type="text"
+                                className="form-input"
+                                value={formData.assignedTo || ''}
+                                onChange={(e) => setFormData(prev => ({ ...prev, assignedTo: e.target.value }))}
+                                placeholder="Verwaltung / Bewirtschafter eingeben"
+                                style={{ width: '100%' }}
+                            />
+                        </div>
                     </div>
                 </div>
 
@@ -6668,6 +6692,13 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                                     </table>
                                 </div>
                             </div>
+                        )}
+
+                        {showEmailImportModal && (
+                            <EmailImportModal
+                                onClose={() => setShowEmailImportModal(false)}
+                                onImport={handleEmailImport}
+                            />
                         )}
 
                         <div className="print-break-inside-avoid">
