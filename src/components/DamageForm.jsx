@@ -1839,7 +1839,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                                 formData.address || 'Keine Adresse'
                             )}
 
-                            {(formData.street || formData.address) && (
+                            {(formData.street || formData.address) ? (
                                 <div style={{ position: 'relative', marginTop: '1rem', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--border)' }}>
                                     <iframe
                                         width="100%"
@@ -1883,7 +1883,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                                         </label>
                                     )}
                                 </div>
-                            )}
+                            ) : null}
                         </div>
                     </div>
 
