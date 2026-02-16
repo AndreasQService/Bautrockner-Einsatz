@@ -1824,6 +1824,18 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                                 style={{ width: '100%' }}
                             />
                         </div>
+                        <div style={{ flex: 1, minWidth: '200px' }}>
+                            <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.25rem', display: 'block' }}>Schadensart</label>
+                            <select
+                                className="form-input"
+                                value={formData.damageCategory || 'Wasserschaden'}
+                                onChange={(e) => setFormData(prev => ({ ...prev, damageCategory: e.target.value }))}
+                                style={{ width: '100%' }}
+                            >
+                                <option value="Wasserschaden">Wasserschaden</option>
+                                <option value="Schimmel">Schimmel</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
 
