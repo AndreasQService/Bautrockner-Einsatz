@@ -179,7 +179,7 @@ const DryingMonitor = ({ reports, onSelectReport }) => {
     )
 }
 
-export default function Dashboard({ reports, onSelectReport, onDeleteReport }) {
+export default function Dashboard({ reports, onSelectReport, onDeleteReport, mode }) {
     const [searchTerm, setSearchTerm] = useState('')
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 20;
@@ -305,8 +305,8 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport }) {
                 </div>
             </div>
 
-            {/* Pass Filtered Reports to Monitors (only when not in Archive) */}
-            {!showArchive && <DryingMonitor reports={filteredReports} onSelectReport={onSelectReport} />}
+            {/* Pass Filtered Reports to Monitors (only when not in Archive OR Technician Mode) */}
+            {!showArchive && mode !== 'technician' && <DryingMonitor reports={filteredReports} onSelectReport={onSelectReport} />}
 
             <div className="card">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>

@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { X, Save, Eraser, Pen, Undo, Trash2, FileText, Loader, Check } from 'lucide-react';
+import { X, Save, Eraser, Pen, Undo, Trash2, FileText, Loader, Check, Hand, ChevronUp, ChevronDown } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 
@@ -12,13 +12,15 @@ const MeasurementModal = ({ isOpen, onClose, onSave, rooms, projectTitle, initia
     const [measurements, setMeasurements] = useState([]);
     const [history, setHistory] = useState([]); // Array of ImageData
     const [historyStep, setHistoryStep] = useState(-1);
+    const [isScrollMode, setIsScrollMode] = useState(false); // New state for Scroll Mode
+    const [isCanvasExpanded, setIsCanvasExpanded] = useState(true); // New state for sticky toggle
     const [globalSettings, setGlobalSettings] = useState({
         date: new Date().toISOString().split('T')[0],
         temp: '',
         humidity: '',
         device: ''
     });
-    const [saveAsPdf, setSaveAsPdf] = useState(true);
+    const [saveAsPdf, setSaveAsPdf] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [isSuccess, setIsSuccess] = useState(false);
 
@@ -138,6 +140,8 @@ const MeasurementModal = ({ isOpen, onClose, onSave, rooms, projectTitle, initia
     };
 
     const startDrawing = (e) => {
+        if (isScrollMode) return; // Disable drawing in Scroll Mode
+
         const canvas = canvasRef.current;
         const ctx = canvas.getContext('2d');
         const rect = canvas.getBoundingClientRect();
@@ -282,15 +286,6 @@ const MeasurementModal = ({ isOpen, onClose, onSave, rooms, projectTitle, initia
                         </div>
                     </div>
                     <div className="no-print" style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.9rem', color: 'var(--text-muted)' }}>
-                            <input
-                                type="checkbox"
-                                checked={saveAsPdf}
-                                onChange={(e) => setSaveAsPdf(e.target.checked)}
-                                style={{ width: '16px', height: '16px', accentColor: 'var(--primary)' }}
-                            />
-                            Als PDF speichern
-                        </label>
                         <button onClick={onClose} className="btn btn-outline">Abbrechen</button>
                         <button
                             onClick={handleSave}
@@ -316,34 +311,64 @@ const MeasurementModal = ({ isOpen, onClose, onSave, rooms, projectTitle, initia
 
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
 
-                    {/* Toolbar & Canvas */}
-                    <div style={{ padding: '1rem', borderBottom: '1px solid var(--border)' }}>
+                    {/* Toolbar & Canvas - Sticky */}
+                    <div style={{
+                        padding: '1rem',
+                        borderBottom: '1px solid var(--border)',
+                        position: 'sticky',
+                        top: 0,
+                        backgroundColor: 'var(--surface)',
+                        zIndex: 10
+                    }}>
                         <div className="no-print" style={{ marginBottom: '0.5rem', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                             <span style={{ fontWeight: 'bold', fontSize: '0.9rem', color: 'var(--text-main)' }}>Werkzeuge:</span>
-                            <button onClick={() => { setColor('#000000'); setLineWidth(2); }} style={{ padding: '0.5rem', borderRadius: '4px', background: color === '#000000' ? 'rgba(255,255,255,0.1)' : 'transparent', border: '1px solid var(--border)' }} title="Stift Schwarz"><Pen size={16} color="var(--text-main)" /></button>
-                            <button onClick={() => { setColor('#ef4444'); setLineWidth(2); }} style={{ padding: '0.5rem', borderRadius: '4px', background: color === '#ef4444' ? 'rgba(255,255,255,0.1)' : 'transparent', border: '1px solid var(--border)' }} title="Stift Rot"><Pen size={16} color="#ef4444" /></button>
-                            <button onClick={() => { setColor('#3b82f6'); setLineWidth(2); }} style={{ padding: '0.5rem', borderRadius: '4px', background: color === '#3b82f6' ? 'rgba(255,255,255,0.1)' : 'transparent', border: '1px solid var(--border)' }} title="Stift Blau"><Pen size={16} color="#3b82f6" /></button>
+                            <button onClick={() => { setIsScrollMode(false); setColor('#000000'); setLineWidth(2); }} style={{ padding: '0.5rem', borderRadius: '4px', background: (!isScrollMode && color === '#000000') ? 'rgba(255,255,255,0.1)' : 'transparent', border: '1px solid var(--border)' }} title="Stift Schwarz"><Pen size={16} color="var(--text-main)" /></button>
+                            <button onClick={() => { setIsScrollMode(false); setColor('#ef4444'); setLineWidth(2); }} style={{ padding: '0.5rem', borderRadius: '4px', background: (!isScrollMode && color === '#ef4444') ? 'rgba(255,255,255,0.1)' : 'transparent', border: '1px solid var(--border)' }} title="Stift Rot"><Pen size={16} color="#ef4444" /></button>
+                            <button onClick={() => { setIsScrollMode(false); setColor('#3b82f6'); setLineWidth(2); }} style={{ padding: '0.5rem', borderRadius: '4px', background: (!isScrollMode && color === '#3b82f6') ? 'rgba(255,255,255,0.1)' : 'transparent', border: '1px solid var(--border)' }} title="Stift Blau"><Pen size={16} color="#3b82f6" /></button>
+                            <button onClick={() => { setIsScrollMode(false); setColor('#ffffff'); setLineWidth(15); }} style={{ padding: '0.5rem', borderRadius: '4px', background: (!isScrollMode && color === '#ffffff') ? 'rgba(255,255,255,0.1)' : 'transparent', border: '1px solid var(--border)' }} title="Radiergummi"><Eraser size={16} color="var(--text-main)" /></button>
+
                             <div style={{ width: '1px', height: '24px', background: 'var(--border)', margin: '0 0.5rem' }}></div>
+
+                            <button onClick={() => setIsScrollMode(!isScrollMode)} style={{ padding: '0.5rem', borderRadius: '4px', background: isScrollMode ? 'var(--primary)' : 'transparent', border: '1px solid var(--border)', color: isScrollMode ? 'white' : 'var(--text-main)' }} title={isScrollMode ? "Scrollen aktiv (Zeichnen deaktiviert)" : "Zeichnen aktiv"}><Hand size={16} /></button>
+
+                            <div style={{ width: '1px', height: '24px', background: 'var(--border)', margin: '0 0.5rem' }}></div>
+
                             <button onClick={handleUndo} disabled={historyStep <= 0} style={{ padding: '0.5rem', borderRadius: '4px', background: 'transparent', border: '1px solid var(--border)', color: historyStep <= 0 ? 'var(--text-muted)' : 'var(--text-main)', opacity: historyStep <= 0 ? 0.5 : 1 }} title="Rückgängig"><Undo size={16} /></button>
                             <button onClick={clearCanvas} style={{ padding: '0.5rem', borderRadius: '4px', background: 'transparent', border: '1px solid var(--border)', color: '#EF4444' }} title="Alles löschen"><Trash2 size={16} /></button>
-                            <span style={{ marginLeft: 'auto', fontSize: '0.8rem', color: 'var(--text-muted)' }}>Grundriss zeichnen</span>
+
+                            <button
+                                onClick={() => setIsCanvasExpanded(!isCanvasExpanded)}
+                                style={{
+                                    padding: '0.5rem',
+                                    borderRadius: '4px',
+                                    background: 'transparent',
+                                    border: '1px solid var(--border)',
+                                    marginLeft: 'auto',
+                                    color: 'var(--text-main)'
+                                }}
+                                title={isCanvasExpanded ? "Skizze einklappen" : "Skizze ausklappen"}
+                            >
+                                {isCanvasExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                            </button>
                         </div>
 
-                        <div style={{ border: '1px solid var(--border)', borderRadius: '4px', overflow: 'hidden', touchAction: 'none' }}>
-                            <canvas
-                                ref={canvasRef}
-                                width={960}
-                                height={400}
-                                style={{ width: '100%', height: '400px', cursor: 'crosshair', display: 'block', backgroundColor: 'white' }}
-                                onMouseDown={startDrawing}
-                                onMouseMove={draw}
-                                onMouseUp={stopDrawing}
-                                onMouseLeave={stopDrawing}
-                                onTouchStart={startDrawing}
-                                onTouchMove={draw}
-                                onTouchEnd={stopDrawing}
-                            />
-                        </div>
+                        {isCanvasExpanded && (
+                            <div style={{ border: '1px solid var(--border)', borderRadius: '4px', overflow: 'hidden', touchAction: isScrollMode ? 'pan-y' : 'none' }}>
+                                <canvas
+                                    ref={canvasRef}
+                                    width={960}
+                                    height={400}
+                                    style={{ width: '100%', height: '400px', cursor: isScrollMode ? 'grab' : 'crosshair', display: 'block', backgroundColor: 'white' }}
+                                    onMouseDown={startDrawing}
+                                    onMouseMove={draw}
+                                    onMouseUp={stopDrawing}
+                                    onMouseLeave={stopDrawing}
+                                    onTouchStart={startDrawing}
+                                    onTouchMove={draw}
+                                    onTouchEnd={stopDrawing}
+                                />
+                            </div>
+                        )}
                     </div>
 
                     {/* Room Name Header */}
