@@ -1,9 +1,10 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { X, Save, Eraser, Pen, Undo, Trash2, FileText, Loader, Check, Hand, ChevronUp, ChevronDown, Plus } from 'lucide-react';
+import { X, Save, Eraser, Pen, Undo, Trash2, FileText, Loader, Check, Hand, ChevronUp, ChevronDown, Plus, Edit3 } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 
-const MeasurementModal = ({ isOpen, onClose, onSave, rooms, projectTitle, initialData }) => {
+const MeasurementModal = ({ isOpen, onClose, onSave, rooms, projectTitle, initialData, readOnly, measurementHistory }) => {
+
     const canvasRef = useRef(null);
     const containerRef = useRef(null);
     const [isDrawing, setIsDrawing] = useState(false);
@@ -14,6 +15,7 @@ const MeasurementModal = ({ isOpen, onClose, onSave, rooms, projectTitle, initia
     const [historyStep, setHistoryStep] = useState(-1);
     const [isScrollMode, setIsScrollMode] = useState(false); // New state for Scroll Mode
     const [isCanvasExpanded, setIsCanvasExpanded] = useState(true); // New state for sticky toggle
+    const [isSketchLocked, setIsSketchLocked] = useState(true); // Default to Locked for safety
     const [globalSettings, setGlobalSettings] = useState({
         date: new Date().toISOString().split('T')[0],
         temp: '',
@@ -23,6 +25,100 @@ const MeasurementModal = ({ isOpen, onClose, onSave, rooms, projectTitle, initia
     const [saveAsPdf, setSaveAsPdf] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [isSuccess, setIsSuccess] = useState(false);
+    const [stylusOnlyMode, setStylusOnlyMode] = useState(false); // New state for Palm Rejection
+
+    // Sync locked state with readOnly prop on open
+    // Also update history if needed
+    useEffect(() => {
+        if (isOpen) {
+            setIsSketchLocked(!!readOnly);
+        }
+    }, [isOpen, readOnly]);
+
+    // Calculate History View Data
+    // Calculate History View Data - PIVOT
+    const { historyColumns, historyRows } = React.useMemo(() => {
+        if (!measurementHistory || measurementHistory.length === 0) return { historyColumns: [], historyRows: [] };
+
+        // 1. Get all unique MP names
+        const allPointNames = new Set(['Messpunkt 1', 'Messpunkt 2', 'Messpunkt 3', 'Messpunkt 4']); // Ensure at least 4 default points
+
+        // Add current measurements (the "capture" template) to ensure they are visible
+        if (measurements && measurements.length > 0) {
+            measurements.forEach(m => {
+                if (m.pointName) allPointNames.add(m.pointName);
+            });
+        }
+
+        measurementHistory.forEach(entry => {
+            entry.measurements.forEach(m => {
+                if (m.pointName) allPointNames.add(m.pointName);
+            });
+        });
+
+        // Sort columns naturally (MP 1, MP 2, MP 10)
+        const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+        const sortedColumns = Array.from(allPointNames).sort(collator.compare);
+
+        // 2. Sort history by Date Descending (Newest first)
+        const sortedHistory = [...measurementHistory].sort((a, b) =>
+            new Date(b.date || 0) - new Date(a.date || 0)
+        );
+
+        // 3. Build Rows
+        const rows = sortedHistory.map((entry, idx) => {
+            const entryDate = entry.globalSettings?.date || entry.date;
+
+            // Find "previous" (older) entry for comparison
+            // Since sorted Descending, previous is at idx + 1
+            const prevEntry = sortedHistory[idx + 1];
+
+            const rowData = {
+                id: entry.id,
+                date: entryDate,
+                points: {}
+            };
+
+            sortedColumns.forEach(mpName => {
+                const currM = entry.measurements.find(m => m.pointName === mpName);
+                if (!currM) return; // No data for this MP in this entry
+
+                const cell = {
+                    w_value: currM.w_value,
+                    b_value: currM.b_value,
+                    w_color: 'inherit',
+                    b_color: 'inherit'
+                };
+
+                // Compare with previous
+                if (prevEntry) {
+                    const prevM = prevEntry.measurements.find(m => m.pointName === mpName);
+                    if (prevM) {
+                        const parse = (v) => parseFloat(String(v).replace(',', '.'));
+
+                        const wc = parse(currM.w_value);
+                        const wp = parse(prevM.w_value);
+                        if (!isNaN(wc) && !isNaN(wp)) {
+                            if (wc < wp) cell.w_color = '#10B981'; // Good
+                            if (wc > wp) cell.w_color = '#EF4444'; // Bad
+                        }
+
+                        const bc = parse(currM.b_value);
+                        const bp = parse(prevM.b_value);
+                        if (!isNaN(bc) && !isNaN(bp)) {
+                            if (bc < bp) cell.b_color = '#10B981';
+                            if (bc > bp) cell.b_color = '#EF4444';
+                        }
+                    }
+                }
+                rowData.points[mpName] = cell;
+            });
+            return rowData;
+        });
+
+        return { historyColumns: sortedColumns, historyRows: rows };
+
+    }, [measurementHistory, measurements]);
 
     // Initialize measurements based on rooms or initialData
     useEffect(() => {
@@ -60,17 +156,13 @@ const MeasurementModal = ({ isOpen, onClose, onSave, rooms, projectTitle, initia
                 }
             } else {
                 // Initialize new
-                const initial = [];
-                // 3 Measurement points (changed from 12)
-                for (let i = 1; i <= 3; i++) {
-                    initial.push({
-                        id: `p${i}`,
-                        pointName: `Messpunkt ${i}`,
-                        w_value: '', // Wand
-                        b_value: '', // Boden
-                        notes: ''
-                    });
-                }
+                const initial = [
+                    { id: `p${Date.now()}`, pointName: 'Messpunkt 1', w_value: '', b_value: '', notes: '' },
+                    { id: `p${Date.now() + 1}`, pointName: 'Messpunkt 2', w_value: '', b_value: '', notes: '' },
+                    { id: `p${Date.now() + 2}`, pointName: 'Messpunkt 3', w_value: '', b_value: '', notes: '' },
+                    { id: `p${Date.now() + 3}`, pointName: 'Messpunkt 4', w_value: '', b_value: '', notes: '' }
+                ];
+                // Start with 4 points as per latest user request
                 setMeasurements(initial);
                 setGlobalSettings({
                     date: new Date().toISOString().split('T')[0],
@@ -91,12 +183,8 @@ const MeasurementModal = ({ isOpen, onClose, onSave, rooms, projectTitle, initia
         const ctx = canvas.getContext('2d');
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
-        ctx.fillStyle = '#ffffff'; // Keep canvas white for drawing contrast, or make it dark if preferred? Usually white paper is better for sketching.
-        // Let's keep canvas white but the rest of the modal dark.
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-        // Draw Grid
-        drawGrid(ctx, canvas.width, canvas.height);
+        // Clear instead of fill white
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
 
         // Save initial blank state
         saveParamsToHistory(canvas);
@@ -120,55 +208,75 @@ const MeasurementModal = ({ isOpen, onClose, onSave, rooms, projectTitle, initia
         }
     };
 
-    const drawGrid = (ctx, w, h) => {
-        ctx.strokeStyle = '#e0e0e0';
-        ctx.lineWidth = 0.5;
-        const gridSize = 40;
 
-        for (let x = 0; x <= w; x += gridSize) {
-            ctx.beginPath();
-            ctx.moveTo(x, 0);
-            ctx.lineTo(x, h);
-            ctx.stroke();
-        }
-        for (let y = 0; y <= h; y += gridSize) {
-            ctx.beginPath();
-            ctx.moveTo(0, y);
-            ctx.lineTo(w, y);
-            ctx.stroke();
-        }
-    };
 
     const startDrawing = (e) => {
-        if (isScrollMode) return; // Disable drawing in Scroll Mode
+        if (isScrollMode || isSketchLocked) return; // Disable drawing in Scroll Mode or Locked
+
+        // Palm Rejection / Stylus Only Mode
+        if (stylusOnlyMode && e.pointerType !== 'pen') return;
+
+        // Pointer Capture
+        if (e.target.setPointerCapture) {
+            e.target.setPointerCapture(e.pointerId);
+        }
 
         const canvas = canvasRef.current;
         const ctx = canvas.getContext('2d');
         const rect = canvas.getBoundingClientRect();
-        const x = (e.clientX || e.touches[0].clientX) - rect.left;
-        const y = (e.clientY || e.touches[0].clientY) - rect.top;
+
+        // Calculate scaling factors (visual size vs internal resolution)
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+
+        const x = (e.clientX - rect.left) * scaleX;
+        const y = (e.clientY - rect.top) * scaleY;
 
         ctx.beginPath();
         ctx.moveTo(x, y);
-        ctx.strokeStyle = color;
+
+        if (color === '#ffffff') {
+            // Eraser Mode
+            ctx.globalCompositeOperation = 'destination-out';
+            ctx.strokeStyle = 'rgba(0,0,0,1)'; // Color doesn't matter for destination-out
+        } else {
+            // Drawing Mode
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.strokeStyle = color;
+        }
+
         ctx.lineWidth = lineWidth;
         setIsDrawing(true);
     };
 
     const draw = (e) => {
         if (!isDrawing) return;
+        if (stylusOnlyMode && e.pointerType !== 'pen') return; // Safety check
+
         const canvas = canvasRef.current;
         const ctx = canvas.getContext('2d');
         const rect = canvas.getBoundingClientRect();
-        const x = (e.clientX || e.touches[0].clientX) - rect.left;
-        const y = (e.clientY || e.touches[0].clientY) - rect.top;
+
+        // Calculate scaling factors (visual size vs internal resolution)
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+
+        const x = (e.clientX - rect.left) * scaleX;
+        const y = (e.clientY - rect.top) * scaleY;
 
         ctx.lineTo(x, y);
         ctx.stroke();
     };
 
-    const stopDrawing = () => {
+    const stopDrawing = (e) => {
         if (isDrawing) {
+            if (e && e.target.releasePointerCapture) {
+                try {
+                    e.target.releasePointerCapture(e.pointerId);
+                } catch (err) {
+                    console.warn("Failed to release pointer capture", err);
+                }
+            }
             setIsDrawing(false);
             const canvas = canvasRef.current;
             saveParamsToHistory(canvas);
@@ -178,9 +286,7 @@ const MeasurementModal = ({ isOpen, onClose, onSave, rooms, projectTitle, initia
     const clearCanvas = () => {
         const canvas = canvasRef.current;
         const ctx = canvas.getContext('2d');
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        drawGrid(ctx, canvas.width, canvas.height);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
         saveParamsToHistory(canvas);
     };
 
@@ -304,7 +410,11 @@ const MeasurementModal = ({ isOpen, onClose, onSave, rooms, projectTitle, initia
                         </div>
                     </div>
                     <div className="no-print" style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                        <button onClick={onClose} className="btn btn-outline">Abbrechen</button>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                            {/* <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+                                <X size={20} />
+                            </button> */}
+                        </div>
                         <button
                             onClick={handleSave}
                             disabled={isSaving}
@@ -320,9 +430,10 @@ const MeasurementModal = ({ isOpen, onClose, onSave, rooms, projectTitle, initia
                             ) : isSuccess ? (
                                 <Check size={18} />
                             ) : (
-                                saveAsPdf ? <FileText size={18} /> : <Save size={18} />
+                                // saveAsPdf ? <FileText size={18} /> : <Save size={18} />
+                                null
                             )}
-                            {isSaving ? 'Speichert...' : isSuccess ? 'Gespeichert!' : 'Speichern'}
+                            {isSaving ? 'Speichert...' : isSuccess ? 'Gespeichert!' : 'Fertig'}
                         </button>
                     </div>
                 </div>
@@ -340,19 +451,59 @@ const MeasurementModal = ({ isOpen, onClose, onSave, rooms, projectTitle, initia
                     }}>
                         <div className="no-print" style={{ marginBottom: '0.5rem', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                             <span style={{ fontWeight: 'bold', fontSize: '0.9rem', color: 'var(--text-main)' }}>Werkzeuge:</span>
-                            <button onClick={() => { setIsScrollMode(false); setColor('#000000'); setLineWidth(2); }} style={{ padding: '0.5rem', borderRadius: '4px', background: (!isScrollMode && color === '#000000') ? 'rgba(255,255,255,0.1)' : 'transparent', border: '1px solid var(--border)' }} title="Stift Schwarz"><Pen size={16} color="var(--text-main)" /></button>
-                            <button onClick={() => { setIsScrollMode(false); setColor('#ef4444'); setLineWidth(2); }} style={{ padding: '0.5rem', borderRadius: '4px', background: (!isScrollMode && color === '#ef4444') ? 'rgba(255,255,255,0.1)' : 'transparent', border: '1px solid var(--border)' }} title="Stift Rot"><Pen size={16} color="#ef4444" /></button>
-                            <button onClick={() => { setIsScrollMode(false); setColor('#3b82f6'); setLineWidth(2); }} style={{ padding: '0.5rem', borderRadius: '4px', background: (!isScrollMode && color === '#3b82f6') ? 'rgba(255,255,255,0.1)' : 'transparent', border: '1px solid var(--border)' }} title="Stift Blau"><Pen size={16} color="#3b82f6" /></button>
-                            <button onClick={() => { setIsScrollMode(false); setColor('#ffffff'); setLineWidth(15); }} style={{ padding: '0.5rem', borderRadius: '4px', background: (!isScrollMode && color === '#ffffff') ? 'rgba(255,255,255,0.1)' : 'transparent', border: '1px solid var(--border)' }} title="Radiergummi"><Eraser size={16} color="var(--text-main)" /></button>
+
+                            {isSketchLocked ? (
+                                <button
+                                    onClick={() => setIsSketchLocked(false)}
+                                    style={{
+                                        padding: '0.5rem 1rem',
+                                        borderRadius: '4px',
+                                        background: 'var(--primary)',
+                                        border: '1px solid var(--primary)',
+                                        color: 'white',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '0.5rem',
+                                        fontSize: '0.9rem',
+                                        fontWeight: 500
+                                    }}
+                                    title="Zeichnen aktivieren"
+                                >
+                                    <Edit3 size={16} /> Skizze bearbeiten
+                                </button>
+                            ) : (
+                                <>
+                                    <button onClick={() => { setIsScrollMode(false); setColor('#000000'); setLineWidth(2); }} style={{ padding: '0.5rem', borderRadius: '4px', background: (!isScrollMode && color === '#000000') ? 'rgba(255,255,255,0.1)' : 'transparent', border: '1px solid var(--border)' }} title="Stift Schwarz"><Pen size={16} color="var(--text-main)" /></button>
+                                    <button onClick={() => { setIsScrollMode(false); setColor('#ef4444'); setLineWidth(2); }} style={{ padding: '0.5rem', borderRadius: '4px', background: (!isScrollMode && color === '#ef4444') ? 'rgba(255,255,255,0.1)' : 'transparent', border: '1px solid var(--border)' }} title="Stift Rot"><Pen size={16} color="#ef4444" /></button>
+                                    <button onClick={() => { setIsScrollMode(false); setColor('#3b82f6'); setLineWidth(2); }} style={{ padding: '0.5rem', borderRadius: '4px', background: (!isScrollMode && color === '#3b82f6') ? 'rgba(255,255,255,0.1)' : 'transparent', border: '1px solid var(--border)' }} title="Stift Blau"><Pen size={16} color="#3b82f6" /></button>
+                                    <button onClick={() => { setIsScrollMode(false); setColor('#ffffff'); setLineWidth(15); }} style={{ padding: '0.5rem', borderRadius: '4px', background: (!isScrollMode && color === '#ffffff') ? 'rgba(255,255,255,0.1)' : 'transparent', border: '1px solid var(--border)' }} title="Radiergummi"><Eraser size={16} color="var(--text-main)" /></button>
+                                    <button onClick={() => setIsSketchLocked(true)} style={{ padding: '0.5rem', borderRadius: '4px', background: 'var(--success)', border: '1px solid var(--success)', color: 'white', marginLeft: '0.5rem' }} title="Skizze sperren (Fertig)"><Check size={16} /></button>
+                                </>
+                            )}
 
                             <div style={{ width: '1px', height: '24px', background: 'var(--border)', margin: '0 0.5rem' }}></div>
+
+                            <button
+                                onClick={() => setStylusOnlyMode(!stylusOnlyMode)}
+                                style={{
+                                    padding: '0.5rem',
+                                    borderRadius: '4px',
+                                    background: stylusOnlyMode ? 'var(--primary)' : 'transparent',
+                                    border: '1px solid var(--border)',
+                                    color: stylusOnlyMode ? 'white' : 'var(--text-main)',
+                                    marginRight: '0.5rem'
+                                }}
+                                title={stylusOnlyMode ? "Nur Stift (Handballen ignorieren)" : "Touch & Stift"}
+                            >
+                                <Pen size={16} />
+                                {stylusOnlyMode && <span style={{ marginLeft: '4px', fontSize: '0.75rem' }}>Nur Stift</span>}
+                            </button>
 
                             <button onClick={() => setIsScrollMode(!isScrollMode)} style={{ padding: '0.5rem', borderRadius: '4px', background: isScrollMode ? 'var(--primary)' : 'transparent', border: '1px solid var(--border)', color: isScrollMode ? 'white' : 'var(--text-main)' }} title={isScrollMode ? "Scrollen aktiv (Zeichnen deaktiviert)" : "Zeichnen aktiv"}><Hand size={16} /></button>
 
                             <div style={{ width: '1px', height: '24px', background: 'var(--border)', margin: '0 0.5rem' }}></div>
 
-                            <button onClick={handleUndo} disabled={historyStep <= 0} style={{ padding: '0.5rem', borderRadius: '4px', background: 'transparent', border: '1px solid var(--border)', color: historyStep <= 0 ? 'var(--text-muted)' : 'var(--text-main)', opacity: historyStep <= 0 ? 0.5 : 1 }} title="Rückgängig"><Undo size={16} /></button>
-                            <button onClick={clearCanvas} style={{ padding: '0.5rem', borderRadius: '4px', background: 'transparent', border: '1px solid var(--border)', color: '#EF4444' }} title="Alles löschen"><Trash2 size={16} /></button>
+                            <button onClick={handleUndo} disabled={historyStep <= 0 || isSketchLocked} style={{ padding: '0.5rem', borderRadius: '4px', background: 'transparent', border: '1px solid var(--border)', color: historyStep <= 0 || isSketchLocked ? 'var(--text-muted)' : 'var(--text-main)', opacity: historyStep <= 0 || isSketchLocked ? 0.5 : 1 }} title="Rückgängig"><Undo size={16} /></button>
 
                             <button
                                 onClick={() => setIsCanvasExpanded(!isCanvasExpanded)}
@@ -371,19 +522,29 @@ const MeasurementModal = ({ isOpen, onClose, onSave, rooms, projectTitle, initia
                         </div>
 
                         {isCanvasExpanded && (
-                            <div style={{ border: '1px solid var(--border)', borderRadius: '4px', overflow: 'hidden', touchAction: isScrollMode ? 'pan-y' : 'none' }}>
+                            <div style={{ border: '1px solid var(--border)', borderRadius: '4px', overflow: 'hidden', touchAction: 'none' }}>
                                 <canvas
                                     ref={canvasRef}
                                     width={960}
                                     height={400}
-                                    style={{ width: '100%', height: '400px', cursor: isScrollMode ? 'grab' : 'crosshair', display: 'block', backgroundColor: 'white' }}
-                                    onMouseDown={startDrawing}
-                                    onMouseMove={draw}
-                                    onMouseUp={stopDrawing}
-                                    onMouseLeave={stopDrawing}
-                                    onTouchStart={startDrawing}
-                                    onTouchMove={draw}
-                                    onTouchEnd={stopDrawing}
+                                    style={{
+                                        width: '100%',
+                                        height: '400px',
+                                        cursor: isScrollMode ? 'grab' : 'crosshair',
+                                        display: 'block',
+                                        backgroundColor: 'white', // Base white
+                                        backgroundImage: `
+                                            linear-gradient(to right, #e0e0e0 1px, transparent 1px),
+                                            linear-gradient(to bottom, #e0e0e0 1px, transparent 1px)
+                                        `,
+                                        backgroundSize: '40px 40px',
+                                        touchAction: 'none'
+                                    }}
+                                    onPointerDown={startDrawing}
+                                    onPointerMove={draw}
+                                    onPointerUp={stopDrawing}
+                                    onPointerLeave={stopDrawing}
+                                    onPointerCancel={stopDrawing}
                                 />
                             </div>
                         )}
@@ -405,17 +566,18 @@ const MeasurementModal = ({ isOpen, onClose, onSave, rooms, projectTitle, initia
                                 value={globalSettings.date}
                                 onChange={e => setGlobalSettings({ ...globalSettings, date: e.target.value })}
                                 className="form-input"
-                                style={{ width: '100%', padding: '0.4rem' }}
+                                style={{ width: '100%', padding: '0.6rem', minHeight: '40px' }}
                             />
                         </div>
                         <div>
                             <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Raumtemp. (°C)</label>
                             <input
                                 type="text"
+                                inputMode="decimal"
                                 value={globalSettings.temp}
                                 onChange={e => setGlobalSettings({ ...globalSettings, temp: e.target.value })}
-                                className="form-input"
-                                style={{ width: '100%', padding: '0.4rem' }}
+                                className="form-input no-spinner"
+                                style={{ width: '100%', padding: '0.6rem', minHeight: '40px' }}
                                 placeholder="20.5"
                             />
                         </div>
@@ -423,10 +585,11 @@ const MeasurementModal = ({ isOpen, onClose, onSave, rooms, projectTitle, initia
                             <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Luftfeuchte (%)</label>
                             <input
                                 type="text"
+                                inputMode="decimal"
                                 value={globalSettings.humidity}
                                 onChange={e => setGlobalSettings({ ...globalSettings, humidity: e.target.value })}
-                                className="form-input"
-                                style={{ width: '100%', padding: '0.4rem' }}
+                                className="form-input no-spinner"
+                                style={{ width: '100%', padding: '0.6rem', minHeight: '40px' }}
                                 placeholder="55"
                             />
                         </div>
@@ -437,7 +600,7 @@ const MeasurementModal = ({ isOpen, onClose, onSave, rooms, projectTitle, initia
                                 value={globalSettings.device}
                                 onChange={e => setGlobalSettings({ ...globalSettings, device: e.target.value })}
                                 className="form-input"
-                                style={{ width: '100%', padding: '0.4rem' }}
+                                style={{ width: '100%', padding: '0.6rem', minHeight: '40px' }}
                                 placeholder="z.B. Trotec"
                             />
                         </div>
@@ -445,93 +608,165 @@ const MeasurementModal = ({ isOpen, onClose, onSave, rooms, projectTitle, initia
 
                     {/* Measurements Table */}
                     <div style={{ padding: '1rem' }}>
-                        <h4 style={{ fontSize: '1rem', fontWeight: 'bold', marginBottom: '0.5rem', color: 'var(--text-main)' }}>Messwerte</h4>
-                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
-                            <thead>
-                                <tr style={{ background: 'var(--background)', borderBottom: '2px solid var(--border)' }}>
-                                    <th style={{ padding: '0.5rem', textAlign: 'left', width: '30%', color: 'var(--text-muted)' }}>Messpunkt</th>
-                                    <th style={{ padding: '0.5rem', textAlign: 'left', width: '20%', color: 'var(--text-muted)' }}>Wand</th>
-                                    <th style={{ padding: '0.5rem', textAlign: 'left', width: '20%', color: 'var(--text-muted)' }}>Boden</th>
-                                    <th style={{ padding: '0.5rem', textAlign: 'left', color: 'var(--text-muted)' }}>Bemerkung</th>
-                                    <th style={{ padding: '0.5rem', width: '40px' }}></th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {measurements.map((row, idx) => (
-                                    <tr key={row.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                                        <td style={{ padding: '0.25rem' }}>
-                                            <input
-                                                type="text"
-                                                value={row.pointName}
-                                                onChange={(e) => updateMeasurement(idx, 'pointName', e.target.value)}
-                                                className="form-input"
-                                                style={{ padding: '0.25rem', fontWeight: 500 }}
-                                            />
-                                        </td>
-                                        <td style={{ padding: '0.25rem' }}>
-                                            <input
-                                                type="text"
-                                                value={row.w_value}
-                                                onChange={(e) => updateMeasurement(idx, 'w_value', e.target.value)}
-                                                className="form-input"
-                                                style={{ padding: '0.25rem' }}
-                                                placeholder="Wert..."
-                                            />
-                                        </td>
-                                        <td style={{ padding: '0.25rem' }}>
-                                            <input
-                                                type="text"
-                                                value={row.b_value}
-                                                onChange={(e) => updateMeasurement(idx, 'b_value', e.target.value)}
-                                                className="form-input"
-                                                style={{ padding: '0.25rem' }}
-                                                placeholder="Wert..."
-                                            />
-                                        </td>
-                                        <td style={{ padding: '0.25rem' }}>
-                                            <input
-                                                type="text"
-                                                value={row.notes}
-                                                onChange={(e) => updateMeasurement(idx, 'notes', e.target.value)}
-                                                className="form-input"
-                                                style={{ padding: '0.25rem' }}
-                                                placeholder="..."
-                                            />
-                                        </td>
-                                        <td style={{ padding: '0.25rem', textAlign: 'center' }}>
-                                            <button
-                                                onClick={() => removeMeasurement(idx)}
-                                                style={{ background: 'transparent', border: 'none', color: '#EF4444', cursor: 'pointer', padding: '4px' }}
-                                                title="Messpunkt löschen"
-                                            >
-                                                <Trash2 size={16} />
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                        <h4 style={{ fontSize: '1rem', fontWeight: 'bold', marginBottom: '0.5rem', color: 'var(--text-main)' }}>
+                            {readOnly ? 'Messverlauf' : 'Messwerte'}
+                        </h4>
 
-                        <button
-                            onClick={addMeasurement}
-                            className="no-print"
-                            style={{
-                                marginTop: '0.5rem',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '0.5rem',
-                                padding: '0.5rem 1rem',
-                                background: 'transparent',
-                                border: '1px dashed var(--border)',
-                                borderRadius: '4px',
-                                color: 'var(--primary)',
-                                cursor: 'pointer',
-                                width: '100%',
-                                justifyContent: 'center'
-                            }}
-                        >
-                            <Plus size={16} /> weiteren Messpunkt hinzufügen
-                        </button>
+                        {readOnly ? (
+                            <div style={{ overflowX: 'auto' }}>
+                                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
+                                    <thead>
+                                        <tr style={{ background: 'var(--background)', borderBottom: '2px solid var(--border)' }}>
+                                            <th style={{ padding: '0.5rem', textAlign: 'left', color: 'var(--text-muted)', minWidth: '100px' }}>Datum</th>
+                                            {historyColumns.map(col => (
+                                                <th key={col} style={{ padding: '0.5rem', textAlign: 'center', color: 'var(--text-muted)', minWidth: '120px' }}>
+                                                    {col}<br />
+                                                    <span style={{ fontSize: '0.7em', fontWeight: 'normal' }}>(W / B)</span>
+                                                </th>
+                                            ))}
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {historyRows.length > 0 ? (
+                                            historyRows.map(row => (
+                                                <tr key={row.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                                                    <td style={{ padding: '0.5rem', color: 'var(--text-muted)' }}>
+                                                        {row.date ? new Date(row.date).toLocaleDateString('de-CH') : '-'}
+                                                    </td>
+                                                    {historyColumns.map(col => {
+                                                        const cell = row.points[col];
+                                                        return (
+                                                            <td key={col} style={{ padding: '0.5rem', textAlign: 'center' }}>
+                                                                {cell ? (
+                                                                    <div style={{ display: 'flex', justifyContent: 'center', gap: '8px' }}>
+                                                                        <span style={{
+                                                                            color: cell.w_color,
+                                                                            fontWeight: cell.w_color !== 'inherit' ? 'bold' : 'normal',
+                                                                            minWidth: '30px',
+                                                                            textAlign: 'right'
+                                                                        }}>
+                                                                            {cell.w_value || '-'}
+                                                                        </span>
+                                                                        <span style={{ color: 'var(--text-muted)' }}>/</span>
+                                                                        <span style={{
+                                                                            color: cell.b_color,
+                                                                            fontWeight: cell.b_color !== 'inherit' ? 'bold' : 'normal',
+                                                                            minWidth: '30px',
+                                                                            textAlign: 'left'
+                                                                        }}>
+                                                                            {cell.b_value || '-'}
+                                                                        </span>
+                                                                    </div>
+                                                                ) : (
+                                                                    <span style={{ color: 'var(--text-muted)' }}>-</span>
+                                                                )}
+                                                            </td>
+                                                        );
+                                                    })}
+                                                </tr>
+                                            ))
+                                        ) : (
+                                            <tr><td colSpan={historyColumns.length + 1} style={{ padding: '1rem', textAlign: 'center', color: 'var(--text-muted)' }}>Keine historischen Daten vorhanden.</td></tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        ) : (
+                            <>
+                                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
+                                    <thead>
+                                        <tr style={{ background: 'var(--background)', borderBottom: '2px solid var(--border)' }}>
+                                            <th style={{ padding: '0.5rem', textAlign: 'left', width: '30%', color: 'var(--text-muted)' }}>Messpunkt</th>
+                                            <th style={{ padding: '0.5rem', textAlign: 'left', width: '20%', color: 'var(--text-muted)' }}>Wand</th>
+                                            <th style={{ padding: '0.5rem', textAlign: 'left', width: '20%', color: 'var(--text-muted)' }}>Boden</th>
+                                            <th style={{ padding: '0.5rem', textAlign: 'left', color: 'var(--text-muted)' }}>Bemerkung</th>
+                                            <th style={{ padding: '0.5rem', width: '40px' }}></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {measurements.map((row, idx) => (
+                                            <tr key={row.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                                                <td style={{ padding: '0.25rem' }}>
+                                                    <input
+                                                        type="text"
+                                                        value={row.pointName}
+                                                        onChange={(e) => updateMeasurement(idx, 'pointName', e.target.value)}
+                                                        className="form-input"
+                                                        style={{ width: '100%', padding: '0.75rem', fontSize: '1rem', minHeight: '44px', userSelect: 'text', WebkitUserSelect: 'text' }}
+                                                        autoComplete="off"
+                                                    />
+                                                </td>
+                                                <td style={{ padding: '0.25rem' }}>
+                                                    <input
+                                                        type="text"
+                                                        inputMode="decimal"
+                                                        value={row.w_value}
+                                                        onChange={(e) => updateMeasurement(idx, 'w_value', e.target.value)}
+                                                        className="form-input no-spinner"
+                                                        style={{ width: '100%', padding: '0.75rem', fontSize: '1rem', minHeight: '44px', touchAction: 'manipulation', userSelect: 'text', WebkitUserSelect: 'text' }}
+                                                        placeholder="Wert..."
+                                                        autoComplete="off"
+                                                    />
+                                                </td>
+                                                <td style={{ padding: '0.25rem' }}>
+                                                    <input
+                                                        type="text"
+                                                        inputMode="decimal"
+                                                        value={row.b_value}
+                                                        onChange={(e) => updateMeasurement(idx, 'b_value', e.target.value)}
+                                                        className="form-input no-spinner"
+                                                        style={{ width: '100%', padding: '0.75rem', fontSize: '1rem', minHeight: '44px', touchAction: 'manipulation', userSelect: 'text', WebkitUserSelect: 'text' }}
+                                                        placeholder="Wert..."
+                                                        autoComplete="off"
+                                                    />
+                                                </td>
+                                                <td style={{ padding: '0.25rem' }}>
+                                                    <input
+                                                        type="text"
+                                                        value={row.notes}
+                                                        onChange={(e) => updateMeasurement(idx, 'notes', e.target.value)}
+                                                        className="form-input"
+                                                        style={{ width: '100%', padding: '0.75rem', fontSize: '1rem', minHeight: '44px', userSelect: 'text', WebkitUserSelect: 'text' }}
+                                                        placeholder="..."
+                                                        autoComplete="off"
+                                                    />
+                                                </td>
+                                                <td style={{ padding: '0.25rem', textAlign: 'center' }}>
+                                                    <button
+                                                        onClick={() => removeMeasurement(idx)}
+                                                        style={{ background: 'transparent', border: 'none', color: '#EF4444', cursor: 'pointer', padding: '4px' }}
+                                                        title="Messpunkt löschen"
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+
+                                <button
+                                    onClick={addMeasurement}
+                                    className="no-print"
+                                    style={{
+                                        marginTop: '0.5rem',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '0.5rem',
+                                        padding: '0.5rem 1rem',
+                                        background: 'transparent',
+                                        border: '1px dashed var(--border)',
+                                        borderRadius: '4px',
+                                        color: 'var(--primary)',
+                                        cursor: 'pointer',
+                                        width: '100%',
+                                        justifyContent: 'center'
+                                    }}
+                                >
+                                    <Plus size={16} /> weiteren Messpunkt hinzufügen
+                                </button>
+                            </>
+                        )}
                     </div>
                 </div>
 
@@ -540,7 +775,7 @@ const MeasurementModal = ({ isOpen, onClose, onSave, rooms, projectTitle, initia
                     Erstellt mit Q-Tool | {new Date().toLocaleDateString('de-CH')}
                 </div>
             </div>
-        </div>
+        </div >
     );
 };
 

@@ -250,11 +250,34 @@ input:-webkit-autofill:active {
   }
 
   body {
-    background-color: white;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
-    font-size: 12pt;
-    /* Readable font size for documents */
+    background: white !important;
+    color: black !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  /* Print Specific Tweaks for Excel-like Layout */
+  .print-only-container {
+    display: block !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Hide everything else */
+  body > *:not(.print-wrapper) {
+    display: none !important;
+  }
+
+  .print-wrapper {
+    display: block !important;
+    width: 100vw;
+    height: 100vh;
+    background: white;
   }
 
   .app-header,

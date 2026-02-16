@@ -288,12 +288,8 @@ export const generateMeasurementExcel = async (formData) => {
 
     }
 
-    // 4. Save/Return
+    // 4. Save
     const buffer = await workbook.xlsx.writeBuffer();
     const fileName = `Messprotokoll_${formData.projectTitle || 'Export'}_${new Date().toISOString().slice(0, 10)}.xlsx`;
-    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-
-    saveAs(blob, fileName);
-
-    return { blob, fileName };
+    saveAs(new Blob([buffer]), fileName);
 };

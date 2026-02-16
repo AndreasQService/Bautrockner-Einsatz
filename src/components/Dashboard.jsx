@@ -91,7 +91,7 @@ const DryingMonitor = ({ reports, onSelectReport }) => {
                                 onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
                             >
                                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
-                                    <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>{report.client}</span>
+                                    <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>{report.locationDetails || report.client}</span>
                                     <span style={{ fontWeight: 700, color: colorClass }}>{days} Tage</span>
                                 </div>
 

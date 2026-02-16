@@ -79,20 +79,23 @@ function App() {
   }
 
   const handleSaveReport = useCallback(async (updatedReport, silent = false) => {
+    // Generate ID eagerly if missing (crucial for auto-saves of new reports)
+    let finalReport = { ...updatedReport };
+    if (!finalReport.id) {
+      finalReport.id = finalReport.projectTitle || `TMP-${Date.now()}`;
+    }
+    // Ensure created date
+    if (!finalReport.date) finalReport.date = new Date().toISOString();
+
     // Use functional update to access latest reports without adding it to dependency array
     setReports(currentReports => {
       let newReports;
-      const exists = currentReports.find(r => r.id === updatedReport.id);
+      const exists = currentReports.find(r => r.id === finalReport.id);
 
       if (exists) {
-        newReports = currentReports.map(r => r.id === updatedReport.id ? updatedReport : r);
+        newReports = currentReports.map(r => r.id === finalReport.id ? finalReport : r);
       } else {
-        // New report
-        const newId = updatedReport.id || updatedReport.projectTitle || `TMP-${Date.now()}`;
-        // We must mutate the updatedReport copy in the outer scope ideally, but here we just ensure consistency
-        if (!updatedReport.id) updatedReport = { ...updatedReport, id: newId };
-
-        newReports = [updatedReport, ...currentReports];
+        newReports = [finalReport, ...currentReports];
       }
 
       // Persist to LocalStorage (Sanitized)
@@ -112,29 +115,31 @@ function App() {
       return newReports;
     });
 
-    // Update selection if not silent (UI feedback)
-    if (!silent) {
+    // Update selection if not silent (UI feedback), OR if the ID was just generated (to keep UI in sync)
+    // IMPORTANT: This ensures that DamageForm gets the new ID via initialData on subsequent re-renders/key updates
+    if (!silent || (!updatedReport.id && finalReport.id)) {
       setSelectedReport(prev => {
         // Only update if ID matches or it's a new one, to avoid heavy re-renders if unrelated
-        if (!prev || prev.id === updatedReport.id || !updatedReport.id) return updatedReport;
+        if (!prev || prev.id === finalReport.id || !updatedReport.id) return finalReport;
         return prev;
       });
-      setView('details');
+      // Ensure view is set correctly if not silent, IF silent ignore view change
+      if (!silent) setView('details');
     }
 
     // Persist to Supabase (Background)
     if (supabase) {
       // ... Supabase logic (can run safely with captured updatedReport) ...
       const rowData = {
-        id: updatedReport.id,
-        project_title: updatedReport.projectTitle,
-        client: updatedReport.client,
-        address: updatedReport.address,
-        status: updatedReport.status,
-        assigned_to: updatedReport.assignedTo,
-        date: updatedReport.date,
-        drying_started: updatedReport.dryingStarted,
-        report_data: updatedReport,
+        id: finalReport.id,
+        project_title: finalReport.projectTitle,
+        client: finalReport.client,
+        address: finalReport.address,
+        status: finalReport.status,
+        assigned_to: finalReport.assignedTo,
+        date: finalReport.date,
+        drying_started: finalReport.dryingStarted,
+        report_data: finalReport, // Use finalReport with ID
         updated_at: new Date().toISOString()
       };
 
@@ -153,6 +158,9 @@ function App() {
         }
       });
     }
+
+    // Return the final report object so the caller can update their local state (e.g. ID)
+    return finalReport;
   }, [supabase]);
 
   const handleNavigateToReport = (identifier) => {
@@ -297,10 +305,12 @@ function App() {
                     {isTechnicianMode ? i18n.t('technicianView') : i18n.t('desktopView')}
                   </button>
                 )}
-                <button className="btn btn-primary" onClick={() => { setSelectedReport(null); setView('new-report'); }}>
-                  <Plus size={18} />
-                  {i18n.t('newOrder')}
-                </button>
+                {!isTechnicianMode && (
+                  <button className="btn btn-primary" onClick={() => { setSelectedReport(null); setView('new-report'); }}>
+                    <Plus size={18} />
+                    {i18n.t('newOrder')}
+                  </button>
+                )}
 
                 {/* User Role Switcher (Demo) */}
                 <div
