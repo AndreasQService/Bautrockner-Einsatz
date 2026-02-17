@@ -4102,13 +4102,13 @@ END:VCARD`;
                                 <span style={{ fontSize: '0.9rem' }}>Email Import</span>
                             </button>
                         )}
-                        {formData.status === 'Leckortung' && (
+                        {formData.status === 'Leckortung' && mode === 'desktop' && (
                             <button
                                 type="button"
                                 className="btn btn-outline"
                                 onClick={handleGeneratePDF}
                                 disabled={isGeneratingPDF}
-                                style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', border: '5px solid red' }}
+                                style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}
                             >
                                 <FileText size={18} />
                                 {isGeneratingPDF ? 'Erstelle...' : 'Bericht (PDF) & Speichern'}
@@ -5426,16 +5426,7 @@ END:VCARD`;
                                 <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--primary)', margin: 0 }}>
                                     Arbeitsrapporte
                                 </h2>
-                                <button
-                                    type="button"
-                                    onClick={handleGeneratePDF}
-                                    disabled={isGeneratingPDF}
-                                    className="btn btn-outline"
-                                    style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem', display: 'flex', gap: '0.5rem', alignItems: 'center', backgroundColor: 'var(--surface)', borderColor: 'var(--border)' }}
-                                >
-                                    <FileText size={16} />
-                                    Schadensbericht
-                                </button>
+                                {null}
                             </div>
 
                             <div className="card" style={{ border: '1px solid var(--border)', padding: '1.5rem' }}>
@@ -6517,15 +6508,17 @@ END:VCARD`;
                         )}
 
                         <div style={{ display: 'flex', gap: '1rem' }}>
-                            <button
-                                type="button"
-                                className="btn btn-outline"
-                                onClick={handlePDFClick}
-                                style={{ color: '#365E7D', borderColor: '#365E7D', border: '5px solid red' }}
-                            >
-                                <FileText size={18} />
-                                Bericht konfigurieren
-                            </button>
+                            {mode === 'desktop' && (
+                                <button
+                                    type="button"
+                                    className="btn btn-outline"
+                                    onClick={handlePDFClick}
+                                    style={{ color: '#365E7D', borderColor: '#365E7D' }}
+                                >
+                                    <FileText size={18} />
+                                    Bericht konfigurieren
+                                </button>
+                            )}
                             <button type="button" className="btn btn-outline" onClick={onCancel}>Abbrechen</button>
                             {mode === 'desktop' && (
                                 <button type="submit" className="btn btn-primary">
