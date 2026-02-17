@@ -778,6 +778,25 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         }));
     };
 
+    const downloadVCard = (contact) => {
+        const vCardData = `BEGIN:VCARD
+VERSION:3.0
+FN:${contact.name || 'Unbekannt'}
+TEL;TYPE=CELL:${contact.phone || ''}
+NOTE:Wohnung: ${contact.apartment || ''}, Rolle: ${contact.role || ''}
+END:VCARD`;
+        const blob = new Blob([vCardData], { type: 'text/vcard' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        a.download = `${contact.name || 'kontakt'}.vcf`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+    };
+
     const handleRemoveContact = (index) => {
         setFormData(prev => ({
             ...prev,
@@ -2070,6 +2089,15 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                                     </a>
                                     <button
                                         type="button"
+                                        className="btn btn-outline"
+                                        style={{ padding: '0.4rem', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                        onClick={() => downloadVCard(contact)}
+                                        title="Kontakt speichern (vCard)"
+                                    >
+                                        <Download size={16} />
+                                    </button>
+                                    <button
+                                        type="button"
                                         onClick={() => {
                                             const newContacts = formData.contacts.filter((_, i) => i !== idx);
                                             setFormData({ ...formData, contacts: newContacts });
@@ -2163,7 +2191,17 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                                                     if (val === 'Sonstiges') {
                                                         setNewRoom(prev => ({ ...prev, apartment: '' }));
                                                     } else {
-                                                        setNewRoom(prev => ({ ...prev, apartment: val }));
+                                                        let relatedStockwerk = '';
+                                                        const matchingContact = (formData.contacts || []).find(c => c.name && c.name.trim().split(/\s+/).pop() === val);
+                                                        if (matchingContact) {
+                                                            relatedStockwerk = matchingContact.floor || matchingContact.apartment || '';
+                                                        } else {
+                                                            const existingRoom = formData.rooms.find(r => r.apartment === val);
+                                                            if (existingRoom) {
+                                                                relatedStockwerk = existingRoom.stockwerk || '';
+                                                            }
+                                                        }
+                                                        setNewRoom(prev => ({ ...prev, apartment: val, stockwerk: relatedStockwerk || prev.stockwerk }));
                                                     }
                                                 }}
                                                 style={{ padding: '0.5rem', fontSize: '0.9rem' }}
@@ -2340,7 +2378,17 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                                                 if (val === 'Sonstiges') {
                                                     setNewRoom(prev => ({ ...prev, apartment: '' }));
                                                 } else {
-                                                    setNewRoom(prev => ({ ...prev, apartment: val }));
+                                                    let relatedStockwerk = '';
+                                                    const matchingContact = (formData.contacts || []).find(c => c.name && c.name.trim().split(/\s+/).pop() === val);
+                                                    if (matchingContact) {
+                                                        relatedStockwerk = matchingContact.floor || matchingContact.apartment || '';
+                                                    } else {
+                                                        const existingRoom = formData.rooms.find(r => r.apartment === val);
+                                                        if (existingRoom) {
+                                                            relatedStockwerk = existingRoom.stockwerk || '';
+                                                        }
+                                                    }
+                                                    setNewRoom(prev => ({ ...prev, apartment: val, stockwerk: relatedStockwerk || prev.stockwerk }));
                                                 }
                                             }}
                                             style={{ padding: '0.5rem', fontSize: '0.9rem' }}
@@ -4499,6 +4547,15 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                                                 <a href={contact.phone ? `tel:${contact.phone}` : '#'} className="btn btn-outline" style={{ padding: '0.4rem', color: 'var(--success)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: contact.phone ? 1 : 0.5, pointerEvents: contact.phone ? 'auto' : 'none' }} title="Anrufen">
                                                     <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
                                                 </a>
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-outline"
+                                                    style={{ padding: '0.4rem', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                                    onClick={() => downloadVCard(contact)}
+                                                    title="Kontakt speichern (vCard)"
+                                                >
+                                                    <Download size={16} />
+                                                </button>
                                             </div>
                                         </div>
                                     </div>
@@ -4612,6 +4669,15 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                                             <a href={contact.phone ? `tel:${contact.phone}` : '#'} className="btn btn-outline" style={{ padding: '0.4rem', color: 'var(--success)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: contact.phone ? 1 : 0.5, pointerEvents: contact.phone ? 'auto' : 'none' }} title="Anrufen">
                                                 <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
                                             </a>
+                                            <button
+                                                type="button"
+                                                className="btn btn-outline"
+                                                style={{ padding: '0.4rem', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                                onClick={() => downloadVCard(contact)}
+                                                title="Kontakt speichern (vCard)"
+                                            >
+                                                <Download size={16} />
+                                            </button>
                                         </div>
                                         <button
                                             type="button"
