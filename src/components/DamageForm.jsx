@@ -2096,18 +2096,20 @@ END:VCARD`;
                                     >
                                         <Download size={16} />
                                     </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            const newContacts = formData.contacts.filter((_, i) => i !== idx);
-                                            setFormData({ ...formData, contacts: newContacts });
-                                        }}
-                                        className="btn btn-outline"
-                                        style={{ padding: '0.4rem', color: '#EF4444' }}
-                                        title="Kontakt löschen"
-                                    >
-                                        <Trash size={16} />
-                                    </button>
+                                    {mode === 'desktop' && (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const newContacts = formData.contacts.filter((_, i) => i !== idx);
+                                                setFormData({ ...formData, contacts: newContacts });
+                                            }}
+                                            className="btn btn-outline"
+                                            style={{ padding: '0.4rem', color: '#EF4444' }}
+                                            title="Kontakt löschen"
+                                        >
+                                            <Trash size={16} />
+                                        </button>
+                                    )}
                                 </div>
 
                                 {/* Delete Button (Absolute top-right or separate) */}
@@ -4598,7 +4600,7 @@ END:VCARD`;
                         ) : (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                                 {formData.contacts && formData.contacts.map((contact, index) => (
-                                    <div key={index} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr auto', gap: '0.5rem', alignItems: 'center' }}>
+                                    <div key={index} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '0.5rem', alignItems: 'center' }}>
                                         <input
                                             type="text"
                                             className="form-input"
@@ -4679,18 +4681,7 @@ END:VCARD`;
                                                 <Download size={16} />
                                             </button>
                                         </div>
-                                        <button
-                                            type="button"
-                                            className="btn btn-ghost"
-                                            style={{ padding: '0.5rem', color: 'var(--danger)' }}
-                                            onClick={() => {
-                                                const newContacts = formData.contacts.filter((_, i) => i !== index);
-                                                setFormData(prev => ({ ...prev, contacts: newContacts }));
-                                            }}
-                                            title="Kontakt entfernen"
-                                        >
-                                            <Trash size={16} />
-                                        </button>
+
                                     </div>
                                 ))}
                                 <button
