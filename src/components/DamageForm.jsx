@@ -4102,13 +4102,13 @@ END:VCARD`;
                                 <span style={{ fontSize: '0.9rem' }}>Email Import</span>
                             </button>
                         )}
-                        {formData.status === 'Leckortung' && mode === 'desktop' && (
+                        {formData.status === 'Leckortung' && (
                             <button
                                 type="button"
                                 className="btn btn-outline"
                                 onClick={handleGeneratePDF}
                                 disabled={isGeneratingPDF}
-                                style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}
+                                style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', border: '5px solid red' }}
                             >
                                 <FileText size={18} />
                                 {isGeneratingPDF ? 'Erstelle...' : 'Bericht (PDF) & Speichern'}
@@ -6517,17 +6517,15 @@ END:VCARD`;
                         )}
 
                         <div style={{ display: 'flex', gap: '1rem' }}>
-                            {mode === 'desktop' && (
-                                <button
-                                    type="button"
-                                    className="btn btn-outline"
-                                    onClick={handlePDFClick}
-                                    style={{ color: '#365E7D', borderColor: '#365E7D' }}
-                                >
-                                    <FileText size={18} />
-                                    Bericht konfigurieren
-                                </button>
-                            )}
+                            <button
+                                type="button"
+                                className="btn btn-outline"
+                                onClick={handlePDFClick}
+                                style={{ color: '#365E7D', borderColor: '#365E7D', border: '5px solid red' }}
+                            >
+                                <FileText size={18} />
+                                Bericht konfigurieren
+                            </button>
                             <button type="button" className="btn btn-outline" onClick={onCancel}>Abbrechen</button>
                             {mode === 'desktop' && (
                                 <button type="submit" className="btn btn-primary">
