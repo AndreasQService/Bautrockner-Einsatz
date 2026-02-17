@@ -2603,21 +2603,23 @@ END:VCARD`;
                                                                                 <img src={img.preview} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onClick={() => window.open(img.preview, '_blank')} />
                                                                             </div>
                                                                             <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', padding: '0 2px', alignItems: 'center' }}>
-                                                                                <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', fontSize: '0.75rem', cursor: 'pointer', color: '#374151' }}>
-                                                                                    <input
-                                                                                        type="checkbox"
-                                                                                        style={{ width: '20px', height: '20px', accentColor: 'var(--primary)' }}
-                                                                                        checked={img.includeInReport !== false}
-                                                                                        onChange={(e) => {
-                                                                                            const isChecked = e.target.checked;
-                                                                                            setFormData(prev => ({
-                                                                                                ...prev,
-                                                                                                images: prev.images.map(i => i === img ? { ...i, includeInReport: isChecked } : i)
-                                                                                            }));
-                                                                                        }}
-                                                                                    />
-                                                                                    <span style={{ fontWeight: 600 }}>Bericht</span>
-                                                                                </label>
+                                                                                {mode === 'desktop' && (
+                                                                                    <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', fontSize: '0.75rem', cursor: 'pointer', color: '#374151' }}>
+                                                                                        <input
+                                                                                            type="checkbox"
+                                                                                            style={{ width: '20px', height: '20px', accentColor: 'var(--primary)' }}
+                                                                                            checked={img.includeInReport !== false}
+                                                                                            onChange={(e) => {
+                                                                                                const isChecked = e.target.checked;
+                                                                                                setFormData(prev => ({
+                                                                                                    ...prev,
+                                                                                                    images: prev.images.map(i => i === img ? { ...i, includeInReport: isChecked } : i)
+                                                                                                }));
+                                                                                            }}
+                                                                                        />
+                                                                                        <span style={{ fontWeight: 600 }}>Bericht</span>
+                                                                                    </label>
+                                                                                )}
                                                                                 <button
                                                                                     type="button"
                                                                                     title="Bearbeiten"
