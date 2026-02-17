@@ -3677,7 +3677,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                     transform: 'translateX(-50%)',
                     width: '100%',
                     maxWidth: '600px',
-                    padding: '0.75rem',
+                    padding: '0.4rem 0.75rem',
                     backgroundColor: '#0F172A',
                     borderTop: '1px solid #334155',
                     display: 'flex',
@@ -3688,14 +3688,14 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                     boxShadow: '0 -4px 12px rgba(0, 0, 0, 0.5)'
                 }}>
                     {/* Status Indicator */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: isSaving ? '#fbbf24' : '#10B981', transition: 'color 0.3s' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem', color: isSaving ? '#fbbf24' : '#10B981', transition: 'color 0.3s' }}>
                         {isSaving ? (
                             <>
-                                <RotateCcw size={14} className="spin" /> Speichert...
+                                <RotateCcw size={12} className="spin" /> Speichert...
                             </>
                         ) : (
                             <>
-                                <CheckCircle size={14} /> Gespeichert
+                                <CheckCircle size={12} /> Gespeichert
                             </>
                         )}
                     </div>
@@ -3704,9 +3704,9 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                         type="button"
                         className="btn btn-primary"
                         onClick={onCancel}
-                        style={{ padding: '0.5rem 1.5rem', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                        style={{ padding: '0.35rem 1rem', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.4rem', borderRadius: '20px' }}
                     >
-                        <CheckCircle size={16} />
+                        <CheckCircle size={14} />
                         Fertig
                     </button>
                 </div>

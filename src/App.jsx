@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Plus, LayoutDashboard, Settings, User, Users, LogOut } from 'lucide-react'
+import { Plus, LayoutDashboard, Settings, User, Users, LogOut, Thermometer } from 'lucide-react'
 import { supabase } from './supabaseClient'
 import Dashboard from './components/Dashboard'
 import DamageForm from './components/DamageForm'
 import DeviceManager from './components/DeviceManager'
 import UserManagementModal from './components/UserManagementModal'
+import MeasurementDeviceManager from './components/MeasurementDeviceManager'
 import LoginScreen from './components/LoginScreen'
 import i18n from './i18n'
 
@@ -14,6 +15,7 @@ function App() {
 
   // Authentication / User Management State
   const [showUserModal, setShowUserModal] = useState(false);
+  const [showMeasurementManager, setShowMeasurementManager] = useState(false);
   const [currentUser, setCurrentUser] = useState(null); // The logged in user
   const [userRole, setUserRole] = useState('admin'); // 'admin' | 'technician' | 'user'
   const [isTechnicianMode, setIsTechnicianMode] = useState(false); // Mode state
@@ -245,7 +247,7 @@ function App() {
       {ToastMarkup}
 
       <header className="app-header">
-        <div className="container header-content">
+        <div className="container header-content" style={{ position: 'relative' }}>
           <div className="logo-area">
             <div className="logo-img-container">
               <img src="/logo.png" alt="QService" style={{ height: '40px', width: 'auto' }} onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }} />
@@ -253,22 +255,25 @@ function App() {
             </div>
             <span>Q-Service AG</span>
           </div>
+
+          {/* User Info & Logout (Centered) */}
+          <div style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <div style={{ textAlign: 'center', fontSize: '0.8rem', lineHeight: 1.2 }}>
+              <div style={{ fontWeight: 600, color: 'var(--text-main)' }}>{currentUser.name}</div>
+              <div style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>{currentUser.role.toUpperCase()}</div>
+            </div>
+            <button
+              onClick={handleLogout}
+              className="btn btn-ghost"
+              title="Abmelden"
+              style={{ padding: '0.5rem', color: '#EF4444' }}
+            >
+              <LogOut size={18} />
+            </button>
+          </div>
           <nav>
             {/* User Info & Logout (Always visible when logged in) */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginRight: '1rem', paddingRight: '1rem', borderRight: '1px solid var(--border)' }}>
-              <div style={{ textAlign: 'right', fontSize: '0.8rem', lineHeight: 1.2 }}>
-                <div style={{ fontWeight: 600, color: 'var(--text-main)' }}>{currentUser.name}</div>
-                <div style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>{currentUser.role.toUpperCase()}</div>
-              </div>
-              <button
-                onClick={handleLogout}
-                className="btn btn-ghost"
-                title="Abmelden"
-                style={{ padding: '0.5rem', color: '#EF4444' }}
-              >
-                <LogOut size={18} />
-              </button>
-            </div>
+            {/* User Info removed from here */}
 
             {view !== 'dashboard' && (
               <button className="btn btn-outline" onClick={handleCancelEntry}>
@@ -279,18 +284,7 @@ function App() {
             {view === 'dashboard' && (
               <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
 
-                {/* Admin Only: Device Manager - Hidden in Technician Mode */}
-                {userRole === 'admin' && !isTechnicianMode && (
-                  <button
-                    className="btn btn-outline"
-                    onClick={() => setView('devices')}
-                    title={i18n.t('devices')}
-                  >
-                    <Settings size={18} style={{ marginRight: '0.5rem' }} />
-                    <span className="hide-mobile">{i18n.t('devices')}</span>
-                  </button>
-                )}
-
+                {/* View Toggle */}
                 {userRole === 'admin' && (
                   <button
                     className={`btn ${isTechnicianMode ? 'btn-primary' : 'btn-outline'}`}
@@ -300,6 +294,7 @@ function App() {
                     {isTechnicianMode ? i18n.t('technicianView') : i18n.t('desktopView')}
                   </button>
                 )}
+
                 {!isTechnicianMode && (
                   <button className="btn btn-primary" onClick={() => { setSelectedReport(null); setView('new-report'); }}>
                     <Plus size={18} />
@@ -307,17 +302,43 @@ function App() {
                   </button>
                 )}
 
-                {/* User User Management Button - Restrict to Admin */}
+                {/* Admin Tools Group */}
                 {userRole === 'admin' && !isTechnicianMode && (
-                  <button
-                    className="btn btn-outline"
-                    onClick={() => setShowUserModal(true)}
-                    style={{ marginLeft: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
-                    title="Benutzer & Rechte"
-                  >
-                    <Users size={18} />
-                    <span className="hide-mobile">Benutzer</span>
-                  </button>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', borderLeft: '1px solid var(--border)', paddingLeft: '1rem', marginLeft: '0.5rem' }}>
+
+                    {/* Trocknungsgeräte */}
+                    <button
+                      className="btn btn-outline"
+                      onClick={() => setView('devices')}
+                      title="Trocknungsgeräte verwalten"
+                      style={{ display: 'flex', gap: '0.5rem', padding: '0.5rem 0.75rem' }}
+                    >
+                      <Settings size={18} />
+                      <span className="hide-mobile">Trockner</span>
+                    </button>
+
+                    {/* Messgeräte */}
+                    <button
+                      className="btn btn-outline"
+                      onClick={() => setShowMeasurementManager(true)}
+                      style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 0.75rem' }}
+                      title="Messgeräte verwalten"
+                    >
+                      <Thermometer size={18} />
+                      <span className="hide-mobile">Messgeräte</span>
+                    </button>
+
+                    {/* Benutzer */}
+                    <button
+                      className="btn btn-outline"
+                      onClick={() => setShowUserModal(true)}
+                      style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 0.75rem' }}
+                      title="Benutzer & Rechte"
+                    >
+                      <Users size={18} />
+                      <span className="hide-mobile">Benutzer</span>
+                    </button>
+                  </div>
                 )}
               </div>
             )}
@@ -341,6 +362,7 @@ function App() {
 
       {/* Render User Management Modal */}
       {showUserModal && <UserManagementModal onClose={() => setShowUserModal(false)} users={users} setUsers={setUsers} />}
+      {showMeasurementManager && <MeasurementDeviceManager onClose={() => setShowMeasurementManager(false)} />}
     </div>
   )
 }
