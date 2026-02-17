@@ -2065,11 +2065,9 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                                         }}
                                         style={{ flex: 1, fontSize: '0.9rem' }}
                                     />
-                                    {contact.phone && (
-                                        <a href={`tel:${contact.phone}`} className="btn btn-outline" style={{ padding: '0.4rem', color: 'var(--success)' }} title="Anrufen">
-                                            <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
-                                        </a>
-                                    )}
+                                    <a href={contact.phone ? `tel:${contact.phone}` : '#'} className="btn btn-outline" style={{ padding: '0.4rem', color: 'var(--success)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: contact.phone ? 1 : 0.5, pointerEvents: contact.phone ? 'auto' : 'none' }} title="Anrufen">
+                                        <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+                                    </a>
                                     <button
                                         type="button"
                                         onClick={() => {
@@ -4469,17 +4467,39 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                                                     setFormData(prev => ({ ...prev, contacts: newContacts }));
                                                 }}
                                             />
-                                            <input
-                                                type="text"
-                                                className="form-input"
-                                                placeholder="Tel.Nr"
-                                                value={contact.phone || ''}
-                                                onChange={(e) => {
-                                                    const newContacts = [...formData.contacts];
-                                                    newContacts[index] = { ...newContacts[index], phone: e.target.value };
-                                                    setFormData(prev => ({ ...prev, contacts: newContacts }));
-                                                }}
-                                            />
+                                            <div style={{ display: 'flex', gap: '0.25rem' }}>
+                                                <input
+                                                    type="text"
+                                                    className="form-input"
+                                                    placeholder="Tel.Nr"
+                                                    value={contact.phone || ''}
+                                                    onChange={(e) => {
+                                                        const newContacts = [...formData.contacts];
+                                                        newContacts[index] = { ...newContacts[index], phone: e.target.value };
+                                                        setFormData(prev => ({ ...prev, contacts: newContacts }));
+                                                    }}
+                                                    onBlur={(e) => {
+                                                        let val = e.target.value.replace(/\s+/g, '');
+                                                        if (val.match(/^0\d{9}$/)) {
+                                                            val = '+41' + val.substring(1);
+                                                        }
+                                                        if (val.match(/^\+41\d{9}$/)) {
+                                                            val = val.replace(/(\+41)(\d{2})(\d{3})(\d{2})(\d{2})/, '$1 $2 $3 $4 $5');
+                                                        } else if (val.match(/^\+41\d{8}$/)) {
+                                                            val = val.replace(/(\+41)(\d{2})(\d{2})(\d{2})(\d{2})/, '$1 $2 $3 $4 $5');
+                                                        }
+                                                        if (val !== e.target.value) {
+                                                            const newContacts = [...formData.contacts];
+                                                            newContacts[index] = { ...newContacts[index], phone: val };
+                                                            setFormData(prev => ({ ...prev, contacts: newContacts }));
+                                                        }
+                                                    }}
+                                                    style={{ flex: 1 }}
+                                                />
+                                                <a href={contact.phone ? `tel:${contact.phone}` : '#'} className="btn btn-outline" style={{ padding: '0.4rem', color: 'var(--success)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: contact.phone ? 1 : 0.5, pointerEvents: contact.phone ? 'auto' : 'none' }} title="Anrufen">
+                                                    <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+                                                </a>
+                                            </div>
                                         </div>
                                     </div>
                                 ))}
@@ -4560,17 +4580,39 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                                                 setFormData(prev => ({ ...prev, contacts: newContacts }));
                                             }}
                                         />
-                                        <input
-                                            type="text"
-                                            className="form-input"
-                                            placeholder="Tel.Nr"
-                                            value={contact.phone || ''}
-                                            onChange={(e) => {
-                                                const newContacts = [...formData.contacts];
-                                                newContacts[index] = { ...newContacts[index], phone: e.target.value };
-                                                setFormData(prev => ({ ...prev, contacts: newContacts }));
-                                            }}
-                                        />
+                                        <div style={{ display: 'flex', gap: '0.25rem' }}>
+                                            <input
+                                                type="text"
+                                                className="form-input"
+                                                placeholder="Tel.Nr"
+                                                value={contact.phone || ''}
+                                                onChange={(e) => {
+                                                    const newContacts = [...formData.contacts];
+                                                    newContacts[index] = { ...newContacts[index], phone: e.target.value };
+                                                    setFormData(prev => ({ ...prev, contacts: newContacts }));
+                                                }}
+                                                onBlur={(e) => {
+                                                    let val = e.target.value.replace(/\s+/g, '');
+                                                    if (val.match(/^0\d{9}$/)) {
+                                                        val = '+41' + val.substring(1);
+                                                    }
+                                                    if (val.match(/^\+41\d{9}$/)) {
+                                                        val = val.replace(/(\+41)(\d{2})(\d{3})(\d{2})(\d{2})/, '$1 $2 $3 $4 $5');
+                                                    } else if (val.match(/^\+41\d{8}$/)) {
+                                                        val = val.replace(/(\+41)(\d{2})(\d{2})(\d{2})(\d{2})/, '$1 $2 $3 $4 $5');
+                                                    }
+                                                    if (val !== e.target.value) {
+                                                        const newContacts = [...formData.contacts];
+                                                        newContacts[index] = { ...newContacts[index], phone: val };
+                                                        setFormData(prev => ({ ...prev, contacts: newContacts }));
+                                                    }
+                                                }}
+                                                style={{ flex: 1 }}
+                                            />
+                                            <a href={contact.phone ? `tel:${contact.phone}` : '#'} className="btn btn-outline" style={{ padding: '0.4rem', color: 'var(--success)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: contact.phone ? 1 : 0.5, pointerEvents: contact.phone ? 'auto' : 'none' }} title="Anrufen">
+                                                <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+                                            </a>
+                                        </div>
                                         <button
                                             type="button"
                                             className="btn btn-ghost"
