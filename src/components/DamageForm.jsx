@@ -3,7 +3,7 @@ import AiSuggestionsPanel from "./AiSuggestionsPanel";
 
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Camera, Image, Trash, X, Plus, Edit3, Save, Upload, FileText, CheckCircle, Circle, AlertTriangle, Play, HelpCircle, ArrowLeft, Mail, Map, MapPin, Folder, Mic, Paperclip, Table, Download, Check, Settings, RotateCcw, ChevronDown, ChevronUp, Briefcase, Hammer, ClipboardList, MicOff } from 'lucide-react'
+import { Camera, Image, Trash, X, Plus, Edit3, Save, Upload, FileText, CheckCircle, Circle, AlertTriangle, Play, HelpCircle, ArrowLeft, Mail, Map, MapPin, Folder, Mic, Paperclip, Table, Download, Check, Settings, RotateCcw, ChevronDown, ChevronUp, Briefcase, Hammer, ClipboardList, MicOff, Eye } from 'lucide-react'
 import { supabase } from '../supabaseClient';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
@@ -147,6 +147,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         damageTypeImage: initialData.damageTypeImage || null,
         status: initialData.status || 'Schadenaufnahme',
         description: initialData.description || '',
+        findings: initialData.findings || '',
         dryingStarted: initialData.dryingStarted || null,
         dryingEnded: initialData.dryingEnded || null,
         equipment: Array.isArray(initialData.equipment) ? initialData.equipment : [],
@@ -176,6 +177,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         damageTypeImage: null,
         status: 'Schadenaufnahme',
         description: '',
+        findings: '',
         dryingStarted: null,
         dryingEnded: null,
         equipment: [],
@@ -1369,8 +1371,14 @@ END:VCARD`;
 
             doc.setFontSize(16);
             doc.setTextColor(0, 0, 0);
+
+            const titleString = `${dataToUse.street || ''} ${dataToUse.city || ''} ${dataToUse.damageType ? '- ' + dataToUse.damageType : ''}`;
+            doc.text(titleString, 14, 65);
+            doc.setTextColor(0, 0, 0);
             if (dataToUse.projectTitle) {
-                doc.text(dataToUse.projectTitle, 14, 65);
+                doc.setFontSize(10);
+                doc.setTextColor(100, 100, 100);
+                doc.text(dataToUse.projectTitle, 14, 75);
             }
 
             doc.setFontSize(11);
@@ -1402,39 +1410,48 @@ END:VCARD`;
             doc.rect(14, yPos, pageWidth - 28, 0.5, 'F');
             yPos += 10; // Spacing after line
 
+            if (dataToUse.description) {
+                doc.setFontSize(16);
+                doc.setFont(undefined, 'bold');
+                doc.setTextColor(14, 165, 233); // Primary Blue
+                doc.text("Beschreibung:", 14, yPos);
+                yPos += 8;
+                doc.setFontSize(11);
+                doc.setFont(undefined, 'normal');
+                doc.setTextColor(0, 0, 0); // Reset to Black
+
+                const splitDesc = doc.splitTextToSize(dataToUse.description, pageWidth - 30);
+                doc.text(splitDesc, 14, yPos);
+                yPos += (splitDesc.length * 6) + 10;
+            }
+
             // Add Schadenursache (Detailed Description) if present
             // Note: dataToUse.cause is the detailed text from the modal
             if (dataToUse.cause) {
+                doc.setFontSize(16);
+                doc.setTextColor(14, 165, 233);
                 doc.setFont(undefined, 'bold');
                 doc.text("Schadenursache:", 14, yPos);
-                yPos += 6;
+                yPos += 8;
+                doc.setFontSize(11);
+                doc.setTextColor(0, 0, 0);
                 doc.setFont(undefined, 'normal');
 
-                // Background box for cause
-                doc.setFillColor(241, 245, 249); // Slate-100
-                doc.setDrawColor(203, 213, 225); // Slate-300
-
-                const splitCause = doc.splitTextToSize(dataToUse.cause, pageWidth - 38); // slightly narrower for padding
-                const boxHeight = (splitCause.length * 5) + 10;
-
-                // Check page break
-                if (yPos + boxHeight > pageHeight - 20) {
-                    doc.addPage();
-                    yPos = 20;
-                }
-
-                doc.roundedRect(14, yPos, pageWidth - 28, boxHeight, 3, 3, 'FD');
-                doc.text(splitCause, 19, yPos + 7); // Padding left/top
-
-                yPos += boxHeight + 10;
+                const splitCause = doc.splitTextToSize(dataToUse.cause, pageWidth - 30);
+                doc.text(splitCause, 14, yPos);
+                yPos += (splitCause.length * 6) + 10;
             }
 
             // Damage Type (Art)
             // Damage Type (Art)
             if (dataToUse.damageType) {
+                doc.setFontSize(16);
+                doc.setTextColor(14, 165, 233);
                 doc.setFont(undefined, 'bold');
                 doc.text("Schadenart:", 14, yPos);
-                yPos += 6;
+                yPos += 8;
+                doc.setFontSize(11);
+                doc.setTextColor(0, 0, 0);
                 doc.setFont(undefined, 'normal');
                 const splitDamageType = doc.splitTextToSize(dataToUse.damageType, pageWidth - 30);
                 doc.text(splitDamageType, 14, yPos);
@@ -1460,16 +1477,9 @@ END:VCARD`;
                 }
             }
 
-            if (dataToUse.description) {
-                doc.setFont(undefined, 'bold');
-                doc.text("Beschreibung:", 14, yPos);
-                yPos += 6;
-                doc.setFont(undefined, 'normal');
 
-                const splitDesc = doc.splitTextToSize(dataToUse.description, pageWidth - 30);
-                doc.text(splitDesc, 14, yPos);
-                yPos += (splitDesc.length * 6) + 10;
-            }
+
+
 
             // --- Measurements & Rooms ---
             // Only rooms with actual measurement data OR images assigned to them
@@ -1557,7 +1567,7 @@ END:VCARD`;
                     doc.setFont(undefined, 'bold');
 
                     // check space for header and at least one image row
-                    if (yPos + 80 > pageHeight) {
+                    if (yPos + 110 > pageHeight - 20) {
                         doc.addPage();
                         yPos = 20;
                         // Repeat headers if logic dictates, but for now just continue
@@ -1662,9 +1672,66 @@ END:VCARD`;
                         }
                     }
                 }
-            } else {
-                // If no rooms, maybe just generic images?
-                // For now, if no rooms, we just leave cover and done.
+            }
+
+            // ADDED: Feststellungen
+            if (dataToUse.findings) {
+                if (yPos + 30 > pageHeight - 20) {
+                    doc.addPage();
+                    yPos = 20;
+                } else {
+                    yPos += 10;
+                }
+
+                doc.setFontSize(16);
+                doc.setFont(undefined, 'bold');
+                doc.setTextColor(14, 165, 233); // Primary Blue
+                doc.text("Feststellungen:", 14, yPos);
+                yPos += 8;
+                doc.setFontSize(11);
+                doc.setFont(undefined, 'normal');
+                doc.setTextColor(0, 0, 0); // Reset to Black
+
+                const splitFindings = doc.splitTextToSize(dataToUse.findings, pageWidth - 30);
+                for (let i = 0; i < splitFindings.length; i++) {
+                    if (yPos + 7 > pageHeight - 20) {
+                        doc.addPage();
+                        yPos = 20;
+                    }
+                    doc.text(splitFindings[i], 14, yPos);
+                    yPos += 6;
+                }
+                yPos += 10;
+            }
+
+            // ADDED: Massnahmen at the very end
+            if (dataToUse.measures) {
+                if (yPos + 30 > pageHeight - 20) {
+                    doc.addPage();
+                    yPos = 20;
+                } else {
+                    yPos += 10; // Spacing if continuing on same page
+                }
+
+                doc.setFontSize(16);
+                doc.setFont(undefined, 'bold');
+                doc.setTextColor(14, 165, 233); // Primary Blue
+                doc.text("Massnahmen:", 14, yPos);
+                yPos += 8;
+                doc.setFontSize(11);
+                doc.setFont(undefined, 'normal');
+                doc.setTextColor(0, 0, 0); // Reset to Black
+
+                const splitMeasures = doc.splitTextToSize(dataToUse.measures, pageWidth - 30);
+                for (let i = 0; i < splitMeasures.length; i++) {
+                    if (yPos + 7 > pageHeight - 20) {
+                        doc.addPage();
+                        yPos = 20;
+                    }
+                    doc.text(splitMeasures[i], 14, yPos);
+                    yPos += 6;
+                }
+                yPos += 10;
             }
 
             const fileName = `Export_${dataToUse.projectTitle || 'Projekt'}.pdf`;
@@ -2082,6 +2149,21 @@ END:VCARD`;
                                     style={{ width: '100%' }}
                                 />
                             </div>
+                            <div style={{ flex: 1 }}>
+                                <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.25rem', display: 'block' }}>Sachbearbeiter</label>
+                                <select
+                                    className="form-input"
+                                    value={formData.clientSource || ''}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, clientSource: e.target.value }))}
+                                    style={{ width: '100%' }}
+                                >
+                                    <option value="">Bitte wählen...</option>
+                                    <option value="Xhemil Ademi">Xhemil Ademi</option>
+                                    <option value="Adi Shala">Adi Shala</option>
+                                    <option value="Andreas Strehler">Andreas Strehler</option>
+                                    <option value="André Rothfuchs">André Rothfuchs</option>
+                                </select>
+                            </div>
                             <div style={{ width: '160px', flexShrink: 0 }}>
                                 <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.25rem', display: 'block' }}>Schadensart</label>
                                 <select
@@ -2103,21 +2185,61 @@ END:VCARD`;
                     <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-main)' }}>
                         <MapPin size={18} /> Schadenort (Adresse)
                     </h3>
-                    <div style={{ fontSize: '1rem', lineHeight: '1.4' }}>
-                        {formData.locationDetails && (
-                            <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>
-                                {formData.locationDetails}
-                            </div>
-                        )}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                        {/* Location Details */}
+                        <div>
+                            <input
+                                className="form-input"
+                                placeholder="Zusatz (z.B. 2. OG)"
+                                value={formData.locationDetails || ''}
+                                onChange={(e) => setFormData(prev => ({ ...prev, locationDetails: e.target.value }))}
+                                style={{ width: '100%', fontSize: '0.9rem' }}
+                            />
+                        </div>
 
-                        {(formData.street && formData.street.trim()) ? (
-                            <>
-                                {formData.street}<br />
-                                {formData.zip} {formData.city}
-                            </>
-                        ) : (
-                            formData.address || 'Keine Adresse'
-                        )}
+                        {/* Street */}
+                        <div>
+                            <input
+                                className="form-input"
+                                placeholder="Strasse & Nr."
+                                value={formData.street || ''}
+                                onChange={(e) => setFormData(prev => ({ ...prev, street: e.target.value }))}
+                                style={{ width: '100%', fontSize: '0.9rem' }}
+                            />
+                        </div>
+
+                        {/* Zip and City */}
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                            <input
+                                list="plz-list-mobile"
+                                className="form-input"
+                                placeholder="PLZ"
+                                value={formData.zip || ''}
+                                onChange={(e) => {
+                                    const val = e.target.value;
+                                    const match = swissPLZ.find(entry => entry.plz === val.trim());
+                                    if (match) {
+                                        setFormData(prev => ({ ...prev, zip: val, city: match.city }));
+                                    } else {
+                                        setFormData(prev => ({ ...prev, zip: val }));
+                                    }
+                                }}
+                                style={{ width: '80px', fontSize: '0.9rem' }}
+                            />
+                            <datalist id="plz-list-mobile">
+                                {swissPLZ.map((entry, idx) => (
+                                    <option key={idx} value={entry.plz}>{entry.city}</option>
+                                ))}
+                            </datalist>
+
+                            <input
+                                className="form-input"
+                                placeholder="Ort"
+                                value={formData.city || ''}
+                                onChange={(e) => setFormData(prev => ({ ...prev, city: e.target.value }))}
+                                style={{ flex: 1, fontSize: '0.9rem' }}
+                            />
+                        </div>
                     </div>
                 </div>
 
@@ -3422,6 +3544,124 @@ END:VCARD`;
                     )
                     }
                 </div >
+
+                {/* Massnahmen & Feststellungen */}
+                {(formData.status === 'Schadenaufnahme' || formData.status === 'Leckortung' || true) && (
+                    <div className="form-group" style={{ marginTop: '2rem', marginBottom: '2rem' }}>
+                        <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                            <Eye size={18} />
+                            Feststellungen
+                        </label>
+                        <textarea
+                            className="form-input"
+                            style={{ minHeight: '100px', resize: 'vertical', marginBottom: '2rem' }}
+                            placeholder="Feststellungen eingeben"
+                            value={formData.findings || ''}
+                            onChange={(e) => setFormData(prev => ({ ...prev, findings: e.target.value }))}
+                        />
+
+                        <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <ClipboardList size={18} />
+                            Massnahmen
+                        </label>
+
+                        <div style={{ display: 'grid', gap: '0.75rem', marginBottom: '1.5rem' }}>
+                            {[
+                                "Trocknung",
+                                "Schimmelbehandlung",
+                                "Organisation externer Handwerker",
+                                "Instandstellung"
+                            ].map(measure => {
+                                const isActive = (formData.measures || '').includes(measure);
+                                return (
+                                    <button
+                                        key={measure}
+                                        type="button"
+                                        onClick={() => {
+                                            let current = formData.measures || '';
+                                            let newValue = '';
+                                            if (current.includes(measure)) {
+                                                // Remove
+                                                newValue = current.replace(measure, '').replace(/\n\n/g, '\n').trim();
+                                            } else {
+                                                // Add
+                                                newValue = current ? (current + '\n' + measure) : measure;
+                                            }
+                                            setFormData(prev => ({ ...prev, measures: newValue }));
+                                        }}
+                                        style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '1rem',
+                                            padding: '1rem',
+                                            backgroundColor: 'rgba(255,255,255,0.03)',
+                                            border: isActive ? '1px solid #0EA5E9' : '1px solid var(--border)',
+                                            borderRadius: '8px',
+                                            color: 'var(--text-main)',
+                                            cursor: 'pointer',
+                                            textAlign: 'left',
+                                            fontSize: '1rem',
+                                            fontWeight: 500,
+                                            transition: 'all 0.2s'
+                                        }}
+                                    >
+                                        <div style={{
+                                            width: '24px',
+                                            height: '24px',
+                                            borderRadius: '4px',
+                                            border: isActive ? 'none' : '2px solid var(--text-muted)',
+                                            backgroundColor: isActive ? 'white' : 'transparent',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            flexShrink: 0
+                                        }}>
+                                            {isActive && <Check size={16} color="#0F172A" strokeWidth={3} />}
+                                        </div>
+                                        {measure}
+                                    </button>
+                                );
+                            })}
+                        </div>
+
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                            <label className="form-label" style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+                                Eigener Text / Ergänzungen
+                            </label>
+                            <button
+                                type="button"
+                                className={`btn btn-ghost ${isListeningMeasures ? 'listening' : ''}`}
+                                style={{
+                                    color: isListeningMeasures ? '#ef4444' : 'var(--text-muted)',
+                                    padding: '4px 8px',
+                                    fontSize: '0.85rem',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: '4px'
+                                }}
+                                onClick={toggleMeasuresListening}
+                                title="Diktieren"
+                            >
+                                {isListeningMeasures ? <MicOff size={14} /> : <Mic size={14} />}
+                                <span>Diktieren</span>
+                            </button>
+                        </div>
+
+                        <textarea
+                            id="measures"
+                            name="measures"
+                            className="form-input"
+                            style={{ minHeight: '100px', resize: 'vertical' }}
+                            placeholder="Eigenen Text eingeben"
+                            value={formData.measures || ''}
+                            onChange={(e) => {
+                                setFormData(prev => ({ ...prev, measures: e.target.value }));
+                            }}
+                        />
+                    </div>
+                )}
 
                 {/* EMAILS & PLANS (Final for User) */}
                 {mode === 'desktop' && (
@@ -4846,9 +5086,9 @@ END:VCARD`;
                             />
                         </div>
 
-                        {/* Kunde von */}
+                        {/* Sachbearbeiter */}
                         <div className="form-group">
-                            <label className="form-label" htmlFor="clientSource">Kunde von</label>
+                            <label className="form-label" htmlFor="clientSource">Sachbearbeiter</label>
                             <select
                                 id="clientSource"
                                 name="clientSource"
@@ -4860,6 +5100,7 @@ END:VCARD`;
                                 <option value="Xhemil Ademi">Xhemil Ademi</option>
                                 <option value="Adi Shala">Adi Shala</option>
                                 <option value="Andreas Strehler">Andreas Strehler</option>
+                                <option value="André Rothfuchs">André Rothfuchs</option>
                             </select>
                         </div>
 
@@ -5394,6 +5635,8 @@ END:VCARD`;
                             </div>
                         )}
                     </div>
+
+
 
 
 
@@ -5975,7 +6218,7 @@ END:VCARD`;
                         )}
                     </div>
 
-                    {/* Interne Notizen */}
+
                     {(mode === 'desktop' || formData.status !== 'Trocknung') && (
                         <div className="form-group">
                             <label className="form-label">Interne Notizen</label>
@@ -6696,6 +6939,9 @@ END:VCARD`;
                                     {/* Messprotokolle Special Section (Goodnotes / Measurement) */}
 
                                     {/* Pläne & Sonstiges Loop */}
+
+
+
 
 
 
@@ -7567,7 +7813,7 @@ END:VCARD`;
                                         </div>
 
                                         <div style={{ height: '200px', backgroundColor: '#000', borderRadius: '8px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                            <img src={activeImageMeta.preview} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} alt="" />
+                                            <img src={activeImageMeta.preview} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', transform: 'none', imageOrientation: 'from-image' }} alt="" />
                                         </div>
                                     </div>
                                 </div>
@@ -7792,7 +8038,7 @@ END:VCARD`;
                             </div>
                             <div style={{ textAlign: 'right' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '1rem', marginBottom: '0.5rem' }}>
-                                    <img src="/logo.png" style={{ height: '50px', objectFit: 'contain' }} alt="Logo" />
+                                    <img src="/logo.png" style={{ height: '50px', width: 'auto' }} alt="Logo" />
                                     <div style={{ textAlign: 'right' }}>
                                         <div style={{ fontWeight: 'bold', fontSize: '16pt', color: '#0F172A' }}>Q-Service AG</div>
 
@@ -7831,7 +8077,7 @@ END:VCARD`;
                         {formData.description && (
                             <div className="pdf-section" style={{ marginBottom: '2.5rem' }}>
                                 <h3 style={{ borderLeft: '4px solid #0EA5E9', paddingLeft: '1rem', marginBottom: '1rem', fontSize: '14pt', color: '#0F172A', fontWeight: 'bold' }}>Beschreibung / Feststellungen</h3>
-                                <div style={{ whiteSpace: 'pre-wrap', fontSize: '11pt', lineHeight: 1.6, color: '#334155', backgroundColor: 'white', padding: '0 0.5rem' }}>
+                                <div style={{ whiteSpace: 'pre-wrap', fontSize: '11pt', fontFamily: 'Arial, sans-serif', lineHeight: 1.5, color: '#000000', backgroundColor: 'white' }}>
                                     {formData.description}
                                 </div>
                             </div>
