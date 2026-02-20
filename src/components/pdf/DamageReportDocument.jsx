@@ -35,7 +35,7 @@ const styles = StyleSheet.create({
     },
     mainTitle: {
         fontSize: 22,
-        color: '#0284c7',
+        color: '#0369a1',
         fontWeight: 'bold',
         marginBottom: 12,
     },
@@ -52,7 +52,7 @@ const styles = StyleSheet.create({
         marginBottom: 15,
         paddingBottom: 10,
         borderBottomWidth: 1.5,
-        borderBottomColor: '#0284c7',
+        borderBottomColor: '#0369a1',
     },
     metaRow: {
         flexDirection: 'row',
@@ -71,12 +71,12 @@ const styles = StyleSheet.create({
     },
     divider: {
         height: 0.5,
-        backgroundColor: '#0284c7',
+        backgroundColor: '#0369a1',
         marginVertical: 10,
     },
     sectionTitle: {
         fontSize: 16,
-        color: '#0284c7',
+        color: '#0369a1',
         fontWeight: 'bold',
         marginTop: 15,
         marginBottom: 12,
@@ -90,12 +90,12 @@ const styles = StyleSheet.create({
     // Apartment / Room Grouping
     apartmentHeader: {
         fontSize: 16,
-        color: '#0284c7',
+        color: '#0369a1',
         fontWeight: 'bold',
         marginTop: 20,
         marginBottom: 5,
         borderBottomWidth: 0.5,
-        borderBottomColor: '#0284c7',
+        borderBottomColor: '#0369a1',
         paddingBottom: 2,
     },
     floorHeader: {
@@ -146,10 +146,9 @@ const styles = StyleSheet.create({
         height: 30,
         // backgroundColor: '#eeeeee', // Debug color removed
         borderTopWidth: 0.5,
-        borderTopColor: '#e2e8f0',
+        borderTopColor: '#0369a1',
         paddingTop: 10,
-        flexDirection: 'row',
-        justifyContent: 'space-between',
+
     },
     footerText: {
         fontSize: 8,
@@ -242,10 +241,19 @@ const DamageReportDocument = ({ data }) => {
                         <Text style={styles.metaLabel}>Ort:</Text>
                         <Text style={styles.metaValue}>{`${data.zip} ${data.city}`}</Text>
                     </View>
-                    {data.locationDetails && (
+                    {/* Lage / Details combined with First Contact Name */}
+                    {(data.locationDetails || (data.contacts && data.contacts.length > 0)) && (
                         <View style={styles.metaRow}>
                             <Text style={styles.metaLabel}>Lage / Details:</Text>
-                            <Text style={styles.metaValue}>{data.locationDetails}</Text>
+                            <Text style={styles.metaValue}>
+                                {[
+                                    data.locationDetails,
+                                    data.contacts?.[0]?.floor,
+                                    data.contacts?.[0]?.stockwerk,
+                                    data.contacts?.[0]?.apartment,
+                                    data.contacts?.[0]?.name
+                                ].filter(p => p && p.trim()).join(' ')}
+                            </Text>
                         </View>
                     )}
                     <View style={styles.metaRow}>
@@ -256,6 +264,10 @@ const DamageReportDocument = ({ data }) => {
                         <Text style={styles.metaLabel}>Sachbearbeiter:</Text>
                         <Text style={styles.metaValue}>{data.clientSource || 'Unbekannt'}</Text>
                     </View>
+                    <View style={styles.metaRow}>
+                        <Text style={styles.metaLabel}>Auftraggeber:</Text>
+                        <Text style={styles.metaValue}>{data.client || ''}</Text>
+                    </View>
                 </View>
 
                 {/* Description */}
@@ -263,6 +275,7 @@ const DamageReportDocument = ({ data }) => {
                     <View style={{ marginBottom: 15 }} wrap={false}>
                         <Text style={styles.sectionTitle}>Beschreibung:</Text>
                         <Text style={styles.textBlock}>{data.description}</Text>
+                        <View style={styles.divider} />
                     </View>
                 )}
 
@@ -271,6 +284,7 @@ const DamageReportDocument = ({ data }) => {
                     <View style={{ marginBottom: 20 }} wrap={false}>
                         <Text style={styles.sectionTitle}>Schadenart (Bild):</Text>
                         <Image src={data.damageTypeImage} style={{ width: 300, height: 200, objectFit: 'contain' }} />
+                        <View style={styles.divider} />
                     </View>
                 )}
 
@@ -290,6 +304,7 @@ const DamageReportDocument = ({ data }) => {
                                 </View>
                             </View>
                         )}
+                        <View style={styles.divider} />
                     </View>
                 )}
 
@@ -351,6 +366,7 @@ const DamageReportDocument = ({ data }) => {
                     <View style={{ marginBottom: 15, marginTop: 20 }} wrap={false}>
                         <Text style={styles.sectionTitle}>Feststellungen:</Text>
                         <Text style={styles.textBlock}>{data.findings}</Text>
+                        <View style={styles.divider} />
                     </View>
                 )}
 
@@ -359,15 +375,20 @@ const DamageReportDocument = ({ data }) => {
                     <View style={{ marginBottom: 15 }} wrap={false}>
                         <Text style={styles.sectionTitle}>Massnahmen:</Text>
                         <Text style={styles.textBlock}>{data.measures}</Text>
+                        <View style={styles.divider} />
                     </View>
                 )}
 
                 {/* Footer - Moved to top to ensure 'fixed' behavior works reliably */}
                 <View style={styles.footer} fixed>
-                    <Text style={styles.footerText}>Q-Service AG, Kriesbachstrasse 30, 8600 Dübendorf, www.q-service.ch, info@q-service.ch Tel. 043 819 14 18</Text>
-                    <Text style={styles.footerText} render={({ pageNumber, totalPages }) => (
-                        `Seite ${pageNumber} von ${totalPages}`
-                    )} />
+                    <View style={{ width: '100%', alignItems: 'center' }}>
+                        <Text style={styles.footerText}>Q-Service AG, Kriesbachstrasse 30, 8600 Dübendorf, www.q-service.ch, info@q-service.ch Tel. 043 819 14 18</Text>
+                    </View>
+                    <View style={{ position: 'absolute', right: 0, top: 10 }}>
+                        <Text style={styles.footerText} render={({ pageNumber, totalPages }) => (
+                            `Seite ${pageNumber} von ${totalPages}`
+                        )} />
+                    </View>
                 </View>
 
                 {/* Header */}
