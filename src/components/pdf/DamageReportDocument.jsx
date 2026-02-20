@@ -35,7 +35,7 @@ const styles = StyleSheet.create({
     },
     mainTitle: {
         fontSize: 22,
-        color: '#0ea5e9', // Primary Blue
+        color: '#0284c7',
         fontWeight: 'bold',
         marginBottom: 12,
     },
@@ -51,8 +51,8 @@ const styles = StyleSheet.create({
     metaSection: {
         marginBottom: 15,
         paddingBottom: 10,
-        borderBottomWidth: 0.5,
-        borderBottomColor: '#0ea5e9',
+        borderBottomWidth: 1.5,
+        borderBottomColor: '#0284c7',
     },
     metaRow: {
         flexDirection: 'row',
@@ -71,12 +71,12 @@ const styles = StyleSheet.create({
     },
     divider: {
         height: 0.5,
-        backgroundColor: '#0ea5e9',
+        backgroundColor: '#0284c7',
         marginVertical: 10,
     },
     sectionTitle: {
         fontSize: 16,
-        color: '#0ea5e9',
+        color: '#0284c7',
         fontWeight: 'bold',
         marginTop: 15,
         marginBottom: 12,
@@ -90,12 +90,12 @@ const styles = StyleSheet.create({
     // Apartment / Room Grouping
     apartmentHeader: {
         fontSize: 16,
-        color: '#0ea5e9',
+        color: '#0284c7',
         fontWeight: 'bold',
         marginTop: 20,
         marginBottom: 5,
         borderBottomWidth: 0.5,
-        borderBottomColor: '#0ea5e9',
+        borderBottomColor: '#0284c7',
         paddingBottom: 2,
     },
     floorHeader: {
