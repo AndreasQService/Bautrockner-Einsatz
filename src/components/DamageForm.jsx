@@ -9,8 +9,8 @@ import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import { swissPLZ } from '../data/swiss_plz';
 import { DEVICE_INVENTORY } from '../data/device_inventory';
-import { jsPDF } from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import { pdf } from '@react-pdf/renderer';
+import DamageReportDocument from './pdf/DamageReportDocument';
 import html2canvas from 'html2canvas';
 import ImageEditor from './ImageEditor';
 import EmailImportModal from './EmailImportModalV2';
@@ -1317,19 +1317,42 @@ END:VCARD`;
 
     // --- PDF Export (Unified Vector Report) ---
     // --- PDF Export (Unified Vector Report) ---
+    // --- PDF Export (Unified Vector Report - @react-pdf) ---
     const generatePDFExport = async (customFormData = null) => {
         const dataToUse = customFormData || formData;
         setIsGeneratingPDF(true);
-        try {
-            const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-            const pageWidth = doc.internal.pageSize.getWidth();
-            const pageHeight = doc.internal.pageSize.getHeight();
 
-            // Helper to load image from URL/Blob to Base64
-            const urlToDataUrl = async (url) => {
-                if (!url) return null;
-                if (url.startsWith('data:')) return url; // Already base64
+        const urlToDataUrl = async (url) => {
+            console.log("Processing Image URL:", url);
+            if (!url) return null;
 
+            // Strategy: Use Canvas for Blobs (to ensure JPEG conversion and fix grey box), 
+            // but use standard Fetch for static assets like /logo.png (to ensure reliability).
+            if (url.startsWith('blob:')) {
+                return new Promise((resolve) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        try {
+                            const canvas = document.createElement('canvas');
+                            canvas.width = img.width;
+                            canvas.height = img.height;
+                            const ctx = canvas.getContext('2d');
+                            ctx.drawImage(img, 0, 0);
+                            const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+                            resolve(dataUrl);
+                        } catch (err) {
+                            console.warn("Canvas conversion failed", err);
+                            resolve(null);
+                        }
+                    };
+                    img.onerror = (e) => {
+                        console.warn("Image load error", e);
+                        resolve(null);
+                    };
+                    img.src = url;
+                });
+            } else {
+                // Standard Fetch for local/remote assets
                 try {
                     const response = await fetch(url);
                     const blob = await response.blob();
@@ -1340,423 +1363,63 @@ END:VCARD`;
                         reader.readAsDataURL(blob);
                     });
                 } catch (e) {
-                    console.error("Failed to load image:", url, e);
+                    console.error("Failed to fetch image:", url, e);
                     return null;
                 }
-            };
+            }
+        };
 
+        try {
+            // Load Logo
             // Load Logo
             let logoData = null;
             try {
-                logoData = await urlToDataUrl('/logo.png');
+                const logoUrl = window.location.origin + '/logo.png';
+                console.log("Fetching Logo from:", logoUrl);
+                logoData = await urlToDataUrl(logoUrl);
+                console.log("Logo Data Length:", logoData ? logoData.length : 0);
             } catch (e) { console.error("Logo load error:", e); }
 
-            // --- Cover Page ---
-            if (logoData) {
-                try {
-                    doc.addImage(logoData, 'PNG', 14, 10, 50, 20);
-                } catch (e) { console.warn("Logo add failed", e); }
-            }
-
-            // Company Address Header
-            doc.setFontSize(10);
-            doc.setTextColor(100, 116, 139); // Slate-500
-            doc.text("Q-Service AG", pageWidth - 14, 15, { align: 'right' });
-            doc.text("Kriesbachstrasse 30", pageWidth - 14, 20, { align: 'right' });
-            doc.text("8600 Dübendorf", pageWidth - 14, 25, { align: 'right' });
-
-            doc.setFontSize(22);
-            doc.setTextColor(14, 165, 233); // Primary Color (Sky-500 equivalent)
-            doc.text("Schadensbericht", 14, 50);
-
-            doc.setFontSize(16);
-            doc.setTextColor(0, 0, 0);
-
-            const titleString = `${dataToUse.street || ''} ${dataToUse.city || ''} ${dataToUse.damageType ? '- ' + dataToUse.damageType : ''}`;
-            doc.text(titleString, 14, 65);
-            doc.setTextColor(0, 0, 0);
-            if (dataToUse.projectTitle) {
-                doc.setFontSize(10);
-                doc.setTextColor(100, 100, 100);
-                doc.text(dataToUse.projectTitle, 14, 75);
-            }
-
-            doc.setFontSize(11);
-            doc.setTextColor(71, 85, 105); // Slate-600
-
-            let yPos = 80;
-            const addLine = (label, value) => {
-                if (value) {
-                    doc.setFont(undefined, 'bold');
-                    doc.text(label + ":", 14, yPos);
-                    doc.setFont(undefined, 'normal');
-                    doc.text(value, 50, yPos);
-                    yPos += 7;
-                }
-            };
-
-            addLine("Strasse", dataToUse.street);
-            addLine("Ort", `${dataToUse.zip} ${dataToUse.city}`);
-            if (dataToUse.locationDetails) {
-                addLine("Lage / Details", dataToUse.locationDetails);
-            }
-            addLine("Datum", new Date().toLocaleDateString('de-CH'));
-            addLine("Sachbearbeiter", dataToUse.clientSource || 'Unbekannt');
-
-            yPos += 5; // Extra spacing
-
-            // Blue Divider Line (Filled Rect for better visibility)
-            doc.setFillColor(14, 165, 233); // Primary Blue #0EA5E9
-            doc.rect(14, yPos, pageWidth - 28, 0.5, 'F');
-            yPos += 10; // Spacing after line
-
-            if (dataToUse.description) {
-                doc.setFontSize(16);
-                doc.setFont(undefined, 'bold');
-                doc.setTextColor(14, 165, 233); // Primary Blue
-                doc.text("Beschreibung:", 14, yPos);
-                yPos += 8;
-                doc.setFontSize(11);
-                doc.setFont(undefined, 'normal');
-                doc.setTextColor(0, 0, 0); // Reset to Black
-
-                const splitDesc = doc.splitTextToSize(dataToUse.description, pageWidth - 30);
-                doc.text(splitDesc, 14, yPos);
-                yPos += (splitDesc.length * 6) + 10;
-            }
-
-            // Add Schadenursache (Detailed Description) if present
-            // Note: dataToUse.cause is the detailed text from the modal
-            if (dataToUse.cause) {
-                doc.setFontSize(16);
-                doc.setTextColor(14, 165, 233);
-                doc.setFont(undefined, 'bold');
-                doc.text("Schadenursache:", 14, yPos);
-                yPos += 8;
-                doc.setFontSize(11);
-                doc.setTextColor(0, 0, 0);
-                doc.setFont(undefined, 'normal');
-
-                const splitCause = doc.splitTextToSize(dataToUse.cause, pageWidth - 30);
-                doc.text(splitCause, 14, yPos);
-                yPos += (splitCause.length * 6) + 10;
-            }
-
-            // Damage Type (Art)
-            // Damage Type (Art)
-            if (dataToUse.damageType) {
-                doc.setFontSize(16);
-                doc.setTextColor(14, 165, 233);
-                doc.setFont(undefined, 'bold');
-                doc.text("Schadenart:", 14, yPos);
-                yPos += 8;
-                doc.setFontSize(11);
-                doc.setTextColor(0, 0, 0);
-                doc.setFont(undefined, 'normal');
-                const splitDamageType = doc.splitTextToSize(dataToUse.damageType, pageWidth - 30);
-                doc.text(splitDamageType, 14, yPos);
-                yPos += (splitDamageType.length * 6) + 4;
-            }
-
-            // Image for Schadenursache / Type
-            if (dataToUse.damageTypeImage) {
-                try {
-                    const imgProps = doc.getImageProperties(dataToUse.damageTypeImage);
-                    const imgWidth = 80;
-                    const imgHeight = (imgProps.height * imgWidth) / imgProps.width;
-
-                    if (yPos + imgHeight > pageHeight - 20) {
-                        doc.addPage();
-                        yPos = 20;
+            // Pre-process images to Base64 (DataURL) for reliable PDF rendering
+            // This fixes issues where Blob URLs fail to load in the PDF context
+            const processedImages = await Promise.all(
+                (dataToUse.images || []).map(async (img) => {
+                    if (img.includeInReport === false) return img;
+                    try {
+                        const base64 = await urlToDataUrl(img.preview);
+                        return { ...img, preview: base64 || img.preview };
+                    } catch (e) {
+                        console.warn("Failed to convert image for PDF:", img.id, e);
+                        return img;
                     }
-
-                    doc.addImage(dataToUse.damageTypeImage, imgProps.fileType, 14, yPos, imgWidth, imgHeight);
-                    yPos += imgHeight + 10;
-                } catch (e) {
-                    console.warn("Could not add damage type image", e);
-                }
-            }
-
-
-
-
-
-            // --- Measurements & Rooms ---
-            // Only rooms with actual measurement data OR images assigned to them
-            // Actually user wants "Messprotokoll", so mainly measurements. 
-            // BUT: "Schadensbericht" implies images too. 
-            // Logic: Iterate all rooms that have ANY data.
-            const roomsWithContent = dataToUse.rooms.filter(room =>
-                dataToUse.images.some(img => (img.roomId === room.id || img.assignedTo === room.name) && img.includeInReport !== false)
+                })
             );
 
-            if (roomsWithContent.length > 0) {
-                // Sort rooms: Apartment -> Stockwerk -> Name
-                roomsWithContent.sort((a, b) => {
-                    const aptA = (a.apartment || '').toLowerCase();
-                    const aptB = (b.apartment || '').toLowerCase();
-                    if (aptA < aptB) return -1;
-                    if (aptA > aptB) return 1;
-
-                    const floorA = (a.stockwerk || '').toLowerCase();
-                    const floorB = (b.stockwerk || '').toLowerCase();
-                    if (floorA < floorB) return -1;
-                    if (floorA > floorB) return 1;
-
-                    return (a.name || '').localeCompare(b.name || '');
-                });
-
-                // Ensure we start after the cover page content
-                if (yPos > pageHeight - 50) {
-                    doc.addPage();
-                    yPos = 20;
-                } else {
-                    yPos += 20; // Some spacing after cover
-                }
-
-                let currentApartment = null;
-                let currentFloor = null;
-
-                for (let i = 0; i < roomsWithContent.length; i++) {
-                    const room = roomsWithContent[i];
-
-                    // Check Apartment Change
-                    if (room.apartment !== currentApartment) {
-                        currentApartment = room.apartment;
-                        currentFloor = null; // Reset floor when apartment changes
-
-                        if (currentApartment) {
-                            if (yPos + 40 > pageHeight) {
-                                doc.addPage();
-                                yPos = 20;
-                            }
-                            doc.setFontSize(16);
-                            doc.setTextColor(14, 165, 233); // Primary Blue
-                            doc.setFont(undefined, 'bold');
-                            doc.text(`Wohnung: ${currentApartment}`, 14, yPos);
-                            yPos += 10;
-
-                            // Draw divider line for apartment
-                            doc.setDrawColor(14, 165, 233);
-                            doc.setLineWidth(0.5);
-                            doc.line(14, yPos - 2, pageWidth - 14, yPos - 2);
-                            yPos += 5;
-                        }
-                    }
-
-                    // Check Floor Change
-                    if (room.stockwerk !== currentFloor) {
-                        currentFloor = room.stockwerk;
-
-                        if (currentFloor) {
-                            if (yPos + 30 > pageHeight) {
-                                doc.addPage();
-                                yPos = 20;
-                            }
-                            doc.setFontSize(13);
-                            doc.setTextColor(71, 85, 105); // Slate-600
-                            doc.setFont(undefined, 'bold');
-                            doc.text(`Stockwerk: ${currentFloor}`, 14, yPos);
-                            yPos += 8;
-                        }
-                    }
-
-                    // Header for Room
-                    doc.setFontSize(12); // Slightly smaller as it's now nested
-                    doc.setTextColor(0, 0, 0); // Black
-                    doc.setFont(undefined, 'bold');
-
-                    // check space for header and at least one image row
-                    if (yPos + 110 > pageHeight - 20) {
-                        doc.addPage();
-                        yPos = 20;
-                        // Repeat headers if logic dictates, but for now just continue
-                        if (currentApartment) {
-                            doc.setFontSize(10);
-                            doc.setTextColor(150, 150, 150);
-                            doc.text(`(Fortsetzung ${currentApartment})`, 14, yPos - 5);
-                        }
-                    }
-
-                    // Draw Room Header (Indented slightly?)
-                    doc.text(room.name, 14, yPos);
-
-                    // Optional Date on right
-                    doc.setFontSize(10);
-                    doc.setFont(undefined, 'normal');
-                    // doc.text(`Datum: ${new Date().toLocaleDateString('de-CH')}`, pageWidth - 14, yPos, { align: 'right' }); 
-                    // Date per room might be redundant if report has date. Remove to save space? User request "unnötig viele seiten".
-
-                    yPos += 8; // Space below header
-
-                    const roomImages = dataToUse.images.filter(img =>
-                        (img.roomId === room.id || img.assignedTo === room.name) &&
-                        img.includeInReport !== false
-                    );
-
-                    if (roomImages.length > 0) {
-                        let imgX = 14;
-                        const imgWidth = 80;
-                        const imgHeight = 60;
-                        const gutter = 10;
-
-                        // Check if we need new page for first row
-                        if (yPos + imgHeight + 20 > pageHeight - 20) {
-                            doc.addPage();
-                            yPos = 20;
-                        }
-
-                        // Grid Layout
-                        let rowMaxH = 0;
-
-                        for (let j = 0; j < roomImages.length; j++) {
-                            const imgItem = roomImages[j];
-
-                            // Check X overflow -> new row
-                            if (imgX + imgWidth > pageWidth - 14) {
-                                imgX = 14;
-                                yPos += rowMaxH + 10; // Move down by row height + gap
-                                rowMaxH = 0;
-
-                                // Check Y overflow -> new page
-                                if (yPos + imgHeight + 20 > pageHeight - 20) {
-                                    doc.addPage();
-                                    yPos = 20;
-                                }
-                            }
-
-                            // Track max height of current row including description
-                            let currentItemH = imgHeight;
-
-                            try {
-                                const imgData = await urlToDataUrl(imgItem.preview);
-                                if (imgData) {
-                                    doc.addImage(imgData, 'JPEG', imgX, yPos, imgWidth, imgHeight);
-
-                                    // Description
-                                    if (imgItem.description) {
-                                        doc.setFontSize(9);
-                                        doc.setTextColor(50, 50, 50);
-                                        const descLines = doc.splitTextToSize(imgItem.description, imgWidth);
-                                        const descHeight = (descLines.length * 4) + 2;
-                                        doc.text(descLines, imgX, yPos + imgHeight + 5);
-                                        currentItemH += 5 + descHeight;
-                                    }
-                                }
-                            } catch (e) {
-                                console.error("Image error", e);
-                            }
-
-                            // Update row max height
-                            if (currentItemH > rowMaxH) rowMaxH = currentItemH;
-
-                            // Next X
-                            imgX += imgWidth + gutter;
-                        }
-
-                        // After images loop, add last row height to yPos
-                        yPos += rowMaxH + 15; // Space after room
-                    }
-
-                    // Add divider between rooms? Optional.
-                    // If not last room
-                    if (i < roomsWithContent.length - 1) {
-                        // Only add small divider if we are NOT changing apartment next
-                        if (roomsWithContent[i + 1].apartment === currentApartment) {
-                            if (yPos + 20 < pageHeight) {
-                                doc.setDrawColor(200, 200, 200);
-                                doc.setLineWidth(0.1);
-                                doc.line(14, yPos - 5, pageWidth - 14, yPos - 5);
-                                yPos += 5;
-                            }
-                        }
-                    }
-                }
+            let processedDamageTypeImage = dataToUse.damageTypeImage;
+            if (processedDamageTypeImage) {
+                try {
+                    const base64 = await urlToDataUrl(processedDamageTypeImage);
+                    if (base64) processedDamageTypeImage = base64;
+                } catch (e) { console.warn("Failed to convert damage type image", e); }
             }
 
-            // ADDED: Feststellungen
-            if (dataToUse.findings) {
-                if (yPos + 30 > pageHeight - 20) {
-                    doc.addPage();
-                    yPos = 20;
-                } else {
-                    yPos += 10;
-                }
+            // Prepare Data for Document Component
+            const docData = {
+                ...dataToUse,
+                images: processedImages,
+                damageTypeImage: processedDamageTypeImage,
+                logo: logoData,
+            };
 
-                doc.setFontSize(16);
-                doc.setFont(undefined, 'bold');
-                doc.setTextColor(14, 165, 233); // Primary Blue
-                doc.text("Feststellungen:", 14, yPos);
-                yPos += 8;
-                doc.setFontSize(11);
-                doc.setFont(undefined, 'normal');
-                doc.setTextColor(0, 0, 0); // Reset to Black
-
-                const splitFindings = doc.splitTextToSize(dataToUse.findings, pageWidth - 30);
-                for (let i = 0; i < splitFindings.length; i++) {
-                    if (yPos + 7 > pageHeight - 20) {
-                        doc.addPage();
-                        yPos = 20;
-                    }
-                    doc.text(splitFindings[i], 14, yPos);
-                    yPos += 6;
-                }
-                yPos += 10;
-            }
-
-            // ADDED: Massnahmen at the very end
-            if (dataToUse.measures) {
-                if (yPos + 30 > pageHeight - 20) {
-                    doc.addPage();
-                    yPos = 20;
-                } else {
-                    yPos += 10; // Spacing if continuing on same page
-                }
-
-                doc.setFontSize(16);
-                doc.setFont(undefined, 'bold');
-                doc.setTextColor(14, 165, 233); // Primary Blue
-                doc.text("Massnahmen:", 14, yPos);
-                yPos += 8;
-                doc.setFontSize(11);
-                doc.setFont(undefined, 'normal');
-                doc.setTextColor(0, 0, 0); // Reset to Black
-
-                const splitMeasures = doc.splitTextToSize(dataToUse.measures, pageWidth - 30);
-                for (let i = 0; i < splitMeasures.length; i++) {
-                    if (yPos + 7 > pageHeight - 20) {
-                        doc.addPage();
-                        yPos = 20;
-                    }
-                    doc.text(splitMeasures[i], 14, yPos);
-                    yPos += 6;
-                }
-                yPos += 10;
-            }
-
+            // Generate Blob using @react-pdf
+            const blob = await pdf(<DamageReportDocument data={docData} />).toBlob();
             const fileName = `Export_${dataToUse.projectTitle || 'Projekt'}.pdf`;
 
-            // Footer for all pages
-            const pageCount = doc.internal.getNumberOfPages();
-            for (let i = 1; i <= pageCount; i++) {
-                doc.setPage(i);
-                doc.setFontSize(8);
-                doc.setTextColor(150, 150, 150); // Gray
-                const footerText = "Q-Service AG, Kriesbachstrasse 30, 8600 Dübendorf, www.q-service.ch, info@q-service.ch Tel. 043 819 14 18";
-                const footerWidth = doc.getTextWidth(footerText);
-                doc.text(footerText, (pageWidth - footerWidth) / 2, pageHeight - 10);
+            // 1. Download File
+            saveAs(blob, fileName);
 
-                // Page Number
-                doc.text(`Seite ${i} von ${pageCount}`, pageWidth - 14, pageHeight - 10, { align: 'right' });
-            }
-
-            doc.save(fileName);
-
-            // Add the new file to the list
-            const pdfBlob = doc.output('blob');
-            const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
-
-            // Use handleImageUpload to add it to state correctly
+            // 2. Upload to Supabase / App State
+            const file = new File([blob], fileName, { type: 'application/pdf' });
             await handleImageUpload([file], { assignedTo: 'Schadensbericht' });
 
         } catch (error) {
@@ -1766,6 +1429,7 @@ END:VCARD`;
             setIsGeneratingPDF(false);
         }
     };
+
 
     const handleGeneratePDF = async () => {
         setIsGeneratingPDF(true);
@@ -3029,6 +2693,8 @@ END:VCARD`;
 
                             {/* Photos (Schadenfotos) */}
                             <div>
+
+
                                 <h4 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--text-main)' }}>Fotos zur Ursache</h4>
 
                                 {/* Upload Zone */}
@@ -3062,10 +2728,26 @@ END:VCARD`;
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                                     {formData.images.filter(img => img.assignedTo === 'Schadenfotos').map((item, idx) => (
                                         <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem', backgroundColor: '#1E293B', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
-                                            <div style={{ width: '80px', height: '80px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: '4px' }}>
+                                            <div style={{ width: '80px', height: '80px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: '4px', border: formData.damageTypeImage === item.preview ? '2px solid #10B981' : 'none' }}>
                                                 <img src={item.preview} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '4px' }} />
                                             </div>
-                                            <div style={{ flex: 1, fontWeight: 500, color: 'var(--text-main)' }}>{item.name}</div>
+
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', padding: '0 0.5rem', cursor: 'pointer' }} onClick={() => setFormData(prev => ({ ...prev, damageTypeImage: prev.damageTypeImage === item.preview ? null : item.preview, damageTypeImageInReport: false }))}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={formData.damageTypeImage === item.preview}
+                                                    readOnly
+                                                    style={{ width: '1.25rem', height: '1.25rem', cursor: 'pointer' }}
+                                                />
+                                            </div>
+
+                                            <div style={{ flex: 1, fontWeight: 500, color: 'var(--text-main)' }}>
+                                                {item.name}
+                                                {formData.damageTypeImage === item.preview && (
+                                                    <div style={{ fontSize: '0.8rem', color: '#10B981', fontWeight: 600 }}>Ausgewählt</div>
+                                                )}
+                                            </div>
+
                                             <button type="button" className="btn btn-ghost" onClick={() => setFormData(prev => ({ ...prev, images: prev.images.filter(i => i !== item) }))} style={{ color: '#EF4444', padding: '0.5rem', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(239, 68, 68, 0.1)' }}><Trash size={18} /></button>
                                         </div>
                                     ))}
@@ -6094,55 +5776,69 @@ END:VCARD`;
                                 {/* Image Upload for Schadenursache */}
                                 <div style={{ marginTop: '0.5rem' }}>
                                     {formData.damageTypeImage ? (
-                                        <div style={{ position: 'relative', width: 'fit-content' }}>
-                                            <img
-                                                src={formData.damageTypeImage}
-                                                alt="Schadenursache"
-                                                style={{ maxHeight: '150px', borderRadius: '8px', border: '1px solid var(--border)' }}
-                                            />
-                                            <button
-                                                type="button"
-                                                onClick={() => setEditingImage({ preview: formData.damageTypeImage, isDamageType: true })}
-                                                style={{
-                                                    position: 'absolute',
-                                                    top: '-8px',
-                                                    right: '24px',
-                                                    background: 'white',
-                                                    border: '1px solid #0EA5E9',
-                                                    borderRadius: '50%',
-                                                    color: '#0EA5E9',
-                                                    width: '24px',
-                                                    height: '24px',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'center',
-                                                    cursor: 'pointer'
-                                                }}
-                                                title="Bild bearbeiten"
-                                            >
-                                                <Edit3 size={14} />
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={removeDamageTypeImage}
-                                                style={{
-                                                    position: 'absolute',
-                                                    top: '-8px',
-                                                    right: '-8px',
-                                                    background: 'white',
-                                                    border: '1px solid #EF4444',
-                                                    borderRadius: '50%',
-                                                    color: '#EF4444',
-                                                    width: '24px',
-                                                    height: '24px',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'center',
-                                                    cursor: 'pointer'
-                                                }}
-                                            >
-                                                <X size={14} />
-                                            </button>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                            <div style={{ position: 'relative', width: 'fit-content' }}>
+                                                <img
+                                                    src={formData.damageTypeImage}
+                                                    alt="Schadenursache"
+                                                    style={{ maxHeight: '150px', borderRadius: '8px', border: '1px solid var(--border)' }}
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setEditingImage({ preview: formData.damageTypeImage, isDamageType: true })}
+                                                    style={{
+                                                        position: 'absolute',
+                                                        top: '-8px',
+                                                        right: '24px',
+                                                        background: 'white',
+                                                        border: '1px solid #0EA5E9',
+                                                        borderRadius: '50%',
+                                                        color: '#0EA5E9',
+                                                        width: '24px',
+                                                        height: '24px',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        cursor: 'pointer'
+                                                    }}
+                                                    title="Bild bearbeiten"
+                                                >
+                                                    <Edit3 size={14} />
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={removeDamageTypeImage}
+                                                    style={{
+                                                        position: 'absolute',
+                                                        top: '-8px',
+                                                        right: '-8px',
+                                                        background: 'white',
+                                                        border: '1px solid #EF4444',
+                                                        borderRadius: '50%',
+                                                        color: '#EF4444',
+                                                        width: '24px',
+                                                        height: '24px',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        cursor: 'pointer'
+                                                    }}
+                                                >
+                                                    <X size={14} />
+                                                </button>
+                                            </div>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.5rem' }}>
+                                                <input
+                                                    type="checkbox"
+                                                    id="chk_img_report"
+                                                    checked={formData.damageTypeImageInReport !== false}
+                                                    onChange={(e) => setFormData(prev => ({ ...prev, damageTypeImageInReport: e.target.checked }))}
+                                                    style={{ width: '1.25rem', height: '1.25rem', accentColor: '#0EA5E9', cursor: 'pointer' }}
+                                                />
+                                                <label htmlFor="chk_img_report" style={{ fontSize: '0.9rem', color: '#94A3B8', cursor: 'pointer', userSelect: 'none' }}>
+                                                    Bild im Bericht anzeigen (oberhalb Text)
+                                                </label>
+                                            </div>
                                         </div>
                                     ) : (
                                         <div style={{ display: 'flex', gap: '0.75rem' }}>
@@ -7034,6 +6730,25 @@ END:VCARD`;
                                                                 </>
                                                             )}
 
+                                                            <button
+                                                                type="button"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    // Check if image
+                                                                    if (!((item.file && item.file.type === 'application/pdf') || (item.name && item.name.toLowerCase().endsWith('.pdf')))) {
+                                                                        if (window.confirm('Dieses Bild als Schadenursache festlegen?')) {
+                                                                            setFormData(prev => ({ ...prev, damageTypeImage: item.preview, damageTypeImageInReport: true }));
+                                                                        }
+                                                                    } else {
+                                                                        alert('Nur Bilder können als Schadenursache verwendet werden.');
+                                                                    }
+                                                                }}
+                                                                style={{ border: 'none', background: 'transparent', color: '#0EA5E9', cursor: 'pointer', padding: '4px', visibility: ((item.file && item.file.type === 'application/pdf') || (item.name && item.name.toLowerCase().endsWith('.pdf'))) ? 'hidden' : 'visible' }}
+                                                                title="Als Schadenursache verwenden"
+                                                            >
+                                                                <Image size={16} />
+                                                            </button>
+
                                                             <button type="button" onClick={() => { if (window.confirm('Löschen?')) setFormData(prev => ({ ...prev, images: prev.images.filter(img => img !== item) })); }} style={{ border: 'none', background: 'transparent', color: '#EF4444', cursor: 'pointer', padding: '4px' }}><X size={16} /></button>
                                                         </div>
                                                     ))}
@@ -7127,6 +6842,25 @@ END:VCARD`;
                                                                     </div>
                                                                 </>
                                                             )}
+
+                                                            <button
+                                                                type="button"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    // Check if image
+                                                                    if (!((item.file && item.file.type === 'application/pdf') || (item.name && item.name.toLowerCase().endsWith('.pdf')))) {
+                                                                        if (window.confirm('Dieses Bild als Schadenursache festlegen?')) {
+                                                                            setFormData(prev => ({ ...prev, damageTypeImage: item.preview, damageTypeImageInReport: true }));
+                                                                        }
+                                                                    } else {
+                                                                        alert('Nur Bilder können als Schadenursache verwendet werden.');
+                                                                    }
+                                                                }}
+                                                                style={{ border: 'none', background: 'transparent', color: '#0EA5E9', cursor: 'pointer', padding: '4px', visibility: ((item.file && item.file.type === 'application/pdf') || (item.name && item.name.toLowerCase().endsWith('.pdf'))) ? 'hidden' : 'visible' }}
+                                                                title="Als Schadenursache verwenden"
+                                                            >
+                                                                <Image size={16} />
+                                                            </button>
 
                                                             <button type="button" onClick={() => { if (window.confirm('Löschen?')) setFormData(prev => ({ ...prev, images: prev.images.filter(img => img !== item) })); }} style={{ border: 'none', background: 'transparent', color: '#EF4444', cursor: 'pointer', padding: '4px' }}><X size={16} /></button>
                                                         </div>
@@ -7653,7 +7387,7 @@ END:VCARD`;
                                                     pointerEvents: 'none'
                                                 }}>
                                                     <div style={{ color: 'white', fontSize: '0.75rem', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                                        {img.assignedTo || 'Unzugewiesen'}
+                                                        {img.name || img.assignedTo || 'Unzugewiesen'}
                                                     </div>
                                                     {img.description && (
                                                         <div style={{ color: '#94A3B8', fontSize: '0.7rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -7717,6 +7451,21 @@ END:VCARD`;
                                                 />
                                                 <span style={{ fontSize: '1rem', fontWeight: 500 }}>Bericht</span>
                                             </label>
+                                        </div>
+
+                                        <div style={{ marginTop: '1rem' }}>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setFormData(prev => ({ ...prev, damageTypeImage: activeImageMeta.preview, damageTypeImageInReport: true }));
+                                                    alert('Bild wurde als Schadenursache festgelegt.');
+                                                }}
+                                                className="btn btn-outline"
+                                                style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', fontSize: '0.9rem' }}
+                                            >
+                                                <Image size={16} />
+                                                Als Schadenursache (Bild) verwenden
+                                            </button>
                                         </div>
 
                                         <div style={{ marginTop: '2rem' }}>
