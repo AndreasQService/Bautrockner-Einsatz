@@ -1421,7 +1421,9 @@ END:VCARD`;
             const now = new Date();
             const timeStr = `${String(now.getHours()).padStart(2, '0')}-${String(now.getMinutes()).padStart(2, '0')}`;
             const dateStr = now.toLocaleDateString('de-CH').replace(/\./g, '-');
-            const fileName = `Export_${dataToUse.projectTitle || 'Projekt'}_${dateStr}_${timeStr}.pdf`;
+            const projNum = dataToUse.projectNumber || dataToUse.projectTitle || 'Project';
+            const location = dataToUse.locationDetails || dataToUse.city || 'Schadenort';
+            const fileName = `${projNum}_${location}_${dateStr}_${timeStr}.pdf`;
 
             // 1. Download File
             saveAs(blob, fileName);
@@ -1598,8 +1600,12 @@ END:VCARD`;
 
                 // Generate Blob
                 const pdfBlob = doc.output('blob');
-                const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-                const fileName = `Schadensbericht_${formData.id || 'Neu'}_${timestamp}.pdf`;
+                const projNum = formData.projectNumber || formData.projectTitle || 'Project';
+                const location = formData.locationDetails || formData.city || 'Schadenort';
+                const now = new Date();
+                const timeStr = `${String(now.getHours()).padStart(2, '0')}-${String(now.getMinutes()).padStart(2, '0')}`;
+                const dateStr = now.toLocaleDateString('de-CH').replace(/\./g, '-');
+                const fileName = `${projNum}_${location}_${dateStr}_${timeStr}.pdf`;
                 const pdfFile = new File([pdfBlob], fileName, { type: 'application/pdf' });
 
                 // Add to Documents (Sonstiges)
