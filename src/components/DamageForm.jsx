@@ -2512,21 +2512,52 @@ END:VCARD`;
                     <div style={{ marginBottom: '2rem' }}>
                         <div style={{ marginBottom: '1rem' }}>
                             {mode !== 'technician' && (
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                                    <h3 style={{ fontSize: '1rem', fontWeight: 600, margin: 0 }}>
-                                        Räume / Fotos
-                                    </h3>
-                                    <button
-                                        type="button"
-                                        onClick={handleGeneratePDF}
-                                        disabled={isGeneratingPDF}
-                                        className="btn btn-outline"
-                                        style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem', display: 'flex', gap: '0.5rem', alignItems: 'center', backgroundColor: 'var(--surface)', borderColor: 'var(--border)' }}
-                                    >
-                                        <FileText size={16} />
-                                        Schadensbericht
-                                    </button>
-                                </div>
+                                <>
+                                    <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', marginBottom: '1rem' }}>
+                                        <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--primary)', margin: 0 }}>
+                                            Räume / Fotos
+                                        </h2>
+                                    </div>
+
+                                    {/* Prominent Centered PDF Button */}
+                                    <div style={{ marginTop: '1.5rem', marginBottom: '2.5rem', display: 'flex', justifyContent: 'center' }}>
+                                        <button
+                                            type="button"
+                                            onClick={handleGeneratePDF}
+                                            disabled={isGeneratingPDF}
+                                            style={{
+                                                padding: '1.25rem 3.5rem',
+                                                fontSize: '1.2rem',
+                                                display: 'flex',
+                                                gap: '1rem',
+                                                alignItems: 'center',
+                                                backgroundColor: 'var(--primary)',
+                                                color: 'white',
+                                                border: 'none',
+                                                borderRadius: '12px',
+                                                fontWeight: '800',
+                                                cursor: 'pointer',
+                                                boxShadow: '0 10px 25px rgba(56, 189, 248, 0.4)',
+                                                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                                textTransform: 'uppercase',
+                                                letterSpacing: '0.5px'
+                                            }}
+                                            onMouseEnter={(e) => {
+                                                e.currentTarget.style.transform = 'scale(1.05)';
+                                                e.currentTarget.style.boxShadow = '0 15px 30px rgba(56, 189, 248, 0.5)';
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                e.currentTarget.style.transform = 'scale(1)';
+                                                e.currentTarget.style.boxShadow = '0 10px 25px rgba(56, 189, 248, 0.4)';
+                                            }}
+                                        >
+                                            <div style={{ backgroundColor: 'white', padding: '0.25rem', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                <FileText size={22} color="#EF4444" />
+                                            </div>
+                                            Schadensbericht erstellen (PDF)
+                                        </button>
+                                    </div>
+                                </>
                             )}
 
 
@@ -2534,17 +2565,33 @@ END:VCARD`;
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                                     {/* NEW: Schadenursache Section (Technician) */}
                                     <div style={{ marginBottom: '1rem', padding: '1rem', border: '1px solid var(--border)', borderRadius: '8px', backgroundColor: 'rgba(255,255,255,0.02)' }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                                            <h4 style={{ fontSize: '1rem', fontWeight: 600, margin: 0, color: 'var(--text-main)' }}>Schadenursache</h4>
+                                        <h4 style={{ fontSize: '1rem', fontWeight: 600, margin: 0, color: 'var(--text-main)', marginBottom: '0.75rem' }}>Schadenursache</h4>
+                                        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1rem', marginTop: '0.5rem' }}>
                                             <button
                                                 type="button"
                                                 onClick={handleGeneratePDF}
                                                 disabled={isGeneratingPDF}
-                                                className="btn btn-outline"
-                                                style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', display: 'flex', gap: '0.4rem', alignItems: 'center', backgroundColor: 'var(--surface)', borderColor: 'var(--border)' }}
+                                                style={{
+                                                    padding: '0.75rem 1.5rem',
+                                                    fontSize: '0.9rem',
+                                                    display: 'flex',
+                                                    gap: '0.5rem',
+                                                    alignItems: 'center',
+                                                    backgroundColor: 'var(--primary)',
+                                                    color: 'white',
+                                                    border: 'none',
+                                                    borderRadius: '8px',
+                                                    fontWeight: '700',
+                                                    cursor: 'pointer',
+                                                    width: '100%',
+                                                    justifyContent: 'center',
+                                                    boxShadow: '0 4px 10px rgba(56, 189, 248, 0.3)'
+                                                }}
                                             >
-                                                <FileText size={14} />
-                                                Schadensbericht
+                                                <div style={{ backgroundColor: 'white', padding: '0.15rem', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                    <FileText size={16} color="#EF4444" />
+                                                </div>
+                                                Schadensbericht (PDF)
                                             </button>
                                         </div>
 
@@ -6683,47 +6730,6 @@ END:VCARD`;
                                             })}
                                         </div>
                                     </div>
-
-                                    {/* Schadensbericht Button below room list - DESKTOP ONLY */}
-                                    {mode !== 'technician' && (
-                                        <div style={{ marginTop: '3rem', marginBottom: '3rem', display: 'flex', justifyContent: 'center' }}>
-                                            <button
-                                                type="button"
-                                                onClick={handleGeneratePDF}
-                                                disabled={isGeneratingPDF}
-                                                style={{
-                                                    padding: '1.25rem 3rem',
-                                                    fontSize: '1.2rem',
-                                                    display: 'flex',
-                                                    gap: '1rem',
-                                                    alignItems: 'center',
-                                                    backgroundColor: 'var(--primary)',
-                                                    color: 'white',
-                                                    border: 'none',
-                                                    borderRadius: '12px',
-                                                    fontWeight: '800',
-                                                    cursor: 'pointer',
-                                                    boxShadow: '0 10px 25px rgba(56, 189, 248, 0.4)',
-                                                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                                                    textTransform: 'uppercase',
-                                                    letterSpacing: '0.5px'
-                                                }}
-                                                onMouseEnter={(e) => {
-                                                    e.currentTarget.style.transform = 'scale(1.05)';
-                                                    e.currentTarget.style.boxShadow = '0 15px 30px rgba(56, 189, 248, 0.5)';
-                                                }}
-                                                onMouseLeave={(e) => {
-                                                    e.currentTarget.style.transform = 'scale(1)';
-                                                    e.currentTarget.style.boxShadow = '0 10px 25px rgba(56, 189, 248, 0.4)';
-                                                }}
-                                            >
-                                                <div style={{ backgroundColor: 'white', padding: '0.25rem', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                                    <FileText size={22} color="#EF4444" />
-                                                </div>
-                                                Schadensbericht erstellen
-                                            </button>
-                                        </div>
-                                    )}
 
 
                                     {/* Messprotokolle Special Section (Goodnotes / Measurement) */}
