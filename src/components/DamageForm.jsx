@@ -3042,6 +3042,29 @@ END:VCARD`;
                                                         <Plus size={14} /> Messung starten
                                                     </button>
                                                 )}
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        if (window.confirm(`Sind Sie sicher, dass Sie den Raum "${room.name}" löschen möchten? Alle zugehörigen Bilder und Messdaten gehen verloren.`)) {
+                                                            handleRemoveRoom(room.id);
+                                                        }
+                                                    }}
+                                                    title="Raum löschen"
+                                                    style={{
+                                                        padding: '0.4rem',
+                                                        borderRadius: '6px',
+                                                        border: '1px solid #EF4444',
+                                                        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                                                        color: '#EF4444',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        cursor: 'pointer'
+                                                    }}
+                                                >
+                                                    <Trash size={14} />
+                                                </button>
                                             </div>
                                         </div>
                                         <div style={{ padding: '0.75rem' }}>
