@@ -461,23 +461,6 @@ const DamageReportDocument = ({ data }) => {
                                 )}
                                 <Text style={styles.roomHeader}>{room.name}</Text>
 
-                                {/* Measurements Summary if exists */}
-                                {room.measurementData && room.measurementData.measurements && (
-                                    <View style={[styles.table, { marginTop: 5, marginBottom: 10 }]}>
-                                        <View style={styles.tableHeaderRow}>
-                                            <View style={{ width: '40%' }}><Text style={styles.tableHeader}>Position</Text></View>
-                                            <View style={{ width: '30%' }}><Text style={styles.tableHeader}>W-Wert</Text></View>
-                                            <View style={{ width: '30%' }}><Text style={styles.tableHeader}>B-Wert</Text></View>
-                                        </View>
-                                        {room.measurementData.measurements.map((m, mi) => (
-                                            <View key={mi} style={styles.tableRow}>
-                                                <View style={{ width: '40%' }}><Text style={styles.tableCell}>{m.location || '-'}</Text></View>
-                                                <View style={{ width: '30%' }}><Text style={styles.tableCell}>{m.wValue || '-'}</Text></View>
-                                                <View style={{ width: '30%' }}><Text style={styles.tableCell}>{m.bValue || '-'}</Text></View>
-                                            </View>
-                                        ))}
-                                    </View>
-                                )}
 
                                 {firstImage && (
                                     <View style={[styles.imageGrid, { marginBottom: 10 }]}>
