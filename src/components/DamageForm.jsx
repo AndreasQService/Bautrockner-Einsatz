@@ -1786,17 +1786,8 @@ END:VCARD`;
     return (
         <>
             <div className="card" style={{ maxWidth: mode === 'desktop' ? '1000px' : '600px', margin: '0 auto', padding: '1.5rem' }}>
-                {showEmailImport && (
-                    <EmailImportModal
-                        onClose={() => setShowEmailImport(false)}
-                        onImport={handleEmailImport}
-                        audioDevices={audioDevices}
-                        selectedDeviceId={selectedDeviceId}
-                        onSelectDeviceId={setSelectedDeviceId}
-                        onRefreshDevices={refreshAudioDevices}
-                        deviceError={deviceError}
-                    />
-                )}
+                {/* REMOVED DUPLICATE EmailImportModal FROM HERE */}
+
                 {/* Project & Order Numbers Row */}
                 {(mode === 'desktop' || mode === 'technician') && (
                     <div style={{
@@ -1956,15 +1947,19 @@ END:VCARD`;
                                 />
                             </div>
                             <div style={{ flex: 1 }}>
-                                <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.4rem', display: 'block', fontWeight: 600 }}>Zuständige Bewirtschaftung</label>
-                                <input
-                                    type="text"
+                                <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.4rem', display: 'block', fontWeight: 600 }}>Bewirtschaftung</label>
+                                <select
                                     className="form-input"
                                     value={formData.assignedTo || ''}
                                     onChange={(e) => setFormData(prev => ({ ...prev, assignedTo: e.target.value }))}
-                                    placeholder="Verwaltung / Bewirtschafter eingeben"
                                     style={{ width: '100%' }}
-                                />
+                                >
+                                    <option value="">Bitte wählen...</option>
+                                    <option value="Valdrin Shala">Valdrin Shala</option>
+                                    <option value="Wincasa">Wincasa</option>
+                                    <option value="Livit">Livit</option>
+                                    <option value="Privera">Privera</option>
+                                </select>
                             </div>
                             <div style={{ flex: 1 }}>
                                 <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.4rem', display: 'block', fontWeight: 600 }}>Sachbearbeiter</label>
@@ -3032,7 +3027,7 @@ END:VCARD`;
                                                             fontWeight: 600
                                                         }}
                                                     >
-                                                        <Plus size={14} /> Neue Messung
+                                                        <Plus size={14} /> Neue Messreihe
                                                     </button>
                                                     <button
                                                         type="button"
@@ -3059,7 +3054,7 @@ END:VCARD`;
                                                             fontWeight: 600
                                                         }}
                                                     >
-                                                        <FileText size={14} /> Fortsetzen
+                                                        <FileText size={14} /> Messreihe fortsetzen
                                                     </button>
                                                 </>
                                             ) : (
@@ -3072,6 +3067,7 @@ END:VCARD`;
                                                         setIsMeasurementReadOnly(false);
                                                         setShowMeasurementModal(true);
                                                     }}
+
                                                     style={{
                                                         padding: mode === 'technician' ? '0.75rem 0.5rem' : '0.4rem 0.6rem',
                                                         borderRadius: '6px',
@@ -4883,6 +4879,7 @@ END:VCARD`;
                 }
 
                 <MeasurementModal
+                    key={activeRoomForMeasurement?.id || 'none'}
                     isOpen={showMeasurementModal}
                     onClose={() => {
                         setShowMeasurementModal(false);
@@ -4897,11 +4894,11 @@ END:VCARD`;
                     initialData={formData.rooms.reduce((acc, r) => {
                         let mData = r.measurementData;
                         // If this is the active room AND we are starting a NEW measurement based on old one
-                        if (activeRoomForMeasurement && r.id === activeRoomForMeasurement.id && isNewMeasurement && mData) {
+                        if (activeRoomForMeasurement && r.id === activeRoomForMeasurement.id && isNewMeasurement && mData && Array.isArray(mData.measurements)) {
                             mData = {
                                 canvasImage: mData.canvasImage, // Keep Sketch
                                 globalSettings: {
-                                    ...mData.globalSettings,
+                                    ...(mData.globalSettings || {}),
                                     date: new Date().toISOString().split('T')[0], // Reset Date to Today
                                     temp: '',
                                     humidity: ''
@@ -4920,13 +4917,27 @@ END:VCARD`;
                     onSave={async (data) => {
                         const { file, measurements, globalSettings, canvasImage } = data;
 
-                        const uploadPromises = [];
+                        // 1. Silent Upload to Supabase (if available) and store URL in history
+                        let protocolUrl = null;
+                        if (supabase && file) {
+                            try {
+                                const fileExt = file.name.split('.').pop() || (file.type === 'application/pdf' ? 'pdf' : 'png');
+                                const fileName = `protocols/${formData.id || 'temp'}/${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
 
-                        // 1. Always upload the file to 'Messprotokolle' category, NOT the room's image list
-                        uploadPromises.push(handleImageUpload([file], {
-                            assignedTo: 'Messprotokolle',
-                            category: 'report'
-                        }));
+                                const { error: uploadError } = await supabase.storage
+                                    .from('damage-images')
+                                    .upload(fileName, file);
+
+                                if (!uploadError) {
+                                    const { data: { publicUrl } } = supabase.storage
+                                        .from('damage-images')
+                                        .getPublicUrl(fileName);
+                                    protocolUrl = publicUrl;
+                                }
+                            } catch (err) {
+                                console.error("Silent protocol upload failed:", err);
+                            }
+                        }
 
                         // 2. Update room data (Latest & History)
                         if (activeRoomForMeasurement) {
@@ -4940,13 +4951,14 @@ END:VCARD`;
                                             date: globalSettings.date || new Date().toISOString(),
                                             measurements: measurements.map(m => ({ ...m })), // Deep clone
                                             globalSettings: { ...globalSettings },
-                                            canvasImage: canvasImage
+                                            canvasImage: canvasImage,
+                                            protocolUrl: protocolUrl // Store the uploaded file link
                                         };
                                         const history = r.measurementHistory ? [...r.measurementHistory] : [];
 
                                         return {
                                             ...r,
-                                            measurementData: { measurements, globalSettings, canvasImage },
+                                            measurementData: { measurements, globalSettings, canvasImage, protocolUrl },
                                             measurementHistory: [...history, newHistoryEntry]
                                         };
                                     }
@@ -4954,13 +4966,6 @@ END:VCARD`;
                                 })
                             }));
                         }
-
-                        // 3. ADDITIONAL COPY: Saving to "Sonstiges" if PDF (legacy/requested behavior?)
-                        // keeping for safety if it was intentional, but 'Messprotokolle' should suffice.
-                        // If user thinks it's wrong to be in images, maybe they don't want it in 'Sonstiges' either?
-                        // I will limit it to just Messprotokolle as that seems safest based on "that is wrong".
-
-                        await Promise.all(uploadPromises);
                     }}
                 />
                 {
