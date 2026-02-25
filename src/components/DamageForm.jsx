@@ -3829,11 +3829,11 @@ END:VCARD`;
                             <Eye size={18} /> Feststellungen & Massnahmen
                         </h3>
 
-                        <div style={{ marginBottom: '1.5rem' }}>
+                        <div style={{ marginBottom: '1.5rem', width: '100%' }}>
                             <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.4rem', display: 'block', fontWeight: 600 }}>Feststellungen</label>
                             <textarea
                                 className="form-input"
-                                style={{ minHeight: '120px', resize: 'vertical' }}
+                                style={{ minHeight: '120px', resize: 'vertical', width: '100%' }}
                                 placeholder="Feststellungen eingeben"
                                 value={formData.findings || ''}
                                 onChange={(e) => setFormData(prev => ({ ...prev, findings: e.target.value }))}
@@ -3923,17 +3923,19 @@ END:VCARD`;
                             </button>
                         </div>
 
-                        <textarea
-                            id="measures"
-                            name="measures"
-                            className="form-input"
-                            style={{ minHeight: '120px', resize: 'vertical' }}
-                            placeholder="Details zu den Massnahmen..."
-                            value={formData.measures || ''}
-                            onChange={(e) => {
-                                setFormData(prev => ({ ...prev, measures: e.target.value }));
-                            }}
-                        />
+                        <div style={{ width: '100%' }}>
+                            <textarea
+                                id="measures"
+                                name="measures"
+                                className="form-input"
+                                style={{ minHeight: '120px', resize: 'vertical', width: '100%' }}
+                                placeholder="Details zu den Massnahmen..."
+                                value={formData.measures || ''}
+                                onChange={(e) => {
+                                    setFormData(prev => ({ ...prev, measures: e.target.value }));
+                                }}
+                            />
+                        </div>
 
                         {/* Centered Schadensbericht Button with PDF Logo */}
                         <div style={{ display: 'flex', justifyContent: 'center', marginTop: '2.5rem', marginBottom: '1rem' }}>
