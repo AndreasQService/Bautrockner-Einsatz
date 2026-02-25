@@ -2099,33 +2099,23 @@ END:VCARD`;
                         <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
                             <div style={{ flex: '1 1 200px' }}>
                                 <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 600, marginBottom: '0.5rem', display: 'block' }}>Bewirtschaftung</label>
-                                <select
+                                <input
                                     className="form-input"
+                                    placeholder="Name / Firma..."
                                     value={formData.assignedTo || ''}
                                     onChange={(e) => setFormData(prev => ({ ...prev, assignedTo: e.target.value }))}
                                     style={{ width: '100%' }}
-                                >
-                                    <option value="">Bitte wählen...</option>
-                                    <option value="Valdrin Shala">Valdrin Shala</option>
-                                    <option value="Wincasa">Wincasa</option>
-                                    <option value="Livit">Livit</option>
-                                    <option value="Privera">Privera</option>
-                                </select>
+                                />
                             </div>
                             <div style={{ flex: '1 1 200px' }}>
                                 <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 600, marginBottom: '0.5rem', display: 'block' }}>Sachbearbeiter</label>
-                                <select
+                                <input
                                     className="form-input"
+                                    placeholder="Name des Sachbearbeiters..."
                                     value={formData.clientSource || ''}
                                     onChange={(e) => setFormData(prev => ({ ...prev, clientSource: e.target.value }))}
                                     style={{ width: '100%' }}
-                                >
-                                    <option value="">Bitte wählen...</option>
-                                    <option value="Xhemil Ademi">Xhemil Ademi</option>
-                                    <option value="Adi Shala">Adi Shala</option>
-                                    <option value="Andreas Strehler">Andreas Strehler</option>
-                                    <option value="André Rothfuchs">André Rothfuchs</option>
-                                </select>
+                                />
                             </div>
                             <div style={{ flex: '1 1 180px' }}>
                                 <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 600, marginBottom: '0.5rem', display: 'block' }}>Leistungsart</label>
