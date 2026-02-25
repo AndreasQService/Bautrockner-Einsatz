@@ -2101,7 +2101,7 @@ END:VCARD`;
                                 <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 600, marginBottom: '0.5rem', display: 'block' }}>Bewirtschafter/in</label>
                                 <input
                                     className="form-input"
-                                    placeholder="Name / Firma..."
+                                    placeholder="Vorname Name"
                                     value={formData.assignedTo || ''}
                                     onChange={(e) => setFormData(prev => ({ ...prev, assignedTo: e.target.value }))}
                                     style={{ width: '100%' }}
