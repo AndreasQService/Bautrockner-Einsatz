@@ -2193,9 +2193,12 @@ END:VCARD`;
                                         />
                                     </div>
                                 </div>
+                            </div>
 
+                            {/* Zweite Zeile für Rechnungsdetails */}
+                            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginTop: '1rem' }}>
                                 {/* Rechnungsvermerk */}
-                                <div style={{ flex: '1 1 120px' }}>
+                                <div style={{ flex: '0 1 250px' }}>
                                     <label style={{ fontSize: '0.65rem', color: '#10B981', textTransform: 'uppercase', fontWeight: 700, display: 'block', marginBottom: '0.25rem' }}>Rechnungsvermerk</label>
                                     <input
                                         className="form-input"
@@ -2207,7 +2210,7 @@ END:VCARD`;
                                 </div>
 
                                 {/* E-Mail */}
-                                <div style={{ flex: '1.5 1 180px' }}>
+                                <div style={{ flex: '1 1 300px' }}>
                                     <label style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '0.25rem' }}>E-Mail (Rechnung)</label>
                                     <input
                                         className="form-input"
