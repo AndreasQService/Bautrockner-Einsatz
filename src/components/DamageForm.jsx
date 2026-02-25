@@ -2098,7 +2098,7 @@ END:VCARD`;
 
                         <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
                             <div style={{ flex: '1 1 200px' }}>
-                                <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 600, marginBottom: '0.5rem', display: 'block' }}>Bewirtschaftung</label>
+                                <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 600, marginBottom: '0.5rem', display: 'block' }}>Bewirtschafter/in</label>
                                 <input
                                     className="form-input"
                                     placeholder="Name / Firma..."
