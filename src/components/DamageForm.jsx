@@ -2107,16 +2107,6 @@ END:VCARD`;
                                     style={{ width: '100%' }}
                                 />
                             </div>
-                            <div style={{ flex: '1 1 200px' }}>
-                                <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 600, marginBottom: '0.5rem', display: 'block' }}>Sachbearbeiter Q-Service</label>
-                                <input
-                                    className="form-input"
-                                    placeholder="Name des Sachbearbeiters..."
-                                    value={formData.clientSource || ''}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, clientSource: e.target.value }))}
-                                    style={{ width: '100%' }}
-                                />
-                            </div>
                             <div style={{ flex: '1 1 180px' }}>
                                 <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 600, marginBottom: '0.5rem', display: 'block' }}>Leistungsart</label>
                                 <select
