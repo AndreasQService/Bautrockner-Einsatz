@@ -1836,7 +1836,7 @@ END:VCARD`;
 
     return (
         <>
-            <div className="card" style={{ maxWidth: mode === 'desktop' ? '1000px' : '600px', margin: '0 auto', padding: '1.5rem' }}>
+            <div className="card" style={{ maxWidth: mode === 'desktop' ? '1000px' : '800px', margin: '0 auto', padding: mode === 'desktop' ? '1.5rem' : '1rem' }}>
                 {/* REMOVED DUPLICATE EmailImportModal FROM HERE */}
 
                 {/* Project & Order Numbers Row */}
@@ -2310,18 +2310,20 @@ END:VCARD`;
                         <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                             <FileText size={18} /> Schadenbeschreibung (KI / Meldung)
                         </h3>
-                        <div style={{ backgroundColor: 'var(--surface)', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border)', marginBottom: '1.5rem' }}>
+                        <div style={{ backgroundColor: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: '12px', border: '1px solid var(--border)', marginBottom: '1.5rem' }}>
                             <textarea
                                 className="form-input"
                                 value={formData.description || ''}
                                 readOnly={true}
                                 placeholder="Beschrieb aus der Meldung..."
                                 style={{
-                                    width: '100%', minHeight: '100px',
+                                    width: '100%', minHeight: '120px',
                                     backgroundColor: 'transparent', border: 'none',
                                     resize: 'none',
                                     fontFamily: 'inherit', color: 'var(--text-main)',
-                                    cursor: 'default'
+                                    cursor: 'default',
+                                    fontSize: '1rem',
+                                    lineHeight: '1.5'
                                 }}
                             />
                         </div>
