@@ -50,6 +50,18 @@ const VcfIcon = ({ size = 24, style = {} }) => (
     </svg>
 );
 
+/* Custom Calendar Icon */
+const CalendarIcon = ({ size = 24, style = {} }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" style={style}>
+        <rect x="3" y="4" width="18" height="18" rx="2" ry="2" fill="white" stroke="#10B981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        <line x1="16" y1="2" x2="16" y2="6" stroke="#10B981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        <line x1="8" y1="2" x2="8" y2="6" stroke="#10B981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        <line x1="3" y1="10" x2="21" y2="10" stroke="#10B981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        <rect x="3" y="11" width="18" height="7" rx="1" fill="#10B981" />
+        <text x="12" y="15.5" fill="white" fontSize="5.5" fontWeight="900" textAnchor="middle" dominantBaseline="middle" style={{ fontFamily: 'Arial, sans-serif', userSelect: 'none' }}>ICS</text>
+    </svg>
+);
+
 const STEPS = ['Schadenaufnahme', 'Leckortung', 'Trocknung', 'Instandsetzung', 'Abgeschlossen']
 
 const statusColors = {
@@ -862,6 +874,51 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         doc.text("* Theoretischer Wert basierend auf Anschlusswert (kW) x Betriebsstunden", 20, currentY + 8);
 
         doc.save(`Energieprotokoll_${formData.projectTitle || 'Export'}.pdf`);
+    };
+
+    const handleDownloadICS = () => {
+        const title = (formData.projectTitle && !formData.projectTitle.startsWith('TMP-')) ? formData.projectTitle : (formData.projectNumber || 'Schadenaufnahme');
+        const summary = `Schadenaufnahme: ${title} | ${formData.client || 'Unbekannter Kunde'}`;
+        const location = `${formData.street || ''}, ${formData.locationDetails || ''}, ${formData.zip} ${formData.city || ''}`.replace(/,,/g, ',').trim();
+
+        let description = `Projekt: ${title}\n`;
+        description += `Kunde: ${formData.client || '-'}\n`;
+        description += `Adresse: ${location}\n\n`;
+
+        if (formData.contacts && formData.contacts.length > 0) {
+            description += `KONTAKTE:\n`;
+            formData.contacts.forEach(c => {
+                description += `- ${c.name} (${c.role}): ${c.phone || '-'}\n`;
+            });
+            description += `\n`;
+        }
+
+        if (formData.description) {
+            description += `BESCHREIBUNG:\n${formData.description}\n`;
+        }
+
+        // Clean up text for ICS
+        const cleanSummary = summary.replace(/,/g, '\\,');
+        const cleanLocation = location.replace(/,/g, '\\,');
+        const cleanDescription = description.replace(/\n/g, '\\n').replace(/,/g, '\\,');
+
+        const icsContent = [
+            'BEGIN:VCALENDAR',
+            'VERSION:2.0',
+            'PRODID:-//Q-Service//QTool//DE',
+            'BEGIN:VEVENT',
+            `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, '').split('.')[0]}Z`,
+            'DTSTART:' + new Date().toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z', // Default to now
+            'DTEND:' + new Date(Date.now() + 3600000).toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z', // +1 hour
+            `SUMMARY:${cleanSummary}`,
+            `LOCATION:${cleanLocation}`,
+            `DESCRIPTION:${cleanDescription}`,
+            'END:VEVENT',
+            'END:VCALENDAR'
+        ].join('\r\n');
+
+        const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+        saveAs(blob, `Termin_${formData.projectNumber || 'Export'}.ics`);
     };
 
 
@@ -2041,6 +2098,33 @@ END:VCARD`;
                                     <option key={status} value={status} style={{ color: '#000' }}>{status}</option>
                                 ))}
                             </select>
+                        </div>
+
+                        {/* Calendar Push Button */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                            <label style={{ fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 700 }}>Export</label>
+                            <button
+                                onClick={handleDownloadICS}
+                                className="btn-glass"
+                                title="Termin für Outlook/Kalender erstellen"
+                                style={{
+                                    height: '38px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.5rem',
+                                    padding: '0 0.75rem',
+                                    borderRadius: '8px',
+                                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                                    color: '#10B981',
+                                    border: '1px solid rgba(16, 185, 129, 0.2)',
+                                    cursor: 'pointer',
+                                    fontSize: '0.85rem',
+                                    fontWeight: 700
+                                }}
+                            >
+                                <CalendarIcon size={18} />
+                                <span>Termin</span>
+                            </button>
                         </div>
                     </div>
                 </div>
