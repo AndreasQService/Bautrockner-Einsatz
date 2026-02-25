@@ -19,7 +19,8 @@ const DEVICE_TYPES = [
     'Bautrockner',
     'Turbinen',
     'Wasserabscheider',
-    'Messgeräte'
+    'Messgeräte',
+    'Datenlogger'
 ];
 
 const DEVICE_ICONS = {
@@ -34,6 +35,7 @@ const DEVICE_ICONS = {
     'Bautrockner': <Monitor size={18} />,
     'Turbinen': <Wind size={18} />,
     'Wasserabscheider': <Package size={18} />,
+    'Datenlogger': <Activity size={18} />,
     'Sonstiges': <Wrench size={18} />
 };
 
