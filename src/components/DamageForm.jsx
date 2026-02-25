@@ -771,10 +771,18 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         const tableData = formData.equipment.map(dev => {
             let consumption = '-';
             let usage = '-';
+
+            // Priority 1: Meter reading
             if (dev.counterEnd && dev.counterStart) {
                 const diff = parseFloat(dev.counterEnd) - parseFloat(dev.counterStart);
                 if (!isNaN(diff)) consumption = diff.toFixed(2) + ' kWh';
             }
+            // Priority 2: Connection value * Hours (Fallback for devices without meter like fans)
+            else if (dev.energyConsumption && dev.hours) {
+                const calc = parseFloat(dev.energyConsumption) * parseFloat(dev.hours);
+                if (!isNaN(calc)) consumption = calc.toFixed(2) + ' kWh*';
+            }
+
             if (dev.hours) usage = dev.hours + ' Std.';
 
             const days = getDaysDiff(dev.startDate, dev.endDate);
@@ -806,6 +814,9 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
             if (dev.counterEnd && dev.counterStart) {
                 const val = parseFloat(dev.counterEnd) - parseFloat(dev.counterStart);
                 return acc + (isNaN(val) ? 0 : val);
+            } else if (dev.energyConsumption && dev.hours) {
+                const calc = parseFloat(dev.energyConsumption) * parseFloat(dev.hours);
+                return acc + (isNaN(calc) ? 0 : calc);
             }
             return acc;
         }, 0);
@@ -813,6 +824,10 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         const finalY = (doc).lastAutoTable.finalY + 10;
         doc.setFontSize(11);
         doc.text(`Gesamtverbrauch: ${totalConsumption.toFixed(2)} kWh`, 20, finalY);
+
+        doc.setFontSize(8);
+        doc.setTextColor(100);
+        doc.text("* Theoretischer Wert basierend auf Anschlusswert (kW) x Betriebsstunden", 20, finalY + 7);
 
         doc.save(`Energieprotokoll_${formData.projectTitle || 'Export'}.pdf`);
     };
@@ -1830,9 +1845,16 @@ END:VCARD`;
 
 
     // Calculate drying summary
-    const finishedDrying = formData.equipment.filter(d => d.endDate && d.counterEnd);
-    const totalDryingHours = finishedDrying.reduce((acc, curr) => acc + (parseFloat(curr.hours) || 0), 0);
-    const totalDryingKwh = finishedDrying.reduce((acc, curr) => acc + ((parseFloat(curr.counterEnd) || 0) - (parseFloat(curr.counterStart) || 0)), 0);
+    const finishedDrying = formData.equipment.filter(d => d.endDate && (d.counterEnd || (d.energyConsumption && d.hours)));
+    const totalDryingHours = formData.equipment.filter(d => d.endDate).reduce((acc, curr) => acc + (parseFloat(curr.hours) || 0), 0);
+    const totalDryingKwh = formData.equipment.filter(d => d.endDate).reduce((acc, curr) => {
+        if (curr.counterEnd && curr.counterStart) {
+            return acc + (parseFloat(curr.counterEnd) - parseFloat(curr.counterStart));
+        } else if (curr.energyConsumption && curr.hours) {
+            return acc + (parseFloat(curr.energyConsumption) * parseFloat(curr.hours));
+        }
+        return acc;
+    }, 0);
 
     return (
         <>
@@ -4934,15 +4956,29 @@ END:VCARD`;
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {formData.equipment.filter(d => d.endDate && d.counterEnd).map((device, idx) => (
-                                        <tr key={idx} style={{ borderBottom: '1px solid var(--border)' }}>
-                                            <td style={{ padding: '0.75rem' }}>#{device.deviceNumber} ({device.room})</td>
-                                            <td style={{ textAlign: 'center', padding: '0.75rem' }}>{getDaysDiff(device.startDate, device.endDate)}</td>
-                                            <td style={{ textAlign: 'center', padding: '0.75rem' }}>{device.hours} h</td>
-                                            <td style={{ textAlign: 'right', padding: '0.75rem' }}>{(parseFloat(device.counterEnd) - parseFloat(device.counterStart)).toFixed(2)}</td>
-                                        </tr>
-                                    ))}
-                                    {formData.equipment.filter(d => d.endDate && d.counterEnd).length === 0 && (
+                                    {formData.equipment.filter(d => d.endDate).map((device, idx) => {
+                                        const hasMeter = device.counterEnd && device.counterStart;
+                                        const hasKw = device.energyConsumption && device.hours;
+                                        let consumption = 0;
+                                        if (hasMeter) {
+                                            consumption = parseFloat(device.counterEnd) - parseFloat(device.counterStart);
+                                        } else if (hasKw) {
+                                            consumption = parseFloat(device.energyConsumption) * parseFloat(device.hours);
+                                        }
+
+                                        return (
+                                            <tr key={idx} style={{ borderBottom: '1px solid var(--border)' }}>
+                                                <td style={{ padding: '0.75rem' }}>#{device.deviceNumber} ({device.room})</td>
+                                                <td style={{ textAlign: 'center', padding: '0.75rem' }}>{getDaysDiff(device.startDate, device.endDate)}</td>
+                                                <td style={{ textAlign: 'center', padding: '0.75rem' }}>{device.hours} h</td>
+                                                <td style={{ textAlign: 'right', padding: '0.75rem' }}>
+                                                    {consumption.toFixed(2)}
+                                                    {!hasMeter && hasKw && <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginLeft: '2px' }}>*</span>}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                    {formData.equipment.filter(d => d.endDate).length === 0 && (
                                         <tr>
                                             <td colSpan="4" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>Keine abgeschlossenen Trocknungen vorhanden.</td>
                                         </tr>
