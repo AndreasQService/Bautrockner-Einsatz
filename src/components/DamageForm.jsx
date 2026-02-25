@@ -161,6 +161,14 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         clientZip: initialData.clientZip || '',
         clientCity: initialData.clientCity || '',
 
+        // Owner & Invoice details (Desktop only)
+        ownerName: initialData.ownerName || '',
+        ownerStreet: initialData.ownerStreet || '',
+        ownerZip: initialData.ownerZip || '',
+        ownerCity: initialData.ownerCity || '',
+        invoiceReference: initialData.invoiceReference || '',
+        ownerEmail: initialData.ownerEmail || '',
+
         contacts: (initialData?.contacts && initialData.contacts.filter(c => c.name || c.phone).length > 0)
             ? initialData.contacts.filter(c => c.name || c.phone)
             : [
@@ -211,6 +219,12 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         clientStreet: '',
         clientZip: '',
         clientCity: '',
+        ownerName: '',
+        ownerStreet: '',
+        ownerZip: '',
+        ownerCity: '',
+        invoiceReference: '',
+        ownerEmail: '',
         // address: '',
         contacts: [
             { apartment: '', name: '', phone: '', role: 'Mieter' },
@@ -2142,6 +2156,87 @@ END:VCARD`;
                                     <option value="Gewerbe / Büro">Gewerbe / Büro</option>
                                     <option value="Sonstiges">Sonstiges</option>
                                 </select>
+                            </div>
+                        </div>
+
+                        {/* Administrative Zeile für das Büro (Desktop only) */}
+                        <div style={{ marginTop: '1.5rem', paddingTop: '1.25rem', borderTop: '1px solid var(--border)' }}>
+                            <label style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--primary)', marginBottom: '0.75rem', display: 'block' }}>
+                                Eigentümer / Rechnungsdetails
+                            </label>
+
+                            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                                {/* Eigentümer */}
+                                <div style={{ flex: '2 1 200px' }}>
+                                    <label style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '0.25rem' }}>Eigentümer</label>
+                                    <input
+                                        className="form-input"
+                                        placeholder="Name/Firma"
+                                        value={formData.ownerName || ''}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, ownerName: e.target.value }))}
+                                        style={{ width: '100%' }}
+                                    />
+                                </div>
+
+                                {/* Adresse Eigentümer */}
+                                <div style={{ flex: '1.5 1 150px' }}>
+                                    <label style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '0.25rem' }}>Strasse & Nr.</label>
+                                    <input
+                                        className="form-input"
+                                        placeholder="Strasse / Nr."
+                                        value={formData.ownerStreet || ''}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, ownerStreet: e.target.value }))}
+                                        style={{ width: '100%' }}
+                                    />
+                                </div>
+
+                                {/* PLZ / Ort */}
+                                <div style={{ width: '180px', display: 'flex', gap: '0.4rem' }}>
+                                    <div style={{ flex: 1 }}>
+                                        <label style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '0.25rem' }}>PLZ</label>
+                                        <input
+                                            className="form-input"
+                                            placeholder="PLZ"
+                                            value={formData.ownerZip || ''}
+                                            onChange={(e) => setFormData(prev => ({ ...prev, ownerZip: e.target.value }))}
+                                            style={{ width: '100%' }}
+                                        />
+                                    </div>
+                                    <div style={{ flex: 2 }}>
+                                        <label style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '0.25rem' }}>Ort</label>
+                                        <input
+                                            className="form-input"
+                                            placeholder="Ort"
+                                            value={formData.ownerCity || ''}
+                                            onChange={(e) => setFormData(prev => ({ ...prev, ownerCity: e.target.value }))}
+                                            style={{ width: '100%' }}
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Rechnungsvermerk */}
+                                <div style={{ flex: '1 1 120px' }}>
+                                    <label style={{ fontSize: '0.65rem', color: '#10B981', textTransform: 'uppercase', fontWeight: 700, display: 'block', marginBottom: '0.25rem' }}>Rechnungsvermerk</label>
+                                    <input
+                                        className="form-input"
+                                        style={{ borderColor: '#10B981', width: '100%', fontWeight: 700 }}
+                                        placeholder="z.B. EIM-..."
+                                        value={formData.invoiceReference || ''}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, invoiceReference: e.target.value }))}
+                                    />
+                                </div>
+
+                                {/* E-Mail */}
+                                <div style={{ flex: '1.5 1 180px' }}>
+                                    <label style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '0.25rem' }}>E-Mail (Rechnung)</label>
+                                    <input
+                                        className="form-input"
+                                        placeholder="rechnung@..."
+                                        value={formData.ownerEmail || ''}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, ownerEmail: e.target.value }))}
+                                        style={{ width: '100%' }}
+                                    />
+                                </div>
                             </div>
                         </div>
                     </div>
