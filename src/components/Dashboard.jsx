@@ -33,6 +33,37 @@ const statusColors = {
     'Abgeschlossen': 'bg-gray-200 text-gray-600'
 }
 
+// Helper to find latest measurement date across all rooms (moved to global scope for reuse)
+const getLatestMeasurementDays = (report) => {
+    if (!report.rooms || report.rooms.length === 0) return null;
+
+    let latestDate = null;
+
+    report.rooms.forEach(room => {
+        // 1. Check current data
+        if (room.measurementData?.globalSettings?.date) {
+            const d = new Date(room.measurementData.globalSettings.date);
+            if (!isNaN(d.getTime())) {
+                if (!latestDate || d > latestDate) latestDate = d;
+            }
+        }
+        // 2. Check history
+        if (room.measurementHistory && Array.isArray(room.measurementHistory)) {
+            room.measurementHistory.forEach(hist => {
+                if (hist.date) {
+                    const d = new Date(hist.date);
+                    if (!isNaN(d.getTime())) {
+                        if (!latestDate || d > latestDate) latestDate = d;
+                    }
+                }
+            });
+        }
+    });
+
+    if (!latestDate) return null;
+    return getDaysDiff(latestDate);
+};
+
 const DryingMonitor = ({ reports, onSelectReport }) => {
     // Filter by status 'Trocknung' OR if there are active devices
     const dryingReports = reports.filter(r => r.status === 'Trocknung' || (r.equipment && r.equipment.length > 0));
@@ -170,6 +201,33 @@ const DryingMonitor = ({ reports, onSelectReport }) => {
                                         <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>Keine Geräte erfasst</span>
                                     )}
                                 </div>
+
+                                {/* Kontrolle Trocknung (Days since last measurement) */}
+                                {(() => {
+                                    const mDays = getLatestMeasurementDays(report);
+                                    if (mDays === null) return null;
+
+                                    let controlColor = '#10B981'; // Green (bis 7 Tage)
+                                    if (mDays > 10) controlColor = '#EF4444'; // Red (mehr als 10 Tage)
+                                    else if (mDays > 7) controlColor = '#F59E0B'; // Orange (7-10 Tage)
+
+                                    return (
+                                        <div style={{
+                                            display: 'flex',
+                                            justifyContent: 'space-between',
+                                            alignItems: 'center',
+                                            padding: '0.5rem 0.75rem',
+                                            marginTop: '0.25rem',
+                                            borderRadius: '8px',
+                                            backgroundColor: 'rgba(255,255,255,0.03)',
+                                            border: `1px solid ${controlColor}33`,
+                                            fontSize: '0.75rem'
+                                        }}>
+                                            <span style={{ fontWeight: 600, color: 'var(--text-muted)' }}>Kontrolle Trocknung</span>
+                                            <span style={{ fontWeight: 800, color: controlColor }}>vor {mDays} {mDays === 1 ? 'Tag' : 'Tagen'}</span>
+                                        </div>
+                                    );
+                                })()}
                                 <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '0.5rem', textAlign: 'right' }}>
                                     Seit {formatDate(report.dryingStarted)}
                                 </div>
@@ -185,6 +243,81 @@ const DryingMonitor = ({ reports, onSelectReport }) => {
         </div>
     )
 }
+
+const MeasurementControlOverview = ({ reports, onSelectReport }) => {
+    // Only active or drying reports
+    const activeReports = reports.filter(r => r.status === 'Trocknung' || (r.equipment && r.equipment.length > 0));
+
+    const sortedReports = activeReports
+        .map(r => ({ ...r, mDays: getLatestMeasurementDays(r) }))
+        .filter(r => r.mDays !== null)
+        .sort((a, b) => b.mDays - a.mDays);
+
+    if (sortedReports.length === 0) return null;
+
+    return (
+        <div className="card" style={{ marginBottom: '2rem', borderTop: '4px solid #10B981' }}>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#10B981' }}></div>
+                Übersicht Kontrolle Trocknung
+            </h2>
+            <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+                    <thead>
+                        <tr style={{ borderBottom: '1px solid var(--border)', color: 'var(--text-muted)', textAlign: 'left' }}>
+                            <th style={{ padding: '0.75rem', fontWeight: 600 }}>Adresse / Strasse</th>
+                            <th style={{ padding: '0.75rem', fontWeight: 600 }}>Schadenort</th>
+                            <th style={{ padding: '0.75rem', textAlign: 'right', fontWeight: 600 }}>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {sortedReports.map(report => {
+                            let controlColor = '#10B981';
+                            if (report.mDays > 10) controlColor = '#EF4444';
+                            else if (report.mDays > 7) controlColor = '#F59E0B';
+
+                            return (
+                                <tr
+                                    key={report.id}
+                                    onClick={() => onSelectReport(report)}
+                                    style={{ borderBottom: '1px solid var(--border)', cursor: 'pointer', transition: 'background-color 0.2s' }}
+                                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.03)'}
+                                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                                >
+                                    <td style={{ padding: '0.75rem' }}>
+                                        <div style={{ fontWeight: 700, color: 'var(--text-main)' }}>
+                                            {report.street || (report.address ? report.address.split(',')[0] : 'Keine Strasse')}
+                                        </div>
+                                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                            {report.zip} {report.city} {report.projectNumber ? `(${report.projectNumber})` : ''}
+                                        </div>
+                                    </td>
+                                    <td style={{ padding: '0.75rem', color: 'var(--text-main)' }}>
+                                        {report.locationDetails || report.client}
+                                    </td>
+                                    <td style={{ padding: '0.75rem', textAlign: 'right' }}>
+                                        <span style={{
+                                            fontWeight: 800,
+                                            color: controlColor,
+                                            padding: '0.25rem 0.6rem',
+                                            borderRadius: '6px',
+                                            backgroundColor: `${controlColor}15`,
+                                            display: 'inline-block',
+                                            minWidth: '85px',
+                                            textAlign: 'center'
+                                        }}>
+                                            vor {report.mDays} {report.mDays === 1 ? 'Tag' : 'Tagen'}
+                                        </span>
+                                    </td>
+                                </tr>
+                            );
+                        })}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    );
+};
 
 export default function Dashboard({ reports, onSelectReport, onDeleteReport, mode }) {
     const [searchTerm, setSearchTerm] = useState('')
@@ -313,7 +446,12 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
             </div>
 
             {/* Pass Filtered Reports to Monitors (only when not in Archive OR Technician Mode) */}
-            {!showArchive && mode !== 'technician' && <DryingMonitor reports={filteredReports} onSelectReport={onSelectReport} />}
+            {!showArchive && mode !== 'technician' && (
+                <>
+                    <MeasurementControlOverview reports={filteredReports} onSelectReport={onSelectReport} />
+                    <DryingMonitor reports={filteredReports} onSelectReport={onSelectReport} />
+                </>
+            )}
 
             {mode === 'technician' ? (
                 <div style={{ paddingBottom: '4rem', maxWidth: '600px', margin: '0 auto', width: '100%' }}>
