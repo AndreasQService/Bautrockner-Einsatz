@@ -757,77 +757,109 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         const doc = new jsPDF();
 
         // Header
-        doc.setFontSize(20);
+        doc.setFontSize(22);
+        doc.setTextColor(41, 128, 185);
         doc.text("Energieprotokoll", 20, 20);
 
         doc.setFontSize(10);
+        doc.setTextColor(50, 50, 50);
         const today = new Date().toLocaleDateString('de-CH');
-        doc.text(`Projekt: ${formData.projectTitle || '-'}`, 20, 30);
-        doc.text(`Kunde: ${formData.client || '-'}`, 20, 35);
-        doc.text(`Adresse: ${formData.street || ''}, ${formData.zip} ${formData.city || ''}`, 20, 40);
-        doc.text(`Erstellt am: ${today}`, 20, 45);
+        doc.text(`Projekt: ${formData.projectTitle || '-'}`, 20, 32);
+        doc.text(`Kunde: ${formData.client || '-'}`, 20, 37);
+        doc.text(`Adresse: ${formData.street || ''}, ${formData.zip} ${formData.city || ''}`, 20, 42);
+        doc.text(`Erstellt am: ${today}`, 20, 47);
 
-        // Table Data
-        const tableData = formData.equipment.map(dev => {
-            let consumption = '-';
-            let usage = '-';
-
-            // Priority 1: Meter reading
-            if (dev.counterEnd && dev.counterStart) {
-                const diff = parseFloat(dev.counterEnd) - parseFloat(dev.counterStart);
-                if (!isNaN(diff)) consumption = diff.toFixed(2) + ' kWh';
-            }
-            // Priority 2: Connection value * Hours (Fallback for devices without meter like fans)
-            else if (dev.energyConsumption && dev.hours) {
-                const calc = parseFloat(dev.energyConsumption) * parseFloat(dev.hours);
-                if (!isNaN(calc)) consumption = calc.toFixed(2) + ' kWh*';
-            }
-
-            if (dev.hours) usage = dev.hours + ' Std.';
-
-            const days = getDaysDiff(dev.startDate, dev.endDate);
-
-            return [
-                (dev.room || 'Unbekannt') + (dev.apartment ? ` (${dev.apartment})` : ''),
-                dev.deviceNumber || '-',
-                dev.startDate || '-',
-                dev.endDate || 'Laufend',
-                days + ' Tage' + (dev.hours ? ` (${dev.hours} Std.)` : ''),
-                dev.counterStart || '-',
-                dev.counterEnd || '-',
-                usage,
-                consumption
-            ];
+        // Group equipment by apartment
+        const groups = {};
+        formData.equipment.forEach(dev => {
+            const key = dev.apartment || 'Hauptobjekt / Unbekannt';
+            if (!groups[key]) groups[key] = [];
+            groups[key].push(dev);
         });
 
-        autoTable(doc, {
-            startY: 55,
-            head: [['Raum', 'Gerät #', 'Start', 'Ende', 'Tage', 'Zähler Start', 'Zähler Ende', 'Laufzeit', 'Verbrauch']],
-            body: tableData,
-            theme: 'grid',
-            headStyles: { fillColor: [41, 128, 185], textColor: 255 },
-            styles: { fontSize: 8 },
-        });
+        let currentY = 55;
+        let grandTotal = 0;
 
-        // Summary
-        const totalConsumption = formData.equipment.reduce((acc, dev) => {
-            if (dev.counterEnd && dev.counterStart) {
-                const val = parseFloat(dev.counterEnd) - parseFloat(dev.counterStart);
+        Object.entries(groups).forEach(([apartment, devices], index) => {
+            // Apartment Sub-Header
+            if (currentY > 240) { doc.addPage(); currentY = 20; }
+            doc.setFontSize(12);
+            doc.setFont(undefined, 'bold');
+            doc.setTextColor(41, 128, 185);
+            doc.text(`Objekt / Einheit: ${apartment}`, 20, currentY);
+            currentY += 7;
+
+            const tableData = devices.map(dev => {
+                let consumptionVal = 0;
+                let consumptionStr = '-';
+                let usage = dev.hours ? dev.hours + ' Std.' : '-';
+
+                if (dev.counterEnd && dev.counterStart) {
+                    consumptionVal = parseFloat(dev.counterEnd) - parseFloat(dev.counterStart);
+                    if (!isNaN(consumptionVal)) consumptionStr = consumptionVal.toFixed(2) + ' kWh';
+                } else if (dev.energyConsumption && dev.hours) {
+                    consumptionVal = parseFloat(dev.energyConsumption) * parseFloat(dev.hours);
+                    if (!isNaN(consumptionVal)) consumptionStr = consumptionVal.toFixed(2) + ' kWh*';
+                }
+
+                if (!isNaN(consumptionVal)) grandTotal += consumptionVal;
+
+                return [
+                    dev.room || 'Unbekannt',
+                    dev.deviceNumber || '-',
+                    dev.startDate || '-',
+                    dev.endDate || 'Laufend',
+                    getDaysDiff(dev.startDate, dev.endDate) + ' Tage',
+                    dev.counterStart || '-',
+                    dev.counterEnd || '-',
+                    usage,
+                    consumptionStr
+                ];
+            });
+
+            autoTable(doc, {
+                startY: currentY,
+                head: [['Raum', 'Gerät #', 'Start', 'Ende', 'Dauer', 'Zähler Start', 'Zähler Ende', 'Laufzeit', 'Verbrauch']],
+                body: tableData,
+                theme: 'grid',
+                headStyles: { fillColor: [41, 128, 185], textColor: 255 },
+                styles: { fontSize: 8 },
+                margin: { left: 20, right: 20 }
+            });
+
+            const apartmentTotal = devices.reduce((acc, dev) => {
+                let val = 0;
+                if (dev.counterEnd && dev.counterStart) {
+                    val = parseFloat(dev.counterEnd) - parseFloat(dev.counterStart);
+                } else if (dev.energyConsumption && dev.hours) {
+                    val = parseFloat(dev.energyConsumption) * parseFloat(dev.hours);
+                }
                 return acc + (isNaN(val) ? 0 : val);
-            } else if (dev.energyConsumption && dev.hours) {
-                const calc = parseFloat(dev.energyConsumption) * parseFloat(dev.hours);
-                return acc + (isNaN(calc) ? 0 : calc);
-            }
-            return acc;
-        }, 0);
+            }, 0);
 
-        const finalY = (doc).lastAutoTable.finalY + 10;
-        doc.setFontSize(11);
-        doc.text(`Gesamtverbrauch: ${totalConsumption.toFixed(2)} kWh`, 20, finalY);
+            currentY = (doc).lastAutoTable.finalY + 8;
+            doc.setFontSize(10);
+            doc.setFont(undefined, 'bold');
+            doc.setTextColor(50, 50, 50);
+            doc.text(`Teilsumme ${apartment}: ${apartmentTotal.toFixed(2)} kWh`, 130, currentY);
+            currentY += 15;
+        });
+
+        // Grand Total Summary
+        if (currentY > 260) { doc.addPage(); currentY = 20; }
+        doc.setDrawColor(41, 128, 185);
+        doc.setLineWidth(0.5);
+        doc.line(20, currentY, 190, currentY);
+        currentY += 10;
+
+        doc.setFontSize(14);
+        doc.setTextColor(41, 128, 185);
+        doc.text(`Gesamtverbrauch Projekt: ${grandTotal.toFixed(2)} kWh`, 20, currentY);
 
         doc.setFontSize(8);
-        doc.setTextColor(100);
-        doc.text("* Theoretischer Wert basierend auf Anschlusswert (kW) x Betriebsstunden", 20, finalY + 7);
+        doc.setTextColor(120, 120, 120);
+        doc.setFont(undefined, 'normal');
+        doc.text("* Theoretischer Wert basierend auf Anschlusswert (kW) x Betriebsstunden", 20, currentY + 8);
 
         doc.save(`Energieprotokoll_${formData.projectTitle || 'Export'}.pdf`);
     };
