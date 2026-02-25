@@ -69,7 +69,7 @@ const styles = StyleSheet.create({
         fontSize: 10,
     },
     divider: {
-        height: 0.7,
+        height: 0.5,
         backgroundColor: '#0F6EA3',
         marginVertical: 10,
     },
@@ -110,7 +110,7 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         marginTop: 2,
         marginBottom: 4,
-        color: '#000000',
+        color: '#0F6EA3',
     },
 
     // Images
@@ -137,7 +137,7 @@ const styles = StyleSheet.create({
     // Table
     table: {
         width: '100%',
-        borderWidth: 1,
+        borderWidth: 0.5,
         borderColor: '#E2E8F0',
         borderRadius: 4,
         overflow: 'hidden',
@@ -147,12 +147,12 @@ const styles = StyleSheet.create({
     tableHeaderRow: {
         flexDirection: 'row',
         backgroundColor: '#F8FAFC',
-        borderBottomWidth: 1,
+        borderBottomWidth: 0.5,
         borderBottomColor: '#E2E8F0',
     },
     tableRow: {
         flexDirection: 'row',
-        borderBottomWidth: 1,
+        borderBottomWidth: 0.5,
         borderBottomColor: '#E2E8F0',
     },
     tableHeader: {
@@ -266,12 +266,18 @@ const DamageReportDocument = ({ data }) => {
 
                 {/* Title */}
                 <View style={styles.titleSection}>
-                    <Text style={styles.mainTitle}>Schadensbericht</Text>
-                    <Text style={styles.subTitle}>
-                        {`${data.street || ''} ${data.city || ''} ${data.damageType ? '- ' + data.damageType : ''}`}
+                    <Text style={styles.mainTitle}>
+                        {data.damageCategory === 'Leckortung' ? 'Leckortungsbericht' :
+                            data.damageCategory === 'Trocknung' ? 'Trocknungsbericht' : 'Schadensbericht'}
                     </Text>
-                    {data.projectTitle && (
-                        <Text style={styles.projectTitle}>{data.projectTitle}</Text>
+                    <Text style={styles.subTitle}>
+                        {`${data.street || ''} ${data.zip || ''} ${data.city || ''} ${data.damageType ? '- ' + data.damageType : ''}`.trim()}
+                    </Text>
+                    {data.projectTitle && !data.projectTitle.startsWith('TMP-') && (
+                        <Text style={styles.projectTitle}>Projekt: {data.projectTitle}</Text>
+                    )}
+                    {data.orderNumber && (
+                        <Text style={styles.projectTitle}>Auftrag: {data.orderNumber}</Text>
                     )}
                 </View>
 
@@ -301,9 +307,15 @@ const DamageReportDocument = ({ data }) => {
                         </View>
                         <View style={{ flex: 1 }}>
                             <View style={styles.metaRow}>
-                                <Text style={styles.metaLabel}>Datum:</Text>
+                                <Text style={styles.metaLabel}>Berichtsdatum:</Text>
                                 <Text style={styles.metaValue}>{new Date().toLocaleString('de-CH', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })} Uhr</Text>
                             </View>
+                            {data.damageReportDate && (
+                                <View style={styles.metaRow}>
+                                    <Text style={styles.metaLabel}>Eingangsdatum:</Text>
+                                    <Text style={styles.metaValue}>{new Date(data.damageReportDate).toLocaleDateString('de-CH')}</Text>
+                                </View>
+                            )}
                             {data.damageDate && (
                                 <View style={styles.metaRow}>
                                     <Text style={styles.metaLabel}>Schadendatum:</Text>
@@ -315,47 +327,68 @@ const DamageReportDocument = ({ data }) => {
 
                     <View style={{ height: 10 }} />
 
-                    <View style={styles.metaRow}>
-                        <Text style={styles.metaLabel}>Strasse:</Text>
-                        <Text style={styles.metaValue}>{data.street}</Text>
-                    </View>
-                    <View style={styles.metaRow}>
-                        <Text style={styles.metaLabel}>Ort:</Text>
-                        <Text style={styles.metaValue}>{`${data.zip} ${data.city}`}</Text>
-                    </View>
-                    {/* Lage / Details combined with First Contact Name */}
-                    {(data.locationDetails || (data.contacts && data.contacts.length > 0)) && (
+                    {data.street && (
                         <View style={styles.metaRow}>
-                            <Text style={styles.metaLabel}>Lage / Details:</Text>
-                            <Text style={styles.metaValue}>
-                                {[
-                                    data.locationDetails,
-                                    data.contacts?.[0]?.floor,
-                                    data.contacts?.[0]?.stockwerk,
-                                    data.contacts?.[0]?.apartment,
-                                    data.contacts?.[0]?.name
-                                ].filter(p => p !== null && p !== undefined && String(p).trim() !== '').map(p => String(p).trim()).join(' ')}
-                            </Text>
+                            <Text style={styles.metaLabel}>Strasse:</Text>
+                            <Text style={styles.metaValue}>{data.street}</Text>
                         </View>
                     )}
-                    <View style={styles.metaRow}>
-                        <Text style={styles.metaLabel}>Sachbearbeiter:</Text>
-                        <Text style={styles.metaValue}>{data.clientSource || 'Unbekannt'}</Text>
-                    </View>
-                    <View style={styles.metaRow}>
-                        <Text style={styles.metaLabel}>Auftraggeber:</Text>
-                        <Text style={styles.metaValue}>{data.client || ''}</Text>
-                    </View>
+                    {(data.zip || data.city) && (
+                        <View style={styles.metaRow}>
+                            <Text style={styles.metaLabel}>Ort:</Text>
+                            <Text style={styles.metaValue}>{`${data.zip || ''} ${data.city || ''}`.trim()}</Text>
+                        </View>
+                    )}
+                    {/* Lage / Details - Improved Display */}
+                    {(() => {
+                        const details = [
+                            data.locationDetails,
+                            data.contacts?.[0]?.floor,
+                            data.contacts?.[0]?.stockwerk,
+                            data.contacts?.[0]?.apartment
+                        ].filter(p => p !== null && p !== undefined && String(p).trim() !== '').map(p => String(p).trim());
+
+                        if (details.length > 0) {
+                            return (
+                                <View style={styles.metaRow}>
+                                    <Text style={styles.metaLabel}>Lage / Details:</Text>
+                                    <Text style={styles.metaValue}>{details.join(', ')}</Text>
+                                </View>
+                            );
+                        }
+                        return null;
+                    })()}
+                    {data.clientSource && (
+                        <View style={styles.metaRow}>
+                            <Text style={styles.metaLabel}>Sachbearbeiter:</Text>
+                            <Text style={styles.metaValue}>{data.clientSource}</Text>
+                        </View>
+                    )}
+                    {data.client && (
+                        <View style={styles.metaRow}>
+                            <Text style={styles.metaLabel}>Auftraggeber:</Text>
+                            <View style={{ flex: 1, flexDirection: 'column' }}>
+                                <Text style={{ color: '#000000', fontSize: 10, lineHeight: 1.2 }}>{data.client}</Text>
+                                {(data.clientStreet || data.clientZip || data.clientCity) && (
+                                    <Text style={{ color: '#000000', fontSize: 10, lineHeight: 1.2 }}>
+                                        {`${data.clientStreet || ''}, ${data.clientZip || ''} ${data.clientCity || ''}`.trim().replace(/^,/, '').trim()}
+                                    </Text>
+                                )}
+                            </View>
+                        </View>
+                    )}
                     {data.insurance && (
                         <View style={styles.metaRow}>
                             <Text style={styles.metaLabel}>Versicherung:</Text>
                             <Text style={styles.metaValue}>{data.insurance}</Text>
                         </View>
                     )}
-                    <View style={styles.metaRow}>
-                        <Text style={styles.metaLabel}>Schadenart:</Text>
-                        <Text style={styles.metaValue}>{data.damageType || '-'}</Text>
-                    </View>
+                    {data.damageType && (
+                        <View style={styles.metaRow}>
+                            <Text style={styles.metaLabel}>Schadenart:</Text>
+                            <Text style={styles.metaValue}>{data.damageType}</Text>
+                        </View>
+                    )}
                 </View>
 
                 {/* Hero / Exterior Photo */}
@@ -384,7 +417,7 @@ const DamageReportDocument = ({ data }) => {
                         <View style={styles.divider} />
                         <View style={{ marginBottom: 10 }}>
                             <Text style={styles.sectionTitle}>SCHADENURSACHE</Text>
-                            <Text style={styles.textBlock}>{data.cause || 'Keine Beschreibung der Ursache angegeben.'}</Text>
+                            {data.cause && <Text style={styles.textBlock}>{data.cause}</Text>}
                         </View>
 
                         {/* Schadenfotos Grid (The "Selected Pics") */}
@@ -498,7 +531,7 @@ const DamageReportDocument = ({ data }) => {
                         </View>
                     );
                 })}
-                {validRooms.length > 0 && <View style={styles.divider} />}
+
 
                 {/* Pläne & Grundrisse */}
                 {data.images && data.images.some(img => img.assignedTo === 'Pläne' && img.includeInReport !== false) && (
@@ -513,47 +546,10 @@ const DamageReportDocument = ({ data }) => {
                                 </View>
                             ))}
                         </View>
-                        <View style={styles.divider} />
                     </View>
                 )}
 
-                {/* Unassigned / Other Images - Ensuring NO images are lost */}
-                {(() => {
-                    const assignedToKnownSection = (img) => {
-                        if (img.assignedTo === 'Schadenfotos' || img.assignedTo === 'Pläne') return true;
-                        return data.rooms?.some(r => {
-                            const assignedTo = String(img.assignedTo || '').trim().toLowerCase();
-                            const roomName = String(r.name || '').trim().toLowerCase();
-                            return (img.roomId && String(img.roomId) === String(r.id)) || (assignedTo === roomName);
-                        });
-                    };
-                    const otherImages = data.images?.filter(img =>
-                        img.includeInReport !== false &&
-                        !assignedToKnownSection(img) &&
-                        !['Schadensbericht', 'Arbeitsrapporte', 'Messprotokolle'].includes(img.assignedTo)
-                    );
 
-                    if (otherImages && otherImages.length > 0) {
-                        console.log(`PDF Document: Rendering ${otherImages.length} unassigned images in 'Weitere Dokumentation'`);
-                        return (
-                            <View style={{ marginBottom: 20 }} wrap={false}>
-                                <View style={styles.divider} />
-                                <Text style={styles.sectionTitle}>WEITERE DOKUMENTATION</Text>
-                                <View style={styles.imageGrid}>
-                                    {otherImages.map((img, i) => (
-                                        <View key={i} style={styles.imageContainer}>
-                                            <Image src={img.preview} style={styles.image} />
-                                            {img.description && <Text style={styles.imageDescription}>{img.description}</Text>}
-                                            {!img.description && img.assignedTo && <Text style={styles.imageDescription}>Kategorie: {img.assignedTo}</Text>}
-                                        </View>
-                                    ))}
-                                </View>
-                                <View style={styles.divider} />
-                            </View>
-                        );
-                    }
-                    return null;
-                })()}
 
                 {/* Findings */}
                 {data.findings && (
@@ -561,17 +557,22 @@ const DamageReportDocument = ({ data }) => {
                         <View style={styles.divider} />
                         <Text style={styles.sectionTitle}>FESTSTELLUNGEN</Text>
                         <Text style={styles.textBlock}>{data.findings}</Text>
-                        <View style={styles.divider} />
                     </View>
                 )}
 
                 {/* Measures */}
-                {data.measures && (
+                {(data.measures || (data.selectedMeasures && data.selectedMeasures.length > 0)) && (
                     <View style={{ marginBottom: 15 }} wrap={false}>
                         <View style={styles.divider} />
                         <Text style={styles.sectionTitle}>MASSNAHMEN</Text>
-                        <Text style={styles.textBlock}>{data.measures}</Text>
-                        <View style={styles.divider} />
+                        {data.selectedMeasures && data.selectedMeasures.length > 0 && (
+                            <View style={{ marginBottom: data.measures ? 10 : 0 }}>
+                                {data.selectedMeasures.map((measure, idx) => (
+                                    <Text key={idx} style={[styles.textBlock, { marginBottom: 2 }]}>• {measure}</Text>
+                                ))}
+                            </View>
+                        )}
+                        {data.measures && <Text style={styles.textBlock}>{data.measures}</Text>}
                     </View>
                 )}
 
@@ -592,7 +593,7 @@ const DamageReportDocument = ({ data }) => {
 
 
             </Page>
-        </Document>
+        </Document >
     );
 };
 

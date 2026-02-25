@@ -133,7 +133,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
 
     const [formData, setFormData] = useState(() => (initialData ? {
         id: initialData.id, // Keep ID if editing
-        projectTitle: initialData.projectTitle || initialData.id || '', // Include projectTitle
+        projectTitle: (initialData.projectTitle && !initialData.projectTitle.startsWith('TMP-')) ? initialData.projectTitle : (initialData.id && !initialData.id.startsWith('TMP-') ? initialData.id : ''),
         client: initialData.client || '',
         locationDetails: initialData.locationDetails || '', // New field for Schadenort (e.g. "Wohnung ...")
         extractedData: initialData?.extractedData || null, // Keep track of AI data if re-editing (unlikely but safe)
@@ -146,6 +146,9 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         street: initialData.street || initialAddressParts.street,
         zip: initialData.zip || initialAddressParts.zip,
         city: initialData.city || initialAddressParts.city,
+        clientStreet: initialData.clientStreet || '',
+        clientZip: initialData.clientZip || '',
+        clientCity: initialData.clientCity || '',
 
         contacts: (initialData?.contacts && initialData.contacts.filter(c => c.name || c.phone).length > 0)
             ? initialData.contacts.filter(c => c.name || c.phone)
@@ -167,12 +170,20 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
             : [],
         projectNumber: initialData.projectNumber || '',
         orderNumber: initialData.orderNumber || '',
+        damageNumber: initialData.damageNumber || '',
+        insurance: initialData.insurance || '',
+        damageReportDate: initialData.damageReportDate || '',
+        measures: initialData.measures || '',
+        selectedMeasures: Array.isArray(initialData.selectedMeasures) ? initialData.selectedMeasures : [],
         rooms: Array.isArray(initialData.rooms) ? initialData.rooms : []
     } : {
         id: null,
         projectTitle: '',
         projectNumber: '',
         orderNumber: '',
+        damageNumber: '',
+        insurance: '',
+        damageReportDate: '',
         client: '',
         locationDetails: '',
         clientSource: '',
@@ -182,6 +193,9 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         street: '',
         zip: '',
         city: '',
+        clientStreet: '',
+        clientZip: '',
+        clientCity: '',
         // address: '',
         contacts: [
             { apartment: '', name: '', phone: '', role: 'Mieter' }
@@ -198,6 +212,9 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         dryingEnded: null,
         equipment: [],
         images: [],
+        exteriorPhoto: null,
+        measures: '',
+        selectedMeasures: [],
         rooms: []
     }));
 
@@ -1158,18 +1175,18 @@ END:VCARD`;
             };
 
             // Metadata Rows
-            addMetaRow(2, 'Objekt:', formData.projectTitle || '');
-            // REMOVED 'Zuständig'
-            addMetaRow(3, 'Schadenort:', formData.locationDetails || '');
-            addMetaRow(4, 'Strasse:', formData.street || '');
-            addMetaRow(5, 'Ort:', `${formData.zip || ''} ${formData.city || ''}`);
-            addMetaRow(6, 'Raum:', room.name);
-            addMetaRow(7, 'Messmittel:', settings.device || 'Checkatrade');
+            addMetaRow(2, 'Auftraggeber:', `${formData.client || ''} ${formData.clientStreet ? ', ' + formData.clientStreet : ''} ${formData.clientZip ? ', ' + formData.clientZip : ''} ${formData.clientCity ? ' ' + formData.clientCity : ''}`.trim());
+            addMetaRow(3, 'Objekt:', formData.projectTitle || '');
+            addMetaRow(4, 'Schadenort:', formData.locationDetails || '');
+            addMetaRow(5, 'Strasse:', formData.street || '');
+            addMetaRow(6, 'Ort:', `${formData.zip || ''} ${formData.city || ''}`);
+            addMetaRow(7, 'Raum:', room.name);
+            addMetaRow(8, 'Messmittel:', settings.device || 'Checkatrade');
 
-            // --- Table Header (Row 8 & 9) ---
-            const hRowIdx = 8;
-            const subHRowIdx = 9;
-            const dataRowIdx = 10;
+            // --- Table Header (Row 9 & 10) ---
+            const hRowIdx = 9;
+            const subHRowIdx = 10;
+            const dataRowIdx = 11;
 
             // A8: Datum (Merge A8:A9)
             worksheet.mergeCells(`A${hRowIdx}:A${subHRowIdx}`);
@@ -1764,6 +1781,9 @@ END:VCARD`;
                 street: data.street || prev.street,
                 zip: data.zip || prev.zip,
                 city: data.city || prev.city,
+                clientStreet: data.clientStreet || prev.clientStreet,
+                clientZip: data.clientZip || prev.clientZip,
+                clientCity: data.clientCity || prev.clientCity,
                 contacts: newContacts
             };
         });
@@ -1802,27 +1822,71 @@ END:VCARD`;
                         justifyContent: 'flex-start',
                         alignItems: 'flex-start'
                     }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                            <label style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-muted)', width: '120px' }}>Projektnummer:</label>
-                            <input
-                                type="text"
-                                className="form-input"
-                                style={{ padding: '0.4rem 0.75rem', fontSize: '0.95rem', width: '250px', backgroundColor: 'var(--background)' }}
-                                value={formData.projectNumber || ''}
-                                onChange={(e) => setFormData(prev => ({ ...prev, projectNumber: e.target.value }))}
-                                placeholder="z.B. P-2024-001"
-                            />
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                            <label style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-muted)', width: '120px' }}>Auftragsnummer:</label>
-                            <input
-                                type="text"
-                                className="form-input"
-                                style={{ padding: '0.4rem 0.75rem', fontSize: '0.95rem', width: '250px', backgroundColor: 'var(--background)' }}
-                                value={formData.orderNumber || ''}
-                                onChange={(e) => setFormData(prev => ({ ...prev, orderNumber: e.target.value }))}
-                                placeholder="z.B. A-12345"
-                            />
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1rem', width: '100%' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                <label style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-muted)', width: '120px' }}>Projektnummer:</label>
+                                <input
+                                    type="text"
+                                    className="form-input"
+                                    style={{ padding: '0.4rem 0.75rem', fontSize: '0.95rem', flex: 1, backgroundColor: 'var(--background)' }}
+                                    value={formData.projectNumber || ''}
+                                    onChange={(e) => {
+                                        const newNum = e.target.value;
+                                        setFormData(prev => {
+                                            const updates = { projectNumber: newNum };
+                                            // If title is currently empty or a TMP ID, update it to the new project number
+                                            if (!prev.projectTitle || prev.projectTitle.startsWith('TMP-')) {
+                                                updates.projectTitle = newNum;
+                                            }
+                                            return { ...prev, ...updates };
+                                        });
+                                    }}
+                                    placeholder=""
+                                />
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                <label style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-muted)', width: '120px' }}>Auftragsnummer:</label>
+                                <input
+                                    type="text"
+                                    className="form-input"
+                                    style={{ padding: '0.4rem 0.75rem', fontSize: '0.95rem', flex: 1, backgroundColor: 'var(--background)' }}
+                                    value={formData.orderNumber || ''}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, orderNumber: e.target.value }))}
+                                    placeholder=""
+                                />
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                <label style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-muted)', width: '120px' }}>Schaden-Nr:</label>
+                                <input
+                                    type="text"
+                                    className="form-input"
+                                    style={{ padding: '0.4rem 0.75rem', fontSize: '0.95rem', flex: 1, backgroundColor: 'var(--background)' }}
+                                    value={formData.damageNumber || ''}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, damageNumber: e.target.value }))}
+                                    placeholder="Schaden Nr. Versicherung"
+                                />
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                <label style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-muted)', width: '120px' }}>Versicherung:</label>
+                                <input
+                                    type="text"
+                                    className="form-input"
+                                    style={{ padding: '0.4rem 0.75rem', fontSize: '0.95rem', flex: 1, backgroundColor: 'var(--background)' }}
+                                    value={formData.insurance || ''}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, insurance: e.target.value }))}
+                                    placeholder="z.B. AXA, Mobiliar..."
+                                />
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                <label style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-muted)', width: '120px' }}>Schadensmeldung:</label>
+                                <input
+                                    type="date"
+                                    className="form-input"
+                                    style={{ padding: '0.4rem 0.75rem', fontSize: '0.95rem', flex: 1, backgroundColor: 'var(--background)' }}
+                                    value={formData.damageReportDate || ''}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, damageReportDate: e.target.value }))}
+                                />
+                            </div>
                         </div>
                     </div>
                 )}
@@ -1843,9 +1907,26 @@ END:VCARD`;
                         >
                             <ArrowLeft size={24} />
                         </button>
-                        <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0 }}>
-                            {formData.projectTitle || 'Projekt'}
-                        </h2>
+                        <input
+                            type="text"
+                            value={(formData.projectTitle && !formData.projectTitle.startsWith('TMP-')) ? formData.projectTitle : (formData.projectNumber || '')}
+                            onChange={(e) => setFormData(prev => ({ ...prev, projectTitle: e.target.value }))}
+                            placeholder={formData.projectNumber || "Projekttitel eingeben..."}
+                            style={{
+                                fontSize: '1.25rem',
+                                fontWeight: 700,
+                                background: 'transparent',
+                                border: 'none',
+                                borderBottom: '1px solid transparent',
+                                color: 'var(--text-main)',
+                                width: '100%',
+                                padding: '0.2rem 0',
+                                outline: 'none',
+                                transition: 'border-color 0.2s'
+                            }}
+                            onFocus={(e) => e.target.style.borderBottomColor = 'var(--primary)'}
+                            onBlur={(e) => e.target.style.borderBottomColor = 'transparent'}
+                        />
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         {mode === 'desktop' && (
@@ -1934,18 +2015,54 @@ END:VCARD`;
                             <Briefcase size={18} /> Auftrag & Verwaltung
                         </h3>
 
-                        <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'flex-start', flexWrap: 'nowrap' }}>
-                            <div style={{ flex: 1 }}>
-                                <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.4rem', display: 'block', fontWeight: 600 }}>Auftraggeber</label>
+                        <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'flex-start', flexWrap: 'wrap', marginBottom: '1rem' }}>
+                            <div style={{ flex: '1 1 300px' }}>
+                                <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.4rem', display: 'block', fontWeight: 600 }}>Auftraggeber (Name/Firma)</label>
                                 <input
                                     type="text"
                                     className="form-input"
                                     value={formData.client || ''}
                                     onChange={(e) => setFormData(prev => ({ ...prev, client: e.target.value }))}
-                                    placeholder="Auftraggeber eingeben"
+                                    placeholder="Name oder Firma des Auftraggebers"
                                     style={{ width: '100%' }}
                                 />
                             </div>
+                            <div style={{ flex: '1 1 200px' }}>
+                                <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.4rem', display: 'block', fontWeight: 600 }}>Strasse & Nr. (AG)</label>
+                                <input
+                                    type="text"
+                                    className="form-input"
+                                    value={formData.clientStreet || ''}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, clientStreet: e.target.value }))}
+                                    placeholder="Strasse / Nr."
+                                    style={{ width: '100%' }}
+                                />
+                            </div>
+                            <div style={{ width: '80px' }}>
+                                <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.4rem', display: 'block', fontWeight: 600 }}>PLZ (AG)</label>
+                                <input
+                                    type="text"
+                                    className="form-input"
+                                    value={formData.clientZip || ''}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, clientZip: e.target.value }))}
+                                    placeholder="PLZ"
+                                    style={{ width: '100%' }}
+                                />
+                            </div>
+                            <div style={{ flex: '1 1 150px' }}>
+                                <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.4rem', display: 'block', fontWeight: 600 }}>Ort (AG)</label>
+                                <input
+                                    type="text"
+                                    className="form-input"
+                                    value={formData.clientCity || ''}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, clientCity: e.target.value }))}
+                                    placeholder="Ort"
+                                    style={{ width: '100%' }}
+                                />
+                            </div>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'flex-start', flexWrap: 'nowrap' }}>
                             <div style={{ flex: 1 }}>
                                 <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.4rem', display: 'block', fontWeight: 600 }}>Bewirtschaftung</label>
                                 <select

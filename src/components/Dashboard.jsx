@@ -346,7 +346,7 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
                                     </div>
 
                                     <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginLeft: '1.25rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                        {report.projectTitle || report.id}
+                                        {report.projectNumber || report.projectTitle || report.id}
                                     </div>
                                 </div>
                                 <ArrowRight size={18} style={{ color: 'var(--primary)', marginLeft: '0.5rem', flexShrink: 0 }} />
@@ -409,7 +409,7 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
                                     const activeDevices = report.equipment ? report.equipment.length : 0;
                                     return (
                                         <tr key={report.id} onClick={() => onSelectReport(report)} style={{ cursor: 'pointer' }}>
-                                            <td style={{ fontWeight: 600, fontSize: '0.9rem' }}>{report.projectTitle || report.id}</td>
+                                            <td style={{ fontWeight: 600, fontSize: '0.9rem' }}>{report.projectNumber || report.projectTitle || report.id}</td>
                                             <td style={{ fontSize: '0.875rem', whiteSpace: 'nowrap' }}>{formatDate(report.date)}</td>
                                             <td style={{ fontWeight: 500 }}>{report.locationDetails || '-'}</td>
                                             <td>

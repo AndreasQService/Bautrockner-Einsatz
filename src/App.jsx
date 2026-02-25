@@ -11,8 +11,20 @@ import EmailImportModalV2 from './components/EmailImportModalV2'
 import i18n from './i18n'
 
 function App() {
-  const [view, setView] = useState('dashboard') // 'dashboard', 'new-report', 'details'
-  const [selectedReport, setSelectedReport] = useState(null)
+  const [view, setView] = useState(() => localStorage.getItem('qservice_current_view') || 'dashboard') // 'dashboard', 'new-report', 'details'
+  const [selectedReport, setSelectedReport] = useState(() => {
+    const savedId = localStorage.getItem('qservice_selected_report_id');
+    const savedReports = localStorage.getItem('qservice_reports_prod');
+    if (savedId && savedReports) {
+      try {
+        const reports = JSON.parse(savedReports);
+        return reports.find(r => r.id === savedId) || null;
+      } catch (e) {
+        return null;
+      }
+    }
+    return null;
+  })
 
   // Authentication / User Management State
   const [showUserModal, setShowUserModal] = useState(false);
@@ -67,6 +79,16 @@ function App() {
     return [];
   });
 
+  // Persist view and selected report state
+  useEffect(() => {
+    localStorage.setItem('qservice_current_view', view);
+    if (selectedReport && selectedReport.id) {
+      localStorage.setItem('qservice_selected_report_id', selectedReport.id);
+    } else {
+      localStorage.removeItem('qservice_selected_report_id');
+    }
+  }, [view, selectedReport]);
+
   // Fetch reports from Supabase on mount
   useEffect(() => {
     if (!supabase) return;
@@ -104,7 +126,7 @@ function App() {
   const handleSaveReport = useCallback(async (updatedReport, silent = false) => {
     let finalReport = { ...updatedReport };
     if (!finalReport.id) {
-      finalReport.id = finalReport.projectTitle || `TMP-${Date.now()}`;
+      finalReport.id = finalReport.projectNumber || finalReport.projectTitle || `TMP-${Date.now()}`;
     }
     if (!finalReport.date) finalReport.date = new Date().toISOString();
 
@@ -168,7 +190,7 @@ function App() {
 
   const handleNavigateToReport = (identifier) => {
     if (!identifier) return;
-    const report = reports.find(r => r.id === identifier || r.projectTitle === identifier);
+    const report = reports.find(r => r.id === identifier || r.projectTitle === identifier || r.projectNumber === identifier);
     if (report) {
       handleSelectReport(report);
       showToast(`Auftrag "${report.projectTitle || report.id}" geöffnet`, 'success');
