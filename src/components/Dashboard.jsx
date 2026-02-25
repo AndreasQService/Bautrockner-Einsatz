@@ -92,9 +92,14 @@ const DryingMonitor = ({ reports, onSelectReport }) => {
                                 onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
                                 onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
                             >
-                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
-                                    <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>{report.locationDetails || report.client}</span>
-                                    <span style={{ fontWeight: 700, color: colorClass }}>{days} Tage</span>
+                                <div style={{ marginBottom: '0.6rem' }}>
+                                    <div style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-main)', marginBottom: '0.15rem', letterSpacing: '0.01em' }}>
+                                        {report.projectNumber || report.projectTitle || '---'}
+                                    </div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                                        <span style={{ fontWeight: 600, fontSize: '0.875rem', color: 'var(--text-main)', opacity: 0.9 }}>{report.locationDetails || report.client}</span>
+                                        <span style={{ fontWeight: 700, color: colorClass }}>{days} Tage</span>
+                                    </div>
                                 </div>
 
                                 <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
