@@ -1133,17 +1133,17 @@ END:VCARD`;
             if (supabase) {
                 try {
                     const fileExt = file.name.split('.').pop();
-                    const fileName = `${formData.id || 'temp'}/${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
+                    const fileName = `cases/${formData.id || 'temp'}/images/${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
 
                     const { data, error } = await supabase.storage
-                        .from('damage-images')
+                        .from('case-files')
                         .upload(fileName, file);
 
                     if (error) throw error;
 
                     // Get Public URL
                     const { data: { publicUrl } } = supabase.storage
-                        .from('damage-images')
+                        .from('case-files')
                         .getPublicUrl(fileName);
 
                     // Update state with real URL and remove uploading flag
@@ -1522,9 +1522,9 @@ END:VCARD`;
             // Method A: Supabase
             if (supabase && (url.includes('supabase.co') || imgObj?.storagePath)) {
                 try {
-                    let path = imgObj?.storagePath || (url.includes('damage-images/') ? url.split('damage-images/')[1]?.split('?')[0] : null);
+                    let path = imgObj?.storagePath || (url.includes('case-files/') ? url.split('case-files/').pop()?.split('?')[0] : null);
                     if (path) {
-                        const { data, error } = await supabase.storage.from('damage-images').download(path);
+                        const { data, error } = await supabase.storage.from('case-files').download(path);
                         if (data && !error) {
                             const raw = await new Promise((resolve) => {
                                 const reader = new FileReader();
@@ -5377,15 +5377,15 @@ END:VCARD`;
                         if (supabase && file) {
                             try {
                                 const fileExt = file.name.split('.').pop() || (file.type === 'application/pdf' ? 'pdf' : 'png');
-                                const fileName = `protocols/${formData.id || 'temp'}/${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
+                                const fileName = `cases/${formData.id || 'temp'}/protocols/${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
 
                                 const { error: uploadError } = await supabase.storage
-                                    .from('damage-images')
+                                    .from('case-files')
                                     .upload(fileName, file);
 
                                 if (!uploadError) {
                                     const { data: { publicUrl } } = supabase.storage
-                                        .from('damage-images')
+                                        .from('case-files')
                                         .getPublicUrl(fileName);
                                     protocolUrl = publicUrl;
                                 }
