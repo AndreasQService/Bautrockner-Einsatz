@@ -71,68 +71,61 @@ const EmailImportModalV2 = ({ onClose, onImport, audioDevices, selectedDeviceId,
         try {
             const genAI = new GoogleGenerativeAI(apiKey);
 
-            const prompt = `Du bist der spezialisierte KI-Assistent für die Antigravity (AG) Wasserschaden-App. 
-Deine Aufgabe ist das präzise Parsing von Daten in die vorgegebene UI-Maske.
+            const prompt = `Du bist ein technischer Daten-Parser. Deine einzige Aufgabe ist es, unstrukturierte Texte in ein JSON-Format zu überführen, das exakt auf die Felder der AG-App passt.
 
-1. STRIKTE ADRESS-TRENNUNG (EIGENTÜMER):
-   - FELD 'EIGENTÜMER': Darf NUR den Firmennamen/Namen enthalten.
-   - CUT-OFF BEFEHL: Sobald im Text 'Strasse', 'Str.', eine Hausnummer, eine PLZ oder ein Ort erscheint, STOPPE das Feld 'EIGENTÜMER'.
-   - PFLICHT-VERSCHIEBUNG: Alle Adressdaten (z.B. 'Zollstrasse 42', '8005', 'Zürich') MÜSSEN in die dafür vorgesehenen Felder 'STRASSE & NR.', 'PLZ' und 'ORT' verschoben werden. Das Adressfeld darf NIEMALS leer bleiben, wenn im Quelltext Adressdaten stehen.
+1. REGEL FÜR ADRESS-SPLIT (PFLICHT):
+   - FELD 'EIGENTÜMER': Suche nach dem Namen der Organisation. 
+   - CUT-OFF: Sobald ein Wort erscheint, das eine Adresse einleitet (Strasse, Str., Weg, PLZ, Hausnummer), MUSS dieses Wort und alles danach aus dem Feld 'EIGENTÜMER' entfernt werden.
+   - MAPPING: Diese entfernten Teile müssen zwingend in die Felder 'STRASSE & NR.', 'PLZ' und 'ORT' geschrieben werden. 
+   - KONTROLLE: Ein leeres Feld 'STRASSE & NR.' bei gleichzeitigem Text im Feld 'EIGENTÜMER' ist ein Systemfehler und muss korrigiert werden.
 
-2. ROLLEN-ZUWEISUNG (NUR DIESE KATEGORIEN):
-   Weise Kontakten EXKLUSIV eines der folgenden Kürzel zu:
-   - 'Mieter': Bewohner der betroffenen Wohnung.
-   - 'Eig.': Eigentümer der Liegenschaft.
-   - 'HW': Hauswart / Hausmeister.
-   - 'Verw.': Verwaltungen (z.B. CSL Immobilien, Weber + Schweizer).
-   - 'Handw.': Externe Firmen/Techniker (z.B. Halter AG, Burkhalter). -> WICHTIG: Absender aus Firmen-Signaturen sind immer 'Handw.'.
-   - 'Sonst.': Falls keine Zuordnung möglich ist.
+2. ROLLEN-LOGIK (NUR DIESE WERTE):
+   Ordne jedem Kontakt ausschliesslich eines dieser Kürzel zu:
+   - 'Handw.': Jede Person mit einer Firmen-Signatur (Technik/Sanitär), die den Schaden meldet oder behebt.
+   - 'Verw.': Jede Firma, die als Verwaltung oder Bewirtschaftung auftritt.
+   - 'Mieter': Personen, die in der betroffenen Wohnung oder im Objekt leben.
+   - 'Eig.': Die im Abschnitt 'Eigentümer' genannte Entität.
+   - 'HW': Hauswart.
 
-3. KONTAKT-DETAILS:
-   - Erstelle für jede Person eine Karte.
-   - Formatiere Telefonnummern auf: +41 XX XXX XX XX.
-   - Trenne Name und Firma sauber voneinander.
+3. VERBOT VON PLATZHALTERN:
+   - Die Ausgabe des Wortes "string" ist strengstens untersagt. 
+   - Falls eine Information im Text nicht existiert, gib einen leeren String ("") aus. 
+   - Fülle JEDES Feld mit den Realdaten aus dem Text, niemals mit Platzhaltern.
 
-4. BEISPIEL-LOGIK:
-   Input: "Eigentümer: Avadis Anlagestiftung Zollstrasse 42 8005 Zürich"
-   -> RECHNUNGS_DETAILS.EIGENTÜMER: Avadis Anlagestiftung
-   -> RECHNUNGS_DETAILS.STRASSE: Zollstrasse 42
-   -> RECHNUNGS_DETAILS.PLZ_ORT: 8005 Zürich
-
-5. QUALITÄTS-CHECK:
-   - Verbot: Die Adresse darf nicht abgeschnitten im Namensfeld stehen (wie 'Zollstra...'). Sie muss nach rechts wandern.
-   - Verbot: Ein Techniker von 'Halter' darf nicht als 'Mieter' markiert werden; er ist zwingend 'Handw.'.
+4. FORMATIERUNG:
+   - Telefon: +41 XX XXX XX XX.
+   - Namen: Trenne Vorname und Nachname (falls möglich).
 
 AUSGABE-FORMAT (JSON):
 {
   "projekt_daten": {
     "interne_id": "2026xxxx",
-    "externe_ref": "string",
-    "auftrags_nr": "string"
+    "externe_ref": "",
+    "auftrags_nr": ""
   },
   "auftrag_verwaltung": {
-    "firma": "string",
-    "sachbearbeiter": "string",
+    "firma": "",
+    "sachbearbeiter": "",
     "leistungsart": "Wasserschaden"
   },
   "rechnungs_details": {
-    "eigentuemer": "string",
-    "email_rechnung": "string",
-    "vermerk": "string"
+    "eigentuemer": "",
+    "email_rechnung": "",
+    "vermerk": ""
   },
   "schadenort": {
-    "strasse_nr": "string",
-    "plz_ort": "string",
-    "etage_wohnung": "string"
+    "strasse_nr": "",
+    "plz_ort": "",
+    "etage_wohnung": ""
   },
   "kontakte": [
     {
-      "name": "string",
-      "rolle": "Mieter | Eig. | HW | Verw. | Handw. | Sonst.",
+      "name": "",
+      "rolle": "Handw. | Verw. | Mieter | Eig. | HW",
       "telefon": "+41 XX XXX XX XX"
     }
   ],
-  "gap_analysis": ["string"]
+  "gap_analysis": []
 }
 
 WICHTIG: Antworte NUR mit dem validen JSON-Code, ohne Markdown-Backticks.

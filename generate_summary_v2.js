@@ -38,30 +38,30 @@ let nextY = addList([
     "Discovery: Dynamisches Abrufen verfügbarer Gemini-Modelle pro API-Key."
 ], 52);
 
-// Section 2: Daten-Extraktor (Master-Prompt)
+// Section 2: Technischer Daten-Parser (Master-Prompt)
 doc.setFontSize(16);
 doc.setTextColor(30, 41, 59);
-doc.text("2. Master-Prompt (Data Extractor Rules)", 20, nextY + 10);
+doc.text("2. Master-Prompt (Technical Parser Rules)", 20, nextY + 10);
 doc.setFontSize(10);
 nextY = addList([
-    "ADRESS-TRENNUNG: Harter Cut-Off bei Erkennung von Strasse, Nr, PLZ oder Ort.",
-    "EIGENTÜMER-REINFALTS-SCHUTZ: Keine Adressdaten im Namensfeld erlaubt.",
-    "PLATZHALTER-VERBOT: Niemals 'string' oder 'n/a' ausgeben - nur leere Strings (\"\").",
-    "RECHNUNGS-REF: 2026er Nummern gehören nur in Projekt-ID, nicht in Vermerke.",
-    "SIGNATUR-LOGIK: Personen aus Firmen-Signaturen sind immer 'Handw.'."
+    "ADRESS-SPLIT (PFLICHT): Harter Cut-Off bei Eigentümer sobald Adresse folgt.",
+    "MAPPING: Cut-Off Bestandteile MÜSSEN in Strasse/PLZ/Ort verschoben werden.",
+    "PLATZHALTER-VERBOT: Ausgabe von 'string' ist strengstens untersagt.",
+    "REALDATEN-PFLICHT: Felder ohne Daten bleiben leer (\"\") statt Platzhalter.",
+    "FORMATIERUNG: Telefon auf +41 XX XXX XX XX formatieren, Namen trennen."
 ], nextY + 17);
 
 // Section 3: Rollen-Mapping (Exklusiv)
 doc.setFontSize(16);
 doc.setTextColor(30, 41, 59);
-doc.text("3. Rollen-Mapping (Kürzel)", 20, nextY + 10);
+doc.text("3. Rollen-Mapping (Exklusive Werte)", 20, nextY + 10);
 doc.setFontSize(10);
 nextY = addList([
-    "Mieter: Bewohner vor Ort.",
-    "Eig.: Eigentümer der Liegenschaft.",
-    "HW: Hauswart / Abwart.",
-    "Verw.: Hausverwaltung / Immobilienmanagement.",
-    "Handw.: Externe Firmen & Techniker (Sanitär, Trocknung etc.)."
+    "Mieter: Bewohner vor Ort / im Objekt.",
+    "Eig.: Eigentümer der Liegenschaft (Entität aus Eigentümer-Feld).",
+    "HW: Hauswart.",
+    "Verw.: Verwaltung / Bewirtschaftung.",
+    "Handw.: Externe Firmen & Techniker (Meldung/Behebung des Schadens)."
 ], nextY + 17);
 
 // Section 4: Validierung

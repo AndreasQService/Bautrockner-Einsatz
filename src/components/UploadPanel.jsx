@@ -56,26 +56,30 @@ export default function UploadPanel({ caseId, onCaseCreated, onExtractionComplet
       const genAI = new GoogleGenerativeAI(apiKey);
       console.log("Analyzing with AI. Text length:", textContext.length);
 
-      const prompt = `Du bist ein Daten-Extraktor für die AG Wasserschaden-App. Deine Aufgabe ist das Mapping von Texten in JSON-Felder.
+      const prompt = `Du bist ein technischer Daten-Parser. Deine einzige Aufgabe ist es, unstrukturierte Texte in ein JSON-Format zu überführen, das exakt auf die Felder der AG-App passt.
 
-1. MUSTERBASIERTE ADRESS-TRENNUNG:
-   - FELD 'EIGENTÜMER': Extrahiere NUR den Namen der juristischen oder natürlichen Person.
-   - TRIGGER FÜR TRENNUNG: Sobald im Textfluss ein Wort auftaucht, das auf eine Adresse hindeutet (Strasse, Str., Weg, Platz, Gasse, Allee) ODER eine Postleitzahl (4-stellig) ODER eine Hausnummer folgt, beende das Feld 'EIGENTÜMER' sofort.
-   - PFLICHT: Verschiebe alle nachfolgenden Adressdaten (Strasse/Nr, PLZ, Ort) zwingend in die dafür vorgesehenen separaten Felder. Ein Überlauf der Adresse in das Namensfeld ist strikt untersagt.
+1. REGEL FÜR ADRESS-SPLIT (PFLICHT):
+   - FELD 'EIGENTÜMER': Suche nach dem Namen der Organisation. 
+   - CUT-OFF: Sobald ein Wort erscheint, das eine Adresse einleitet (Strasse, Str., Weg, PLZ, Hausnummer), MUSS dieses Wort und alles danach aus dem Feld 'EIGENTÜMER' entfernt werden.
+   - MAPPING: Diese entfernten Teile müssen zwingend in die Felder 'STRASSE & NR.', 'PLZ' und 'ORT' geschrieben werden. 
+   - KONTROLLE: Ein leeres Feld 'STRASSE & NR.' bei gleichzeitigem Text im Feld 'EIGENTÜMER' ist ein Systemfehler und muss korrigiert werden.
 
-2. GENERISCHE ROLLEN-LOGIK (NUR DIESE KÜRZEL):
-   - 'Handw.': Jede Person, die eine Firmen-Signatur (Handwerk, Sanitär, Technik) besitzt, die NICHT die Hausverwaltung ist.
-   - 'Verw.': Firmen, die als Verwaltung, Immobilienmanagement oder Bewirtschaftung bezeichnet werden.
-   - 'Mieter': Personen, die als Bewohner, Mieter oder 'vor Ort' lebend beschrieben werden.
-   - 'Eig.': Die Person/Firma, die unter dem Label 'Eigentümer' steht.
-   - 'HW': Personen, die als Hauswart oder Abwart bezeichnet werden.
+2. ROLLEN-LOGIK (NUR DIESE WERTE):
+   Ordne jedem Kontakt ausschliesslich eines dieser Kürzel zu:
+   - 'Handw.': Jede Person mit einer Firmen-Signatur (Technik/Sanitär), die den Schaden meldet oder behebt.
+   - 'Verw.': Jede Firma, die als Verwaltung oder Bewirtschaftung auftritt.
+   - 'Mieter': Personen, die in der betroffenen Wohnung oder im Objekt leben.
+   - 'Eig.': Die im Abschnitt 'Eigentümer' genannte Entität.
+   - 'HW': Hauswart.
 
 3. VERBOT VON PLATZHALTERN:
-   - Es dürfen NIEMALS Wörter wie "string", "n/a" oder "unbekannt" ausgegeben werden.
-   - Ist ein Feld im Quelltext nicht vorhanden, ist ein leerer String ("") auszugeben. 
+   - Die Ausgabe des Wortes "string" ist strengstens untersagt. 
+   - Falls eine Information im Text nicht existiert, gib einen leeren String ("") aus. 
+   - Fülle JEDES Feld mit den Realdaten aus dem Text, niemals mit Platzhaltern.
 
-4. VALIDIERUNG:
-   - Prüfe vor der Ausgabe: Ist das Feld 'STRASSE' leer, obwohl im Quelltext eine Adresse steht? Wenn ja, korrigiere das Mapping.
+4. FORMATIERUNG:
+   - Telefon: +41 XX XXX XX XX.
+   - Namen: Trenne Vorname und Nachname (falls möglich).
 
 AUSGABE-FORMAT (JSON):
 {
