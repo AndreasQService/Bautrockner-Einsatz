@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Plus, LayoutDashboard, Settings, User, Users, LogOut, Thermometer, Database } from 'lucide-react'
+import { Plus, LayoutDashboard, Settings, User, Users, LogOut, Thermometer, Database, RotateCcw } from 'lucide-react'
 import { supabase } from './supabaseClient'
 import Dashboard from './components/Dashboard'
 import DamageForm from './components/DamageForm'
@@ -105,7 +105,22 @@ function App() {
         const loadedReports = data.map(row => row.report_data);
         if (loadedReports.length > 0) {
           setReports(loadedReports);
-          localStorage.setItem('qservice_reports_prod', JSON.stringify(loadedReports));
+
+          // Save a cached version to LocalStorage (only latest 10, and no base64)
+          try {
+            const cachedReports = loadedReports.slice(0, 10).map(r => ({
+              ...r,
+              damageTypeImage: (r.damageTypeImage && r.damageTypeImage.startsWith('data:')) ? null : r.damageTypeImage,
+              exteriorPhoto: (r.exteriorPhoto && r.exteriorPhoto.startsWith('data:')) ? null : r.exteriorPhoto,
+              images: r.images ? r.images.map(img => ({
+                ...img,
+                preview: (img.preview && (img.preview.startsWith('blob:') || img.preview.startsWith('data:'))) ? null : img.preview
+              })) : []
+            }));
+            localStorage.setItem('qservice_reports_prod', JSON.stringify(cachedReports));
+          } catch (e) {
+            console.warn("Initial LocalStorage cache failed:", e.message);
+          }
         }
       }
     };
@@ -140,17 +155,31 @@ function App() {
         newReports = [finalReport, ...currentReports];
       }
 
+      // 1. Persist to LocalStorage (Shrink if too large)
       try {
-        const sanitizedReports = newReports.map(r => ({
+        // Only save metadata and limited content to LocalStorage to prevent QuotaExceededError
+        // We keep full data in memory and in Supabase
+        const minimalReports = newReports.slice(0, 15).map(r => ({
           ...r,
+          // Strip heavy image content from LocalStorage
+          damageTypeImage: (r.damageTypeImage && r.damageTypeImage.startsWith('data:')) ? null : r.damageTypeImage,
+          exteriorPhoto: (r.exteriorPhoto && r.exteriorPhoto.startsWith('data:')) ? null : r.exteriorPhoto,
           images: r.images ? r.images.map(img => ({
             ...img,
-            preview: (img.preview && img.preview.startsWith('blob:')) ? null : img.preview
+            preview: (img.preview && (img.preview.startsWith('blob:') || img.preview.startsWith('data:'))) ? null : img.preview
           })) : []
         }));
-        localStorage.setItem('qservice_reports_prod', JSON.stringify(sanitizedReports));
+
+        try {
+          localStorage.setItem('qservice_reports_prod', JSON.stringify(minimalReports));
+        } catch (innerE) {
+          if (innerE.name === 'QuotaExceededError') {
+            // If still failing, keep only the most recent 5
+            localStorage.setItem('qservice_reports_prod', JSON.stringify(minimalReports.slice(0, 5)));
+          }
+        }
       } catch (e) {
-        console.error("LocalStorage Save Failed (Quota/Size?):", e);
+        console.warn("LocalStorage caching failed, but in-memory state remains:", e.message);
       }
       return newReports;
     });
@@ -226,20 +255,52 @@ function App() {
   };
 
   const handleEmailImport = (importedData) => {
+    if (!importedData) return;
+
     const newId = `P-${Date.now()}`;
+
+    // Mapping Gemini structure to Flat Report Structure
+    const projectNum = importedData.projekt_daten?.interne_id || '';
+    const client = importedData.auftrag_verwaltung?.firma || importedData.client || '';
+    const street = importedData.schadenort?.strasse_nr || importedData.street || '';
+
+    let zip = importedData.zip || '';
+    let city = importedData.city || '';
+    if (importedData.schadenort?.plz_ort) {
+      const parts = String(importedData.schadenort.plz_ort).trim().split(/\s+/);
+      if (parts.length >= 2 && /^\d{4,5}$/.test(parts[0])) {
+        zip = parts[0];
+        city = parts.slice(1).join(' ');
+      } else {
+        city = importedData.schadenort.plz_ort;
+      }
+    }
+
     const newReport = {
       id: newId,
-      projectTitle: importedData.projectTitle || 'Importiertes Projekt',
-      client: importedData.client || '',
-      street: importedData.street || '',
-      zip: importedData.zip || '',
-      city: importedData.city || '',
-      address: `${importedData.street || ''}, ${importedData.zip || ''} ${importedData.city || ''}`.trim(),
+      projectTitle: projectNum || client || 'Importiertes Projekt',
+      projectNumber: projectNum,
+      orderNumber: importedData.projekt_daten?.auftrags_nr || '',
+      invoiceReference: importedData.projekt_daten?.externe_ref || importedData.rechnungs_details?.vermerk || '',
+      client: client,
+      street: street,
+      zip: zip,
+      city: city,
+      address: `${street}, ${zip} ${city}`.trim(),
+      locationDetails: importedData.schadenort?.etage_wohnung || '',
+      ownerName: importedData.rechnungs_details?.eigentuemer || '',
+      ownerEmail: importedData.rechnungs_details?.email_rechnung || '',
       description: importedData.description || '',
-      manager: importedData.manager || '',
+      assignedTo: importedData.auftrag_verwaltung?.sachbearbeiter || '',
       status: 'Schadenaufnahme',
       date: new Date().toISOString(),
-      contacts: importedData.contacts || [],
+      contacts: (importedData.kontakte || []).map(c => ({
+        name: c.name || '',
+        phone: c.telefon || '',
+        role: c.rolle || 'Mieter',
+        apartment: '',
+        floor: ''
+      })),
       rooms: [],
       images: [],
       equipment: [],
@@ -420,6 +481,19 @@ function App() {
                     border: '1px solid var(--border)',
                     marginLeft: '0.5rem'
                   }}>
+                    <button
+                      className="btn btn-ghost"
+                      onClick={() => {
+                        if (confirm('Lokal gespeicherte Berichte (Cache) löschen? Echte Daten in der Cloud bleiben erhalten.')) {
+                          localStorage.removeItem('qservice_reports_prod');
+                          window.location.reload();
+                        }
+                      }}
+                      title="Cache leeren"
+                      style={{ padding: '0.5rem', color: '#FBBF24' }}
+                    >
+                      <RotateCcw size={18} />
+                    </button>
                     <button
                       className="btn btn-ghost"
                       onClick={() => setView('devices')}

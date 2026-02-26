@@ -24,6 +24,28 @@ const MeasurementModal = ({ isOpen, onClose, onSave, rooms, projectTitle, initia
         humidity: '',
         device: ''
     });
+    const [availableDevices, setAvailableDevices] = useState([]);
+
+    useEffect(() => {
+        const savedDevices = localStorage.getItem('qtool_measurement_devices');
+        if (savedDevices) {
+            try {
+                const parsed = JSON.parse(savedDevices);
+                // Safer way to flatten for older browsers
+                let flattened = [];
+                Object.keys(parsed).forEach(key => {
+                    if (Array.isArray(parsed[key])) {
+                        parsed[key].forEach(d => {
+                            if (d && d.name) flattened.push(d.name);
+                        });
+                    }
+                });
+                setAvailableDevices(Array.from(new Set(flattened))); // unique names
+            } catch (e) {
+                console.error("Error loading devices for modal", e);
+            }
+        }
+    }, [isOpen]);
     const [saveAsPdf, setSaveAsPdf] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [isSuccess, setIsSuccess] = useState(false);
@@ -793,12 +815,18 @@ const MeasurementModal = ({ isOpen, onClose, onSave, rooms, projectTitle, initia
                                 <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Messgerät</label>
                                 <input
                                     type="text"
+                                    list="available-devices"
                                     value={globalSettings.device}
                                     onChange={e => setGlobalSettings({ ...globalSettings, device: e.target.value })}
                                     className="form-input"
                                     style={{ width: '100%', padding: '0.6rem', minHeight: '40px' }}
                                     placeholder="z.B. Trotec"
                                 />
+                                <datalist id="available-devices">
+                                    {availableDevices.map((d, i) => (
+                                        <option key={i} value={d} />
+                                    ))}
+                                </datalist>
                             </div>
                         </div>
                     )}

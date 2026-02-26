@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Plus, Trash, Settings, Thermometer, Camera, Activity, PenTool, Tv, Box } from 'lucide-react';
+import { X, Plus, Trash, Settings, Thermometer, Camera, Activity, PenTool, Tv, Box, Check } from 'lucide-react';
 
 const CATEGORIES = [
     { id: 'moisture', label: 'Feuchtigkeitsmessgerät', icon: <Activity /> },
@@ -14,11 +14,7 @@ const CATEGORIES = [
 const MeasurementDeviceManager = ({ onClose }) => {
     // Data Structure: { 'moisture': [{ id: 1, name: 'Trotec T 3000' }], ... }
     const [devices, setDevices] = useState(() => {
-        const saved = localStorage.getItem('qtool_measurement_devices');
-        if (saved) return JSON.parse(saved);
-
-        // Defaults
-        return {
+        const defaultDevices = {
             moisture: [{ id: 1, name: 'Trotec T 3000' }],
             thermal: [],
             pipe: [],
@@ -27,11 +23,25 @@ const MeasurementDeviceManager = ({ onClose }) => {
             roof: [],
             other: []
         };
+
+        try {
+            const saved = localStorage.getItem('qtool_measurement_devices');
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                // Merge with defaults to ensure all keys exist
+                return { ...defaultDevices, ...parsed };
+            }
+        } catch (e) {
+            console.error("Failed to load devices", e);
+        }
+        return defaultDevices;
     });
 
     useEffect(() => {
         localStorage.setItem('qtool_measurement_devices', JSON.stringify(devices));
     }, [devices]);
+
+    const [showSuccess, setShowSuccess] = useState(false);
 
     const [activeTab, setActiveTab] = useState('moisture');
     const [newItemName, setNewItemName] = useState('');
@@ -45,6 +55,8 @@ const MeasurementDeviceManager = ({ onClose }) => {
             [activeTab]: [...(prev[activeTab] || []), { id: Date.now(), name: newItemName.trim() }]
         }));
         setNewItemName('');
+        setShowSuccess(true);
+        setTimeout(() => setShowSuccess(false), 2000);
     };
 
     const handleDelete = (categoryId, itemId) => {
@@ -123,8 +135,9 @@ const MeasurementDeviceManager = ({ onClose }) => {
                                 style={{ flex: 1 }}
                                 autoFocus
                             />
-                            <button type="submit" className="btn btn-primary">
-                                <Plus size={18} /> Hinzufügen
+                            <button type="submit" className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                {showSuccess ? <Check size={18} /> : <Plus size={18} />}
+                                {showSuccess ? 'Gespeichert' : 'Hinzufügen'}
                             </button>
                         </form>
 

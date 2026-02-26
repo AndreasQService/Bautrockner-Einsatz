@@ -23,7 +23,6 @@ import DamageReportDocument from './pdf/DamageReportDocument';
 import html2canvas from 'html2canvas';
 import ImageEditor from './ImageEditor';
 import EmailImportModal from './EmailImportModalV2';
-import OpenAI from "openai";
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import CameraCaptureModal from './CameraCaptureModal';
@@ -264,6 +263,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
     const [isSaving, setIsSaving] = useState(false);
     const [lastSaved, setLastSaved] = useState(null);
     const [visibleRoomImages, setVisibleRoomImages] = useState({}); // Stores roomId -> boolean for toggle
+    const [conflicts, setConflicts] = useState({}); // Stores { fieldPath: { original: '...', new: '...' } }
 
 
     // Auto-Save Effect
@@ -1480,6 +1480,7 @@ END:VCARD`;
         setFormData(prev => ({ ...prev, [name]: value }))
     }
 
+
     // --- PDF Export (Unified Vector Report) ---
     // --- PDF Export (Unified Vector Report) ---
     // --- PDF Export (Unified Vector Report - @react-pdf) ---
@@ -1871,57 +1872,129 @@ END:VCARD`;
         }, 500); // 500ms delay to ensure render
     }
 
+    const renderConflictWarn = (fieldPath) => {
+        if (!conflicts[fieldPath]) return null;
+        const conflict = conflicts[fieldPath];
+        return (
+            <div style={{
+                position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)',
+                display: 'flex', alignItems: 'center', gap: '0.5rem',
+                backgroundColor: 'rgba(245, 158, 11, 0.15)', padding: '2px 8px', borderRadius: '4px',
+                border: '1px solid rgba(245, 158, 11, 0.3)', zIndex: 10
+            }} title={`Konflikt: Vorher "${conflict.original}"`}>
+                <AlertCircle size={14} color="#f59e0b" />
+                <button
+                    onClick={() => {
+                        setFormData(prev => ({ ...prev, [fieldPath]: conflict.original }));
+                        const newC = { ...conflicts };
+                        delete newC[fieldPath];
+                        setConflicts(newC);
+                    }}
+                    style={{ background: 'none', border: 'none', color: '#f59e0b', fontSize: '0.65rem', fontWeight: 800, cursor: 'pointer', padding: 0 }}
+                >
+                    WIDERRUFEN
+                </button>
+            </div>
+        );
+    };
+
     const handleEmailImport = (data) => {
-        console.log("handleEmailImport called with:", data);
+        console.log("handleEmailImport v2026.1 called with:", data);
         if (!data) return;
 
-        // Enhanced Logic: Filter out "Verwaltung" from contacts if mapped to assignedTo
-        let importContacts = [...(data.contacts || [])];
-        let importManager = data.manager;
-
-        // Find "Verwaltung" contact to merge/remove
-        const adminIndex = importContacts.findIndex(c =>
-            c.role === 'Verwaltung' || (importManager && c.name && c.name.toLowerCase().includes(importManager.toLowerCase()))
-        );
-
-        if (adminIndex !== -1) {
-            const adminC = importContacts[adminIndex];
-            // Construct detailed string: Name, Tel, Email
-            // Only add if not already present in the string
-            if (!importManager) importManager = adminC.name;
-
-            if (adminC.phone && (!importManager || !importManager.includes(adminC.phone))) {
-                importManager = (importManager ? importManager + ", " : "") + adminC.phone;
-            }
-            if (adminC.email && (!importManager || !importManager.includes(adminC.email))) {
-                importManager = (importManager ? importManager + ", " : "") + adminC.email;
-            }
-
-            // Remove from list to avoid duplication
-            importContacts.splice(adminIndex, 1);
-        }
-
         setFormData(prev => {
-            const newContacts = [
-                ...(prev.contacts || []),
-                ...importContacts
-            ];
+            const newConflicts = { ...conflicts };
+            const nextData = { ...prev };
 
-            return {
-                ...prev,
-                projectTitle: data.projectTitle || prev.projectTitle,
-                client: data.client || prev.client,
-                assignedTo: importManager || prev.assignedTo,
-                description: data.description ? (prev.description ? prev.description + '\n\n' + data.description : data.description) : prev.description,
-                street: data.street || prev.street,
-                zip: data.zip || prev.zip,
-                city: data.city || prev.city,
-                clientStreet: data.clientStreet || prev.clientStreet,
-                clientZip: data.clientZip || prev.clientZip,
-                clientCity: data.clientCity || prev.clientCity,
-                contacts: newContacts
+            // --- Helper: Merge Field with Fill-if-Empty & Conflict Detect ---
+            const mergeField = (path, newVal) => {
+                if (!newVal) return;
+                const currentVal = prev[path];
+
+                if (!currentVal || currentVal.toString().trim() === "") {
+                    // Empty? Fill it!
+                    nextData[path] = newVal;
+                } else if (currentVal.toString().trim() !== newVal.toString().trim()) {
+                    // Mismatch? Mark as conflict for the Rollback-Icon
+                    newConflicts[path] = { original: currentVal, newValue: newVal };
+                    // Optionally: overwrite if Recency Priority is desired, but user said "merkte" und "Warn-Icon"
+                    // Let's stick to Recency Priority for the actual value but show the warning
+                    nextData[path] = newVal;
+                }
             };
+
+            // Mapping (Schema 2026.1 to formData)
+            if (data.projekt_daten) {
+                mergeField('projectNumber', data.projekt_daten.interne_id);
+                mergeField('orderNumber', data.projekt_daten.externe_ref);
+                mergeField('damageNumber', data.projekt_daten.auftrags_nr);
+            }
+            if (data.auftrag_verwaltung) {
+                mergeField('client', data.auftrag_verwaltung.firma);
+                mergeField('assignedTo', data.auftrag_verwaltung.sachbearbeiter);
+                if (data.auftrag_verwaltung.leistungsart) {
+                    mergeField('damageCategory', data.auftrag_verwaltung.leistungsart);
+                }
+            }
+            if (data.rechnungs_details) {
+                mergeField('ownerName', data.rechnungs_details.eigentuemer);
+                mergeField('ownerEmail', data.rechnungs_details.email_rechnung);
+                mergeField('invoiceReference', data.rechnungs_details.vermerk);
+            }
+            if (data.schadenort) {
+                mergeField('street', data.schadenort.strasse_nr);
+                mergeField('locationDetails', data.schadenort.etage_wohnung);
+
+                // PLZ / Ort Split
+                if (data.schadenort.plz_ort) {
+                    const parts = data.schadenort.plz_ort.trim().split(/\s+/);
+                    if (parts.length >= 1) {
+                        const zipCandidate = parts[0];
+                        if (zipCandidate.length === 4 && /^\d+$/.test(zipCandidate)) {
+                            mergeField('zip', zipCandidate);
+                            mergeField('city', parts.slice(1).join(' '));
+                        } else {
+                            mergeField('city', data.schadenort.plz_ort);
+                        }
+                    }
+                }
+            }
+
+            // --- SMART CONTACT MERGE ---
+            let currentContacts = [...(prev.contacts || [])];
+            if (data.kontakte && Array.isArray(data.kontakte)) {
+                data.kontakte.forEach(newContact => {
+                    // Find existing by name match (case insensitive, stripped)
+                    const existingIdx = currentContacts.findIndex(c =>
+                        c.name && newContact.name &&
+                        c.name.trim().toLowerCase() === newContact.name.trim().toLowerCase()
+                    );
+
+                    if (existingIdx !== -1) {
+                        // MERGE EXISTING
+                        const existing = currentContacts[existingIdx];
+                        currentContacts[existingIdx] = {
+                            ...existing,
+                            phone: existing.phone || newContact.telefon, // Fill empty phone
+                            role: existing.role || newContact.rolle,     // Fill empty role
+                        };
+                    } else {
+                        // ADD NEW (Unique)
+                        currentContacts.push({
+                            name: newContact.name,
+                            phone: newContact.telefon,
+                            role: newContact.rolle || 'Mieter',
+                            apartment: ''
+                        });
+                    }
+                });
+            }
+
+            nextData.contacts = currentContacts;
+            setConflicts(newConflicts);
+            return nextData;
         });
+
         setShowEmailImport(false);
     };
 
@@ -1955,47 +2028,56 @@ END:VCARD`;
                 {mode === 'desktop' && (
                     <div className="card" style={{ marginBottom: '1.5rem', padding: '0.75rem 1.25rem' }}>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: '0.75rem' }}>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', position: 'relative' }}>
                                 <label style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 700 }}>PROJEKT-NR:</label>
-                                <input
-                                    type="text"
-                                    className="form-input"
-                                    style={{ padding: '0.4rem 0.6rem', fontSize: '0.85rem', backgroundColor: 'rgba(255,255,255,0.02)', fontWeight: 700, width: '100%', minWidth: 0 }}
-                                    value={formData.projectNumber || ''}
-                                    onChange={(e) => {
-                                        const val = e.target.value;
-                                        setFormData(prev => {
-                                            const updates = { projectNumber: val };
-                                            if (!prev.projectTitle || prev.projectTitle.startsWith('TMP-')) {
-                                                updates.projectTitle = val;
-                                            }
-                                            return { ...prev, ...updates };
-                                        });
-                                    }}
-                                    placeholder="W-25..."
-                                />
+                                <div style={{ position: 'relative' }}>
+                                    <input
+                                        type="text"
+                                        className="form-input"
+                                        style={{ padding: '0.4rem 0.6rem', fontSize: '0.85rem', backgroundColor: 'rgba(255,255,255,0.02)', fontWeight: 700, width: '100%', minWidth: 0 }}
+                                        value={formData.projectNumber || ''}
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            setFormData(prev => {
+                                                const updates = { projectNumber: val };
+                                                if (!prev.projectTitle || prev.projectTitle.startsWith('TMP-')) {
+                                                    updates.projectTitle = val;
+                                                }
+                                                return { ...prev, ...updates };
+                                            });
+                                        }}
+                                        placeholder="W-25..."
+                                    />
+                                    {renderConflictWarn('projectNumber')}
+                                </div>
                             </div>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', position: 'relative' }}>
                                 <label style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 700 }}>AUFTRAGSNUMMER:</label>
-                                <input
-                                    type="text"
-                                    className="form-input"
-                                    style={{ padding: '0.4rem 0.6rem', fontSize: '0.85rem', backgroundColor: 'rgba(255,255,255,0.02)', width: '100%', minWidth: 0 }}
-                                    value={formData.orderNumber || ''}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, orderNumber: e.target.value }))}
-                                    placeholder="Nr."
-                                />
+                                <div style={{ position: 'relative' }}>
+                                    <input
+                                        type="text"
+                                        className="form-input"
+                                        style={{ padding: '0.4rem 0.6rem', fontSize: '0.85rem', backgroundColor: 'rgba(255,255,255,0.02)', width: '100%', minWidth: 0 }}
+                                        value={formData.orderNumber || ''}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, orderNumber: e.target.value }))}
+                                        placeholder="Nr."
+                                    />
+                                    {renderConflictWarn('orderNumber')}
+                                </div>
                             </div>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', position: 'relative' }}>
                                 <label style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 700 }}>SCHADEN-NR:</label>
-                                <input
-                                    type="text"
-                                    className="form-input"
-                                    style={{ padding: '0.4rem 0.6rem', fontSize: '0.85rem', backgroundColor: 'rgba(255,255,255,0.02)', width: '100%', minWidth: 0 }}
-                                    value={formData.damageNumber || ''}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, damageNumber: e.target.value }))}
-                                    placeholder="Versicherung Nr."
-                                />
+                                <div style={{ position: 'relative' }}>
+                                    <input
+                                        type="text"
+                                        className="form-input"
+                                        style={{ padding: '0.4rem 0.6rem', fontSize: '0.85rem', backgroundColor: 'rgba(255,255,255,0.02)', width: '100%', minWidth: 0 }}
+                                        value={formData.damageNumber || ''}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, damageNumber: e.target.value }))}
+                                        placeholder="Versicherung Nr."
+                                    />
+                                    {renderConflictWarn('damageNumber')}
+                                </div>
                             </div>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
                                 <label style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 700 }}>VERSICHERUNG:</label>

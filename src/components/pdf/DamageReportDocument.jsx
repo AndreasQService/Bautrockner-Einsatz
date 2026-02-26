@@ -576,6 +576,22 @@ const DamageReportDocument = ({ data }) => {
                     </View>
                 )}
 
+                {/* Messprotokolle Section */}
+                {data.images && data.images.some(img => img.assignedTo === 'Messprotokolle' && img.includeInReport !== false) && (
+                    <View style={{ marginBottom: 20 }} wrap={false}>
+                        <View style={styles.divider} />
+                        <Text style={styles.sectionTitle}>MESSPROTOKOLLE</Text>
+                        <View style={styles.imageGrid}>
+                            {data.images.filter(img => img.assignedTo === 'Messprotokolle' && img.includeInReport !== false).map((img, i) => (
+                                <View key={i} style={{ width: '100%', marginBottom: 15 }}>
+                                    <Image src={img.preview} style={{ width: '100%', height: 400, objectFit: 'contain' }} />
+                                    {img.name && <Text style={[styles.imageDescription, { textAlign: 'center' }]}>{img.name}</Text>}
+                                </View>
+                            ))}
+                        </View>
+                    </View>
+                )}
+
                 {/* Footer - Moved to top to ensure 'fixed' behavior works reliably */}
                 <View style={styles.footer} fixed>
                     <View style={{ width: '100%', alignItems: 'center' }}>
