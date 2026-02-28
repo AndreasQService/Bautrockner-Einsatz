@@ -1,12 +1,13 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Save, X, PenTool, Circle as CircleIcon, Undo } from 'lucide-react';
+import { Save, X, PenTool, Circle as CircleIcon, Undo, Eraser } from 'lucide-react';
 
 const ImageEditor = ({ image, onSave, onCancel }) => {
     const canvasRef = useRef(null);
+    const bgCanvasRef = useRef(null);
     const [context, setContext] = useState(null);
     const [isDrawing, setIsDrawing] = useState(false);
-    const [tool, setTool] = useState('pen'); // 'pen', 'circle'
+    const [tool, setTool] = useState('pen'); // 'pen', 'circle', 'eraser'
     const [color, setColor] = useState('#EF4444'); // Red by default
     const [lineWidth, setLineWidth] = useState(5);
     const [history, setHistory] = useState([]);
@@ -42,12 +43,21 @@ const ImageEditor = ({ image, onSave, onCancel }) => {
                     }
                 }
 
+                // Setup Draw Canvas
                 canvas.width = width;
                 canvas.height = height;
-
-                ctx.drawImage(img, 0, 0, width, height);
                 ctx.lineCap = 'round';
                 ctx.lineJoin = 'round';
+                ctx.clearRect(0, 0, width, height);
+
+                // Setup Background Canvas
+                if (bgCanvasRef.current) {
+                    const bgCanvas = bgCanvasRef.current;
+                    bgCanvas.width = width;
+                    bgCanvas.height = height;
+                    const bgCtx = bgCanvas.getContext('2d');
+                    bgCtx.drawImage(img, 0, 0, width, height);
+                }
 
                 const initialState = ctx.getImageData(0, 0, width, height);
                 setHistory([initialState]);
@@ -79,10 +89,11 @@ const ImageEditor = ({ image, onSave, onCancel }) => {
 
         snapshot.current = context.getImageData(0, 0, canvasRef.current.width, canvasRef.current.height);
 
-        if (tool === 'pen') {
+        if (tool === 'pen' || tool === 'eraser') {
             context.beginPath();
             context.strokeStyle = color;
-            context.lineWidth = lineWidth;
+            context.lineWidth = tool === 'eraser' ? 30 : lineWidth;
+            context.globalCompositeOperation = tool === 'eraser' ? 'destination-out' : 'source-over';
             context.moveTo(coords.x, coords.y);
         }
     };
@@ -93,7 +104,7 @@ const ImageEditor = ({ image, onSave, onCancel }) => {
 
         const coords = getCoordinates(e);
 
-        if (tool === 'pen') {
+        if (tool === 'pen' || tool === 'eraser') {
             context.lineTo(coords.x, coords.y);
             context.stroke();
         } else if (tool === 'circle') {
@@ -112,7 +123,7 @@ const ImageEditor = ({ image, onSave, onCancel }) => {
     const stopDrawing = (e) => {
         if (!context) return;
         if (isDrawing) {
-            if (tool === 'pen') {
+            if (tool === 'pen' || tool === 'eraser') {
                 context.closePath();
             }
             setIsDrawing(false);
@@ -131,8 +142,24 @@ const ImageEditor = ({ image, onSave, onCancel }) => {
 
     const handleSave = () => {
         if (!canvasRef.current) return;
-        const dataUrl = canvasRef.current.toDataURL('image/jpeg', 0.9);
-        onSave(dataUrl);
+
+        // Merge background image and canvas
+        const mergeCanvas = document.createElement('canvas');
+        const canvas = canvasRef.current;
+        mergeCanvas.width = canvas.width;
+        mergeCanvas.height = canvas.height;
+        const mergeCtx = mergeCanvas.getContext('2d');
+
+        const img = new window.Image();
+        img.crossOrigin = 'Anonymous';
+        img.src = image.preview;
+
+        img.onload = () => {
+            mergeCtx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            mergeCtx.drawImage(canvas, 0, 0);
+            const dataUrl = mergeCanvas.toDataURL('image/jpeg', 0.9);
+            onSave(dataUrl);
+        };
     };
 
     const editorContent = (
@@ -143,7 +170,7 @@ const ImageEditor = ({ image, onSave, onCancel }) => {
             display: 'flex', flexDirection: 'column',
             overflow: 'hidden', touchAction: 'none'
         }}>
-            {/* Background Layer */}
+            {/* Background Blur Layer */}
             <div style={{
                 position: 'absolute', inset: 0,
                 backgroundImage: `url(${image.preview})`,
@@ -176,6 +203,13 @@ const ImageEditor = ({ image, onSave, onCancel }) => {
                         <CircleIcon size={20} />
                     </button>
                     <button
+                        onPointerDown={(e) => { e.stopPropagation(); setTool('eraser'); }}
+                        style={{ padding: '0.5rem', borderRadius: '8px', border: 'none', background: tool === 'eraser' ? '#3B82F6' : 'transparent', color: 'white', cursor: 'pointer' }}
+                        title="Radiergummi"
+                    >
+                        <Eraser size={20} />
+                    </button>
+                    <button
                         onPointerDown={(e) => { e.stopPropagation(); handleUndo(); }}
                         disabled={history.length <= 1}
                         style={{ padding: '0.5rem', borderRadius: '8px', border: 'none', background: 'transparent', color: history.length > 1 ? 'white' : 'rgba(255,255,255,0.2)', cursor: 'pointer' }}
@@ -196,29 +230,50 @@ const ImageEditor = ({ image, onSave, onCancel }) => {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                padding: '4rem', // Generous padding to ensure image doesn't feel too big
+                padding: '2rem',
                 overflow: 'hidden',
                 zIndex: 5
             }}>
-                <canvas
-                    ref={canvasRef}
-                    onPointerDown={startDrawing}
-                    onPointerMove={draw}
-                    onPointerUp={stopDrawing}
-                    onPointerLeave={stopDrawing}
-                    onPointerCancel={stopDrawing}
-                    style={{
-                        maxWidth: '90%', // Limit to 90% of available space
-                        maxHeight: '90%',
-                        width: 'auto',
-                        height: 'auto',
-                        display: 'block',
-                        backgroundColor: '#000',
-                        boxShadow: '0 25px 60px rgba(0,0,0,0.8)',
-                        touchAction: 'none',
-                        cursor: 'crosshair'
-                    }}
-                />
+                <div style={{
+                    position: 'relative',
+                    boxShadow: '0 25px 60px rgba(0,0,0,0.8)',
+                    backgroundColor: '#000',
+                    lineHeight: 0,
+                    width: 'fit-content',
+                    height: 'fit-content'
+                }}>
+                    {/* Background Layer: The Photo */}
+                    <canvas
+                        ref={bgCanvasRef}
+                        style={{
+                            maxWidth: '90vw',
+                            maxHeight: '70vh',
+                            width: 'auto',
+                            height: 'auto',
+                            display: 'block'
+                        }}
+                    />
+
+                    {/* Drawing Layer: Transparent Overlay */}
+                    <canvas
+                        ref={canvasRef}
+                        onPointerDown={startDrawing}
+                        onPointerMove={draw}
+                        onPointerUp={stopDrawing}
+                        onPointerLeave={stopDrawing}
+                        onPointerCancel={stopDrawing}
+                        style={{
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            width: '100%',
+                            height: '100%',
+                            touchAction: 'none',
+                            cursor: 'crosshair',
+                            zIndex: 6
+                        }}
+                    />
+                </div>
             </div>
 
             {/* Footer */}

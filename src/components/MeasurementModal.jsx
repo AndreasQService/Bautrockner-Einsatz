@@ -12,6 +12,7 @@ const MeasurementModal = ({ isOpen, onClose, onSave, rooms, projectTitle, initia
     const [isDrawing, setIsDrawing] = useState(false);
     const [color, setColor] = useState('#000000');
     const [lineWidth, setLineWidth] = useState(2);
+    const [activeTool, setActiveTool] = useState('pen'); // 'pen' or 'eraser'
     const [measurements, setMeasurements] = useState([]);
     const [history, setHistory] = useState([]); // Array of ImageData
     const [historyStep, setHistoryStep] = useState(-1);
@@ -288,14 +289,14 @@ const MeasurementModal = ({ isOpen, onClose, onSave, rooms, projectTitle, initia
         ctx.beginPath();
         ctx.moveTo(coords.x, coords.y);
 
-        if (color === '#ffffff') {
+        if (activeTool === 'eraser') {
             ctx.globalCompositeOperation = 'destination-out';
+            ctx.lineWidth = 20; // Eraser is thicker by default
         } else {
             ctx.globalCompositeOperation = 'source-over';
             ctx.strokeStyle = color;
+            ctx.lineWidth = lineWidth;
         }
-
-        ctx.lineWidth = lineWidth;
         setIsDrawing(true);
     };
 
@@ -575,12 +576,12 @@ const MeasurementModal = ({ isOpen, onClose, onSave, rooms, projectTitle, initia
                                             <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>Stift</span>
                                         </button>
                                         <button
-                                            onClick={() => { setIsScrollMode(false); setColor('#ef4444'); setLineWidth(2); }}
+                                            onClick={() => { setIsScrollMode(false); setActiveTool('pen'); setColor('#ef4444'); setLineWidth(2); }}
                                             style={{
                                                 padding: '0.5rem',
                                                 borderRadius: '6px',
-                                                background: (!isScrollMode && color === '#ef4444') ? 'rgba(239, 68, 68, 0.2)' : 'rgba(255,255,255,0.05)',
-                                                border: (!isScrollMode && color === '#ef4444') ? '1px solid #ef4444' : '1px solid var(--border)',
+                                                background: (!isScrollMode && activeTool === 'pen' && color === '#ef4444') ? 'rgba(239, 68, 68, 0.2)' : 'rgba(255,255,255,0.05)',
+                                                border: (!isScrollMode && activeTool === 'pen' && color === '#ef4444') ? '1px solid #ef4444' : '1px solid var(--border)',
                                                 color: '#ef4444'
                                             }}
                                             title="Stift Rot"
@@ -588,12 +589,12 @@ const MeasurementModal = ({ isOpen, onClose, onSave, rooms, projectTitle, initia
                                             <Pen size={16} />
                                         </button>
                                         <button
-                                            onClick={() => { setIsScrollMode(false); setColor('#3b82f6'); setLineWidth(2); }}
+                                            onClick={() => { setIsScrollMode(false); setActiveTool('pen'); setColor('#3b82f6'); setLineWidth(2); }}
                                             style={{
                                                 padding: '0.5rem',
                                                 borderRadius: '6px',
-                                                background: (!isScrollMode && color === '#3b82f6') ? 'rgba(59, 130, 246, 0.2)' : 'rgba(255,255,255,0.05)',
-                                                border: (!isScrollMode && color === '#3b82f6') ? '1px solid #3b82f6' : '1px solid var(--border)',
+                                                background: (!isScrollMode && activeTool === 'pen' && color === '#3b82f6') ? 'rgba(59, 130, 246, 0.2)' : 'rgba(255,255,255,0.05)',
+                                                border: (!isScrollMode && activeTool === 'pen' && color === '#3b82f6') ? '1px solid #3b82f6' : '1px solid var(--border)',
                                                 color: '#3b82f6'
                                             }}
                                             title="Stift Blau"
@@ -601,12 +602,12 @@ const MeasurementModal = ({ isOpen, onClose, onSave, rooms, projectTitle, initia
                                             <Pen size={16} />
                                         </button>
                                         <button
-                                            onClick={() => { setIsScrollMode(false); setColor('#ffffff'); setLineWidth(15); }}
+                                            onClick={() => { setIsScrollMode(false); setActiveTool('eraser'); }}
                                             style={{
                                                 padding: '0.5rem 0.75rem',
                                                 borderRadius: '6px',
-                                                background: (!isScrollMode && color === '#ffffff') ? '#f1f5f9' : 'rgba(255,255,255,0.05)',
-                                                border: (!isScrollMode && color === '#ffffff') ? '1px solid #cbd5e1' : '1px solid var(--border)',
+                                                background: (!isScrollMode && activeTool === 'eraser') ? '#f1f5f9' : 'rgba(255,255,255,0.05)',
+                                                border: (!isScrollMode && activeTool === 'eraser') ? '1px solid #cbd5e1' : '1px solid var(--border)',
                                                 color: '#475569',
                                                 display: 'flex',
                                                 alignItems: 'center',
