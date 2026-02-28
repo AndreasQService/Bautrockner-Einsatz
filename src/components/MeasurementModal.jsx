@@ -52,13 +52,13 @@ const MeasurementModal = ({ isOpen, onClose, onSave, rooms, projectTitle, initia
     const [stylusOnlyMode, setStylusOnlyMode] = useState(false); // New state for Palm Rejection
     const [showCamera, setShowCamera] = useState(false);
 
-    // Sync locked state with readOnly prop on open
-    // Also update history if needed
+    // Always lock the sketch by default when the modal opens
     useEffect(() => {
         if (isOpen) {
-            setIsSketchLocked(!!readOnly);
+            setIsSketchLocked(true);
+            setStylusOnlyMode(false); // Reset stylus mode too for fresh start
         }
-    }, [isOpen, readOnly]);
+    }, [isOpen]);
 
     // Calculate History View Data
     // Calculate History View Data - PIVOT
@@ -152,16 +152,36 @@ const MeasurementModal = ({ isOpen, onClose, onSave, rooms, projectTitle, initia
 
     }, [measurementHistory, measurements]);
 
+    const isInitializedRef = useRef(null);
+
     // Initialize measurements based on rooms or initialData
     useEffect(() => {
-        if (isSuccess) return; // Prevent reset during success message
-        if (isOpen && rooms && rooms.length > 0) {
-            // Priority: Load from initialData if available for this room
-            // current room is rooms[0]
-            const roomData = initialData ? initialData[rooms[0].id] : null;
+        if (!isOpen) {
+            isInitializedRef.current = null;
+            setHistory([]);
+            setHistoryStep(-1);
+            return;
+        }
+
+        if (isSuccess) return;
+
+        const currentRoomId = rooms && rooms.length > 0 ? rooms[0].id : null;
+        if (!currentRoomId) return;
+
+        if (isInitializedRef.current === currentRoomId) return;
+        isInitializedRef.current = currentRoomId;
+
+        let initTimer = null;
+        const roomData = initialData ? initialData[currentRoomId] : null;
+
+        const performInit = () => {
+            const canvas = canvasRef.current;
+            if (!canvas) {
+                initTimer = setTimeout(performInit, 50);
+                return;
+            }
 
             if (roomData) {
-                // Restore measurements
                 setMeasurements(roomData.measurements || []);
                 setGlobalSettings(roomData.globalSettings || {
                     date: new Date().toISOString().split('T')[0],
@@ -170,31 +190,26 @@ const MeasurementModal = ({ isOpen, onClose, onSave, rooms, projectTitle, initia
                     device: ''
                 });
 
-                // Restore canvas
                 if (roomData.canvasImage) {
                     const img = new window.Image();
                     img.onload = () => {
-                        const canvas = canvasRef.current;
-                        if (canvas) {
-                            const ctx = canvas.getContext('2d');
-                            ctx.clearRect(0, 0, canvas.width, canvas.height);
-                            ctx.drawImage(img, 0, 0);
-                            saveParamsToHistory(canvas); // Save restored state to history
-                        }
+                        const ctx = canvas.getContext('2d');
+                        ctx.fillStyle = '#ffffff';
+                        ctx.fillRect(0, 0, canvas.width, canvas.height);
+                        ctx.drawImage(img, 0, 0);
+                        saveParamsToHistory(canvas);
                     };
                     img.src = roomData.canvasImage;
                 } else {
-                    setTimeout(initCanvas, 100);
+                    initCanvas();
                 }
             } else {
-                // Initialize new
                 const initial = [
                     { id: `p${Date.now()}`, pointName: 'Messpunkt 1', w_value: '', b_value: '', notes: '' },
                     { id: `p${Date.now() + 1}`, pointName: 'Messpunkt 2', w_value: '', b_value: '', notes: '' },
                     { id: `p${Date.now() + 2}`, pointName: 'Messpunkt 3', w_value: '', b_value: '', notes: '' },
                     { id: `p${Date.now() + 3}`, pointName: 'Messpunkt 4', w_value: '', b_value: '', notes: '' }
                 ];
-                // Start with 4 points as per latest user request
                 setMeasurements(initial);
                 setGlobalSettings({
                     date: new Date().toISOString().split('T')[0],
@@ -202,11 +217,15 @@ const MeasurementModal = ({ isOpen, onClose, onSave, rooms, projectTitle, initia
                     humidity: '',
                     device: ''
                 });
-
-                // Clear/Init canvas
-                setTimeout(initCanvas, 100);
+                initCanvas();
             }
-        }
+        };
+
+        performInit();
+
+        return () => {
+            if (initTimer) clearTimeout(initTimer);
+        };
     }, [isOpen, rooms, initialData, isSuccess]);
 
     const initCanvas = () => {
@@ -215,10 +234,8 @@ const MeasurementModal = ({ isOpen, onClose, onSave, rooms, projectTitle, initia
         const ctx = canvas.getContext('2d');
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
-        // Clear instead of fill white
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-        // Save initial blank state
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
         saveParamsToHistory(canvas);
     };
 
@@ -242,37 +259,38 @@ const MeasurementModal = ({ isOpen, onClose, onSave, rooms, projectTitle, initia
 
 
 
+    const getCoordinates = (e) => {
+        const canvas = canvasRef.current;
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+
+        return {
+            x: (e.clientX - rect.left) * scaleX,
+            y: (e.clientY - rect.top) * scaleY
+        };
+    };
+
     const startDrawing = (e) => {
-        if (isScrollMode || isSketchLocked) return; // Disable drawing in Scroll Mode or Locked
+        if (isScrollMode || isSketchLocked) return;
 
         // Palm Rejection / Stylus Only Mode
         if (stylusOnlyMode && e.pointerType !== 'pen') return;
 
-        // Pointer Capture
         if (e.target.setPointerCapture) {
             e.target.setPointerCapture(e.pointerId);
         }
 
+        const coords = getCoordinates(e);
         const canvas = canvasRef.current;
         const ctx = canvas.getContext('2d');
-        const rect = canvas.getBoundingClientRect();
-
-        // Calculate scaling factors (visual size vs internal resolution)
-        const scaleX = canvas.width / rect.width;
-        const scaleY = canvas.height / rect.height;
-
-        const x = (e.clientX - rect.left) * scaleX;
-        const y = (e.clientY - rect.top) * scaleY;
 
         ctx.beginPath();
-        ctx.moveTo(x, y);
+        ctx.moveTo(coords.x, coords.y);
 
         if (color === '#ffffff') {
-            // Eraser Mode
             ctx.globalCompositeOperation = 'destination-out';
-            ctx.strokeStyle = 'rgba(0,0,0,1)'; // Color doesn't matter for destination-out
         } else {
-            // Drawing Mode
             ctx.globalCompositeOperation = 'source-over';
             ctx.strokeStyle = color;
         }
@@ -283,35 +301,22 @@ const MeasurementModal = ({ isOpen, onClose, onSave, rooms, projectTitle, initia
 
     const draw = (e) => {
         if (!isDrawing) return;
-        if (stylusOnlyMode && e.pointerType !== 'pen') return; // Safety check
+        if (stylusOnlyMode && e.pointerType !== 'pen') return;
 
-        const canvas = canvasRef.current;
-        const ctx = canvas.getContext('2d');
-        const rect = canvas.getBoundingClientRect();
+        const coords = getCoordinates(e);
+        const ctx = canvasRef.current.getContext('2d');
 
-        // Calculate scaling factors (visual size vs internal resolution)
-        const scaleX = canvas.width / rect.width;
-        const scaleY = canvas.height / rect.height;
-
-        const x = (e.clientX - rect.left) * scaleX;
-        const y = (e.clientY - rect.top) * scaleY;
-
-        ctx.lineTo(x, y);
+        ctx.lineTo(coords.x, coords.y);
         ctx.stroke();
     };
 
     const stopDrawing = (e) => {
         if (isDrawing) {
             if (e && e.target.releasePointerCapture) {
-                try {
-                    e.target.releasePointerCapture(e.pointerId);
-                } catch (err) {
-                    console.warn("Failed to release pointer capture", err);
-                }
+                try { e.target.releasePointerCapture(e.pointerId); } catch (err) { }
             }
             setIsDrawing(false);
-            const canvas = canvasRef.current;
-            saveParamsToHistory(canvas);
+            saveParamsToHistory(canvasRef.current);
         }
     };
 
@@ -685,17 +690,23 @@ const MeasurementModal = ({ isOpen, onClose, onSave, rooms, projectTitle, initia
                                 <button
                                     onClick={() => setStylusOnlyMode(!stylusOnlyMode)}
                                     style={{
-                                        padding: '0.5rem',
-                                        borderRadius: '4px',
-                                        background: stylusOnlyMode ? 'var(--primary)' : 'transparent',
-                                        border: '1px solid var(--border)',
+                                        padding: '0.5rem 0.75rem',
+                                        borderRadius: '6px',
+                                        background: stylusOnlyMode ? '#F59E0B' : 'rgba(255,255,255,0.05)',
+                                        border: stylusOnlyMode ? '1px solid #F59E0B' : '1px solid var(--border)',
                                         color: stylusOnlyMode ? 'white' : 'var(--text-main)',
-                                        marginRight: '0.5rem'
+                                        marginRight: '0.5rem',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '0.4rem',
+                                        fontWeight: 600,
+                                        fontSize: '0.8rem'
                                     }}
+                                    disabled={isSketchLocked}
                                     title={stylusOnlyMode ? "Nur Stift (Handballen ignorieren)" : "Touch & Stift"}
                                 >
                                     <Pen size={16} />
-                                    {stylusOnlyMode && <span style={{ marginLeft: '4px', fontSize: '0.75rem' }}>Nur Stift</span>}
+                                    <span>{stylusOnlyMode ? "Nur Stift" : "Stift & Hand"}</span>
                                 </button>
 
                                 <button
@@ -736,33 +747,37 @@ const MeasurementModal = ({ isOpen, onClose, onSave, rooms, projectTitle, initia
                                 </button>
                             </div>
 
-                            {isCanvasExpanded && (
-                                <div style={{ border: '1px solid var(--border)', borderRadius: '4px', overflow: 'hidden', touchAction: 'none' }}>
-                                    <canvas
-                                        ref={canvasRef}
-                                        width={960}
-                                        height={400}
-                                        style={{
-                                            width: '100%',
-                                            height: '400px',
-                                            cursor: isScrollMode ? 'grab' : 'crosshair',
-                                            display: 'block',
-                                            backgroundColor: 'white', // Base white
-                                            backgroundImage: `
-                                                linear-gradient(to right, #e0e0e0 1px, transparent 1px),
-                                                linear-gradient(to bottom, #e0e0e0 1px, transparent 1px)
-                                            `,
-                                            backgroundSize: '40px 40px',
-                                            touchAction: 'none'
-                                        }}
-                                        onPointerDown={startDrawing}
-                                        onPointerMove={draw}
-                                        onPointerUp={stopDrawing}
-                                        onPointerLeave={stopDrawing}
-                                        onPointerCancel={stopDrawing}
-                                    />
-                                </div>
-                            )}
+                            <div style={{
+                                display: isCanvasExpanded ? 'block' : 'none',
+                                border: '1px solid var(--border)',
+                                borderRadius: '4px',
+                                overflow: 'hidden',
+                                touchAction: 'none'
+                            }}>
+                                <canvas
+                                    ref={canvasRef}
+                                    width={960}
+                                    height={400}
+                                    style={{
+                                        width: '100%',
+                                        height: '400px',
+                                        cursor: isScrollMode ? 'grab' : 'crosshair',
+                                        display: 'block',
+                                        backgroundColor: 'white', // Base white
+                                        backgroundImage: `
+                                            linear-gradient(to right, #e0e0e0 1px, transparent 1px),
+                                            linear-gradient(to bottom, #e0e0e0 1px, transparent 1px)
+                                        `,
+                                        backgroundSize: '40px 40px',
+                                        touchAction: 'none'
+                                    }}
+                                    onPointerDown={startDrawing}
+                                    onPointerMove={draw}
+                                    onPointerUp={stopDrawing}
+                                    onPointerLeave={stopDrawing}
+                                    onPointerCancel={stopDrawing}
+                                />
+                            </div>
                         </div>
                     )}
 
@@ -790,25 +805,29 @@ const MeasurementModal = ({ isOpen, onClose, onSave, rooms, projectTitle, initia
                             <div>
                                 <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Raumtemp. (°C)</label>
                                 <input
-                                    type="text"
+                                    type="number"
+                                    step="any"
                                     inputMode="decimal"
                                     value={globalSettings.temp}
                                     onChange={e => setGlobalSettings({ ...globalSettings, temp: e.target.value })}
                                     className="form-input no-spinner"
                                     style={{ width: '100%', padding: '0.6rem', minHeight: '40px' }}
                                     placeholder="20.5"
+                                    autoComplete="off"
                                 />
                             </div>
                             <div>
                                 <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Luftfeuchte (%)</label>
                                 <input
-                                    type="text"
+                                    type="number"
+                                    step="any"
                                     inputMode="decimal"
                                     value={globalSettings.humidity}
                                     onChange={e => setGlobalSettings({ ...globalSettings, humidity: e.target.value })}
                                     className="form-input no-spinner"
                                     style={{ width: '100%', padding: '0.6rem', minHeight: '40px' }}
                                     placeholder="55"
+                                    autoComplete="off"
                                 />
                             </div>
                             <div>
@@ -865,7 +884,7 @@ const MeasurementModal = ({ isOpen, onClose, onSave, rooms, projectTitle, initia
                                                         inputMode="decimal"
                                                         value={row.w_value}
                                                         onChange={(e) => updateMeasurement(idx, 'w_value', e.target.value)}
-                                                        className="form-input no-spinner"
+                                                        className="form-input"
                                                         style={{ width: '100%', padding: '0.75rem', fontSize: '1rem', minHeight: '44px', touchAction: 'manipulation', userSelect: 'text', WebkitUserSelect: 'text' }}
                                                         placeholder="Wert..."
                                                         autoComplete="off"
@@ -877,7 +896,7 @@ const MeasurementModal = ({ isOpen, onClose, onSave, rooms, projectTitle, initia
                                                         inputMode="decimal"
                                                         value={row.b_value}
                                                         onChange={(e) => updateMeasurement(idx, 'b_value', e.target.value)}
-                                                        className="form-input no-spinner"
+                                                        className="form-input"
                                                         style={{ width: '100%', padding: '0.75rem', fontSize: '1rem', minHeight: '44px', touchAction: 'manipulation', userSelect: 'text', WebkitUserSelect: 'text' }}
                                                         placeholder="Wert..."
                                                         autoComplete="off"
@@ -990,21 +1009,7 @@ const MeasurementModal = ({ isOpen, onClose, onSave, rooms, projectTitle, initia
                                                         })}
                                                     </tr>
                                                 ))}
-                                                {/* Protocol Row */}
-                                                <tr style={{ background: 'rgba(255,255,255,0.02)' }}>
-                                                    <td style={{ padding: '0.6rem 0.5rem', fontWeight: 600, color: 'var(--text-muted)', position: 'sticky', left: 0, backgroundColor: 'var(--surface)', zIndex: 10, borderRight: '1px solid var(--border)' }}>
-                                                        Protokoll
-                                                    </td>
-                                                    {[...historyRows].reverse().map(row => (
-                                                        <td key={row.id} style={{ padding: '0.5rem', textAlign: 'center' }}>
-                                                            {row.protocolUrl ? (
-                                                                <a href={row.protocolUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-                                                                    <FileText size={18} />
-                                                                </a>
-                                                            ) : '-'}
-                                                        </td>
-                                                    ))}
-                                                </tr>
+                                                {/* Protocol Row Removed */}
                                             </tbody>
                                         </table>
                                     ) : (
@@ -1019,7 +1024,7 @@ const MeasurementModal = ({ isOpen, onClose, onSave, rooms, projectTitle, initia
                                                             <span style={{ fontSize: '0.7em', fontWeight: 'normal' }}>(W / B)</span>
                                                         </th>
                                                     ))}
-                                                    <th style={{ padding: '0.5rem', textAlign: 'center', color: 'var(--text-muted)' }}>Protokoll</th>
+                                                    {/* Protocol Header Removed */}
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -1058,13 +1063,7 @@ const MeasurementModal = ({ isOpen, onClose, onSave, rooms, projectTitle, initia
                                                                 </td>
                                                             );
                                                         })}
-                                                        <td style={{ padding: '0.5rem', textAlign: 'center' }}>
-                                                            {row.protocolUrl ? (
-                                                                <a href={row.protocolUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-                                                                    <FileText size={18} />
-                                                                </a>
-                                                            ) : '-'}
-                                                        </td>
+                                                        {/* Protocol Cell Removed */}
                                                     </tr>
                                                 ))}
                                             </tbody>

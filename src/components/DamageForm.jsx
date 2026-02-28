@@ -264,6 +264,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
     const [lastSaved, setLastSaved] = useState(null);
     const [visibleRoomImages, setVisibleRoomImages] = useState({}); // Stores roomId -> boolean for toggle
     const [conflicts, setConflicts] = useState({}); // Stores { fieldPath: { original: '...', new: '...' } }
+    const [isContactsExpanded, setIsContactsExpanded] = useState(mode !== 'technician');
 
 
     // Auto-Save Effect
@@ -2910,229 +2911,255 @@ END:VCARD`;
 
                 {/* 2. Contacts */}
                 <div className="card" style={{ marginBottom: '1.5rem', padding: '1.5rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.75rem' }}>
+                    <div
+                        onClick={() => setIsContactsExpanded(!isContactsExpanded)}
+                        style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            marginBottom: isContactsExpanded ? '1.5rem' : '0',
+                            borderBottom: isContactsExpanded ? '1px solid var(--border)' : 'none',
+                            paddingBottom: isContactsExpanded ? '0.75rem' : '0',
+                            cursor: 'pointer',
+                            userSelect: 'none'
+                        }}
+                    >
                         <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.6rem', margin: 0 }}>
                             <Folder size={18} /> Kontakte
+                            {!isContactsExpanded && formData.contacts.some(c => c.name) && (
+                                <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-muted)', marginLeft: '0.5rem' }}>
+                                    ({formData.contacts.filter(c => c.name).length} vorhanden)
+                                </span>
+                            )}
                         </h3>
+                        <div style={{ color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>{isContactsExpanded ? 'Einklappen' : 'Ausklappen'}</span>
+                            <ChevronDown size={20} style={{ transform: isContactsExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.3s ease' }} />
+                        </div>
                     </div>
 
-                    <div style={{
-                        display: 'grid',
-                        gridTemplateColumns: mode === 'desktop' ? 'repeat(3, 1fr)' : '1fr',
-                        gap: '1.25rem'
-                    }}>
-                        {formData.contacts.map((contact, idx) => (
-                            <div key={idx} className="glass-card" style={{
-                                display: 'flex',
-                                flexDirection: 'column',
-                                gap: '1rem',
-                                padding: '1.5rem',
-                                position: 'relative',
-                                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                                minWidth: 0
+                    {isContactsExpanded && (
+                        <>
+
+                            <div style={{
+                                display: 'grid',
+                                gridTemplateColumns: mode === 'desktop' ? 'repeat(3, 1fr)' : '1fr',
+                                gap: '1.25rem'
                             }}>
-                                {/* Row 1: Name & vCard (Blue Button) */}
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                                    <label style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)', fontWeight: 750 }}>Name</label>
-                                    <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'stretch' }}>
-                                        <input
-                                            type="text"
-                                            placeholder="Name"
-                                            className="form-input"
-                                            value={contact.name}
-                                            onChange={(e) => {
-                                                const newContacts = [...formData.contacts];
-                                                newContacts[idx].name = e.target.value;
-                                                setFormData({ ...formData, contacts: newContacts });
-                                            }}
-                                            style={{ fontWeight: 700, fontSize: '0.95rem', flex: 1, padding: '0.55rem 0.7rem', minWidth: 0 }}
-                                        />
-                                        <button
-                                            type="button"
-                                            onClick={() => downloadVCard(contact)}
-                                            className="btn-glass"
-                                            style={{
-                                                padding: '0 0.5rem',
-                                                borderRadius: '8px',
-                                                cursor: 'pointer',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                backgroundColor: 'rgba(15, 110, 163, 0.15)',
-                                                border: '1px solid rgba(15, 110, 163, 0.25)',
-                                                color: '#0F6EA3',
-                                                flexShrink: 0
-                                            }}
-                                            title="vCard downloaden"
-                                        >
-                                            <VcfIcon size={20} />
-                                        </button>
-                                    </div>
-                                </div>
-
-                                {/* Row 2: Etage / Rolle (STRICTLY ON ONE ROW) */}
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                                    <label style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)', fontWeight: 750 }}>Etage / Rolle</label>
-                                    <div style={{
-                                        display: 'grid',
-                                        gridTemplateColumns: 'minmax(0, 1.2fr) minmax(0, 0.8fr)',
-                                        gap: '0.4rem',
-                                        alignItems: 'center',
-                                        width: '100%'
+                                {formData.contacts.map((contact, idx) => (
+                                    <div key={idx} className="glass-card" style={{
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        gap: '1rem',
+                                        padding: '1.5rem',
+                                        position: 'relative',
+                                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                        minWidth: 0
                                     }}>
-                                        <input
-                                            type="text"
-                                            placeholder="Etage"
-                                            className="form-input"
-                                            value={contact.floor || ''}
-                                            onChange={(e) => {
-                                                const newContacts = [...formData.contacts];
-                                                newContacts[idx].floor = e.target.value;
-                                                setFormData({ ...formData, contacts: newContacts });
-                                            }}
-                                            style={{
-                                                fontSize: '0.85rem',
-                                                fontWeight: 600,
-                                                padding: '0.55rem 0.6rem',
-                                                width: '100%',
-                                                minWidth: 0
-                                            }}
-                                        />
-                                        <select
-                                            className="form-input"
-                                            value={contact.role || 'Mieter'}
-                                            onChange={(e) => {
-                                                const newContacts = [...formData.contacts];
-                                                newContacts[idx].role = e.target.value;
-                                                setFormData({ ...formData, contacts: newContacts });
-                                            }}
-                                            style={{
-                                                fontSize: '0.8rem',
-                                                fontWeight: 600,
-                                                padding: '0.55rem 0.3rem',
-                                                width: '100%',
-                                                minWidth: 0,
-                                                textAlign: 'center'
-                                            }}
-                                        >
-                                            <option value="Mieter">Mieter</option>
-                                            <option value="Eigentümer">Eig.</option>
-                                            <option value="Hauswart">HW</option>
-                                            <option value="Verwaltung">Verw.</option>
-                                            <option value="Handwerker">Handw.</option>
-                                            <option value="Sonstiges">Sonst.</option>
-                                        </select>
+                                        {/* Row 1: Name & vCard (Blue Button) */}
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                                            <label style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)', fontWeight: 750 }}>Name</label>
+                                            <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'stretch' }}>
+                                                <input
+                                                    type="text"
+                                                    placeholder="Name"
+                                                    className="form-input"
+                                                    value={contact.name}
+                                                    onChange={(e) => {
+                                                        const newContacts = [...formData.contacts];
+                                                        newContacts[idx].name = e.target.value;
+                                                        setFormData({ ...formData, contacts: newContacts });
+                                                    }}
+                                                    style={{ fontWeight: 700, fontSize: '0.95rem', flex: 1, padding: '0.55rem 0.7rem', minWidth: 0 }}
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => downloadVCard(contact)}
+                                                    className="btn-glass"
+                                                    style={{
+                                                        padding: '0 0.5rem',
+                                                        borderRadius: '8px',
+                                                        cursor: 'pointer',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        backgroundColor: 'rgba(15, 110, 163, 0.15)',
+                                                        border: '1px solid rgba(15, 110, 163, 0.25)',
+                                                        color: '#0F6EA3',
+                                                        flexShrink: 0
+                                                    }}
+                                                    title="vCard downloaden"
+                                                >
+                                                    <VcfIcon size={20} />
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        {/* Row 2: Etage / Rolle (STRICTLY ON ONE ROW) */}
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                                            <label style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)', fontWeight: 750 }}>Etage / Rolle</label>
+                                            <div style={{
+                                                display: 'grid',
+                                                gridTemplateColumns: 'minmax(0, 1.2fr) minmax(0, 0.8fr)',
+                                                gap: '0.4rem',
+                                                alignItems: 'center',
+                                                width: '100%'
+                                            }}>
+                                                <input
+                                                    type="text"
+                                                    placeholder="Etage"
+                                                    className="form-input"
+                                                    value={contact.floor || ''}
+                                                    onChange={(e) => {
+                                                        const newContacts = [...formData.contacts];
+                                                        newContacts[idx].floor = e.target.value;
+                                                        setFormData({ ...formData, contacts: newContacts });
+                                                    }}
+                                                    style={{
+                                                        fontSize: '0.85rem',
+                                                        fontWeight: 600,
+                                                        padding: '0.55rem 0.6rem',
+                                                        width: '100%',
+                                                        minWidth: 0
+                                                    }}
+                                                />
+                                                <select
+                                                    className="form-input"
+                                                    value={contact.role || 'Mieter'}
+                                                    onChange={(e) => {
+                                                        const newContacts = [...formData.contacts];
+                                                        newContacts[idx].role = e.target.value;
+                                                        setFormData({ ...formData, contacts: newContacts });
+                                                    }}
+                                                    style={{
+                                                        fontSize: '0.8rem',
+                                                        fontWeight: 600,
+                                                        padding: '0.55rem 0.3rem',
+                                                        width: '100%',
+                                                        minWidth: 0,
+                                                        textAlign: 'center'
+                                                    }}
+                                                >
+                                                    <option value="Mieter">Mieter</option>
+                                                    <option value="Eigentümer">Eig.</option>
+                                                    <option value="Hauswart">HW</option>
+                                                    <option value="Verwaltung">Verw.</option>
+                                                    <option value="Handwerker">Handw.</option>
+                                                    <option value="Sonstiges">Sonst.</option>
+                                                </select>
+                                            </div>
+                                        </div>
+
+                                        {/* Row 3: Telefon */}
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                                            <label style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)', fontWeight: 750 }}>Telefon</label>
+                                            <input
+                                                type="text"
+                                                placeholder="+41 79 123 45 67"
+                                                className="form-input"
+                                                value={contact.phone}
+                                                onChange={(e) => {
+                                                    const newContacts = [...formData.contacts];
+                                                    newContacts[idx].phone = e.target.value;
+                                                    setFormData({ ...formData, contacts: newContacts });
+                                                }}
+                                                onBlur={(e) => {
+                                                    let val = e.target.value.replace(/\s+/g, '');
+                                                    if (val.match(/^0\d{9}$/)) {
+                                                        val = '+41' + val.substring(1);
+                                                    }
+                                                    if (val.match(/^\+41\d{9}$/)) {
+                                                        val = val.replace(/(\+41)(\d{2})(\d{3})(\d{2})(\d{2})/, '$1 $2 $3 $4 $5');
+                                                    }
+                                                    else if (val.match(/^\+41\d{8}$/)) {
+                                                        val = val.replace(/(\+41)(\d{2})(\d{2})(\d{2})(\d{2})/, '$1 $2 $3 $4 $5');
+                                                    }
+                                                    if (val !== e.target.value) {
+                                                        const newContacts = [...formData.contacts];
+                                                        newContacts[idx].phone = val;
+                                                        setFormData({ ...formData, contacts: newContacts });
+                                                    }
+                                                }}
+                                                style={{ width: '100%', fontSize: '0.95rem', fontWeight: 600, padding: '0.55rem 0.7rem' }}
+                                            />
+                                        </div>
+
+                                        {/* Action Buttons Row (Bottom Right) */}
+                                        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '0.15rem' }}>
+                                            {/* Call Button */}
+                                            <a
+                                                href={contact.phone ? `tel:${contact.phone}` : '#'}
+                                                className="btn-glass"
+                                                style={{
+                                                    padding: '0.45rem',
+                                                    borderRadius: '8px',
+                                                    color: '#10B981',
+                                                    cursor: contact.phone ? 'pointer' : 'default',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    opacity: contact.phone ? 1 : 0.3,
+                                                    backgroundColor: 'rgba(16, 185, 129, 0.08)',
+                                                    border: '1px solid rgba(16, 185, 129, 0.15)'
+                                                }}
+                                                title="Anrufen"
+                                            >
+                                                <Phone size={16} />
+                                            </a>
+
+                                            {/* Delete Button */}
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    if (window.confirm('Kontakt wirklich löschen?')) {
+                                                        handleRemoveContact(idx);
+                                                    }
+                                                }}
+                                                className="btn-glass"
+                                                style={{
+                                                    padding: '0.45rem',
+                                                    borderRadius: '8px',
+                                                    color: '#EF4444',
+                                                    cursor: 'pointer',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    backgroundColor: 'rgba(239, 68, 68, 0.08)',
+                                                    border: '1px solid rgba(239, 68, 68, 0.15)'
+                                                }}
+                                                title="Löschen"
+                                            >
+                                                <Trash size={16} />
+                                            </button>
+                                        </div>
+
+                                        {/* Delete Button (Absolute top-right or separate) */}
+
                                     </div>
-                                </div>
-
-                                {/* Row 3: Telefon */}
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                                    <label style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)', fontWeight: 750 }}>Telefon</label>
-                                    <input
-                                        type="text"
-                                        placeholder="+41 79 123 45 67"
-                                        className="form-input"
-                                        value={contact.phone}
-                                        onChange={(e) => {
-                                            const newContacts = [...formData.contacts];
-                                            newContacts[idx].phone = e.target.value;
-                                            setFormData({ ...formData, contacts: newContacts });
-                                        }}
-                                        onBlur={(e) => {
-                                            let val = e.target.value.replace(/\s+/g, '');
-                                            if (val.match(/^0\d{9}$/)) {
-                                                val = '+41' + val.substring(1);
-                                            }
-                                            if (val.match(/^\+41\d{9}$/)) {
-                                                val = val.replace(/(\+41)(\d{2})(\d{3})(\d{2})(\d{2})/, '$1 $2 $3 $4 $5');
-                                            }
-                                            else if (val.match(/^\+41\d{8}$/)) {
-                                                val = val.replace(/(\+41)(\d{2})(\d{2})(\d{2})(\d{2})/, '$1 $2 $3 $4 $5');
-                                            }
-                                            if (val !== e.target.value) {
-                                                const newContacts = [...formData.contacts];
-                                                newContacts[idx].phone = val;
-                                                setFormData({ ...formData, contacts: newContacts });
-                                            }
-                                        }}
-                                        style={{ width: '100%', fontSize: '0.95rem', fontWeight: 600, padding: '0.55rem 0.7rem' }}
-                                    />
-                                </div>
-
-                                {/* Action Buttons Row (Bottom Right) */}
-                                <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '0.15rem' }}>
-                                    {/* Call Button */}
-                                    <a
-                                        href={contact.phone ? `tel:${contact.phone}` : '#'}
-                                        className="btn-glass"
-                                        style={{
-                                            padding: '0.45rem',
-                                            borderRadius: '8px',
-                                            color: '#10B981',
-                                            cursor: contact.phone ? 'pointer' : 'default',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            opacity: contact.phone ? 1 : 0.3,
-                                            backgroundColor: 'rgba(16, 185, 129, 0.08)',
-                                            border: '1px solid rgba(16, 185, 129, 0.15)'
-                                        }}
-                                        title="Anrufen"
-                                    >
-                                        <Phone size={16} />
-                                    </a>
-
-                                    {/* Delete Button */}
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            if (window.confirm('Kontakt wirklich löschen?')) {
-                                                handleRemoveContact(idx);
-                                            }
-                                        }}
-                                        className="btn-glass"
-                                        style={{
-                                            padding: '0.45rem',
-                                            borderRadius: '8px',
-                                            color: '#EF4444',
-                                            cursor: 'pointer',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            backgroundColor: 'rgba(239, 68, 68, 0.08)',
-                                            border: '1px solid rgba(239, 68, 68, 0.15)'
-                                        }}
-                                        title="Löschen"
-                                    >
-                                        <Trash size={16} />
-                                    </button>
-                                </div>
-
-                                {/* Delete Button (Absolute top-right or separate) */}
-
+                                ))}
                             </div>
-                        ))}
-                    </div>
 
-                    {/* Add Contact Button - Moved below the tiles */}
-                    <div style={{ marginTop: '1.25rem', display: 'flex', justifyContent: 'flex-start' }}>
-                        <button
-                            type="button"
-                            onClick={handleAddContact}
-                            className="btn btn-outline"
-                            style={{
-                                padding: '0.5rem 1rem',
-                                fontSize: '0.85rem',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '0.5rem',
-                                borderRadius: '10px'
-                            }}
-                        >
-                            <Plus size={16} />
-                            Kontakt hinzufügen
-                        </button>
-                    </div>
+                            {/* Add Contact Button - Moved below the tiles */}
+                            <div style={{ marginTop: '1.25rem', display: 'flex', justifyContent: 'flex-start' }}>
+                                <button
+                                    type="button"
+                                    onClick={handleAddContact}
+                                    className="btn btn-outline"
+                                    style={{
+                                        padding: '0.5rem 1rem',
+                                        fontSize: '0.85rem',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '0.5rem',
+                                        borderRadius: '10px'
+                                    }}
+                                >
+                                    <Plus size={16} />
+                                    Kontakt hinzufügen
+                                </button>
+                            </div>
+                        </>
+                    )}
                 </div>
 
 
@@ -3546,7 +3573,7 @@ END:VCARD`;
                                                 onClick={(e) => {
                                                     e.stopPropagation();
                                                     setActiveRoomForMeasurement(room);
-                                                    setIsNewMeasurement(false);
+                                                    setIsNewMeasurement(true); // Always start a new series with empty values
                                                     setIsMeasurementReadOnly(false);
                                                     setShowMeasurementModal(true);
                                                 }}
@@ -5273,34 +5300,9 @@ END:VCARD`;
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
                                     {/* Left Column: Fields */}
                                     <div>
-                                        <div className="form-group" style={{ marginBottom: '1.5rem' }}>
-                                            <label style={{ display: 'block', fontSize: '0.9rem', color: '#94A3B8', marginBottom: '0.5rem' }}>Zuständig</label>
-                                            <input
-                                                type="text"
-                                                className="form-input"
-                                                style={{ backgroundColor: '#0F172A', borderColor: '#334155', color: 'white', width: '100%' }}
-                                                value={activeImageMeta.technician || formData.assignedTo || ''}
-                                                onChange={(e) => {
-                                                    const val = e.target.value;
-                                                    setActiveImageMeta(prev => ({ ...prev, technician: val }));
-                                                }}
-                                                placeholder="Name des Techniker"
-                                            />
-                                        </div>
 
 
 
-                                        <div style={{ marginTop: '2rem' }}>
-                                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer', userSelect: 'none' }}>
-                                                <input
-                                                    type="checkbox"
-                                                    checked={activeImageMeta.includeInReport !== false}
-                                                    onChange={(e) => setActiveImageMeta(prev => ({ ...prev, includeInReport: e.target.checked }))}
-                                                    style={{ width: '1.25rem', height: '1.25rem', accentColor: '#0F6EA3' }}
-                                                />
-                                                <span style={{ fontSize: '1rem', fontWeight: 500 }}>Bericht</span>
-                                            </label>
-                                        </div>
 
                                         <div style={{ marginTop: '2rem' }}>
                                             <button
