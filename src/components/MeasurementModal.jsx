@@ -282,26 +282,33 @@ const MeasurementModal = ({ isOpen, onClose, onSave, rooms, projectTitle, initia
         };
     };
 
-    const startDrawing = (e) => {
-        if (isScrollMode || isSketchLocked) return;
+    // Optimization: Cache context and use requestAnimationFrame
+    const ctxRef = useRef(null);
+    const rafRef = useRef(null);
+    const lastCoords = useRef(null);
 
-        // Palm Rejection / Stylus Only Mode
+    const startDrawing = (e) => {
+        if (!isOpen || isSketchLocked) return;
         if (stylusOnlyMode && e.pointerType !== 'pen') return;
+        if (isScrollMode) return;
 
         if (e.target.setPointerCapture) {
-            e.target.setPointerCapture(e.pointerId);
+            try { e.target.setPointerCapture(e.pointerId); } catch (err) { }
         }
 
         const coords = getCoordinates(e);
+        lastCoords.current = coords;
+
         const canvas = canvasRef.current;
-        const ctx = canvas.getContext('2d');
+        if (!ctxRef.current) ctxRef.current = canvas.getContext('2d', { willReadFrequently: true });
+        const ctx = ctxRef.current;
 
         ctx.beginPath();
         ctx.moveTo(coords.x, coords.y);
 
         if (activeTool === 'eraser') {
             ctx.globalCompositeOperation = 'destination-out';
-            ctx.lineWidth = 20; // Eraser is thicker by default
+            ctx.lineWidth = 30; // Thicker eraser
         } else {
             ctx.globalCompositeOperation = 'source-over';
             ctx.strokeStyle = color;
@@ -314,15 +321,26 @@ const MeasurementModal = ({ isOpen, onClose, onSave, rooms, projectTitle, initia
         if (!isDrawing) return;
         if (stylusOnlyMode && e.pointerType !== 'pen') return;
 
-        const coords = getCoordinates(e);
-        const ctx = canvasRef.current.getContext('2d');
+        lastCoords.current = getCoordinates(e);
 
-        ctx.lineTo(coords.x, coords.y);
-        ctx.stroke();
+        if (!rafRef.current) {
+            rafRef.current = requestAnimationFrame(() => {
+                rafRef.current = null;
+                if (!isDrawing || !lastCoords.current) return;
+
+                const ctx = ctxRef.current;
+                const coords = lastCoords.current;
+                ctx.lineTo(coords.x, coords.y);
+                ctx.stroke();
+            });
+        }
     };
 
     const stopDrawing = (e) => {
         if (isDrawing) {
+            if (rafRef.current) cancelAnimationFrame(rafRef.current);
+            rafRef.current = null;
+
             if (e && e.target.releasePointerCapture) {
                 try { e.target.releasePointerCapture(e.pointerId); } catch (err) { }
             }

@@ -3239,7 +3239,7 @@ END:VCARD`;
                                                         flexShrink: 0,
                                                         border: img.includeInReport !== false ? '2px solid #0F6EA3' : '1px solid var(--border)'
                                                     }}>
-                                                        <img src={img.preview} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onClick={() => setActiveImageMeta(img)} />
+                                                        <img src={img.preview} style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: 'pointer' }} onClick={() => setEditingImage(img)} />
 
                                                         {/* Include in Report Toggle (Centered/Unified) */}
                                                         <div
@@ -3732,7 +3732,18 @@ END:VCARD`;
                                                             <div key={idx} style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start', border: '1px solid var(--border)', padding: '0.5rem', borderRadius: '6px', backgroundColor: 'var(--background)' }}>
                                                                 {/* Thumbnail check */}
                                                                 <div style={{ flex: '0 0 100px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
-                                                                    <div style={{ width: '100px', height: '100px', borderRadius: '6px', overflow: 'hidden', backgroundColor: '#E5E7EB', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+                                                                    <div style={{
+                                                                        width: '100px',
+                                                                        height: '100px',
+                                                                        borderRadius: '6px',
+                                                                        overflow: 'hidden',
+                                                                        backgroundColor: '#E5E7EB',
+                                                                        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                                                                        border: (activeImageMeta?.preview === img.preview || editingImage?.preview === img.preview) ? '3px solid #3B82F6' : '1px solid var(--border)',
+                                                                        transform: (activeImageMeta?.preview === img.preview || editingImage?.preview === img.preview) ? 'scale(1.05)' : 'none',
+                                                                        transition: 'all 0.2s ease',
+                                                                        zIndex: (activeImageMeta?.preview === img.preview || editingImage?.preview === img.preview) ? 10 : 1
+                                                                    }}>
                                                                         <img src={img.preview} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onClick={() => window.open(img.preview, '_blank')} />
                                                                     </div>
                                                                     <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', padding: '0 2px', alignItems: 'center' }}>
@@ -3766,7 +3777,7 @@ END:VCARD`;
                                                                                 justifyContent: 'center',
                                                                                 boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
                                                                             }}
-                                                                            onClick={() => setActiveImageMeta(img)}
+                                                                            onClick={() => setEditingImage(img)}
                                                                         >
                                                                             <Edit3 size={22} />
                                                                         </button>
@@ -5266,10 +5277,10 @@ END:VCARD`;
                     editingImage && (
                         <ImageEditor
                             image={editingImage}
-                            onSave={(newPreview) => {
+                            onSave={(newPreview, newDescription) => {
                                 setFormData(prev => ({
                                     ...prev,
-                                    images: prev.images.map(img => img === editingImage ? { ...img, preview: newPreview } : img)
+                                    images: prev.images.map(img => img === editingImage ? { ...img, preview: newPreview, description: newDescription } : img)
                                 }));
                                 setEditingImage(null);
                             }}
@@ -5278,130 +5289,7 @@ END:VCARD`;
                     )
                 }
 
-                {/* New Image Metadata Modal */}
-                {
-                    activeImageMeta && (
-                        <div style={{
-                            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-                            backgroundColor: 'rgba(0,0,0,0.75)', zIndex: 10000,
-                            display: 'flex', alignItems: 'center', justifyContent: 'center'
-                        }}>
-                            <div style={{
-                                backgroundColor: '#1E293B',
-                                padding: '1rem',
-                                borderRadius: '16px',
-                                width: '95%',
-                                maxWidth: '600px',
-                                maxHeight: '90vh',
-                                overflowY: 'auto',
-                                color: 'white',
-                                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)'
-                            }}>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                                    {/* Left Column: Fields */}
-                                    <div>
-
-
-
-
-                                        <div style={{ marginTop: '2rem' }}>
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    // Save activeImageMeta to formData first
-                                                    setFormData(prev => ({
-                                                        ...prev,
-                                                        images: prev.images.map(img => img.preview === activeImageMeta.preview ? activeImageMeta : img)
-                                                    }));
-                                                    setEditingImage(activeImageMeta);
-                                                    setActiveImageMeta(null);
-                                                }}
-                                                style={{ color: '#0F6EA3', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1rem' }}
-                                            >
-                                                <Edit3 size={20} />
-                                                Bild bearbeiten (Zeichnen)
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    {/* Right Column: Description & Preview */}
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                                        <div style={{ position: 'relative', display: 'flex', flexDirection: 'column' }}>
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                                                <span style={{ fontSize: '0.9rem', color: '#94A3B8' }}>Beschreibung</span>
-                                                <button
-                                                    type="button"
-                                                    onClick={isRecording === 'modal' ? stopRecording : () => startRecording('modal')}
-                                                    className={`btn ${isRecording === 'modal' ? 'btn-danger' : 'btn-outline'}`}
-                                                    style={{
-                                                        padding: '0.25rem 0.75rem',
-                                                        fontSize: '0.8rem',
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        gap: '0.5rem',
-                                                        borderColor: isRecording ? '#EF4444' : '#475569',
-                                                        color: isRecording ? 'white' : '#94A3B8',
-                                                        backgroundColor: isRecording ? '#EF4444' : 'transparent',
-                                                        cursor: 'pointer'
-                                                    }}
-                                                >
-                                                    <Mic size={14} className={isRecording === 'modal' ? 'animate-pulse' : ''} />
-                                                    {isRecording === 'modal' ? 'Aufnahme stoppen...' : 'Spracheingabe (KI)'}
-                                                </button>
-                                            </div>
-                                            <textarea
-                                                placeholder="Beschreibung hinzufügen..."
-                                                style={{
-                                                    flex: 1,
-                                                    backgroundColor: '#0F172A',
-                                                    borderColor: isRecording ? '#EF4444' : '#334155',
-                                                    color: 'white',
-                                                    padding: '1rem',
-                                                    borderRadius: '8px',
-                                                    resize: 'none',
-                                                    minHeight: '150px',
-                                                    transition: 'border-color 0.3s'
-                                                }}
-                                                value={activeImageMeta.description || ''}
-                                                onChange={(e) => setActiveImageMeta(prev => ({ ...prev, description: e.target.value }))}
-                                            />
-                                        </div>
-
-                                        <div style={{ height: '200px', backgroundColor: '#000', borderRadius: '8px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                            <img src={activeImageMeta.preview} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} alt="" />
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div style={{ marginTop: '2rem', display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
-                                    <button
-                                        type="button"
-                                        className="btn btn-ghost"
-                                        onClick={() => setActiveImageMeta(null)}
-                                        style={{ color: '#94A3B8' }}
-                                    >
-                                        Abbrechen
-                                    </button>
-                                    <button
-                                        type="button"
-                                        className="btn btn-primary"
-                                        onClick={() => {
-                                            setFormData(prev => ({
-                                                ...prev,
-                                                images: prev.images.map(img => img.preview === activeImageMeta.preview ? activeImageMeta : img)
-                                            }));
-                                            setActiveImageMeta(null);
-                                        }}
-                                        style={{ padding: '0.75rem 2rem' }}
-                                    >
-                                        <Save size={18} />
-                                        Speichern
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    )
-                }
+                {/* New Image Metadata Modal - PORTAL CENTERED (DEPRECATED - Unified into ImageEditor) */}
                 {
                     showCameraModal && (
                         <CameraCaptureModal
