@@ -21,10 +21,10 @@ serve(async (req) => {
         // 1. Setup Supabase Client
         const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
         const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-        const openaiApiKey = Deno.env.get('OPENAI_API_KEY') ?? ''
+        const googleApiKey = Deno.env.get('GOOGLE_API_KEY') ?? ''
 
-        if (!openaiApiKey) {
-            throw new Error("OPENAI_API_KEY is not set in Secrets")
+        if (!googleApiKey) {
+            throw new Error("GOOGLE_API_KEY is not set in Secrets")
         }
 
         const supabase = createClient(supabaseUrl, supabaseKey)
@@ -99,96 +99,63 @@ serve(async (req) => {
         console.log("Extracted text length:", textContent.length);
         console.log("Text preview:", textContent.slice(0, 100));
 
-        // 5. Call OpenAI
-        const systemPrompt = `
-Du extrahierst strukturierte Daten für eine Gebäude-Sanierungsfirma (Q-Service).
+        // 5. Call Gemini AI
+        const systemPrompt = `Du bist ein technischer Daten-Parser für die AG-App (Q-Service). Deine Aufgabe ist es, unstrukturierte Texte (E-Mails, PDF-Inhalte) in ein exaktes JSON-Format zu überführen.
 
-WICHTIG:
-- Erfinde keine Informationen.
-- Wenn ein Wert nicht eindeutig vorhanden ist, setze null.
-- projectTitle Format: "[Schadenstyp] - [Strasse]"
-- client ist die Firma oder Person, die den Auftrag erteilt.
-- street enthält nur Strasse und Hausnummer.
-- zip enthält nur die 4-stellige PLZ.
-- city enthält nur den Ortsnamen.
-- description ist eine sachliche Zusammenfassung des Schadens (max. 3 Sätze).
-- Rolle muss eine der vorgegebenen Rollen sein.
-    `;
+1. REGEL FÜR ADRESS-SPLIT (PFLICHT):
+   - FELD 'EIGENTÜMER': Suche nach dem Namen der Organisation oder Person.
+   - CUT-OFF: Sobald ein Wort erscheint, das eine Adresse einleitet (Strasse, Str., Weg, PLZ, Ort), muss dieses Wort und alles danach aus dem Feld 'EIGENTÜMER' entfernt werden.
+   - MAPPING: Diese entfernten Teile müssen in 'strasse_nr' und 'plz_ort' des Schadenorts geschrieben werden.
 
-        const completion = await fetch("https://api.openai.com/v1/chat/completions", {
+2. ROLLEN-LOGIK (NUR DIESE WERTE):
+   Ordne jedem Kontakt ausschliesslich eines dieser Kürzel zu:
+   - 'Handw.': Firmen, Techniker, Sanitär.
+   - 'Verw.': Verwaltungen, Bewirtschaftungen.
+   - 'Mieter': Bewohner des Objekts.
+   - 'Eig.': Der Eigentümer (wie oben extrahiert).
+   - 'HW': Hauswart.
+
+3. VERBOT VON PLATZHALTERN:
+   - Gib niemals das Wort "string" oder ähnliche Platzhalter aus.
+   - Falls eine Information nicht existiert, gib einen leeren String ("") aus.
+
+4. FORMATIERUNG:
+   - Telefon: +41 XX XXX XX XX (wo möglich).
+
+AUSGABE-FORMAT (JSON):
+{
+  "projekt_daten": { "interne_id": "", "externe_ref": "", "auftrags_nr": "" },
+  "auftrag_verwaltung": { "firma": "", "sachbearbeiter": "", "leistungsart": "" },
+  "rechnungs_details": { "eigentuemer": "", "email_rechnung": "", "vermerk": "" },
+  "schadenort": { "strasse_nr": "", "plz_ort": "", "etage_wohnung": "" },
+  "kontakte": [ { "name": "", "rolle": "Handw.|Verw.|Mieter|Eig.|HW", "telefon": "" } ],
+  "gap_analysis": []
+}
+
+Antworte NUR mit dem validen JSON-Code OHNE Markdown-Formatierung.`;
+
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${googleApiKey}`, {
             method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${openaiApiKey}`
-            },
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-                model: "gpt-4o",
-                response_format: {
-                    type: "json_schema",
-                    json_schema: {
-                        name: "extraction_result",
-                        strict: true,
-                        schema: {
-                            type: "object",
-                            properties: {
-                                projectTitle: { type: ["string", "null"] },
-                                client: { type: ["string", "null"] },
-                                street: { type: ["string", "null"] },
-                                zip: {
-                                    type: ["string", "null"],
-                                    pattern: "^[0-9]{4}$"
-                                },
-                                city: { type: ["string", "null"] },
-                                description: { type: ["string", "null"] },
-                                contacts: {
-                                    type: "array",
-                                    items: {
-                                        type: "object",
-                                        properties: {
-                                            role: {
-                                                type: ["string", "null"],
-                                                enum: ["Mieter", "Eigentümer", "Verwaltung", "Hauswart", "Sonstiges", null]
-                                            },
-                                            name: { type: ["string", "null"] },
-                                            phone: { type: ["string", "null"] },
-                                            email: { type: ["string", "null"] }
-                                        },
-                                        required: ["role", "name", "phone", "email"],
-                                        additionalProperties: false
-                                    }
-                                }
-                            },
-                            required: ["projectTitle", "client", "street", "zip", "city", "description", "contacts"],
-                            additionalProperties: false
-                        }
-                    }
-                },
-                messages: [
-                    { role: "system", content: systemPrompt },
-                    { role: "user", content: `Hier ist der Text des Dokuments/der Nachricht:\n\n${textContent}` }
-                ],
-                temperature: 0
+                contents: [{
+                    parts: [
+                        { text: systemPrompt },
+                        { text: `HIER IST DER TEXT ZUR ANALYSE:\n\n${textContent}` }
+                    ]
+                }],
+                generationConfig: {
+                    temperature: 0.1,
+                    responseMimeType: "application/json"
+                }
             })
         });
 
-        const aiRes = await completion.json();
-        console.log("OpenAI Response Status:", completion.status);
+        const resData = await response.json();
+        if (resData.error) throw new Error("Gemini API Error: " + resData.error.message);
 
-        if (aiRes.error) {
-            throw new Error("OpenAI Error: " + aiRes.error.message);
-        }
+        const aiResult = JSON.parse(resData.candidates[0].content.parts[0].text.trim());
 
-        let rawContent = aiRes.choices[0].message.content;
-        // Cleanup JSON markdown if present
-        rawContent = rawContent.replace(/```json/g, "").replace(/```/g, "").trim();
-
-        let aiResult;
-        try {
-            aiResult = JSON.parse(rawContent);
-        } catch (e) {
-            console.error("JSON Parse Error:", rawContent);
-            throw new Error("Failed to parse AI response as JSON");
-        }
 
         // 6. Save Extraction to DB
         const { error: insertError } = await supabase
@@ -207,16 +174,6 @@ WICHTIG:
             .from("case_documents")
             .update({ extraction_status: "completed" })
             .eq("id", document_id);
-
-        // 8. Optional: Merge into report_data (Behalten wir bei, damit 'Magic' direkt sichtbar ist,
-        //    aber Frontend steuert ja jetzt via Vorschau)
-        //    Wir machen es trotzdem, falls der User refresht.
-        const { data: report } = await supabase.from("damage_reports").select("report_data").eq("id", doc.case_id).single();
-        const currentData = report?.report_data || {};
-        // Nur leere Felder auffüllen? Oder überschreiben? 
-        // Strategie: AI Ergebnis ist "Vorschlag". Wir speichern es hier NICHT direkt hart in den Report, 
-        // sondern verlassen uns darauf, dass das Frontend es via "case_extractions" oder Rückgabewert holt.
-        // ABER: Dein Frontend-Code erwartet im Moment die Daten zurück vom Function Call.
 
         // Return result to client
         return new Response(

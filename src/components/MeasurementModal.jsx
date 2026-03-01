@@ -9,6 +9,7 @@ const MeasurementModal = ({ isOpen, onClose, onSave, rooms, projectTitle, initia
 
     const canvasRef = useRef(null);
     const containerRef = useRef(null);
+    const isInitializedRef = useRef(null); // Track initialization per session
     const [isDrawing, setIsDrawing] = useState(false);
     const [color, setColor] = useState('#000000');
     const [lineWidth, setLineWidth] = useState(2);
@@ -153,12 +154,13 @@ const MeasurementModal = ({ isOpen, onClose, onSave, rooms, projectTitle, initia
 
     }, [measurementHistory, measurements]);
 
-    const isInitializedRef = useRef(null);
+
 
     // Initialize measurements based on rooms or initialData
     useEffect(() => {
         if (!isOpen) {
             isInitializedRef.current = null;
+            // Clear history on close to prevent carry-over if key doesn't change
             setHistory([]);
             setHistoryStep(-1);
             return;
@@ -178,6 +180,7 @@ const MeasurementModal = ({ isOpen, onClose, onSave, rooms, projectTitle, initia
         const performInit = () => {
             const canvas = canvasRef.current;
             if (!canvas) {
+                // If canvas not ready yet, retry in 50ms
                 initTimer = setTimeout(performInit, 50);
                 return;
             }
@@ -205,6 +208,7 @@ const MeasurementModal = ({ isOpen, onClose, onSave, rooms, projectTitle, initia
                     initCanvas();
                 }
             } else {
+                // Default measurements
                 const initial = [
                     { id: `p${Date.now()}`, pointName: 'Messpunkt 1', w_value: '', b_value: '', notes: '' },
                     { id: `p${Date.now() + 1}`, pointName: 'Messpunkt 2', w_value: '', b_value: '', notes: '' },
@@ -222,6 +226,7 @@ const MeasurementModal = ({ isOpen, onClose, onSave, rooms, projectTitle, initia
             }
         };
 
+        // Start initialization
         performInit();
 
         return () => {
@@ -235,8 +240,13 @@ const MeasurementModal = ({ isOpen, onClose, onSave, rooms, projectTitle, initia
         const ctx = canvas.getContext('2d');
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
+        // Fill white background explicitly (better for toDataURL than transparency)
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
+        // Clear center to allow grid background to show through if needed,
+        // but actually clearRect keeps transparency.
+        // If we want white, we stay white.
+        // ctx.clearRect(0, 0, canvas.width, canvas.height);
         saveParamsToHistory(canvas);
     };
 
@@ -657,7 +667,7 @@ const MeasurementModal = ({ isOpen, onClose, onSave, rooms, projectTitle, initia
                                         <input
                                             id="sketch-photo-upload"
                                             type="file"
-                                            accept="image/*"
+                                            accept="image/*,.heic,.heif"
                                             style={{ display: 'none' }}
                                             onChange={(e) => {
                                                 const file = e.target.files?.[0];

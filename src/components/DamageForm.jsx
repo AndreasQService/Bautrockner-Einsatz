@@ -1883,7 +1883,7 @@ END:VCARD`;
                 backgroundColor: 'rgba(245, 158, 11, 0.15)', padding: '2px 8px', borderRadius: '4px',
                 border: '1px solid rgba(245, 158, 11, 0.3)', zIndex: 10
             }} title={`Konflikt: Vorher "${conflict.original}"`}>
-                <AlertCircle size={14} color="#f59e0b" />
+                <AlertTriangle size={14} color="#f59e0b" />
                 <button
                     onClick={() => {
                         setFormData(prev => ({ ...prev, [fieldPath]: conflict.original }));
@@ -2688,7 +2688,7 @@ END:VCARD`;
                                     <input
                                         type="file"
                                         multiple
-                                        accept="image/*"
+                                        accept="image/*,.heic,.heif"
                                         style={{ display: 'none' }}
                                         onChange={async (e) => {
                                             if (!e.target.files?.length) return;
@@ -4621,7 +4621,7 @@ END:VCARD`;
                                     <Plus size={20} />
                                 </div>
                                 <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>Sonstiges Dokument hochladen / Drop</span>
-                                <input id="file-upload-Sonstiges-desktop" type="file" multiple accept="image/*,application/pdf" style={{ display: 'none' }} onChange={(e) => handleCategorySelect(e, 'Sonstiges')} />
+                                <input id="file-upload-Sonstiges-desktop" type="file" multiple accept="image/*,.heic,.heif,application/pdf" style={{ display: 'none' }} onChange={(e) => handleCategorySelect(e, 'Sonstiges')} />
                             </div>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
                                 {formData.images.filter(img => img.assignedTo === 'Sonstiges').map((item, idx) => (

@@ -42,7 +42,7 @@ create table if not exists case_documents (
   id uuid primary key default gen_random_uuid(),
   case_id text not null,
   file_path text not null,
-  file_type text not null check (file_type in ('pdf','msg')),
+  file_type text not null check (file_type in ('pdf','msg','txt')),
   original_filename text,
   extraction_status text not null default 'pending',
   created_at timestamptz not null default now()
@@ -58,9 +58,13 @@ alter table case_documents enable row level security;
 drop policy if exists "Enable all access for anon" on case_documents;
 drop policy if exists "Enable all access for authenticated" on case_documents;
 
--- Create policies for AUTHENTICATED users
+-- Create policies for AUTHENTICATED & ANON (Dev-Mode)
 create policy "Enable all access for authenticated" on case_documents
   for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+
+create policy "Enable all access for anon" on case_documents
+  for all using (true) with check (true);
+
 
 
 -----------------------------------------------------------
@@ -86,9 +90,13 @@ alter table case_extractions enable row level security;
 drop policy if exists "Enable all access for anon" on case_extractions;
 drop policy if exists "Enable all access for authenticated" on case_extractions;
 
--- Create policies for AUTHENTICATED users
+-- Create policies for AUTHENTICATED & ANON (Dev-Mode)
 create policy "Enable all access for authenticated" on case_extractions
   for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+
+create policy "Enable all access for anon" on case_extractions
+  for all using (true) with check (true);
+
 
 
 -----------------------------------------------------------

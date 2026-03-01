@@ -56,60 +56,35 @@ export default function UploadPanel({ caseId, onCaseCreated, onExtractionComplet
       const genAI = new GoogleGenerativeAI(apiKey);
       console.log("Analyzing with AI. Text length:", textContext.length);
 
-      const prompt = `Du bist ein technischer Daten-Parser. Deine einzige Aufgabe ist es, unstrukturierte Texte in ein JSON-Format zu überführen, das exakt auf die Felder der AG-App passt.
+      const prompt = `Du bist ein technischer Daten-Parser für die AG-App (Q-Service). Deine Aufgabe ist es, unstrukturierte Texte (E-Mails, PDF-Inhalte) in ein exaktes JSON-Format zu überführen.
 
 1. REGEL FÜR ADRESS-SPLIT (PFLICHT):
-   - FELD 'EIGENTÜMER': Suche nach dem Namen der Organisation. 
-   - CUT-OFF: Sobald ein Wort erscheint, das eine Adresse einleitet (Strasse, Str., Weg, PLZ, Hausnummer), MUSS dieses Wort und alles danach aus dem Feld 'EIGENTÜMER' entfernt werden.
-   - MAPPING: Diese entfernten Teile müssen zwingend in die Felder 'STRASSE & NR.', 'PLZ' und 'ORT' geschrieben werden. 
-   - KONTROLLE: Ein leeres Feld 'STRASSE & NR.' bei gleichzeitigem Text im Feld 'EIGENTÜMER' ist ein Systemfehler und muss korrigiert werden.
+   - FELD 'EIGENTÜMER': Suche nach dem Namen der Organisation oder Person.
+   - CUT-OFF: Sobald ein Wort erscheint, das eine Adresse einleitet (Strasse, Str., Weg, PLZ, Ort), muss dieses Wort und alles danach aus dem Feld 'EIGENTÜMER' entfernt werden.
+   - MAPPING: Diese entfernten Teile müssen in 'strasse_nr' und 'plz_ort' des Schadenorts geschrieben werden.
 
 2. ROLLEN-LOGIK (NUR DIESE WERTE):
    Ordne jedem Kontakt ausschliesslich eines dieser Kürzel zu:
-   - 'Handw.': Jede Person mit einer Firmen-Signatur (Technik/Sanitär), die den Schaden meldet oder behebt.
-   - 'Verw.': Jede Firma, die als Verwaltung oder Bewirtschaftung auftritt.
-   - 'Mieter': Personen, die in der betroffenen Wohnung oder im Objekt leben.
-   - 'Eig.': Die im Abschnitt 'Eigentümer' genannte Entität.
+   - 'Handw.': Firmen, Techniker, Sanitär.
+   - 'Verw.': Verwaltungen, Bewirtschaftungen.
+   - 'Mieter': Bewohner des Objekts.
+   - 'Eig.': Der Eigentümer (wie oben extrahiert).
    - 'HW': Hauswart.
 
 3. VERBOT VON PLATZHALTERN:
-   - Die Ausgabe des Wortes "string" ist strengstens untersagt. 
-   - Falls eine Information im Text nicht existiert, gib einen leeren String ("") aus. 
-   - Fülle JEDES Feld mit den Realdaten aus dem Text, niemals mit Platzhaltern.
+   - Gib niemals das Wort "string" oder ähnliche Platzhalter aus.
+   - Falls eine Information nicht existiert, gib einen leeren String ("") aus.
 
 4. FORMATIERUNG:
-   - Telefon: +41 XX XXX XX XX.
-   - Namen: Trenne Vorname und Nachname (falls möglich).
+   - Telefon: +41 XX XXX XX XX (wo möglich).
 
 AUSGABE-FORMAT (JSON):
 {
-  "projekt_daten": {
-    "interne_id": "2026xxxx",
-    "externe_ref": "",
-    "auftrags_nr": ""
-  },
-  "auftrag_verwaltung": {
-    "firma": "",
-    "sachbearbeiter": "",
-    "leistungsart": "Wasserschaden"
-  },
-  "rechnungs_details": {
-    "eigentuemer": "",
-    "email_rechnung": "",
-    "vermerk": ""
-  },
-  "schadenort": {
-    "strasse_nr": "",
-    "plz_ort": "",
-    "etage_wohnung": ""
-  },
-  "kontakte": [
-    {
-      "name": "",
-      "rolle": "Handw. | Verw. | Mieter | Eig. | HW",
-      "telefon": "+41 XX XXX XX XX"
-    }
-  ],
+  "projekt_daten": { "interne_id": "", "externe_ref": "", "auftrags_nr": "" },
+  "auftrag_verwaltung": { "firma": "", "sachbearbeiter": "", "leistungsart": "" },
+  "rechnungs_details": { "eigentuemer": "", "email_rechnung": "", "vermerk": "" },
+  "schadenort": { "strasse_nr": "", "plz_ort": "", "etage_wohnung": "" },
+  "kontakte": [ { "name": "", "rolle": "Handw.|Verw.|Mieter|Eig.|HW", "telefon": "" } ],
   "gap_analysis": []
 }
 
@@ -287,14 +262,15 @@ ${textContext}`;
       const id = await ensureCaseId();
       console.log("Using Case ID:", id);
       let newImages = [];
-      let combinedText = "";
+      let combinedClientText = "";
+      let extractionResults = [];
 
       for (const file of files) {
         const lowerName = file.name.toLowerCase();
         console.log("Processing item:", lowerName);
 
         // --- TYPE 1: BILDER ---
-        if (lowerName.match(/\.(jpg|jpeg|png|gif|webp)$/)) {
+        if (lowerName.match(/\.(jpg|jpeg|png|gif|webp|heic|heif)$/)) {
           try {
             const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
             const filePath = `cases/${id}/images/${timestamp}_${safeName(file.name)}`;
@@ -314,41 +290,103 @@ ${textContext}`;
 
         // --- TYPE 2: DOKUMENTE ---
         else if (lowerName.match(/\.(pdf|msg|txt)$/)) {
-          console.log("Extracting text from document...");
+          console.log("Handling document:", lowerName);
           try {
-            const fileType = lowerName.endsWith(".pdf") ? "pdf" : (lowerName.endsWith(".txt") ? "txt" : "msg");
+            const isPdf = lowerName.endsWith(".pdf");
+            const isMsg = lowerName.endsWith(".msg");
+            const isTxt = lowerName.endsWith(".txt");
+
+            const fileTypeLabel = isPdf ? "pdf" : (isMsg ? "msg" : "txt");
             const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
             const filePath = `cases/${id}/original/${timestamp}_${safeName(file.name)}`;
 
             console.log("Uploading original to:", filePath);
-            await supabase.storage.from("case-files").upload(filePath, file, { upsert: true });
+            const { error: uploadError } = await supabase.storage.from("case-files").upload(filePath, file, { upsert: true });
+            if (uploadError) throw uploadError;
 
-            if (fileType === 'pdf') {
-              combinedText += await processPdfFile(file) + "\n\n";
-            } else if (fileType === 'txt') {
-              combinedText += await file.text() + "\n\n";
+            // --- PFLICHT: DB Eintrag in case_documents ---
+            console.log("Creating DB record in case_documents...");
+            const { data: docRecord, error: dbError } = await supabase
+              .from("case_documents")
+              .insert({
+                case_id: id,
+                file_path: filePath,
+                file_type: isPdf ? 'pdf' : (isMsg ? 'msg' : 'txt'),
+                original_filename: file.name,
+                extraction_status: 'pending'
+              })
+              .select()
+              .single();
+
+            if (dbError) {
+              console.warn("Could not create case_documents record:", dbError);
             }
-          } catch (e) { console.error("Doc extraction failed", e); }
+
+            // --- TRIGGER EXTRACTION ---
+            if ((isPdf || isMsg || isTxt) && docRecord) {
+              setStatus(`⏳ Analysiere ${file.name} (Edge Function)...`);
+              console.log("Invoking 'extract' function for doc:", docRecord.id);
+
+              const { data: extraction, error: funcError } = await supabase.functions.invoke("extract", {
+                body: { document_id: docRecord.id }
+              });
+
+              if (funcError) {
+                console.error("Edge Function Error:", funcError);
+                // Fallback to client-side if server fails
+                if (isPdf) combinedClientText += await processPdfFile(file) + "\n\n";
+              } else if (extraction?.success && extraction.data) {
+                console.log("Edge Function extraction success!");
+                extractionResults.push(extraction.data);
+              }
+            }
+            else if (isTxt) {
+              combinedClientText += await file.text() + "\n\n";
+            }
+            else if (isPdf && !docRecord) {
+              // Fallback client-side PDF parsing if no DB record
+              combinedClientText += await processPdfFile(file) + "\n\n";
+            }
+          } catch (e) { console.error("Doc processing failed", e); }
         }
       }
 
-      // Final Analysis if text found
-      if (combinedText.trim()) {
-        console.log("Text gathered. Length:", combinedText.length, "Calling AI...");
-        const aiResult = await analyzeWithAI(combinedText);
+      // --- AGGREGATE RESULTS ---
+      let finalResult = null;
+
+      // If we have Edge Function results, use the first one (or merge if needed)
+      if (extractionResults.length > 0) {
+        finalResult = extractionResults[0]; // Simple approach: take first
+        // TODO: Implement smart merge if multiple docs
+      }
+
+      // If we have additional text (pasted or fallback), augment with Gemini
+      if (combinedClientText.trim()) {
+        console.log("Text gathered for client-side analysis. Calling AI...");
+        const aiResult = await analyzeWithAI(combinedClientText);
         if (aiResult) {
-          console.log("AI extraction complete.");
-          setPreviewData(aiResult);
+          // If we had no Edge result, take Gemini. If we have both, maybe merge?
+          if (!finalResult) {
+            finalResult = aiResult;
+          } else {
+            console.log("Both Server and Client results available. Keeping Server as primary.");
+          }
         }
+      }
+
+      if (finalResult) {
+        setPreviewData(finalResult);
+        setStatus("✅ Dokumente analysiert.");
+      } else if (newImages.length > 0) {
+        setStatus("✅ Bilder hochgeladen.");
       } else {
-        console.log("No text content found to analyze.");
+        setStatus("ℹ️ Keine extrahierbaren Daten gefunden.");
       }
 
       if (newImages.length > 0 && onImagesUploaded) {
         onImagesUploaded(newImages);
       }
 
-      setStatus("✅ Dokumente analysiert.");
       setFiles([]);
 
     } catch (err) {
@@ -536,7 +574,7 @@ ${textContext}`;
             id="file-upload-input"
             type="file"
             multiple
-            accept=".pdf,.msg,.txt,.jpg,.jpeg,.png,.gif,application/pdf,image/*"
+            accept=".pdf,.msg,.txt,.jpg,.jpeg,.png,.gif,.heic,.heif,application/pdf,image/*"
             style={{ display: "none" }}
             onChange={handleFileChange}
           />
