@@ -6,7 +6,7 @@ import { Document, Page, Text, View, StyleSheet, Image, Font } from '@react-pdf/
 const styles = StyleSheet.create({
     page: {
         padding: 30,
-        paddingBottom: 80, // Space for footer
+        paddingBottom: 90, // Increased to provide more safety for the footer
         fontFamily: 'Helvetica',
         fontSize: 10,
         color: '#000000',
@@ -117,22 +117,26 @@ const styles = StyleSheet.create({
     imageGrid: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        gap: 10,
+        justifyContent: 'space-between',
+        width: '100%',
     },
     imageContainer: {
-        width: '48%', // 2 per row approx
+        width: '49%', // 2 per row
         marginBottom: 10,
+        alignItems: 'flex-start',
     },
     image: {
         width: '100%',
-        height: 150,
+        height: 200, // Slightly more height
         objectFit: 'contain',
+        objectPosition: 'left',
         borderRadius: 2,
     },
     imageDescription: {
         fontSize: 9,
         color: '#475569',
         marginTop: 4,
+        textAlign: 'left',
     },
     // Table
     table: {
@@ -172,17 +176,26 @@ const styles = StyleSheet.create({
         bottom: 30,
         left: 30,
         right: 30,
-        height: 30,
-        // backgroundColor: '#eeeeee', // Debug color removed
+        height: 60, // Increased more to be absolutely sure
         borderTopWidth: 0.5,
         borderTopColor: '#0369a1',
         paddingTop: 10,
-
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
     },
     footerText: {
-        fontSize: 8,
-        color: '#000000', // Changed to black for visibility
+        fontSize: 10,
+        color: '#000000',
     },
+    pageNumber: {
+        position: 'absolute',
+        bottom: 40,
+        right: 30,
+        fontSize: 10,
+        color: '#000000',
+        textAlign: 'right',
+    }
 });
 
 // Helper to sort rooms
@@ -253,9 +266,26 @@ const DamageReportDocument = ({ data }) => {
 
 
 
-                {/* Header */}
                 <View style={styles.header} fixed>
-                    {data.logo && <Image src={data.logo} style={styles.logo} />}
+                    <View style={{ alignItems: 'flex-start' }}>
+                        {data.logo && <Image src={data.logo} style={styles.logo} />}
+                        {data.projectNumber && (
+                            <Text
+                                style={{ fontSize: 9, color: '#0F6EA3', fontWeight: 'bold', marginTop: 2 }}
+                                render={({ pageNumber }) => (
+                                    pageNumber > 1 ? `Projekt-Nr: ${data.projectNumber}` : ''
+                                )}
+                            />
+                        )}
+                        {data.orderNumber && (
+                            <Text
+                                style={{ fontSize: 8, color: '#64748B', fontWeight: 'bold' }}
+                                render={({ pageNumber }) => (
+                                    pageNumber > 1 ? `Auftrag: ${data.orderNumber}` : ''
+                                )}
+                            />
+                        )}
+                    </View>
                     <View style={styles.companyInfo}>
                         <Text>Q-Service AG</Text>
                         <Text>Kriesbachstrasse 30</Text>
@@ -273,12 +303,6 @@ const DamageReportDocument = ({ data }) => {
                     <Text style={styles.subTitle}>
                         {`${data.street || ''} ${data.zip || ''} ${data.city || ''} ${data.damageType ? '- ' + data.damageType : ''}`.trim()}
                     </Text>
-                    {data.projectTitle && !data.projectTitle.startsWith('TMP-') && (
-                        <Text style={styles.projectTitle}>Projekt: {data.projectTitle}</Text>
-                    )}
-                    {data.orderNumber && (
-                        <Text style={styles.projectTitle}>Auftrag: {data.orderNumber}</Text>
-                    )}
                 </View>
 
                 {/* Meta Data */}
@@ -393,13 +417,15 @@ const DamageReportDocument = ({ data }) => {
 
                 {/* Hero / Exterior Photo */}
                 {data.exteriorPhoto && (
-                    <View style={{ marginBottom: 20, alignItems: 'center' }} wrap={false}>
-                        <Image src={data.exteriorPhoto} style={{ width: '100%', height: 250, objectFit: 'contain', borderRadius: 4 }} />
-                        <Text style={[styles.imageDescription, { textAlign: 'center', marginTop: 5 }]}>Außenansicht / Übersicht</Text>
+                    <View style={{ marginBottom: 20, alignItems: 'flex-start' }} wrap={false}>
+                        <View style={{ width: '100%' }}>
+                            <View style={styles.imageContainer}>
+                                <Image src={data.exteriorPhoto} style={[styles.image, { height: 250 }]} />
+                                <Text style={styles.imageDescription}>Außenansicht / Übersicht</Text>
+                            </View>
+                        </View>
                     </View>
                 )}
-
-                <View style={styles.divider} />
 
                 {/* Schadensbeschreibung mit Bildern */}
                 {((data.description && data.includeDescriptionInReport !== false) || (data.images && data.images.some(img => !img.roomId && img.assignedTo !== 'Schadenfotos' && img.assignedTo !== 'Pläne' && img.assignedTo !== 'Messprotokolle' && img.includeInReport !== false))) && (
@@ -414,42 +440,16 @@ const DamageReportDocument = ({ data }) => {
                             <View style={{ marginTop: 10 }}>
                                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
                                     {data.images.filter(img => !img.roomId && img.assignedTo !== 'Schadenfotos' && img.assignedTo !== 'Pläne' && img.assignedTo !== 'Messprotokolle' && img.includeInReport !== false).map((img, i) => (
-                                        <View key={i} style={{ width: '48%', marginBottom: 10 }}>
-                                            <Image src={img.preview} style={{ width: '100%', height: 160, objectFit: 'contain' }} />
+                                        <View key={i} style={styles.imageContainer}>
+                                            <Image src={img.preview} style={styles.image} />
                                         </View>
                                     ))}
                                 </View>
                             </View>
                         )}
-                        <View style={styles.divider} />
                     </View>
                 )}
 
-                {/* Damage Cause Section & Hero Photos */}
-                {(data.cause || (data.images && data.images.some(img => img.assignedTo === 'Schadenfotos' && img.includeInReport !== false))) && (
-                    <View style={{ marginBottom: 20 }} wrap={false}>
-                        <View style={styles.divider} />
-                        <View style={{ marginBottom: 10 }}>
-                            <Text style={styles.sectionTitle}>SCHADENURSACHE</Text>
-                            {data.cause && <Text style={styles.textBlock}>{data.cause}</Text>}
-                        </View>
-
-                        {/* Schadenfotos Grid (The "Selected Pics") */}
-                        {data.images && data.images.some(img => img.assignedTo === 'Schadenfotos' && img.includeInReport !== false) && (
-                            <View style={{ marginTop: 10 }}>
-                                <Text style={[styles.imageDescription, { fontWeight: 'bold', marginBottom: 8, color: '#0F6EA3' }]}>FOTOS ZUR URSACHE</Text>
-                                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-                                    {data.images.filter(img => img.assignedTo === 'Schadenfotos' && img.includeInReport !== false).map((img, i) => (
-                                        <View key={i} style={{ width: '48%', marginBottom: 10 }}>
-                                            <Image src={img.preview} style={{ width: '100%', height: 160, objectFit: 'contain' }} />
-                                        </View>
-                                    ))}
-                                </View>
-                            </View>
-                        )}
-                        <View style={styles.divider} />
-                    </View>
-                )}
 
 
                 {/* Raumdokumentation Section */}
@@ -481,7 +481,7 @@ const DamageReportDocument = ({ data }) => {
                                 {isFirstRoom && (
                                     <View>
                                         <View style={styles.divider} />
-                                        <Text style={styles.sectionTitle}>RAUMDOKUMENTATION</Text>
+                                        <Text style={styles.sectionTitle}>DOKUMENTATION</Text>
                                     </View>
                                 )}
 
@@ -573,6 +573,31 @@ const DamageReportDocument = ({ data }) => {
                     </View>
                 )}
 
+                {/* Damage Cause Section & Hero Photos */}
+                {(data.cause || (data.images && data.images.some(img => img.assignedTo === 'Schadenfotos' && img.includeInReport !== false))) && (
+                    <View style={{ marginBottom: 15 }} wrap={false}>
+                        <View style={styles.divider} />
+                        <View style={{ marginBottom: 10 }}>
+                            <Text style={styles.sectionTitle}>SCHADENURSACHE</Text>
+                            {data.cause && <Text style={styles.textBlock}>{data.cause}</Text>}
+                        </View>
+
+                        {/* Schadenfotos Grid (The "Selected Pics") */}
+                        {data.images && data.images.some(img => img.assignedTo === 'Schadenfotos' && img.includeInReport !== false) && (
+                            <View style={{ marginTop: 10 }}>
+                                <Text style={[styles.imageDescription, { fontWeight: 'bold', marginBottom: 8, color: '#0F6EA3' }]}>FOTOS ZUR URSACHE</Text>
+                                <View style={styles.imageGrid}>
+                                    {data.images.filter(img => img.assignedTo === 'Schadenfotos' && img.includeInReport !== false).map((img, i) => (
+                                        <View key={i} style={styles.imageContainer}>
+                                            <Image src={img.preview} style={styles.image} />
+                                        </View>
+                                    ))}
+                                </View>
+                            </View>
+                        )}
+                    </View>
+                )}
+
                 {/* Measures */}
                 {(data.measures || (data.selectedMeasures && data.selectedMeasures.length > 0)) && (
                     <View style={{ marginBottom: 15 }} wrap={false}>
@@ -597,25 +622,37 @@ const DamageReportDocument = ({ data }) => {
                         <View style={styles.imageGrid}>
                             {data.images.filter(img => img.assignedTo === 'Messprotokolle' && img.includeInReport !== false).map((img, i) => (
                                 <View key={i} style={{ width: '100%', marginBottom: 15 }}>
-                                    <Image src={img.preview} style={{ width: '100%', height: 400, objectFit: 'contain' }} />
-                                    {img.name && <Text style={[styles.imageDescription, { textAlign: 'center' }]}>{img.name}</Text>}
+                                    <Image src={img.preview} style={{ width: '100%', height: 500, objectFit: 'contain' }} />
+                                    {img.name && <Text style={styles.imageDescription}>{img.name}</Text>}
                                 </View>
                             ))}
                         </View>
                     </View>
                 )}
 
-                {/* Footer - Moved to top to ensure 'fixed' behavior works reliably */}
                 <View style={styles.footer} fixed>
-                    <View style={{ width: '100%', alignItems: 'center' }}>
-                        <Text style={styles.footerText}>Q-Service AG, Kriesbachstrasse 30, 8600 Dübendorf, www.q-service.ch, info@q-service.ch Tel. 043 819 14 18</Text>
+                    {/* Column 1: Project Number */}
+                    <View style={{ width: '25%', alignItems: 'flex-start' }}>
+                        <Text style={styles.footerText}>
+                            {data.projectNumber ? `Projekt-Nr: ${data.projectNumber}` : ''}
+                        </Text>
                     </View>
-                    <View style={{ position: 'absolute', right: 0, top: 10 }}>
-                        <Text style={styles.footerText} render={({ pageNumber, totalPages }) => (
-                            `Seite ${pageNumber} von ${totalPages}`
-                        )} />
+
+                    {/* Column 2: Company Info */}
+                    <View style={{ width: '50%', alignItems: 'center' }}>
+                        <Text style={styles.footerText}>Q-Service AG • Kriesbachstrasse 30 • 8600 Dübendorf</Text>
+                        <Text style={styles.footerText}>www.q-service.ch • Tel. 043 819 14 18</Text>
                     </View>
+
+                    {/* Column 3: Buffer (Page number is now absolute for better reliability) */}
+                    <View style={{ width: '25%' }} />
                 </View>
+
+                <Text
+                    style={styles.pageNumber}
+                    render={({ pageNumber, totalPages }) => `${pageNumber} von ${totalPages}`}
+                    fixed
+                />
 
                 {/* Header */}
 

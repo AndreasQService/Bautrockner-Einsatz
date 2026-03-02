@@ -1500,7 +1500,7 @@ END:VCARD`;
                     const img = new window.Image();
                     img.crossOrigin = "anonymous";
                     img.onload = () => {
-                        const MAX_SIZE = 800; // Even more conservative
+                        const MAX_SIZE = 1200; // Increased from 800 for better detail visibility
                         let width = img.width;
                         let height = img.height;
                         if (width > height) {
@@ -1513,7 +1513,7 @@ END:VCARD`;
                         canvas.height = height;
                         const ctx = canvas.getContext('2d');
                         ctx.drawImage(img, 0, 0, width, height);
-                        resolve(canvas.toDataURL('image/jpeg', 0.6));
+                        resolve(canvas.toDataURL('image/jpeg', 0.85)); // Higher quality for PDF
                     };
                     img.onerror = () => resolve(dataUrl.startsWith('data:') ? dataUrl : null);
                     img.src = dataUrl;
@@ -2020,6 +2020,51 @@ END:VCARD`;
         }
         return acc;
     }, 0);
+
+    const renderDocCard = (img, idx) => (
+        <div key={idx}
+            style={{
+                position: 'relative', width: '140px', height: '90px', borderRadius: '8px', overflow: 'hidden',
+                border: '1px solid var(--border)', cursor: 'pointer',
+                backgroundColor: 'rgba(255,255,255,0.03)',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                padding: '0.5rem', transition: 'all 0.2s'
+            }}
+            onClick={() => window.open(img.preview, '_blank')}
+            title={img.name}
+            onMouseOver={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.08)'}
+            onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.03)'}
+        >
+            {(img.name?.toLowerCase().endsWith('.pdf') || img.fileType === 'pdf') ?
+                <PdfIcon size={28} /> :
+                (img.name?.toLowerCase().endsWith('.msg') ? <Mail size={28} color="var(--primary)" /> : <FileText size={28} color="var(--primary)" />)
+            }
+            <div style={{ fontSize: '0.7rem', marginTop: 6, width: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'center', color: 'var(--text-main)', fontWeight: 500 }}>
+                {img.name}
+            </div>
+
+            <button
+                onClick={(e) => {
+                    e.stopPropagation();
+                    setFormData(prev => ({
+                        ...prev,
+                        images: prev.images.filter(i => i !== img)
+                    }));
+                }}
+                style={{
+                    position: 'absolute', top: 4, right: 4,
+                    background: 'rgba(0,0,0,0.4)', color: '#ef4444',
+                    border: 'none', borderRadius: '50%',
+                    width: 22, height: 22,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    cursor: 'pointer', padding: 0
+                }}
+                title="Löschen"
+            >
+                <X size={14} />
+            </button>
+        </div>
+    );
 
     return (
         <>
@@ -2623,6 +2668,15 @@ END:VCARD`;
                             <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.6rem', margin: 0 }}>
                                 <FileText size={18} /> Schadenbeschreibung (KI / Meldung)
                             </h3>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: 'var(--text-muted)', cursor: 'pointer' }}>
+                                <input
+                                    type="checkbox"
+                                    checked={formData.includeDescriptionInReport}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, includeDescriptionInReport: e.target.checked }))}
+                                    style={{ width: '18px', height: '18px', accentColor: '#0F6EA3' }}
+                                />
+                                In Bericht aufnehmen
+                            </label>
                         </div>
                         <textarea
                             value={formData.description || ''}
@@ -2641,7 +2695,8 @@ END:VCARD`;
                                 fontSize: '1rem',
                                 lineHeight: 1.6,
                                 marginBottom: '1.5rem',
-                                boxSizing: 'border-box'
+                                boxSizing: 'border-box',
+                                opacity: formData.includeDescriptionInReport ? 1 : 0.6
                             }}
                         />
 
@@ -2664,9 +2719,9 @@ END:VCARD`;
                                         style={{
                                             position: 'relative', width: '100px', height: '100px', borderRadius: '12px', overflow: 'hidden',
                                             cursor: 'pointer',
-                                            display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                            border: img.includeInReport !== false ? '2px solid #0F6EA3' : '1px solid var(--border)'
                                         }}
-                                        onClick={() => setGlobalPreviewImage(img.preview)}
                                     >
                                         <img
                                             src={img.preview}
@@ -2674,18 +2729,32 @@ END:VCARD`;
                                             className="hover-zoom"
                                             style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                                             onError={(e) => { e.target.style.display = 'none'; }}
+                                            onClick={() => setGlobalPreviewImage(img.preview)}
                                         />
+
+                                        {/* Bericht Toggle Checkbox */}
                                         <div
                                             style={{
-                                                position: 'absolute', inset: 0,
-                                                zIndex: 5, cursor: 'zoom-in'
+                                                position: 'absolute', top: 4, left: 4,
+                                                zIndex: 15, display: 'flex'
                                             }}
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setGlobalPreviewImage(img.preview);
-                                            }}
-                                            title="Vergrößern"
-                                        />
+                                            onClick={(e) => e.stopPropagation()}
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                checked={img.includeInReport !== false}
+                                                onChange={(e) => {
+                                                    const checked = e.target.checked;
+                                                    setFormData(prev => ({
+                                                        ...prev,
+                                                        images: prev.images.map(i => i === img ? { ...i, includeInReport: checked } : i)
+                                                    }));
+                                                }}
+                                                style={{ width: '18px', height: '18px', accentColor: '#0F6EA3', cursor: 'pointer' }}
+                                                title="Übernahme in Bericht steuern"
+                                            />
+                                        </div>
+
                                         <button
                                             onClick={(e) => {
                                                 e.stopPropagation();
@@ -2708,6 +2777,18 @@ END:VCARD`;
                                         >
                                             <X size={14} />
                                         </button>
+
+                                        {/* Click layer for Zoom */}
+                                        <div
+                                            style={{
+                                                position: 'absolute', inset: 0,
+                                                zIndex: 5, cursor: 'zoom-in'
+                                            }}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setGlobalPreviewImage(img.preview);
+                                            }}
+                                        />
                                     </div>
                                 ))}
 
@@ -2785,57 +2866,51 @@ END:VCARD`;
                                 <label style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1rem' }}>
                                     <FileText size={18} /> Dokumente & Anhänge (PDF, MSG)
                                 </label>
-                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem' }}>
-                                    {formData.images.filter(img => {
-                                        const isDoc = img.type === 'document' ||
-                                            img.name?.toLowerCase().endsWith('.msg') ||
-                                            img.name?.toLowerCase().endsWith('.pdf') ||
-                                            img.name?.toLowerCase().endsWith('.txt');
-                                        return img && !img.roomId && isDoc;
-                                    }).map((img, idx) => (
-                                        <div key={idx}
-                                            style={{
-                                                position: 'relative', width: '140px', height: '90px', borderRadius: '8px', overflow: 'hidden',
-                                                border: '1px solid var(--border)', cursor: 'pointer',
-                                                backgroundColor: 'rgba(255,255,255,0.03)',
-                                                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                                                padding: '0.5rem', transition: 'all 0.2s'
-                                            }}
-                                            onClick={() => window.open(img.preview, '_blank')}
-                                            title={img.name}
-                                            onMouseOver={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.08)'}
-                                            onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.03)'}
-                                        >
-                                            {(img.name?.toLowerCase().endsWith('.pdf') || img.fileType === 'pdf') ?
-                                                <PdfIcon size={28} /> :
-                                                (img.name?.toLowerCase().endsWith('.msg') ? <Mail size={28} color="var(--primary)" /> : <FileText size={28} color="var(--primary)" />)
-                                            }
-                                            <div style={{ fontSize: '0.7rem', marginTop: 6, width: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'center', color: 'var(--text-main)', fontWeight: 500 }}>
-                                                {img.name}
-                                            </div>
 
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setFormData(prev => ({
-                                                        ...prev,
-                                                        images: prev.images.filter(i => i !== img)
-                                                    }));
-                                                }}
-                                                style={{
-                                                    position: 'absolute', top: 4, right: 4,
-                                                    background: 'rgba(0,0,0,0.4)', color: '#ef4444',
-                                                    border: 'none', borderRadius: '50%',
-                                                    width: 22, height: 22,
-                                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                                    cursor: 'pointer', padding: 0
-                                                }}
-                                                title="Löschen"
-                                            >
-                                                <X size={14} />
-                                            </button>
-                                        </div>
-                                    ))}
+                                {/* 1. Berichte & Protokolle (Generated) */}
+                                <div style={{ marginBottom: '1.5rem' }}>
+                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                        <div style={{ width: '4px', height: '12px', background: 'var(--primary)', borderRadius: '2px' }} />
+                                        Berichte & Protokolle
+                                    </div>
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem' }}>
+                                        {formData.images.filter(img => {
+                                            const isDoc = img.type === 'document' || img.name?.toLowerCase().endsWith('.pdf');
+                                            const isGenerated = img.assignedTo === 'Schadensbericht' || img.assignedTo === 'Messprotokolle';
+                                            return img && !img.roomId && isDoc && isGenerated;
+                                        }).length > 0 ? (
+                                            formData.images.filter(img => {
+                                                const isDoc = img.type === 'document' || img.name?.toLowerCase().endsWith('.pdf');
+                                                const isGenerated = img.assignedTo === 'Schadensbericht' || img.assignedTo === 'Messprotokolle';
+                                                return img && !img.roomId && isDoc && isGenerated;
+                                            }).map((img, idx) => renderDocCard(img, idx))
+                                        ) : (
+                                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', italic: true, padding: '0.5rem' }}>Keine Berichte vorhanden</div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* 2. Eingegangene Dokumente (External / Uploaded) */}
+                                <div>
+                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                        <div style={{ width: '4px', height: '12px', background: '#94A3B8', borderRadius: '2px' }} />
+                                        Eingegangene Dokumente (Mail/PDF)
+                                    </div>
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem' }}>
+                                        {formData.images.filter(img => {
+                                            const isDoc = img.type === 'document' || img.name?.toLowerCase().endsWith('.msg') || img.name?.toLowerCase().endsWith('.pdf') || img.name?.toLowerCase().endsWith('.txt');
+                                            const isGenerated = img.assignedTo === 'Schadensbericht' || img.assignedTo === 'Messprotokolle';
+                                            return img && !img.roomId && isDoc && !isGenerated;
+                                        }).length > 0 ? (
+                                            formData.images.filter(img => {
+                                                const isDoc = img.type === 'document' || img.name?.toLowerCase().endsWith('.msg') || img.name?.toLowerCase().endsWith('.pdf') || img.name?.toLowerCase().endsWith('.txt');
+                                                const isGenerated = img.assignedTo === 'Schadensbericht' || img.assignedTo === 'Messprotokolle';
+                                                return img && !img.roomId && isDoc && !isGenerated;
+                                            }).map((img, idx) => renderDocCard(img, idx))
+                                        ) : (
+                                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', italic: true, padding: '0.5rem' }}>Keine eingegangenen Dokumente</div>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         )}
@@ -2942,6 +3017,31 @@ END:VCARD`;
                                     title="Foto entfernen"
                                 >
                                     <X size={20} />
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setEditingImage({ preview: formData.exteriorPhoto, id: 'exterior', isExterior: true })}
+                                    style={{
+                                        position: 'absolute',
+                                        top: '15px',
+                                        left: '15px',
+                                        backgroundColor: 'rgba(15, 110, 163, 0.9)',
+                                        color: 'white',
+                                        border: 'none',
+                                        borderRadius: '50%',
+                                        width: '36px',
+                                        height: '36px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        cursor: 'pointer',
+                                        boxShadow: '0 4px 6px -1px rgba(0,0,0,0.2)',
+                                        backdropFilter: 'blur(4px)',
+                                        zIndex: 10
+                                    }}
+                                    title="Foto bearbeiten"
+                                >
+                                    <Edit3 size={18} />
                                 </button>
                             </div>
                         </div>
@@ -5318,19 +5418,25 @@ END:VCARD`;
                             image={editingImage}
                             onSave={(newPreview, newDescription) => {
                                 setFormData(prev => {
+                                    // 1. Check if it's the Aussenaufnahme (Special case)
+                                    if (editingImage.isExterior) {
+                                        return { ...prev, exteriorPhoto: newPreview };
+                                    }
+
+                                    // 2. Standard Case: List of Images
                                     const nextImages = [];
                                     prev.images.forEach(img => {
                                         if (img === editingImage) {
-                                            // 1. Keep the original but hide it from the report
+                                            // Keep the original but hide it from the report
                                             nextImages.push({ ...img, includeInReport: false });
-                                            // 2. Add the NEW edited version as a separate entry
+                                            // Add the NEW edited version as a separate entry
                                             nextImages.push({
                                                 ...img,
                                                 id: `copy_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
                                                 name: img.name ? `Kopie von ${img.name}` : 'Bearbeitetes Bild',
                                                 preview: newPreview,
                                                 description: newDescription,
-                                                includeInReport: true // The edited version is usually the one you want in the PDF
+                                                includeInReport: true
                                             });
                                         } else {
                                             nextImages.push(img);

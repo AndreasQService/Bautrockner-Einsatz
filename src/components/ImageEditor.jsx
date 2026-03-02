@@ -18,7 +18,7 @@ const ImageEditor = ({ image, onSave, onCancel }) => {
 
     const [tool, setTool] = useState('pen'); // 'pen', 'circle', 'eraser'
     const [color, setColor] = useState('#EF4444'); // Red by default
-    const [lineWidth, setLineWidth] = useState(5);
+    const [lineWidth, setLineWidth] = useState(12); // Default 12 as requested
     const [history, setHistory] = useState([]);
     const [isDrawing, setIsDrawing] = useState(false);
     const [isInitializing, setIsInitializing] = useState(true);
@@ -171,7 +171,7 @@ const ImageEditor = ({ image, onSave, onCancel }) => {
             pCtx.stroke();
         } else if (tool === 'eraser') {
             ctx.globalCompositeOperation = 'destination-out';
-            ctx.lineWidth = 30;
+            ctx.lineWidth = lineWidth * 4; // Scaled eraser
             ctx.beginPath();
             ctx.moveTo(startPos.current.x, startPos.current.y);
             ctx.lineTo(coords.x, coords.y);
@@ -308,6 +308,17 @@ const ImageEditor = ({ image, onSave, onCancel }) => {
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', backgroundColor: 'rgba(255,255,255,0.05)', padding: '0.4rem 0.6rem', borderRadius: '12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginRight: '0.5rem' }}>
+                        <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: 'white', opacity: 0.5 }} />
+                        <input
+                            type="range"
+                            min="2"
+                            max="40"
+                            value={lineWidth}
+                            onChange={(e) => setLineWidth(parseInt(e.target.value))}
+                            style={{ width: '80px', cursor: 'pointer', accentColor: '#3B82F6' }}
+                        />
+                    </div>
                     <input type="color" value={color} onChange={(e) => setColor(e.target.value)} style={{ width: '28px', height: '28px', border: '2px solid white', borderRadius: '50%', cursor: 'pointer', padding: 0 }} />
                 </div>
             </div>
