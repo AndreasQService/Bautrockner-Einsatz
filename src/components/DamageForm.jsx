@@ -209,6 +209,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         damageReportDate: initialData.damageReportDate || '',
         measures: initialData.measures || '',
         selectedMeasures: Array.isArray(initialData.selectedMeasures) ? initialData.selectedMeasures : [],
+        includeDescriptionInReport: initialData.includeDescriptionInReport !== false, // Default to true
         rooms: Array.isArray(initialData.rooms) ? initialData.rooms : []
     } : {
         id: null,
@@ -257,6 +258,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         exteriorPhoto: null,
         measures: '',
         selectedMeasures: [],
+        includeDescriptionInReport: true,
         rooms: []
     }));
 
@@ -2531,7 +2533,18 @@ END:VCARD`;
                         <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                             <FileText size={18} /> Schadenbeschreibung (KI / Meldung)
                         </h3>
-                        <div style={{ backgroundColor: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: '12px', border: '1px solid var(--border)', marginBottom: '1.5rem' }}>
+                        <div style={{ backgroundColor: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: '12px', border: '1px solid var(--border)', marginBottom: '1.5rem', position: 'relative' }}>
+                            <div style={{ position: 'absolute', top: '0.5rem', right: '0.5rem', zIndex: 10 }}>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem', color: 'var(--text-muted)', cursor: 'pointer' }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={formData.includeDescriptionInReport}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, includeDescriptionInReport: e.target.checked }))}
+                                        style={{ width: '16px', height: '16px', accentColor: '#0F6EA3' }}
+                                    />
+                                    Bericht
+                                </label>
+                            </div>
                             <textarea
                                 className="form-input"
                                 value={formData.description || ''}
@@ -2544,7 +2557,8 @@ END:VCARD`;
                                     fontFamily: 'inherit', color: 'var(--text-main)',
                                     cursor: 'default',
                                     fontSize: '1rem',
-                                    lineHeight: '1.5'
+                                    lineHeight: '1.5',
+                                    opacity: formData.includeDescriptionInReport ? 1 : 0.5
                                 }}
                             />
                         </div>
@@ -2562,12 +2576,37 @@ END:VCARD`;
                             }).map((img, idx) => (
                                 <div key={idx}
                                     style={{
+                                        position: 'relative',
                                         width: '80px', height: '80px', borderRadius: '4px', overflow: 'hidden',
-                                        border: '1px solid var(--border)', cursor: 'pointer'
+                                        border: img.includeInReport !== false ? '2px solid #0F6EA3' : '1px solid var(--border)', cursor: 'pointer'
                                     }}
-                                    onClick={() => setGlobalPreviewImage(img.preview)}
                                 >
-                                    <img src={img.preview} alt="Schadensbild" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                    <img
+                                        src={img.preview}
+                                        alt="Schadensbild"
+                                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                        onClick={() => setGlobalPreviewImage(img.preview)}
+                                    />
+                                    <div
+                                        style={{
+                                            position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+                                            pointerEvents: 'none', display: 'flex', alignItems: 'flex-start', padding: '2px',
+                                            backgroundColor: img.includeInReport === false ? 'rgba(0,0,0,0.3)' : 'transparent'
+                                        }}
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            checked={img.includeInReport !== false}
+                                            onChange={(e) => {
+                                                const checked = e.target.checked;
+                                                setFormData(prev => ({
+                                                    ...prev,
+                                                    images: prev.images.map(i => i === img ? { ...i, includeInReport: checked } : i)
+                                                }));
+                                            }}
+                                            style={{ pointerEvents: 'auto', width: '18px', height: '18px', cursor: 'pointer', accentColor: '#0F6EA3' }}
+                                        />
+                                    </div>
                                 </div>
                             ))}
                             {(!formData.images || formData.images.filter(img => !img.roomId && !(img.type === 'document' || img.name?.toLowerCase().endsWith('.msg') || img.name?.toLowerCase().endsWith('.pdf') || img.name?.toLowerCase().endsWith('.txt'))).length === 0) && (
@@ -5278,10 +5317,27 @@ END:VCARD`;
                         <ImageEditor
                             image={editingImage}
                             onSave={(newPreview, newDescription) => {
-                                setFormData(prev => ({
-                                    ...prev,
-                                    images: prev.images.map(img => img === editingImage ? { ...img, preview: newPreview, description: newDescription } : img)
-                                }));
+                                setFormData(prev => {
+                                    const nextImages = [];
+                                    prev.images.forEach(img => {
+                                        if (img === editingImage) {
+                                            // 1. Keep the original but hide it from the report
+                                            nextImages.push({ ...img, includeInReport: false });
+                                            // 2. Add the NEW edited version as a separate entry
+                                            nextImages.push({
+                                                ...img,
+                                                id: `copy_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+                                                name: img.name ? `Kopie von ${img.name}` : 'Bearbeitetes Bild',
+                                                preview: newPreview,
+                                                description: newDescription,
+                                                includeInReport: true // The edited version is usually the one you want in the PDF
+                                            });
+                                        } else {
+                                            nextImages.push(img);
+                                        }
+                                    });
+                                    return { ...prev, images: nextImages };
+                                });
                                 setEditingImage(null);
                             }}
                             onCancel={() => setEditingImage(null)}

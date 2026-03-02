@@ -401,12 +401,26 @@ const DamageReportDocument = ({ data }) => {
 
                 <View style={styles.divider} />
 
-                {/* Description */}
-                {data.description && (
+                {/* Schadensbeschreibung mit Bildern */}
+                {((data.description && data.includeDescriptionInReport !== false) || (data.images && data.images.some(img => !img.roomId && img.assignedTo !== 'Schadenfotos' && img.assignedTo !== 'Pläne' && img.assignedTo !== 'Messprotokolle' && img.includeInReport !== false))) && (
                     <View style={{ marginBottom: 15 }} wrap={false}>
                         <View style={styles.divider} />
-                        <Text style={styles.sectionTitle}>BESCHREIBUNG</Text>
-                        <Text style={styles.textBlock}>{data.description}</Text>
+                        <Text style={styles.sectionTitle}>SCHADENSBESCHREIBUNG MIT BILDERN</Text>
+
+                        {data.description && data.includeDescriptionInReport !== false && <Text style={styles.textBlock}>{data.description}</Text>}
+
+                        {/* Images related to description (unassigned/initial images) */}
+                        {data.images && data.images.some(img => !img.roomId && img.assignedTo !== 'Schadenfotos' && img.assignedTo !== 'Pläne' && img.assignedTo !== 'Messprotokolle' && img.includeInReport !== false) && (
+                            <View style={{ marginTop: 10 }}>
+                                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+                                    {data.images.filter(img => !img.roomId && img.assignedTo !== 'Schadenfotos' && img.assignedTo !== 'Pläne' && img.assignedTo !== 'Messprotokolle' && img.includeInReport !== false).map((img, i) => (
+                                        <View key={i} style={{ width: '48%', marginBottom: 10 }}>
+                                            <Image src={img.preview} style={{ width: '100%', height: 160, objectFit: 'contain' }} />
+                                        </View>
+                                    ))}
+                                </View>
+                            </View>
+                        )}
                         <View style={styles.divider} />
                     </View>
                 )}
@@ -428,7 +442,6 @@ const DamageReportDocument = ({ data }) => {
                                     {data.images.filter(img => img.assignedTo === 'Schadenfotos' && img.includeInReport !== false).map((img, i) => (
                                         <View key={i} style={{ width: '48%', marginBottom: 10 }}>
                                             <Image src={img.preview} style={{ width: '100%', height: 160, objectFit: 'contain' }} />
-                                            {img.description && <Text style={[styles.imageDescription, { marginTop: 4 }]}>{img.description}</Text>}
                                         </View>
                                     ))}
                                 </View>
