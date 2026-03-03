@@ -14,24 +14,22 @@ const styles = StyleSheet.create({
     },
 
     header: {
+        marginBottom: 20,
         flexDirection: 'row',
         justifyContent: 'space-between',
-        alignItems: 'flex-end',
-        paddingBottom: 8,
-        borderBottomWidth: 1,
-        borderBottomColor: '#0F6EA3',
-        marginBottom: 20,
+        alignItems: 'flex-start',
     },
     logo: {
-        width: 120,
-        height: 45,
+        width: 100,
+        height: 40,
         objectFit: 'contain',
     },
-    headerProjectInfo: {
+    companyInfo: {
         textAlign: 'right',
         fontSize: 9,
         color: '#64748B',
-        lineHeight: 1.4,
+        lineHeight: 1.2,
+        marginLeft: 'auto',
     },
     titleSection: {
         marginBottom: 20,
@@ -73,8 +71,7 @@ const styles = StyleSheet.create({
     divider: {
         height: 0.5,
         backgroundColor: '#0F6EA3',
-        marginTop: 15,
-        marginBottom: 10,
+        marginVertical: 10,
     },
     sectionTitle: {
         fontSize: 16,
@@ -179,22 +176,26 @@ const styles = StyleSheet.create({
         bottom: 30,
         left: 30,
         right: 30,
+        height: 60, // Increased more to be absolutely sure
+        borderTopWidth: 0.5,
+        borderTopColor: '#0369a1',
         paddingTop: 10,
-        borderTopWidth: 1,
-        borderTopColor: '#0F6EA3',
-        zIndex: 100, // Ensure it's on top
-    },
-    footerContent: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        alignItems: 'center',
-        width: '100%',
+        alignItems: 'flex-start',
     },
     footerText: {
-        fontSize: 8,
-        color: '#64748B',
+        fontSize: 10,
+        color: '#000000',
     },
-
+    pageNumber: {
+        position: 'absolute',
+        bottom: 40,
+        right: 30,
+        fontSize: 10,
+        color: '#000000',
+        textAlign: 'right',
+    }
 });
 
 // Helper to sort rooms
@@ -264,39 +265,32 @@ const DamageReportDocument = ({ data }) => {
             <Page size="A4" style={styles.page} wrap>
 
 
+
                 <View style={styles.header} fixed>
-                    {data.logo && <Image src={data.logo} style={styles.logo} />}
-
-                    <View style={styles.headerProjectInfo}>
-                        <Text
-                            render={({ pageNumber }) => (
-                                pageNumber > 1 ? `Projekt-Nr: ${data.projectNumber || '-'}` : ''
-                            )}
-                        />
-                        <Text
-                            render={({ pageNumber }) => (
-                                pageNumber > 1 && data.orderNumber ? `Auftrag: ${data.orderNumber}` : ''
-                            )}
-                        />
-                        {/* Always show small branding on subsequent pages if logo is large on first? 
-                            Actually, logo is fixed, so it's always there. */}
+                    <View style={{ alignItems: 'flex-start' }}>
+                        {data.logo && <Image src={data.logo} style={styles.logo} />}
+                        {data.projectNumber && (
+                            <Text
+                                style={{ fontSize: 9, color: '#0F6EA3', fontWeight: 'bold', marginTop: 2 }}
+                                render={({ pageNumber }) => (
+                                    pageNumber > 1 ? `Projekt-Nr: ${data.projectNumber}` : ''
+                                )}
+                            />
+                        )}
+                        {data.orderNumber && (
+                            <Text
+                                style={{ fontSize: 8, color: '#64748B', fontWeight: 'bold' }}
+                                render={({ pageNumber }) => (
+                                    pageNumber > 1 ? `Auftrag: ${data.orderNumber}` : ''
+                                )}
+                            />
+                        )}
                     </View>
-                </View>
-
-                {/* Footer Component (repeats on all pages) */}
-                <View style={styles.footer} fixed>
-                    <View style={styles.footerContent}>
-                        <View>
-                            <Text style={styles.footerText}>Q-Service AG • Kriesbachstrasse 30 • 8600 Dübendorf</Text>
-                            <Text style={styles.footerText}>www.q-service.ch • Tel. 043 819 14 18</Text>
-                        </View>
-
-                        <Text
-                            style={[styles.footerText, { textAlign: 'right' }]}
-                            render={({ pageNumber, totalPages }) => (
-                                `Seite ${pageNumber} von ${totalPages}`
-                            )}
-                        />
+                    <View style={styles.companyInfo}>
+                        <Text>Q-Service AG</Text>
+                        <Text>Kriesbachstrasse 30</Text>
+                        <Text>8600 Dübendorf</Text>
+                        <Text>www.q-service.ch</Text>
                     </View>
                 </View>
 
@@ -312,6 +306,7 @@ const DamageReportDocument = ({ data }) => {
                 </View>
 
                 {/* Meta Data */}
+                <View style={styles.divider} />
                 <View style={styles.metaSection}>
                     <View style={{ flexDirection: 'row', gap: 20 }}>
                         <View style={{ flex: 1 }}>
@@ -337,7 +332,7 @@ const DamageReportDocument = ({ data }) => {
                         <View style={{ flex: 1 }}>
                             <View style={styles.metaRow}>
                                 <Text style={styles.metaLabel}>Berichtsdatum:</Text>
-                                <Text style={styles.metaValue}>{new Date().toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit', year: 'numeric' })}</Text>
+                                <Text style={styles.metaValue}>{new Date().toLocaleString('de-CH', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })} Uhr</Text>
                             </View>
                             {data.damageReportDate && (
                                 <View style={styles.metaRow}>
@@ -418,7 +413,6 @@ const DamageReportDocument = ({ data }) => {
                             <Text style={styles.metaValue}>{data.damageType}</Text>
                         </View>
                     )}
-                    <View style={styles.divider} />
                 </View>
 
                 {/* Hero / Exterior Photo */}
@@ -430,14 +424,14 @@ const DamageReportDocument = ({ data }) => {
                                 <Text style={styles.imageDescription}>Außenansicht / Übersicht</Text>
                             </View>
                         </View>
-                        <View style={styles.divider} />
                     </View>
                 )}
 
                 {/* Schadensbeschreibung mit Bildern */}
                 {((data.description && data.includeDescriptionInReport !== false) || (data.images && data.images.some(img => !img.roomId && img.assignedTo !== 'Schadenfotos' && img.assignedTo !== 'Pläne' && img.assignedTo !== 'Messprotokolle' && img.includeInReport !== false))) && (
-                    <View style={{ marginBottom: 15 }}>
-                        <Text style={styles.sectionTitle}>SCHADENBESCHREIBUNG</Text>
+                    <View style={{ marginBottom: 15 }} wrap={false}>
+                        <View style={styles.divider} />
+                        <Text style={styles.sectionTitle}>SCHADENSBESCHREIBUNG MIT BILDERN</Text>
 
                         {data.description && data.includeDescriptionInReport !== false && <Text style={styles.textBlock}>{data.description}</Text>}
 
@@ -453,7 +447,6 @@ const DamageReportDocument = ({ data }) => {
                                 </View>
                             </View>
                         )}
-                        <View style={styles.divider} />
                     </View>
                 )}
 
@@ -486,7 +479,10 @@ const DamageReportDocument = ({ data }) => {
                             {/* Header Block - Keeps Section Title + Room Header + 1st Image together */}
                             <View wrap={false}>
                                 {isFirstRoom && (
-                                    <Text style={styles.sectionTitle}>DOKUMENTATION</Text>
+                                    <View>
+                                        <View style={styles.divider} />
+                                        <Text style={styles.sectionTitle}>DOKUMENTATION</Text>
+                                    </View>
                                 )}
 
                                 {isNewApt && (room.apartment || room.stockwerk) && (
@@ -545,16 +541,6 @@ const DamageReportDocument = ({ data }) => {
                                     ))}
                                 </View>
                             )}
-
-                            {/* Divider between apartments or at the end of documentation */}
-                            {(() => {
-                                const nextRoom = validRooms[index + 1];
-                                const isLastRoomOfApt = !nextRoom || nextRoom.apartment !== room.apartment || nextRoom.stockwerk !== room.stockwerk;
-                                if (isLastRoomOfApt) {
-                                    return <View style={styles.divider} />;
-                                }
-                                return null;
-                            })()}
                         </View>
                     );
                 })}
@@ -563,6 +549,7 @@ const DamageReportDocument = ({ data }) => {
                 {/* Pläne & Grundrisse */}
                 {data.images && data.images.some(img => img.assignedTo === 'Pläne' && img.includeInReport !== false) && (
                     <View style={{ marginBottom: 20 }} wrap={false}>
+                        <View style={styles.divider} />
                         <Text style={styles.sectionTitle}>PLÄNE & GRUNDRISSE</Text>
                         <View style={styles.imageGrid}>
                             {data.images.filter(img => img.assignedTo === 'Pläne' && img.includeInReport !== false).map((img, i) => (
@@ -572,7 +559,6 @@ const DamageReportDocument = ({ data }) => {
                                 </View>
                             ))}
                         </View>
-                        <View style={styles.divider} />
                     </View>
                 )}
 
@@ -581,15 +567,16 @@ const DamageReportDocument = ({ data }) => {
                 {/* Findings */}
                 {data.findings && (
                     <View style={{ marginBottom: 15, marginTop: 20 }} wrap={false}>
+                        <View style={styles.divider} />
                         <Text style={styles.sectionTitle}>FESTSTELLUNGEN</Text>
                         <Text style={styles.textBlock}>{data.findings}</Text>
-                        <View style={styles.divider} />
                     </View>
                 )}
 
                 {/* Damage Cause Section & Hero Photos */}
                 {(data.cause || (data.images && data.images.some(img => img.assignedTo === 'Schadenfotos' && img.includeInReport !== false))) && (
                     <View style={{ marginBottom: 15 }} wrap={false}>
+                        <View style={styles.divider} />
                         <View style={{ marginBottom: 10 }}>
                             <Text style={styles.sectionTitle}>SCHADENURSACHE</Text>
                             {data.cause && <Text style={styles.textBlock}>{data.cause}</Text>}
@@ -608,13 +595,13 @@ const DamageReportDocument = ({ data }) => {
                                 </View>
                             </View>
                         )}
-                        <View style={styles.divider} />
                     </View>
                 )}
 
                 {/* Measures */}
                 {(data.measures || (data.selectedMeasures && data.selectedMeasures.length > 0)) && (
                     <View style={{ marginBottom: 15 }} wrap={false}>
+                        <View style={styles.divider} />
                         <Text style={styles.sectionTitle}>MASSNAHMEN</Text>
                         {data.selectedMeasures && data.selectedMeasures.length > 0 && (
                             <View style={{ marginBottom: data.measures ? 10 : 0 }}>
@@ -624,13 +611,13 @@ const DamageReportDocument = ({ data }) => {
                             </View>
                         )}
                         {data.measures && <Text style={styles.textBlock}>{data.measures}</Text>}
-                        <View style={styles.divider} />
                     </View>
                 )}
 
                 {/* Messprotokolle Section */}
                 {data.images && data.images.some(img => img.assignedTo === 'Messprotokolle' && img.includeInReport !== false) && (
                     <View style={{ marginBottom: 20 }} wrap={false}>
+                        <View style={styles.divider} />
                         <Text style={styles.sectionTitle}>MESSPROTOKOLLE</Text>
                         <View style={styles.imageGrid}>
                             {data.images.filter(img => img.assignedTo === 'Messprotokolle' && img.includeInReport !== false).map((img, i) => (
@@ -640,11 +627,39 @@ const DamageReportDocument = ({ data }) => {
                                 </View>
                             ))}
                         </View>
-                        <View style={styles.divider} />
                     </View>
                 )}
+
+                <View style={styles.footer} fixed>
+                    {/* Column 1: Project Number */}
+                    <View style={{ width: '25%', alignItems: 'flex-start' }}>
+                        <Text style={styles.footerText}>
+                            {data.projectNumber ? `Projekt-Nr: ${data.projectNumber}` : ''}
+                        </Text>
+                    </View>
+
+                    {/* Column 2: Company Info */}
+                    <View style={{ width: '50%', alignItems: 'center' }}>
+                        <Text style={styles.footerText}>Q-Service AG • Kriesbachstrasse 30 • 8600 Dübendorf</Text>
+                        <Text style={styles.footerText}>www.q-service.ch • Tel. 043 819 14 18</Text>
+                    </View>
+
+                    {/* Column 3: Buffer (Page number is now absolute for better reliability) */}
+                    <View style={{ width: '25%' }} />
+                </View>
+
+                <Text
+                    style={styles.pageNumber}
+                    render={({ pageNumber, totalPages }) => `${pageNumber} von ${totalPages}`}
+                    fixed
+                />
+
+                {/* Header */}
+
+
+
             </Page>
-        </Document>
+        </Document >
     );
 };
 
