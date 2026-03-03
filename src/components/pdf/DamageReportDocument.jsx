@@ -182,11 +182,13 @@ const styles = StyleSheet.create({
         paddingTop: 10,
         borderTopWidth: 1,
         borderTopColor: '#0F6EA3',
+        zIndex: 100, // Ensure it's on top
     },
     footerContent: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
+        width: '100%',
     },
     footerText: {
         fontSize: 8,
@@ -262,7 +264,6 @@ const DamageReportDocument = ({ data }) => {
             <Page size="A4" style={styles.page} wrap>
 
 
-
                 <View style={styles.header} fixed>
                     {data.logo && <Image src={data.logo} style={styles.logo} />}
 
@@ -279,6 +280,23 @@ const DamageReportDocument = ({ data }) => {
                         />
                         {/* Always show small branding on subsequent pages if logo is large on first? 
                             Actually, logo is fixed, so it's always there. */}
+                    </View>
+                </View>
+
+                {/* Footer Component (repeats on all pages) */}
+                <View style={styles.footer} fixed>
+                    <View style={styles.footerContent}>
+                        <View>
+                            <Text style={styles.footerText}>Q-Service AG • Kriesbachstrasse 30 • 8600 Dübendorf</Text>
+                            <Text style={styles.footerText}>www.q-service.ch • Tel. 043 819 14 18</Text>
+                        </View>
+
+                        <Text
+                            style={[styles.footerText, { textAlign: 'right' }]}
+                            render={({ pageNumber, totalPages }) => (
+                                `Seite ${pageNumber} von ${totalPages}`
+                            )}
+                        />
                     </View>
                 </View>
 
@@ -625,28 +643,8 @@ const DamageReportDocument = ({ data }) => {
                         <View style={styles.divider} />
                     </View>
                 )}
-
-                <View style={styles.footer} fixed>
-                    <View style={styles.footerContent}>
-                        <View>
-                            <Text style={styles.footerText}>Q-Service AG • Kriesbachstrasse 30 • 8600 Dübendorf</Text>
-                            <Text style={styles.footerText}>www.q-service.ch • Tel. 043 819 14 18</Text>
-                        </View>
-
-                        <Text style={[styles.footerText, { textAlign: 'right' }]}
-                            render={({ pageNumber, totalPages }) => (
-                                `Seite ${pageNumber} ${totalPages ? 'von ' + totalPages : ''}`
-                            )}
-                        />
-                    </View>
-                </View>
-
-                {/* Header */}
-
-
-
             </Page>
-        </Document >
+        </Document>
     );
 };
 
