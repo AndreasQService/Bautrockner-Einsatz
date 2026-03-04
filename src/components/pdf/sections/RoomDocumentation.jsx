@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/immutability */
 import React from 'react';
 import { View, Image, Text } from '@react-pdf/renderer';
 import { styles } from '../PDFStyles';
