@@ -1,0 +1,104 @@
+Found at line 4236
+                            >
+                                {isListeningMeasures ? <MicOff size={14} /> : <Mic size={14} />}
+                                <span>Diktieren</span>
+                            </button>
+                        </div>
+
+                        <div style={{ width: '100%' }}>
+                            <textarea
+                                id="measures"
+                                name="measures"
+                                className="form-input"
+                                style={{ minHeight: '120px', resize: 'vertical', width: '100%' }}
+                                placeholder="Details zu den Massnahmen..."
+                                value={formData.measures || ''}
+                                onChange={(e) => {
+                                    setFormData(prev => ({ ...prev, measures: e.target.value }));
+                                }}
+                            />
+                        </div>
+
+                        {/* Centered Schadensbericht Button with PDF Logo */}
+                        <div style={{ display: 'flex', justifyContent: 'center', marginTop: '2.5rem', marginBottom: '1rem' }}>
+                            <button
+                                type="button"
+                                onClick={handleGeneratePDF}
+                                disabled={isGeneratingPDF}
+                                className="btn btn-primary"
+                                style={{
+                                    padding: '1.2rem 4rem',
+                                    fontSize: '1.5rem',
+                                    fontWeight: 900,
+                                    borderRadius: '24px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '1.25rem',
+                                    backgroundColor: '#0F6EA3', // Solid blue
+                                    color: 'white', // White text for maximum contrast
+                                    border: '3px solid rgba(255,255,255,0.2)',
+                                    boxShadow: '0 15px 35px -5px rgba(15, 110, 163, 0.6)',
+                                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                    cursor: 'pointer',
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '1px'
+                                }}
+                            >
+                                <PdfIcon size={32} />
+                                <span>Schadensbericht</span>
+                            </button>
+                        </div>
+                    </div>
+-------------------
+Found at line 4467
+                                        alignItems: 'center',
+                                        gap: '0.5rem',
+                                        color: isListeningMeasures ? '#EF4444' : 'var(--primary)',
+                                        borderRadius: '10px',
+                                        fontWeight: 700
+                                    }}
+                                >
+                                    {isListeningMeasures ? <MicOff size={16} /> : <Mic size={16} />}
+                                    {isListeningMeasures ? 'Stop' : 'Diktieren'}
+                                </button>
+                            </div>
+                            <textarea
+                                className="form-input"
+                                value={formData.measures || ''}
+                                onChange={(e) => setFormData(prev => ({ ...prev, measures: e.target.value }))}
+                                placeholder="Zusätzliche Massnahmen beschreiben..."
+                                style={{ width: '100%', minHeight: '100px', fontFamily: 'inherit', lineHeight: '1.5' }}
+                            />
+                        </div>
+
+                        {/* Centered Schadensbericht Button for Technician Mode (Tablet) */}
+                        <div style={{ display: 'flex', justifyContent: 'center', marginTop: '2rem', marginBottom: '1rem' }}>
+                            <button
+                                type="button"
+                                onClick={handleGeneratePDF}
+                                disabled={isGeneratingPDF}
+                                className="btn btn-primary"
+                                style={{
+                                    padding: '1.2rem 4rem',
+                                    fontSize: '1.5rem',
+                                    fontWeight: 900,
+                                    borderRadius: '24px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '1.25rem',
+                                    backgroundColor: '#0F6EA3',
+                                    color: 'white',
+                                    border: '3px solid rgba(255,255,255,0.2)',
+                                    boxShadow: '0 15px 35px -5px rgba(15, 110, 163, 0.6)',
+                                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                    cursor: 'pointer',
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '1px',
+                                    width: '100%', // Full width on tablet for better touch target
+                                    maxWidth: '500px'
+                                }}
+                            >
+                                <PdfIcon size={32} />
+                                <span>Schadensbericht</span>
+                            </button>
+-------------------

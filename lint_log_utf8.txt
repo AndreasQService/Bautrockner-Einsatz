@@ -1,0 +1,482 @@
+﻿
+> qservice@0.0.0 lint
+> eslint .
+
+node.exe : [BABEL] Note: 
+The code generator has 
+deoptimised the styling of C
+:\QTool\Backups\QTool_2026-0
+2-18_22-19-18\src\components
+\DamageForm.jsx as it 
+exceeds the max of 500KB.
+In Zeile:1 Zeichen:1
++ & "C:\Program 
+Files\nodejs/node.exe" 
+"C:\Program 
+Files\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~
+    + CategoryInfo          
+    : NotSpecified: ([BABE  
+  L] Note: T...e max of 5   
+ 00KB.:String) [], Remot    
+eException
+    + FullyQualifiedErrorId 
+    : NativeCommandError
+ 
+
+C:\QTool\Backups\QTool_2026-02-18_22-19-18\inspect_db.js
+  13:19  error  'tables' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+
+C:\QTool\Backups\QTool_2026-02-18_22-19-18\src\App.jsx
+  163:6  warning  React Hook useCallback has an unnecessary dependency: 'supabase'. Either exclude it or remove the dependency array. Outer scope values like 'supabase' aren't valid dependencies because mutating them doesn't re-render the component  react-hooks/exhaustive-deps
+
+C:\QTool\Backups\QTool_2026-02-18_22-19-18\src\components\AiSuggestionsPanel.jsx
+  1:17  error  'useState' is defined but never used. Allowed unused vars must match /^[A-Z_]/u   no-unused-vars
+  1:27  error  'useEffect' is defined but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+
+C:\QTool\Backups\QTool_2026-02-18_22-19-18\src\components\DamageForm.jsx
+     5:10  error    'createPortal' is defined but never used. Allowed unused vars must match /^[A-Z_]/u                                                                                                                                                                                        no-unused-vars
+    63:7   error    'addAnnotationToImage' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u                                                                                                                                                                       no-unused-vars
+   110:12  error    'caseId' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u                                                                                                                                                                                     no-unused-vars
+   110:20  error    'setCaseId' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u                                                                                                                                                                                  no-unused-vars
+   177:12  error    'lastSaved' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u                                                                                                                                                                                  no-unused-vars
+   703:25  error    'setReportCause' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u                                                                                                                                                                             no-unused-vars
+   741:68  warning  The ref value 'lastSavedData.current' will likely have changed by the time this effect cleanup function runs. If this ref points to a node rendered by React, copy 'lastSavedData.current' to a variable inside the effect, and use that variable in the cleanup function  react-hooks/exhaustive-deps
+   816:11  error    'handleRemoveDevice' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u                                                                                                                                                                         no-unused-vars
+   868:11  error    'handleRemoveContact' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u                                                                                                                                                                        no-unused-vars
+   879:15  error    'newImages' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u                                                                                                                                                                                  no-unused-vars
+   913:29  error    'data' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u                                                                                                                                                                                       no-unused-vars
+   998:11  error    'generateExcelExport' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u                                                                                                                                                                        no-unused-vars
+  1163:33  error    'colNumber' is defined but never used                                                                                                                                                                                                                                      no-unused-vars
+  1657:11  error    'handleStartDrying' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u                                                                                                                                                                          no-unused-vars
+  1666:11  error    'handleEndDrying' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u                                                                                                                                                                            no-unused-vars
+  1747:11  error    'generatePDFContent' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u                                                                                                                                                                         no-unused-vars
+  1761:44  error    'pageNum' is defined but never used                                                                                                                                                                                                                                        no-unused-vars
+  6581:38  error    Unexpected constant truthiness on the left-hand side of a `&&` expression                                                                                                                                                                                                  no-constant-binary-expression
+  7347:33  error    'file' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u                                                                                                                                                                                       no-unused-vars
+  7389:26  error    Unexpected constant truthiness on the left-hand side of a `&&` expression                                                                                                                                                                                                  no-constant-binary-expression
+
+C:\QTool\Backups\QTool_2026-02-18_22-19-18\src\components\Dashboard.jsx
+   73:29  error  'color' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       no-unused-vars
+   78:31  error  'equipSummary' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                no-unused-vars
+  117:51  error  'itemEnd' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     no-unused-vars
+  118:51  error  'itemDays' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    no-unused-vars
+  234:9   error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+  232 |     // Reset to page 1 when search changes
+  233 |     useEffect(() => {
+> 234 |         setCurrentPage(1);
+      |         ^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  235 |     }, [searchTerm]);
+  236 |
+  237 |     if (!reports) {  react-hooks/set-state-in-effect
+
+C:\QTool\Backups\QTool_2026-02-18_22-19-18\src\components\EmailImportModal.jsx
+    3:10  error  'swissPLZ' is defined but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+   89:22  error  'e' is defined but never used                                                    no-unused-vars
+  104:75  error  Unnecessary escape character: \.                                                 no-useless-escape
+  104:79  error  Unnecessary escape character: \/                                                 no-useless-escape
+
+C:\QTool\Backups\QTool_2026-02-18_22-19-18\src\components\EmailImportModalV2.jsx
+    5:10  error  'swissPLZ' is defined but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+  382:33  error  'onDragOver' is not defined                                                      no-undef
+  383:34  error  'onDragLeave' is not defined                                                     no-undef
+  384:29  error  'onDrop' is not defined                                                          no-undef
+  391:33  error  'isDragging' is not defined                                                      no-undef
+  404:46  error  'isDragging' is not defined                                                      no-undef
+  410:22  error  'isDragging' is not defined                                                      no-undef
+  432:39  error  'handleFileUpload' is not defined                                                no-undef
+
+C:\QTool\Backups\QTool_2026-02-18_22-19-18\src\components\ImageEditor.jsx
+   97:13  error  Error: This value cannot be modified
+
+Modifying a value returned from 'useState()', which should not be modified directly. Use the setter function to update instead.
+
+   95 |         if (tool === 'pen') {
+   96 |             context.beginPath();
+>  97 |             context.strokeStyle = color;
+      |             ^^^^^^^ `context` cannot be modified
+   98 |             context.lineWidth = lineWidth;
+   99 |             context.moveTo(coords.x, coords.y);
+  100 |         }                                                                        react-hooks/immutability
+  120:13  error  Error: This value cannot be modified
+
+Modifying a value returned from 'useState()', which should not be modified directly. Use the setter function to update instead.
+
+  118 |             // Draw new circle
+  119 |             context.beginPath();
+> 120 |             context.strokeStyle = color;
+      |             ^^^^^^^ `context` cannot be modified
+  121 |             context.lineWidth = lineWidth;
+  122 |
+  123 |             const radius = Math.sqrt(Math.pow(coords.x - startPos.current.x, 2) + Math.pow(coords.y - startPos.current.y, 2));  react-hooks/immutability
+  129:26  error  'e' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       no-unused-vars
+
+C:\QTool\Backups\QTool_2026-02-18_22-19-18\src\components\MeasurementModal.jsx
+   25:23  error    'setSaveAsPdf' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              no-unused-vars
+  150:29  error    Error: Cannot access variable before it is declared
+
+`saveParamsToHistory` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.
+
+  148 |                             ctx.clearRect(0, 0, canvas.width, canvas.height);
+  149 |                             ctx.drawImage(img, 0, 0);
+> 150 |                             saveParamsToHistory(canvas); // Save restored state to history
+      |                             ^^^^^^^^^^^^^^^^^^^ `saveParamsToHistory` accessed before it is declared
+  151 |                         }
+  152 |                     };
+  153 |                     img.src = roomData.canvasImage;
+
+  191 |     };
+  192 |
+> 193 |     const saveParamsToHistory = (canvas) => {
+      |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 194 |         const ctx = canvas.getContext('2d');
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 195 |         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 196 |         setHistory(prev => [...prev.slice(0, historyStep + 1), imageData]);
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 197 |         setHistoryStep(prev => prev + 1);
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 198 |     };
+      | ^^^^^^^ `saveParamsToHistory` is declared here
+  199 |
+  200 |     const handleUndo = () => {
+  201 |         if (historyStep > 0) {  react-hooks/immutability
+  155:32  error    Error: Cannot access variable before it is declared
+
+`initCanvas` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.
+
+  153 |                     img.src = roomData.canvasImage;
+  154 |                 } else {
+> 155 |                     setTimeout(initCanvas, 100);
+      |                                ^^^^^^^^^^ `initCanvas` accessed before it is declared
+  156 |                 }
+  157 |             } else {
+  158 |                 // Initialize new
+
+  178 |     }, [isOpen, rooms, initialData, isSuccess]);
+  179 |
+> 180 |     const initCanvas = () => {
+      |     ^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 181 |         const canvas = canvasRef.current;
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 182 |         if (!canvas) return;
+      ÔÇª
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 190 |         saveParamsToHistory(canvas);
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 191 |     };
+      | ^^^^^^^ `initCanvas` is declared here
+  192 |
+  193 |     const saveParamsToHistory = (canvas) => {
+  194 |         const ctx = canvas.getContext('2d');                                                                                                                                                                                                                                                                                                                           react-hooks/immutability
+  178:8   warning  React Hook useEffect has missing dependencies: 'initCanvas' and 'saveParamsToHistory'. Either include them or remove the dependency array                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 react-hooks/exhaustive-deps
+  286:11  error    'clearCanvas' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               no-unused-vars
+  366:15  error    'newId' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     no-unused-vars
+
+C:\QTool\Backups\QTool_2026-02-18_22-19-18\src\components\UploadPanel.jsx
+  8:33  error  Unnecessary escape character: \-  no-useless-escape
+
+C:\QTool\Backups\QTool_2026-02-18_22-19-18\src\utils\MeasurementExcelExporter.js
+  52:44  error  Unnecessary escape character: \/  no-useless-escape
+  52:46  error  Unnecessary escape character: \[  no-useless-escape
+
+C:\QTool\Backups\QTool_2026-02-18_22-19-18\src\utils\MeasurementExcelExporter.v1_final.js
+  52:44  error  Unnecessary escape character: \/  no-useless-escape
+  52:46  error  Unnecessary escape character: \[  no-useless-escape
+
+C:\QTool\check_brackets.js
+  2:12  error  'require' is not defined  no-undef
+
+C:\QTool\check_div_detail.js
+  2:12  error  'require' is not defined  no-undef
+
+C:\QTool\check_divs_final.js
+  16:23  error  'opener' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+
+C:\QTool\check_divs_v2.js
+  5:5  error  'depth' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+
+C:\QTool\check_divs_v3.js
+  10:9  error  'pos' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+
+C:\QTool\count_divs.js
+  2:12  error  'require' is not defined  no-undef
+
+C:\QTool\count_divs_up_to_1924.js
+  2:12  error  'require' is not defined  no-undef
+
+C:\QTool\inspect_db.js
+  13:19  error  'tables' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+
+C:\QTool\simple_div_check.js
+  2:12  error  'require' is not defined  no-undef
+
+C:\QTool\src\App.jsx
+   22:16  error    'e' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           no-unused-vars
+  218:6   warning  React Hook useCallback has an unnecessary dependency: 'supabase'. Either exclude it or remove the dependency array. Outer scope values like 'supabase' aren't valid dependencies because mutating them doesn't re-render the component                                                                                                                                                                                                                                                                                                                                                                                                                  react-hooks/exhaustive-deps
+  260:24  error    Error: Cannot call impure function during render
+
+`Date.now` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
+
+  258 |     if (!importedData) return;
+  259 |
+> 260 |     const newId = `P-${Date.now()}`;
+      |                        ^^^^^^^^^^ Cannot call impure function
+  261 |
+  262 |     // Mapping Gemini structure to Flat Report Structure
+  263 |     const projectNum = importedData.projekt_daten?.interne_id || '';  react-hooks/purity
+
+C:\QTool\src\components\AiSuggestionsPanel.jsx
+  1:17  error  'useState' is defined but never used. Allowed unused vars must match /^[A-Z_]/u   no-unused-vars
+  1:27  error  'useEffect' is defined but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+
+C:\QTool\src\components\DamageForm.jsx
+    14:10  error  'createPortal' is defined but never used. Allowed unused vars must match /^[A-Z_]/u                    no-unused-vars
+    19:10  error  'swissPLZ' is defined but never used. Allowed unused vars must match /^[A-Z_]/u                        no-unused-vars
+    21:10  error  'pdf' is defined but never used. Allowed unused vars must match /^[A-Z_]/u                             no-unused-vars
+    23:8   error  'html2canvas' is defined but never used. Allowed unused vars must match /^[A-Z_]/u                     no-unused-vars
+    26:10  error  'jsPDF' is defined but never used. Allowed unused vars must match /^[A-Z_]/u                           no-unused-vars
+    27:8   error  'autoTable' is defined but never used. Allowed unused vars must match /^[A-Z_]/u                       no-unused-vars
+    30:10  error  'generateMeasurementExcel' is defined but never used. Allowed unused vars must match /^[A-Z_]/u        no-unused-vars
+    37:23  error  'addAnnotationToImage' is defined but never used. Allowed unused vars must match /^[A-Z_]/u            no-unused-vars
+    37:45  error  'parseAddress' is defined but never used. Allowed unused vars must match /^[A-Z_]/u                    no-unused-vars
+    37:59  error  'urlToDataUrl' is defined but never used. Allowed unused vars must match /^[A-Z_]/u                    no-unused-vars
+    37:73  error  'resizeImage' is defined but never used. Allowed unused vars must match /^[A-Z_]/u                     no-unused-vars
+    50:9   error  'lastSaved' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u              no-unused-vars
+    52:9   error  'setIsGeneratingPDF' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u     no-unused-vars
+    62:9   error  'handleInputChange' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u      no-unused-vars
+    76:12  error  'visibleRoomImages' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u      no-unused-vars
+    76:31  error  'setVisibleRoomImages' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u   no-unused-vars
+    77:12  error  'isContactsExpanded' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u     no-unused-vars
+    77:32  error  'setIsContactsExpanded' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+    85:12  error  'showImageSelector' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u      no-unused-vars
+    85:31  error  'setShowImageSelector' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u   no-unused-vars
+   145:12  error  'activeImageMeta' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u        no-unused-vars
+   154:12  error  'isRecording' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u            no-unused-vars
+   155:12  error  'isTranscribing' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u         no-unused-vars
+   156:12  error  'audioLevel' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u             no-unused-vars
+   197:12  error  'isAddRoomExpanded' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u      no-unused-vars
+   197:31  error  'setIsAddRoomExpanded' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u   no-unused-vars
+   241:11  error  'startRecording' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u         no-unused-vars
+   312:11  error  'stopRecording' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u          no-unused-vars
+   462:11  error  'handlePDFClick' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u         no-unused-vars
+  1226:52  error  'setEditingImage' is not defined                                                                       no-undef
+  1268:38  error  'setEditingImage' is not defined                                                                       no-undef
+  1307:40  error  'handleGeneratePDF' is not defined                                                                     no-undef
+  1687:21  error  'editingImage' is not defined                                                                          no-undef
+  1689:36  error  'editingImage' is not defined                                                                          no-undef
+  1693:41  error  'editingImage' is not defined                                                                          no-undef
+  1700:53  error  'editingImage' is not defined                                                                          no-undef
+  1718:33  error  'setEditingImage' is not defined                                                                       no-undef
+  1720:45  error  'setEditingImage' is not defined                                                                       no-undef
+
+C:\QTool\src\components\DamageForm\DamageForm.constants.jsx
+  35:14  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+  37:14  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+  45:14  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+C:\QTool\src\components\DamageForm\DamageForm.utils.js
+  115:14  error  'err' is defined but never used  no-unused-vars
+  115:19  error  Empty block statement            no-empty
+  129:26  error  'e' is defined but never used    no-unused-vars
+  135:14  error  'err' is defined but never used  no-unused-vars
+  135:19  error  Empty block statement            no-empty
+
+C:\QTool\src\components\DamageForm\sections\RoomManager.jsx
+  15:5  error  'setGlobalPreviewImage' is defined but never used  no-unused-vars
+  31:5  error  'showAddDeviceForm' is defined but never used      no-unused-vars
+  32:5  error  'setShowAddDeviceForm' is defined but never used   no-unused-vars
+
+C:\QTool\src\components\Dashboard.jsx
+  106:29  error  'color' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       no-unused-vars
+  111:31  error  'equipSummary' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                no-unused-vars
+  155:51  error  'itemEnd' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     no-unused-vars
+  156:51  error  'itemDays' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    no-unused-vars
+  374:9   error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+  372 |     // Reset to page 1 when search changes
+  373 |     useEffect(() => {
+> 374 |         setCurrentPage(1);
+      |         ^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  375 |     }, [searchTerm]);
+  376 |
+  377 |     if (!reports) {  react-hooks/set-state-in-effect
+
+C:\QTool\src\components\EmailImportModal.jsx
+    3:10  error  'swissPLZ' is defined but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+   89:22  error  'e' is defined but never used                                                    no-unused-vars
+  104:75  error  Unnecessary escape character: \.                                                 no-useless-escape
+  104:79  error  Unnecessary escape character: \/                                                 no-useless-escape
+
+C:\QTool\src\components\EmailImportModalV2.jsx
+    5:10   error  'swissPLZ' is defined but never used. Allowed unused vars must match /^[A-Z_]/u           no-unused-vars
+    7:147  error  'deviceError' is defined but never used                                                   no-unused-vars
+   13:19   error  'setUseAI' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+  149:22   error  'e' is defined but never used                                                             no-unused-vars
+  149:25   error  Empty block statement                                                                     no-empty
+
+C:\QTool\src\components\ImageEditor.jsx
+  349:42  error  Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+  347 |                             maxWidth: '96%',
+  348 |                             maxHeight: '96%',
+> 349 |                             aspectRatio: bgCanvasRef.current ? `${bgCanvasRef.current.width}/${bgCanvasRef.current.height}` : 'auto'
+      |                                          ^^^^^^^^^^^^^^^^^^^ Cannot access ref value during render
+  350 |                         }}>
+  351 |                             <canvas ref={bgCanvasRef} style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />
+  352 |                             <canvas ref={canvasRef} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 6, pointerEvents: 'none' }} />                                                               react-hooks/refs
+  349:67  error  Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+  347 |                             maxWidth: '96%',
+  348 |                             maxHeight: '96%',
+> 349 |                             aspectRatio: bgCanvasRef.current ? `${bgCanvasRef.current.width}/${bgCanvasRef.current.height}` : 'auto'
+      |                                                                   ^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot access ref value during render
+  350 |                         }}>
+  351 |                             <canvas ref={bgCanvasRef} style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />
+  352 |                             <canvas ref={canvasRef} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 6, pointerEvents: 'none' }} />                                react-hooks/refs
+  349:96  error  Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+  347 |                             maxWidth: '96%',
+  348 |                             maxHeight: '96%',
+> 349 |                             aspectRatio: bgCanvasRef.current ? `${bgCanvasRef.current.width}/${bgCanvasRef.current.height}` : 'auto'
+      |                                                                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot access ref value during render
+  350 |                         }}>
+  351 |                             <canvas ref={bgCanvasRef} style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />
+  352 |                             <canvas ref={canvasRef} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 6, pointerEvents: 'none' }} />  react-hooks/refs
+
+C:\QTool\src\components\MeasurementModal.jsx
+   51:23  error    'setSaveAsPdf' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          no-unused-vars
+  204:25  error    Error: Cannot access variable before it is declared
+
+`saveParamsToHistory` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.
+
+  202 |                         ctx.fillRect(0, 0, canvas.width, canvas.height);
+  203 |                         ctx.drawImage(img, 0, 0);
+> 204 |                         saveParamsToHistory(canvas);
+      |                         ^^^^^^^^^^^^^^^^^^^ `saveParamsToHistory` accessed before it is declared
+  205 |                     };
+  206 |                     img.src = roomData.canvasImage;
+  207 |                 } else {
+
+  251 |     };
+  252 |
+> 253 |     const saveParamsToHistory = (canvas) => {
+      |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 254 |         const ctx = canvas.getContext('2d');
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 255 |         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 256 |         setHistory(prev => [...prev.slice(0, historyStep + 1), imageData]);
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 257 |         setHistoryStep(prev => prev + 1);
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 258 |     };
+      | ^^^^^^^ `saveParamsToHistory` is declared here
+  259 |
+  260 |     const handleUndo = () => {
+  261 |         if (historyStep > 0) {  react-hooks/immutability
+  208:21  error    Error: Cannot access variable before it is declared
+
+`initCanvas` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.
+
+  206 |                     img.src = roomData.canvasImage;
+  207 |                 } else {
+> 208 |                     initCanvas();
+      |                     ^^^^^^^^^^ `initCanvas` accessed before it is declared
+  209 |                 }
+  210 |             } else {
+  211 |                 // Default measurements
+
+  235 |     }, [isOpen, rooms, initialData, isSuccess]);
+  236 |
+> 237 |     const initCanvas = () => {
+      |     ^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 238 |         const canvas = canvasRef.current;
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 239 |         if (!canvas) return;
+      ÔÇª
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 250 |         saveParamsToHistory(canvas);
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 251 |     };
+      | ^^^^^^^ `initCanvas` is declared here
+  252 |
+  253 |     const saveParamsToHistory = (canvas) => {
+  254 |         const ctx = canvas.getContext('2d');                                                                                                                                                                                                                                                                                           react-hooks/immutability
+  235:8   warning  React Hook useEffect has missing dependencies: 'initCanvas' and 'saveParamsToHistory'. Either include them or remove the dependency array                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             react-hooks/exhaustive-deps
+  296:69  error    'err' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       no-unused-vars
+  296:74  error    Empty block statement                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 no-empty
+  345:77  error    'err' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       no-unused-vars
+  345:82  error    Empty block statement                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 no-empty
+  352:11  error    'handlePhotoUpload' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     no-unused-vars
+  379:11  error    'clearCanvas' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           no-unused-vars
+
+C:\QTool\src\components\UploadPanel.jsx
+    8:33  error    Unnecessary escape character: \-                                                                                                      no-useless-escape
+  203:6   warning  React Hook useEffect has missing dependencies: 'handleUploadFiles' and 'loading'. Either include them or remove the dependency array  react-hooks/exhaustive-deps
+  215:6   warning  React Hook useEffect has missing dependencies: 'handleAnalyzeText' and 'loading'. Either include them or remove the dependency array  react-hooks/exhaustive-deps
+  299:19  error    'fileTypeLabel' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u                                         no-unused-vars
+
+C:\QTool\src\components\pdf\DamageReportDocument.jsx
+    1:1   error  Definition for rule 'react/prop-types' was not found                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            react/prop-types
+  475:25  error  Error: Cannot reassign variable after render completes
+
+Reassigning `currentApartment` after render has completed can cause inconsistent behavior on subsequent renders. Consider using state instead.
+
+  473 |
+  474 |                     if (isNewApt) {
+> 475 |                         currentApartment = room.apartment;
+      |                         ^^^^^^^^^^^^^^^^ Cannot reassign `currentApartment` after render completes
+  476 |                         currentFloor = room.stockwerk;
+  477 |                     }
+  478 |  react-hooks/immutability
+
+C:\QTool\src\hooks\useDamageForm.js
+  359:8  warning  React Hook useCallback has a missing dependency: 'handleImageUpload'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+  364:8  warning  React Hook useCallback has a missing dependency: 'handleImageUpload'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+  370:8  warning  React Hook useCallback has a missing dependency: 'handleImageUpload'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+  375:8  warning  React Hook useCallback has a missing dependency: 'handleImageUpload'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\QTool\src\services\ExportService.js
+   24:17  error  'logoId' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+   66:34  error  'dateIdx' is defined but never used                                                     no-unused-vars
+  104:42  error  'apartment' is defined but never used                                                   no-unused-vars
+
+C:\QTool\src\services\PDFService.js
+  49:26  error  'e' is defined but never used  no-unused-vars
+
+C:\QTool\src\utils\MeasurementExcelExporter.js
+  52:44  error  Unnecessary escape character: \/  no-useless-escape
+  52:46  error  Unnecessary escape character: \[  no-useless-escape
+
+C:\QTool\src\utils\MeasurementExcelExporter.v1_final.js
+  52:44  error  Unnecessary escape character: \/  no-useless-escape
+  52:46  error  Unnecessary escape character: \[  no-useless-escape
+
+C:\QTool\trace_v16.js
+  2:12  error  'require' is not defined  no-undef
+
+Ô£û 164 problems (153 errors, 11 warnings)
+

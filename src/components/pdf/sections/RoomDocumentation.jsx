@@ -21,7 +21,7 @@ const RoomDocumentation = ({ rooms, images }) => {
                     currentFloor = room.stockwerk;
                 }
 
-                const roomImages = (images || []).filter(img => {
+                const allRoomImages = (images || []).filter(img => {
                     const assignedTo = String(img.assignedTo || '').trim().toLowerCase();
                     const roomName = String(room.name || '').trim().toLowerCase();
                     return img.includeInReport !== false && (
@@ -29,6 +29,13 @@ const RoomDocumentation = ({ rooms, images }) => {
                         (assignedTo === roomName)
                     );
                 });
+
+                const roomImages = allRoomImages
+                    .filter(img => !img.linkedToOriginal)
+                    .map(img => {
+                        const thermal = allRoomImages.find(i => i.linkedToOriginal === img.id);
+                        return thermal ? { ...img, thermalImage: thermal } : img;
+                    });
 
                 const firstImage = roomImages[0];
                 const restImages = roomImages.slice(1);
@@ -63,7 +70,7 @@ const RoomDocumentation = ({ rooms, images }) => {
                             <Text style={styles.roomHeader}>{room.name}</Text>
 
                             {firstImage && (
-                                <View style={[styles.imageGrid, { marginBottom: 10 }]}>
+                                <View style={[styles.imageGrid, { flexWrap: 'nowrap', marginBottom: 10 }]}>
                                     <View style={styles.imageContainer}>
                                         {firstImage.preview ? (
                                             <Image src={firstImage.preview} style={styles.image} />
@@ -76,6 +83,21 @@ const RoomDocumentation = ({ rooms, images }) => {
                                             <Text style={styles.imageDescription}>{firstImage.description}</Text>
                                         )}
                                     </View>
+
+                                    {firstImage.thermalImage && (
+                                        <View style={styles.imageContainer}>
+                                            {firstImage.thermalImage.preview ? (
+                                                <Image src={firstImage.thermalImage.preview} style={styles.image} />
+                                            ) : (
+                                                <View style={[styles.image, { alignItems: 'center', justifyContent: 'center', backgroundColor: '#f1f5f9' }]}>
+                                                    <Text style={{ fontSize: 8, color: '#ef4444' }}>[ BILD NICHT VERFÜGBAR ]</Text>
+                                                </View>
+                                            )}
+                                            <Text style={[styles.imageDescription, { color: '#ef4444', fontWeight: 'bold' }]}>
+                                                [Thermobild] {firstImage.thermalImage.description}
+                                            </Text>
+                                        </View>
+                                    )}
                                 </View>
                             )}
                         </View>

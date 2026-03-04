@@ -4,7 +4,13 @@ import { styles } from '../PDFStyles';
 import ImageGrid from '../components/ImageGrid';
 
 const DescriptionSection = ({ data }) => {
-    const unassignedImages = data.images ? data.images.filter(img => !img.roomId && img.assignedTo !== 'Schadenfotos' && img.assignedTo !== 'Pläne' && img.assignedTo !== 'Messprotokolle' && img.includeInReport !== false) : [];
+    const allUnassignedImages = data.images ? data.images.filter(img => !img.roomId && img.assignedTo !== 'Schadenfotos' && img.assignedTo !== 'Pläne' && img.assignedTo !== 'Messprotokolle' && img.includeInReport !== false) : [];
+    const unassignedImages = allUnassignedImages
+        .filter(img => !img.linkedToOriginal)
+        .map(img => {
+            const thermal = allUnassignedImages.find(i => i.linkedToOriginal === img.id);
+            return thermal ? { ...img, thermalImage: thermal } : img;
+        });
 
     const hasUnassignedImages = unassignedImages.length > 0;
     const hasDescription = data.description && data.includeDescriptionInReport !== false;
@@ -25,11 +31,11 @@ const DescriptionSection = ({ data }) => {
                 </View>
             )}
 
-            {/* Schadensbeschreibung mit Bildern */}
+            {/* Schadensbeschreibung */}
             {(hasDescription || hasUnassignedImages) && (
                 <View style={{ marginBottom: 15 }} wrap={false}>
                     <View style={styles.divider} />
-                    <Text style={styles.sectionTitle}>SCHADENSBESCHREIBUNG MIT BILDERN</Text>
+                    <Text style={styles.sectionTitle}>Schadenbeschreibung</Text>
 
                     {hasDescription && <Text style={styles.textBlock}>{data.description}</Text>}
 

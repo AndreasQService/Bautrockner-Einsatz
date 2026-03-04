@@ -6,7 +6,13 @@ import ImageGrid from '../components/ImageGrid';
 const CauseSection = ({ data }) => {
     const findings = data.findings;
     const cause = data.cause;
-    const causeImages = data.images ? data.images.filter(img => img.assignedTo === 'Schadenfotos' && img.includeInReport !== false) : [];
+    const allCauseImages = data.images ? data.images.filter(img => img.assignedTo === 'Schadenfotos' && img.includeInReport !== false) : [];
+    const causeImages = allCauseImages
+        .filter(img => !img.linkedToOriginal)
+        .map(img => {
+            const thermal = data.images.find(i => i.linkedToOriginal === img.id);
+            return thermal ? { ...img, thermalImage: thermal } : img;
+        });
 
     const hasCause = cause || causeImages.length > 0;
 

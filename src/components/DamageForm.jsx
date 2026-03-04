@@ -12,7 +12,7 @@ if (typeof window !== 'undefined') {
 
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Camera, Image, Trash, X, Plus, Edit3, Save, Upload, FileText, CheckCircle, Circle, AlertTriangle, Play, HelpCircle, ArrowLeft, Mail, Map, MapPin, Folder, Mic, Paperclip, Table, Download, Check, Settings, RotateCcw, ChevronDown, ChevronUp, Briefcase, Hammer, ClipboardList, MicOff, Eye, Database, Phone, UserPlus } from 'lucide-react'
+import { Camera, Image, Trash, X, Plus, Edit3, Save, Upload, FileText, CheckCircle, Circle, AlertTriangle, Play, HelpCircle, ArrowLeft, Mail, Map, MapPin, Folder, Mic, Paperclip, Table, Download, Check, Settings, RotateCcw, ChevronDown, ChevronUp, Briefcase, Hammer, ClipboardList, MicOff, Eye, Database, Phone, UserPlus, Link, Unlink } from 'lucide-react'
 import { supabase } from '../supabaseClient';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
@@ -264,6 +264,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
 
     const [isSaving, setIsSaving] = useState(false);
     const [lastSaved, setLastSaved] = useState(null);
+    const [linkingImageId, setLinkingImageId] = useState(null);
     const [visibleRoomImages, setVisibleRoomImages] = useState({}); // Stores roomId -> boolean for toggle
     const [conflicts, setConflicts] = useState({}); // Stores { fieldPath: { original: '...', new: '...' } }
     const [isContactsExpanded, setIsContactsExpanded] = useState(mode !== 'technician');
@@ -3867,150 +3868,260 @@ END:VCARD`;
 
                                                 {isVisible && (
                                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1rem' }}>
-                                                        {roomImages.map((img, idx) => (
-                                                            <div key={idx} style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start', border: '1px solid var(--border)', padding: '0.5rem', borderRadius: '6px', backgroundColor: 'var(--background)' }}>
-                                                                {/* Thumbnail check */}
-                                                                <div style={{ flex: '0 0 100px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
-                                                                    <div style={{
-                                                                        width: '100px',
-                                                                        height: '100px',
-                                                                        borderRadius: '6px',
-                                                                        overflow: 'hidden',
-                                                                        backgroundColor: '#E5E7EB',
-                                                                        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-                                                                        border: (activeImageMeta?.preview === img.preview || editingImage?.preview === img.preview) ? '3px solid #3B82F6' : '1px solid var(--border)',
-                                                                        transform: (activeImageMeta?.preview === img.preview || editingImage?.preview === img.preview) ? 'scale(1.05)' : 'none',
-                                                                        transition: 'all 0.2s ease',
-                                                                        zIndex: (activeImageMeta?.preview === img.preview || editingImage?.preview === img.preview) ? 10 : 1
-                                                                    }}>
-                                                                        <img src={img.preview} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onClick={() => window.open(img.preview, '_blank')} />
-                                                                    </div>
-                                                                    <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', padding: '0 2px', alignItems: 'center' }}>
-                                                                        <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', fontSize: '0.75rem', cursor: 'pointer', color: 'var(--text-main)' }}>
-                                                                            <input
-                                                                                type="checkbox"
-                                                                                style={{ width: '20px', height: '20px', accentColor: 'var(--primary)' }}
-                                                                                checked={img.includeInReport !== false}
-                                                                                onChange={(e) => {
-                                                                                    const isChecked = e.target.checked;
+                                                        {roomImages.filter(img => !img.linkedToOriginal).map((img, idx, filteredArray) => {
+                                                            const thermalImg = roomImages.find(i => i.linkedToOriginal === img.id);
+                                                            const isLinkingThis = linkingImageId === img.id;
+                                                            return (
+                                                                <div key={idx} style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start', border: '1px solid var(--border)', padding: '0.5rem', borderRadius: '6px', backgroundColor: isLinkingThis ? 'rgba(15, 110, 163, 0.1)' : 'var(--background)' }}>
+                                                                    {/* Thumbnail check */}
+                                                                    <div style={{ flex: '0 0 100px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
+                                                                        <div style={{
+                                                                            width: '100px',
+                                                                            height: '100px',
+                                                                            borderRadius: '6px',
+                                                                            overflow: 'hidden',
+                                                                            backgroundColor: '#E5E7EB',
+                                                                            boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                                                                            border: (activeImageMeta?.preview === img.preview || editingImage?.preview === img.preview) ? '3px solid #3B82F6' : (linkingImageId ? '3px solid #10B981' : '1px solid var(--border)'),
+                                                                            transform: (activeImageMeta?.preview === img.preview || editingImage?.preview === img.preview) ? 'scale(1.05)' : 'none',
+                                                                            transition: 'all 0.2s ease',
+                                                                            zIndex: (activeImageMeta?.preview === img.preview || editingImage?.preview === img.preview) ? 10 : 1,
+                                                                            cursor: linkingImageId ? 'pointer' : 'default'
+                                                                        }}
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                if (linkingImageId && linkingImageId !== img.id) {
                                                                                     setFormData(prev => ({
                                                                                         ...prev,
-                                                                                        images: prev.images.map(i => i === img ? { ...i, includeInReport: isChecked } : i)
+                                                                                        images: prev.images.map(i => i.id === linkingImageId ? { ...i, linkedToOriginal: img.id } : i)
                                                                                     }));
-                                                                                }}
-                                                                            />
-                                                                            <span style={{ fontWeight: 600 }}>Bericht</span>
-                                                                        </label>
-                                                                        <button
-                                                                            type="button"
-                                                                            title="Bearbeiten"
-                                                                            style={{
-                                                                                border: '1px solid var(--border)',
-                                                                                backgroundColor: '#1E293B',
-                                                                                color: 'white',
-                                                                                cursor: 'pointer',
-                                                                                padding: '8px',
-                                                                                borderRadius: '8px',
-                                                                                display: 'flex',
-                                                                                alignItems: 'center',
-                                                                                justifyContent: 'center',
-                                                                                boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
-                                                                            }}
-                                                                            onClick={() => setEditingImage(img)}
-                                                                        >
-                                                                            <Edit3 size={22} />
-                                                                        </button>
-                                                                    </div>
-                                                                </div>
-
-                                                                {/* File Info & Description */}
-                                                                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                                                                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
-                                                                        <textarea
-                                                                            placeholder="Beschreibung..."
-                                                                            className="form-input"
-                                                                            rows={3}
-                                                                            style={{
-                                                                                fontSize: '0.9rem',
-                                                                                padding: '0.5rem',
-                                                                                flex: 1,
-                                                                                width: 'auto',
-                                                                                resize: 'none',
-                                                                                backgroundColor: isRecording === img.preview ? '#450a0a' : '#0F172A',
-                                                                                borderColor: isRecording === img.preview ? '#EF4444' : '#334155',
-                                                                                color: 'white'
-                                                                            }}
-                                                                            value={img.description || ''}
-                                                                            onChange={(e) => {
-                                                                                const newDesc = e.target.value;
-                                                                                setFormData(prev => ({
-                                                                                    ...prev,
-                                                                                    images: prev.images.map(i => i === img ? { ...i, description: newDesc } : i)
-                                                                                }));
-                                                                            }}
-                                                                        />
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() => isRecording === img.preview ? stopRecording() : startRecording(img.preview)}
-                                                                            title={isRecording === img.preview ? "Aufnahme stoppen" : "Spracheingabe starten"}
-                                                                            style={{
-                                                                                border: isRecording === img.preview ? 'none' : '1px solid var(--border)',
-                                                                                backgroundColor: isRecording === img.preview ? '#EF4444' : '#1E293B',
-                                                                                color: isRecording === img.preview ? 'white' : '#94A3B8',
-                                                                                width: '36px',
-                                                                                height: '36px',
-                                                                                borderRadius: '50%',
-                                                                                cursor: 'pointer',
-                                                                                display: 'flex',
-                                                                                alignItems: 'center',
-                                                                                justifyContent: 'center',
-                                                                                transition: 'all 0.2s',
-                                                                                boxShadow: isRecording === img.preview ? '0 0 0 4px rgba(239, 68, 68, 0.2)' : '0 1px 2px rgba(0,0,0,0.1)',
-                                                                                flexShrink: 0
-                                                                            }}
-                                                                        >
-                                                                            <Mic size={20} className={isRecording === img.preview ? 'animate-pulse' : ''} />
-                                                                        </button>
-                                                                    </div>
-                                                                </div>
-
-                                                                {/* Actions: Delete */}
-                                                                <div>
-                                                                    {mode !== 'technician' && (
-                                                                        <button
-                                                                            type="button"
-                                                                            className="btn btn-ghost"
-                                                                            title="Bild löschen" // Added title for clarity
-                                                                            style={{
-                                                                                color: '#EF4444',
-                                                                                padding: '0',
-                                                                                backgroundColor: '#1E293B',
-                                                                                border: '1px solid var(--border)',
-                                                                                borderRadius: '50%',
-                                                                                width: '36px',
-                                                                                height: '36px',
-                                                                                display: 'flex',
-                                                                                alignItems: 'center',
-                                                                                justifyContent: 'center',
-                                                                                boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
-                                                                                cursor: 'pointer'
-                                                                            }}
-                                                                            onClick={() => {
-                                                                                if (window.confirm('Bild wirklich löschen?')) {
-                                                                                    setFormData(prev => ({
-                                                                                        ...prev,
-                                                                                        images: prev.images.filter(i => i !== img)
-                                                                                    }));
+                                                                                    setLinkingImageId(null);
+                                                                                } else if (linkingImageId === img.id) {
+                                                                                    setLinkingImageId(null);
                                                                                 }
                                                                             }}
                                                                         >
-                                                                            <Trash size={16} />
-                                                                        </button>
-                                                                    )}
-                                                                </div>
+                                                                            <img src={img.preview} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onClick={(e) => {
+                                                                                e.stopPropagation(); if (!linkingImageId) window.open(img.preview, '_blank'); else {
+                                                                                    setFormData(prev => ({
+                                                                                        ...prev,
+                                                                                        images: prev.images.map(i => i.id === linkingImageId ? { ...i, linkedToOriginal: img.id } : i)
+                                                                                    }));
+                                                                                    setLinkingImageId(null);
+                                                                                }
+                                                                            }} />
+                                                                        </div>
+                                                                        {linkingImageId === img.id && (
+                                                                            <div style={{ fontSize: '0.65rem', color: '#10B981', fontWeight: 'bold', textAlign: 'center' }}>Bitte Ziel wählen...</div>
+                                                                        )}
+                                                                        <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', padding: '0 2px', alignItems: 'center' }}>
+                                                                            <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', fontSize: '0.75rem', cursor: 'pointer', color: 'var(--text-main)' }}>
+                                                                                <input
+                                                                                    type="checkbox"
+                                                                                    style={{ width: '20px', height: '20px', accentColor: 'var(--primary)' }}
+                                                                                    checked={img.includeInReport !== false}
+                                                                                    onChange={(e) => {
+                                                                                        const isChecked = e.target.checked;
+                                                                                        setFormData(prev => ({
+                                                                                            ...prev,
+                                                                                            images: prev.images.map(i => i === img ? { ...i, includeInReport: isChecked } : i)
+                                                                                        }));
+                                                                                    }}
+                                                                                />
+                                                                                <span style={{ fontWeight: 600 }}>Bericht</span>
+                                                                            </label>
+                                                                            <button
+                                                                                type="button"
+                                                                                title="Bearbeiten"
+                                                                                style={{
+                                                                                    border: '1px solid var(--border)',
+                                                                                    backgroundColor: '#1E293B',
+                                                                                    color: 'white',
+                                                                                    cursor: 'pointer',
+                                                                                    padding: '8px',
+                                                                                    borderRadius: '8px',
+                                                                                    display: 'flex',
+                                                                                    alignItems: 'center',
+                                                                                    justifyContent: 'center',
+                                                                                    boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
+                                                                                }}
+                                                                                onClick={() => setEditingImage(img)}
+                                                                            >
+                                                                                <Edit3 size={22} />
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
 
-                                                            </div>
-                                                        ))}
+                                                                    {/* File Info & Description */}
+                                                                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                                                                        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
+                                                                            <textarea
+                                                                                placeholder="Beschreibung..."
+                                                                                className="form-input"
+                                                                                rows={3}
+                                                                                style={{
+                                                                                    fontSize: '0.9rem',
+                                                                                    padding: '0.5rem',
+                                                                                    flex: 1,
+                                                                                    width: 'auto',
+                                                                                    resize: 'none',
+                                                                                    backgroundColor: isRecording === img.preview ? '#450a0a' : '#0F172A',
+                                                                                    borderColor: isRecording === img.preview ? '#EF4444' : '#334155',
+                                                                                    color: 'white'
+                                                                                }}
+                                                                                value={img.description || ''}
+                                                                                onChange={(e) => {
+                                                                                    const newDesc = e.target.value;
+                                                                                    setFormData(prev => ({
+                                                                                        ...prev,
+                                                                                        images: prev.images.map(i => i === img ? { ...i, description: newDesc } : i)
+                                                                                    }));
+                                                                                }}
+                                                                            />
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => isRecording === img.preview ? stopRecording() : startRecording(img.preview)}
+                                                                                title={isRecording === img.preview ? "Aufnahme stoppen" : "Spracheingabe starten"}
+                                                                                style={{
+                                                                                    border: isRecording === img.preview ? 'none' : '1px solid var(--border)',
+                                                                                    backgroundColor: isRecording === img.preview ? '#EF4444' : '#1E293B',
+                                                                                    color: isRecording === img.preview ? 'white' : '#94A3B8',
+                                                                                    width: '36px',
+                                                                                    height: '36px',
+                                                                                    borderRadius: '50%',
+                                                                                    cursor: 'pointer',
+                                                                                    display: 'flex',
+                                                                                    alignItems: 'center',
+                                                                                    justifyContent: 'center',
+                                                                                    transition: 'all 0.2s',
+                                                                                    boxShadow: isRecording === img.preview ? '0 0 0 4px rgba(239, 68, 68, 0.2)' : '0 1px 2px rgba(0,0,0,0.1)',
+                                                                                    flexShrink: 0
+                                                                                }}
+                                                                            >
+                                                                                <Mic size={20} className={isRecording === img.preview ? 'animate-pulse' : ''} />
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
+
+                                                                    {/* Second Thumbnail (Thermal if exists) */}
+                                                                    {thermalImg && (
+                                                                        <div style={{ flex: '0 0 100px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', opacity: linkingImageId ? 0.5 : 1 }}>
+                                                                            <div style={{ width: '100px', height: '100px', borderRadius: '6px', overflow: 'hidden', backgroundColor: '#E5E7EB', border: '2px solid #10B981', position: 'relative' }}>
+                                                                                <img src={thermalImg.preview} alt="Thermobild" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onClick={() => window.open(thermalImg.preview, '_blank')} />
+                                                                                <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(16, 185, 129, 0.9)', color: 'white', fontSize: '0.65rem', textAlign: 'center', padding: '3px 0', fontWeight: 'bold', textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>THERMO</div>
+                                                                            </div>
+                                                                        </div>
+                                                                    )}
+
+                                                                    {/* Actions: Delete, Up, Down, Link */}
+                                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                                                        <button
+                                                                            type="button"
+                                                                            className="btn btn-ghost"
+                                                                            title="Bild nach oben verschieben"
+                                                                            disabled={idx === 0}
+                                                                            style={{ color: '#3B82F6', padding: '0', backgroundColor: '#1E293B', border: '1px solid var(--border)', borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 2px rgba(0,0,0,0.1)', cursor: idx === 0 ? 'not-allowed' : 'pointer', opacity: idx === 0 ? 0.5 : 1 }}
+                                                                            onClick={() => {
+                                                                                setFormData(prev => {
+                                                                                    const newImages = [...prev.images];
+                                                                                    const visible = roomImages.filter(i => !i.linkedToOriginal);
+                                                                                    const gCurIdx = newImages.findIndex(i => i.id === img.id);
+                                                                                    const gTarIdx = newImages.findIndex(i => i.id === visible[idx - 1].id);
+                                                                                    const temp = newImages[gCurIdx];
+                                                                                    newImages[gCurIdx] = newImages[gTarIdx];
+                                                                                    newImages[gTarIdx] = temp;
+                                                                                    return { ...prev, images: newImages };
+                                                                                });
+                                                                            }}
+                                                                        >
+                                                                            <ChevronUp size={16} />
+                                                                        </button>
+
+                                                                        <button
+                                                                            type="button"
+                                                                            className="btn btn-ghost"
+                                                                            title="Bild nach unten verschieben"
+                                                                            disabled={idx === filteredArray.length - 1}
+                                                                            style={{ color: '#3B82F6', padding: '0', backgroundColor: '#1E293B', border: '1px solid var(--border)', borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 2px rgba(0,0,0,0.1)', cursor: idx === filteredArray.length - 1 ? 'not-allowed' : 'pointer', opacity: idx === filteredArray.length - 1 ? 0.5 : 1 }}
+                                                                            onClick={() => {
+                                                                                setFormData(prev => {
+                                                                                    const newImages = [...prev.images];
+                                                                                    const visible = roomImages.filter(i => !i.linkedToOriginal);
+                                                                                    const gCurIdx = newImages.findIndex(i => i.id === img.id);
+                                                                                    const gTarIdx = newImages.findIndex(i => i.id === visible[idx + 1].id);
+                                                                                    const temp = newImages[gCurIdx];
+                                                                                    newImages[gCurIdx] = newImages[gTarIdx];
+                                                                                    newImages[gTarIdx] = temp;
+                                                                                    return { ...prev, images: newImages };
+                                                                                });
+                                                                            }}
+                                                                        >
+                                                                            <ChevronDown size={16} />
+                                                                        </button>
+
+                                                                        {!thermalImg ? (
+                                                                            <button
+                                                                                type="button"
+                                                                                className="btn btn-ghost"
+                                                                                title="Als Thermobild verknüpfen"
+                                                                                style={{ color: '#10B981', padding: '0', backgroundColor: '#1E293B', border: '1px solid var(--border)', borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 2px rgba(0,0,0,0.1)', cursor: 'pointer' }}
+                                                                                onClick={() => setLinkingImageId(isLinkingThis ? null : img.id)}
+                                                                            >
+                                                                                <Link size={16} />
+                                                                            </button>
+                                                                        ) : (
+                                                                            <button
+                                                                                type="button"
+                                                                                className="btn btn-ghost"
+                                                                                title="Verknüpfung aufheben"
+                                                                                style={{ color: '#F59E0B', padding: '0', backgroundColor: '#1E293B', border: '1px solid var(--border)', borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 2px rgba(0,0,0,0.1)', cursor: 'pointer' }}
+                                                                                onClick={() => {
+                                                                                    setFormData(prev => ({
+                                                                                        ...prev,
+                                                                                        images: prev.images.map(i => i.id === thermalImg.id ? { ...i, linkedToOriginal: null } : i)
+                                                                                    }));
+                                                                                }}
+                                                                            >
+                                                                                <Unlink size={16} />
+                                                                            </button>
+                                                                        )}
+
+                                                                        {mode !== 'technician' && (
+                                                                            <button
+                                                                                type="button"
+                                                                                className="btn btn-ghost"
+                                                                                title="Bild löschen"
+                                                                                style={{
+                                                                                    color: '#EF4444',
+                                                                                    padding: '0',
+                                                                                    backgroundColor: '#1E293B',
+                                                                                    border: '1px solid var(--border)',
+                                                                                    borderRadius: '50%',
+                                                                                    width: '36px',
+                                                                                    height: '36px',
+                                                                                    display: 'flex',
+                                                                                    alignItems: 'center',
+                                                                                    justifyContent: 'center',
+                                                                                    boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
+                                                                                    cursor: 'pointer'
+                                                                                }}
+                                                                                onClick={() => {
+                                                                                    if (window.confirm('Bild wirklich löschen?')) {
+                                                                                        setFormData(prev => ({
+                                                                                            ...prev,
+                                                                                            images: prev.images.filter(i => i !== img && (!thermalImg || i !== thermalImg))
+                                                                                        }));
+                                                                                    }
+                                                                                }}
+                                                                            >
+                                                                                <Trash size={16} />
+                                                                            </button>
+                                                                        )}
+                                                                    </div>
+
+                                                                </div>
+                                                            );
+                                                        })}
                                                         {roomImages.length === 0 && (
                                                             <div style={{ fontSize: '0.85rem', color: '#9CA3AF', fontStyle: 'italic', marginBottom: '0.5rem' }}>Keine Bilder</div>
                                                         )}

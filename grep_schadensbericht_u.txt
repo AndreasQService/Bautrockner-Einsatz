@@ -1,0 +1,7 @@
+﻿3d67681:src:components/DamageForm.jsx:            await handleImageUpload([file], { assignedTo: 'Schadensbericht' });
+3d67681:src:components/DamageForm.jsx:                        {/* Centered Schadensbericht Button with PDF Logo */}
+3d67681:src:components/DamageForm.jsx:                                <span>Schadensbericht</span>
+3d67681:src:components/DamageForm.jsx:                        {/* Centered Schadensbericht Button for Technician Mode (Tablet) */}
+3d67681:src:components/DamageForm.jsx:                                <span>Schadensbericht</span>
+3d67681:src:components/DamageForm.jsx:                                    <h1 style={{ fontSize: '28pt', fontWeight: '800', margin: 0, color: '#0F172A' }}>Schadensbericht</h1>
+3d67681:src:components/pdf/DamageReportDocument.jsx:                            data.damageCategory === 'Trocknung' ? 'Trocknungsbericht' : 'Schadensbericht'}
