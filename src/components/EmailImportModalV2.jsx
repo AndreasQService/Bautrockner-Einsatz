@@ -79,20 +79,55 @@ const EmailImportModalV2 = ({ onClose, onImport, audioDevices, selectedDeviceId,
    - MAPPING: Diese entfernten Teile müssen zwingend in die Felder 'STRASSE & NR.', 'PLZ' und 'ORT' geschrieben werden. 
    - KONTROLLE: Ein leeres Feld 'STRASSE & NR.' bei gleichzeitigem Text im Feld 'EIGENTÜMER' ist ein Systemfehler und muss korrigiert werden.
 
-2. ROLLEN-LOGIK (NUR DIESE WERTE):
-   Ordne jedem Kontakt ausschliesslich eines dieser Kürzel zu:
-   - 'Handw.': Jede Person mit einer Firmen-Signatur (Technik/Sanitär), die den Schaden meldet oder behebt.
-   - 'Verw.': Jede Firma, die als Verwaltung oder Bewirtschaftung auftritt.
-   - 'Mieter': Personen, die in der betroffenen Wohnung oder im Objekt leben.
-   - 'Eig.': Die im Abschnitt 'Eigentümer' genannte Entität.
-   - 'HW': Hauswart.
+2. AUFTRAGGEBER-LOGIK (PFLICHT):
+   Der Auftraggeber ist die Person/Firma, die das Email AN Q-Service geschrieben hat.
 
-3. VERBOT VON PLATZHALTERN:
+   SCHRITT 1 – TRENNLINIE FINDEN:
+   Suche nach der Trennlinie zum weitergeleiteten Teil: "Von:", "Gesendet:", "-----Ursprüngliche Nachricht-----", "From:".
+   ALLES VOR dieser Trennlinie = das äussere/eigene Email des Absenders.
+   ALLES NACH dieser Trennlinie = weitergeleitete Inhalte anderer Personen → IGNORIEREN für Auftraggeber-Erkennung.
+
+   SCHRITT 2 – ABSENDER-SIGNATUR LESEN:
+   Die Signatur am Ende des äusseren Emails (vor der Trennlinie) enthält den Auftraggeber.
+   Erkennungsmuster: Vorname Name + Jobtitel + Firmenname + Adresse + Telefon/Email.
+   → 'auftrag_verwaltung.firma' = Firmenname aus dieser Signatur.
+   → 'auftrag_verwaltung.sachbearbeiter' = Person aus dieser Signatur.
+   → 'auftrag_verwaltung.telefon' = Telefon aus dieser Signatur.
+   → 'auftrag_verwaltung.email' = E-Mail aus dieser Signatur.
+
+   KONKRETES BEISPIEL:
+   Text: "...Nikola Komani / Serviceleiter / Neukom Marzolo AG / Gewerbestrasse 13 / 8197 Rafz / nikola.komani@neukom-marzolo.ch
+   Von: Susanne Waeckerlin ... Verwaltung/Auftraggeber: STUMP + PARTNER AG ..."
+   → firma = "Neukom Marzolo AG" (aus der EIGENEN Signatur VOR "Von:")
+   → NICHT "STUMP + PARTNER AG" (das ist im weitergeleiteten Teil)
+
+   AUFTRAGGEBER-ADRESSE: Adresse der Auftraggeber-Firma gehört in 'auftrag_verwaltung.adresse' und 'auftrag_verwaltung.plz_ort'. NICHT in 'schadenort'!
+
+2b. SCHADENORT-EXTRAKTION (PFLICHT):
+   - BETREFF als Quelle: Wenn der Email-Betreff eine Strasse enthält (Muster: "Wasserschaden Strassename Nr"), IST DAS DER SCHADENORT. Extrahiere Strasse + Hausnummer daraus.
+   - Beispiel: "Betreff: Wasserschaden Leutschenbachstrasse 30 B1804" → schadenort.strasse_nr = "Leutschenbachstrasse 30", schadenort.etage_wohnung = "B1804"
+   - WOHNUNGSNUMMERN erkennen: Codes wie "B1804", "EG", "3OG", "DG", "W12", "OG3", "C204" gehören in schadenort.etage_wohnung, NICHT in strasse_nr.
+   - PLZ/ORT: Falls PLZ nicht im Text steht, lass schadenort.plz_ort leer (""). NICHT raten!
+   - MEHRFACH-QUELLEN: Die Adresse kann auch in einer Signatur, Cc-Liste oder Weiterleitungszeile vorkommen ("Betreff:", "Subject:", "Objekt:").
+
+3. ROLLEN-LOGIK (STRIKTE REGELN):
+   Jede Person bekommt GENAU EINE Rolle. KEINE Doppelzuweisung erlaubt.
+   Prioritätsreihenfolge bei Unklarheit: Handw. > Verw. > Eig. > HW > Mieter
+   
+   - 'Handw.': Techniker, Sanitär, Heizung, Monteure, Handwerker-Firmen – NUR wenn sie am Schaden gearbeitet haben UND NICHT der Auftraggeber sind.
+   - 'Verw.': Firmen mit Bezeichnung Verwaltung, Bewirtschaftung, Immobilien AG, Partner.
+   - 'Mieter': NUR Personen die EXPLIZIT als "Mieter" bezeichnet werden, oder die in der beschädigten Wohnung wohnen (erkenntlich an: "wohnt in", "Mieter:", "bewohnt").
+   - 'Eig.': NUR die explizit als "Eigentümer:" oder "Eig.:" bezeichnete Person/Firma.
+   - 'HW': Hauswart.
+   - FEHLER-KONTROLLE: Ein Sanitärtechniker ist KEIN Mieter. Eine Verwaltungsfirma ist kein Handwerker.
+
+4. VERBOT VON PLATZHALTERN:
    - Die Ausgabe des Wortes "string" ist strengstens untersagt. 
    - Falls eine Information im Text nicht existiert, gib einen leeren String ("") aus. 
    - Fülle JEDES Feld mit den Realdaten aus dem Text, niemals mit Platzhaltern.
+   - Rechnungsvermerk: NUR echte Referenznummern (z.B. RIM-23, Ref: 2026xxx). KEINE Schadensbeschreibung.
 
-4. FORMATIERUNG:
+5. FORMATIERUNG:
    - Telefon: +41 XX XXX XX XX.
    - Namen: Trenne Vorname und Nachname (falls möglich).
 
@@ -106,7 +141,11 @@ AUSGABE-FORMAT (JSON):
   "auftrag_verwaltung": {
     "firma": "",
     "sachbearbeiter": "",
-    "leistungsart": "Wasserschaden"
+    "telefon": "",
+    "email": "",
+    "leistungsart": "Wasserschaden",
+    "adresse": "",
+    "plz_ort": ""
   },
   "rechnungs_details": {
     "eigentuemer": "",
@@ -266,6 +305,16 @@ ${text}`;
                                 <div>
                                     <label style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8' }}>Sachbearbeiter</label>
                                     <input className="form-input" style={{ width: '100%' }} value={previewData.auftrag_verwaltung?.sachbearbeiter || ''} onChange={e => setPreviewData({ ...previewData, auftrag_verwaltung: { ...previewData.auftrag_verwaltung, sachbearbeiter: e.target.value } })} />
+                                </div>
+                                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                    <div style={{ flex: 1 }}>
+                                        <label style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8' }}>Telefon (AG)</label>
+                                        <input className="form-input" style={{ width: '100%' }} placeholder="+41 XX XXX XX XX" value={previewData.auftrag_verwaltung?.telefon || ''} onChange={e => setPreviewData({ ...previewData, auftrag_verwaltung: { ...previewData.auftrag_verwaltung, telefon: e.target.value } })} />
+                                    </div>
+                                    <div style={{ flex: 1 }}>
+                                        <label style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8' }}>E-Mail (AG)</label>
+                                        <input className="form-input" style={{ width: '100%' }} placeholder="email@firma.ch" value={previewData.auftrag_verwaltung?.email || ''} onChange={e => setPreviewData({ ...previewData, auftrag_verwaltung: { ...previewData.auftrag_verwaltung, email: e.target.value } })} />
+                                    </div>
                                 </div>
                             </div>
                         </div>

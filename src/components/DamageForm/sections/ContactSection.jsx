@@ -70,6 +70,27 @@ const ContactSection = ({ formData, setFormData, mode, renderConflictWarn }) => 
                                 style={{ width: '100%' }}
                             />
                         </div>
+                        <div style={{ flex: '1 1 160px' }}>
+                            <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 600, marginBottom: '0.5rem', display: 'block' }}>Telefon (AG-Kontakt)</label>
+                            <input
+                                className="form-input"
+                                placeholder="+41 XX XXX XX XX"
+                                value={formData.clientPhone || ''}
+                                onChange={(e) => setFormData(prev => ({ ...prev, clientPhone: e.target.value }))}
+                                style={{ width: '100%' }}
+                            />
+                        </div>
+                        <div style={{ flex: '2 1 200px' }}>
+                            <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 600, marginBottom: '0.5rem', display: 'block' }}>E-Mail (AG-Kontakt)</label>
+                            <input
+                                type="email"
+                                className="form-input"
+                                placeholder="email@firma.ch"
+                                value={formData.clientEmail || ''}
+                                onChange={(e) => setFormData(prev => ({ ...prev, clientEmail: e.target.value }))}
+                                style={{ width: '100%' }}
+                            />
+                        </div>
                         <div style={{ flex: '1 1 180px' }}>
                             <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 600, marginBottom: '0.5rem', display: 'block' }}>Leistungsart</label>
                             <select
@@ -82,22 +103,6 @@ const ContactSection = ({ formData, setFormData, mode, renderConflictWarn }) => 
                                 <option value="Schimmel">Schimmel</option>
                                 <option value="Leckortung">Leckortung</option>
                                 <option value="Trocknung">Trocknung</option>
-                            </select>
-                        </div>
-                        <div style={{ flex: '1 1 200px' }}>
-                            <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 600, marginBottom: '0.5rem', display: 'block' }}>Art der Liegenschaft</label>
-                            <select
-                                className="form-input"
-                                value={formData.propertyType || ''}
-                                onChange={(e) => setFormData(prev => ({ ...prev, propertyType: e.target.value }))}
-                                style={{ width: '100%' }}
-                            >
-                                <option value="">Bitte wählen...</option>
-                                <option value="Einfamilienhaus">Einfamilienhaus</option>
-                                <option value="Mehrfamilienhaus">Mehrfamilienhaus</option>
-                                <option value="Eigentumswohnung">Eigentumswohnung</option>
-                                <option value="Gewerbe / Büro">Gewerbe / Büro</option>
-                                <option value="Sonstiges">Sonstiges</option>
                             </select>
                         </div>
                     </div>
@@ -185,7 +190,7 @@ const ContactSection = ({ formData, setFormData, mode, renderConflictWarn }) => 
                             </div>
                         </div>
                     </div>
-                </div>
+                </div >
             )}
 
             {/* Address Text Details */}

@@ -9,6 +9,8 @@ import MeasurementDeviceManager from './components/MeasurementDeviceManager'
 import LoginScreen from './components/LoginScreen'
 import EmailImportModalV2 from './components/EmailImportModalV2'
 import i18n from './i18n'
+import { useIsAuthenticated, useMsal } from "@azure/msal-react";
+import { loginRequest } from "./msalConfig";
 
 function App() {
   const [view, setView] = useState(() => localStorage.getItem('qservice_current_view') || 'dashboard') // 'dashboard', 'new-report', 'details'
@@ -35,6 +37,23 @@ function App() {
   const [showEmailImport, setShowEmailImport] = useState(false);
   const [audioDevices, setAudioDevices] = useState([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState(localStorage.getItem('qtool_selected_mic') || '');
+
+  // MSAL hooks for OneDrive
+  const { instance, accounts } = useMsal();
+  const isAuthenticated = useIsAuthenticated();
+
+  const handleLoginOneDrive = () => {
+    instance.loginPopup(loginRequest).catch(e => {
+      console.error("MSAL Login Error:", e);
+      alert("MSAL Fehler: " + e.message);
+    });
+  };
+
+  const handleLogoutOneDrive = () => {
+    instance.logoutPopup().catch(e => {
+      console.error("MSAL Logout Error:", e);
+    });
+  };
 
   // Users List (Managed here to share with LoginScreen)
   const [users, setUsers] = useState(() => {
@@ -102,7 +121,13 @@ function App() {
       if (error) {
         console.error('Error fetching reports from Supabase:', error);
       } else if (data) {
-        const loadedReports = data.map(row => row.report_data);
+        const loadedReports = data.map(row => row.report_data).map(report => ({
+          ...report,
+          images: (report.images || []).map(img => ({
+            ...img,
+            includeInReport: true
+          }))
+        }));
         if (loadedReports.length > 0) {
           setReports(loadedReports);
 
@@ -276,6 +301,20 @@ function App() {
       }
     }
 
+    // Auftraggeber-Adresse
+    let clientStreet = importedData.auftrag_verwaltung?.adresse || '';
+    let clientZip = '';
+    let clientCity = '';
+    if (importedData.auftrag_verwaltung?.plz_ort) {
+      const clientParts = String(importedData.auftrag_verwaltung.plz_ort).trim().split(/\s+/);
+      if (clientParts.length >= 2 && /^\d{4,5}$/.test(clientParts[0])) {
+        clientZip = clientParts[0];
+        clientCity = clientParts.slice(1).join(' ');
+      } else {
+        clientCity = importedData.auftrag_verwaltung.plz_ort;
+      }
+    }
+
     const newReport = {
       id: newId,
       projectTitle: projectNum || client || 'Importiertes Projekt',
@@ -283,6 +322,11 @@ function App() {
       orderNumber: importedData.projekt_daten?.auftrags_nr || '',
       invoiceReference: importedData.projekt_daten?.externe_ref || importedData.rechnungs_details?.vermerk || '',
       client: client,
+      clientStreet: clientStreet,
+      clientZip: clientZip,
+      clientCity: clientCity,
+      clientPhone: importedData.auftrag_verwaltung?.telefon || '',
+      clientEmail: importedData.auftrag_verwaltung?.email || '',
       street: street,
       zip: zip,
       city: city,
@@ -294,13 +338,31 @@ function App() {
       assignedTo: importedData.auftrag_verwaltung?.sachbearbeiter || '',
       status: 'Schadenaufnahme',
       date: new Date().toISOString(),
-      contacts: (importedData.kontakte || []).map(c => ({
-        name: c.name || '',
-        phone: c.telefon || '',
-        role: c.rolle || 'Mieter',
-        apartment: '',
-        floor: ''
-      })),
+      contacts: (importedData.kontakte || []).map(c => {
+        // KI-Kürzel auf Dropdown-Werte mappen
+        const rolleMap = {
+          'Eig.': 'Eigentümer',
+          'Eig': 'Eigentümer',
+          'Eigentümer': 'Eigentümer',
+          'Verw.': 'Verwaltung',
+          'Verw': 'Verwaltung',
+          'Verwaltung': 'Verwaltung',
+          'Handw.': 'Handwerker',
+          'Handw': 'Handwerker',
+          'Handwerker': 'Handwerker',
+          'HW': 'Hauswart',
+          'Hauswart': 'Hauswart',
+          'Mieter': 'Mieter',
+        };
+        const mappedRole = rolleMap[c.rolle] || rolleMap[(c.rolle || '').trim()] || 'Mieter';
+        return {
+          name: c.name || '',
+          phone: c.telefon || '',
+          role: mappedRole,
+          apartment: '',
+          floor: ''
+        };
+      }),
       rooms: [],
       images: [],
       equipment: [],
@@ -429,7 +491,7 @@ function App() {
               onClick={handleLogout}
               className="btn btn-ghost"
               title="Abmelden"
-              style={{ padding: '0.4rem', color: '#F87171', borderRadius: '50%' }}
+              style={{ padding: '0.75rem', color: '#F87171', borderRadius: '50%', minWidth: '44px', minHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
             >
               <LogOut size={16} />
             </button>
@@ -466,6 +528,19 @@ function App() {
                       <Database size={18} />
                       <span className="hide-mobile">Import</span>
                     </button>
+
+                    {/* OneDrive Test Button */}
+                    {!isAuthenticated ? (
+                      <button className="btn btn-outline" onClick={handleLoginOneDrive} style={{ color: '#0078D4', borderColor: '#0078D4', gap: '0.4rem' }}>
+                        <Database size={18} />
+                        <span className="hide-mobile">OneDrive Login</span>
+                      </button>
+                    ) : (
+                      <button className="btn btn-outline" onClick={handleLogoutOneDrive} style={{ color: '#10B981', borderColor: '#10B981', gap: '0.4rem' }}>
+                        <Database size={18} />
+                        <span className="hide-mobile">OneDrive OK ({accounts[0]?.name?.split(' ')[0]})</span>
+                      </button>
+                    )}
                   </>
                 )}
 

@@ -13,7 +13,7 @@ const DescriptionSection = ({ data }) => {
         });
 
     const hasUnassignedImages = unassignedImages.length > 0;
-    const hasDescription = data.description && data.includeDescriptionInReport !== false;
+    const hasDescription = data.description && data.description.trim().length > 0 && data.includeDescriptionInReport !== false;
 
     if (!data.exteriorPhoto && !hasDescription && !hasUnassignedImages) return null;
 
@@ -31,15 +31,19 @@ const DescriptionSection = ({ data }) => {
                 </View>
             )}
 
-            {/* Schadensbeschreibung */}
-            {(hasDescription || hasUnassignedImages) && (
+            {/* Schadensbeschreibung – Titel + Text nur wenn wirklich Beschreibung vorhanden */}
+            {hasUnassignedImages && !hasDescription && (
+                <View style={{ marginBottom: 15 }} wrap={false}>
+                    <View style={styles.divider} />
+                    <ImageGrid images={unassignedImages} wrap={false} />
+                </View>
+            )}
+
+            {hasDescription && (
                 <View style={{ marginBottom: 15 }} wrap={false}>
                     <View style={styles.divider} />
                     <Text style={styles.sectionTitle}>Schadenbeschreibung</Text>
-
-                    {hasDescription && <Text style={styles.textBlock}>{data.description}</Text>}
-
-                    {/* Images related to description (unassigned/initial images) */}
+                    <Text style={styles.textBlock}>{data.description.trim()}</Text>
                     {hasUnassignedImages && (
                         <View style={{ marginTop: 10 }}>
                             <ImageGrid images={unassignedImages} wrap={false} />

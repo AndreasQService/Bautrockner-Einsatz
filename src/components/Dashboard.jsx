@@ -389,7 +389,8 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
                         <button
                             onClick={() => setShowArchive(false)}
                             style={{
-                                padding: '0.25rem 1rem',
+                                padding: '0.5rem 1rem',
+                                minHeight: '44px',
                                 borderRadius: '9999px',
                                 border: 'none',
                                 fontSize: '0.875rem',
@@ -405,7 +406,8 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
                         <button
                             onClick={() => setShowArchive(true)}
                             style={{
-                                padding: '0.25rem 1rem',
+                                padding: '0.5rem 1rem',
+                                minHeight: '44px',
                                 borderRadius: '9999px',
                                 border: 'none',
                                 fontSize: '0.875rem',
@@ -430,7 +432,8 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
                         onChange={(e) => setSearchTerm(e.target.value)}
                         style={{
                             width: '100%',
-                            padding: '0.5rem 1rem 0.5rem 2.5rem',
+                            padding: '0.75rem 1rem 0.75rem 2.5rem',
+                            minHeight: '44px',
                             border: '1px solid var(--border)',
                             borderRadius: '9999px',
                             fontSize: '0.9rem',
@@ -454,7 +457,7 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
             )}
 
             {mode === 'technician' ? (
-                <div style={{ paddingBottom: '4rem', maxWidth: '600px', margin: '0 auto', width: '100%' }}>
+                <div data-testid="techniker-list" style={{ paddingBottom: '4rem', maxWidth: '600px', margin: '0 auto', width: '100%' }}>
                     <div style={{ marginBottom: '0.75rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
                         {paginatedReports.length} Projekte gefunden
                     </div>

@@ -25,6 +25,8 @@ export const useDamageForm = (initialData, onSave, mode = 'desktop') => {
         clientStreet: initialData.clientStreet || '',
         clientZip: initialData.clientZip || '',
         clientCity: initialData.clientCity || '',
+        clientPhone: initialData.clientPhone || '',
+        clientEmail: initialData.clientEmail || '',
         ownerName: initialData.ownerName || '',
         ownerStreet: initialData.ownerStreet || '',
         ownerZip: initialData.ownerZip || '',
@@ -50,7 +52,9 @@ export const useDamageForm = (initialData, onSave, mode = 'desktop') => {
         dryingEnded: initialData.dryingEnded || null,
         equipment: Array.isArray(initialData.equipment) ? initialData.equipment : [],
         images: Array.isArray(initialData.images)
-            ? initialData.images.map(img => typeof img === 'string' ? { preview: img, name: 'Existing Image', date: new Date().toISOString() } : img)
+            ? initialData.images.map(img => typeof img === 'string'
+                ? { preview: img, name: 'Existing Image', date: new Date().toISOString(), includeInReport: true }
+                : { ...img, includeInReport: true })
             : [],
         projectNumber: initialData.projectNumber || '',
         orderNumber: initialData.orderNumber || '',
@@ -81,6 +85,8 @@ export const useDamageForm = (initialData, onSave, mode = 'desktop') => {
         clientStreet: '',
         clientZip: '',
         clientCity: '',
+        clientPhone: '',
+        clientEmail: '',
         ownerName: '',
         ownerStreet: '',
         ownerZip: '',
@@ -196,6 +202,15 @@ export const useDamageForm = (initialData, onSave, mode = 'desktop') => {
 
     const handleEmailImport = useCallback((data) => {
         if (!data) return;
+
+        // KI-Kürzel auf Dropdown-Werte mappen
+        const rolleMap = {
+            'Eig.': 'Eigentümer', 'Eig': 'Eigentümer', 'Eigentümer': 'Eigentümer',
+            'Verw.': 'Verwaltung', 'Verw': 'Verwaltung', 'Verwaltung': 'Verwaltung',
+            'Handw.': 'Handwerker', 'Handw': 'Handwerker', 'Handwerker': 'Handwerker',
+            'HW': 'Hauswart', 'Hauswart': 'Hauswart', 'Mieter': 'Mieter',
+        };
+
         setFormData(prev => {
             const newConflicts = { ...conflicts };
             const nextData = { ...prev };
@@ -218,8 +233,20 @@ export const useDamageForm = (initialData, onSave, mode = 'desktop') => {
             if (data.auftrag_verwaltung) {
                 mergeField('client', data.auftrag_verwaltung.firma);
                 mergeField('assignedTo', data.auftrag_verwaltung.sachbearbeiter);
+                mergeField('clientStreet', data.auftrag_verwaltung.adresse);
+                mergeField('clientPhone', data.auftrag_verwaltung.telefon);
+                mergeField('clientEmail', data.auftrag_verwaltung.email);
                 if (data.auftrag_verwaltung.leistungsart) {
                     mergeField('damageCategory', data.auftrag_verwaltung.leistungsart);
+                }
+                if (data.auftrag_verwaltung.plz_ort) {
+                    const cp = data.auftrag_verwaltung.plz_ort.trim().split(/\s+/);
+                    if (cp.length >= 2 && /^\d{4,5}$/.test(cp[0])) {
+                        mergeField('clientZip', cp[0]);
+                        mergeField('clientCity', cp.slice(1).join(' '));
+                    } else {
+                        mergeField('clientCity', data.auftrag_verwaltung.plz_ort);
+                    }
                 }
             }
             if (data.rechnungs_details) {
@@ -251,17 +278,18 @@ export const useDamageForm = (initialData, onSave, mode = 'desktop') => {
                         c.name && newContact.name &&
                         c.name.trim().toLowerCase() === newContact.name.trim().toLowerCase()
                     );
+                    const mappedRole = rolleMap[newContact.rolle] || rolleMap[(newContact.rolle || '').trim()] || 'Mieter';
                     if (existingIdx !== -1) {
                         currentContacts[existingIdx] = {
                             ...currentContacts[existingIdx],
                             phone: currentContacts[existingIdx].phone || newContact.telefon,
-                            role: currentContacts[existingIdx].role || newContact.rolle,
+                            role: currentContacts[existingIdx].role !== 'Mieter' ? currentContacts[existingIdx].role : mappedRole,
                         };
                     } else {
                         currentContacts.push({
                             name: newContact.name,
                             phone: newContact.telefon,
-                            role: newContact.rolle || 'Mieter',
+                            role: mappedRole,
                             apartment: ''
                         });
                     }

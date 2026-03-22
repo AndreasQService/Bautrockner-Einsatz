@@ -408,8 +408,11 @@ const ImageEditor = ({ image, onSave, onCancel }) => {
                 padding: '0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom))',
                 backgroundColor: '#1E293B',
                 borderTop: '1px solid rgba(255,255,255,0.1)',
-                display: 'flex', justifyContent: 'flex-end', alignItems: 'center'
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center'
             }}>
+                <button onClick={onCancel} style={{ padding: '0.75rem 2rem', borderRadius: '12px', border: '2px solid rgba(255,255,255,0.15)', backgroundColor: 'transparent', color: '#94A3B8', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <X size={22} /> Abbrechen
+                </button>
                 <button onClick={handleSave} style={{ padding: '0.75rem 2.5rem', borderRadius: '12px', border: 'none', backgroundColor: '#10B981', color: 'white', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)' }}>
                     <Save size={24} /> Speichern
                 </button>

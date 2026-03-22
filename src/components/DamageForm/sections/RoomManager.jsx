@@ -3,7 +3,7 @@ import {
     Image, Plus, X, FileText, MapPin, Map, Camera,
     Folder, ChevronDown, Phone, Trash, Edit3,
     AlertTriangle, Check, Table, Settings, RotateCcw, CheckCircle,
-    ChevronUp, Mic, MicOff, Star
+    ChevronUp, Mic, MicOff, Star, GripVertical
 } from 'lucide-react';
 
 export default function RoomManager({
@@ -33,12 +33,46 @@ export default function RoomManager({
 }) {
     // Local state for toggling room image visibility (if needed, or pass from parent)
     const [visibleRoomImages, setVisibleRoomImages] = useState({});
+    const [dragImageIndex, setDragImageIndex] = useState(null);
+    const [dragOverIndex, setDragOverIndex] = useState(null);
+    const [dragRoomId, setDragRoomId] = useState(null);
 
     const toggleRoomImages = (roomId) => {
         setVisibleRoomImages(prev => ({
             ...prev,
             [roomId]: !prev[roomId]
         }));
+    };
+
+    const handleImageDragStart = (e, globalIndex, roomId) => {
+        setDragImageIndex(globalIndex);
+        setDragRoomId(roomId);
+        e.dataTransfer.effectAllowed = 'move';
+    };
+
+    const handleImageDragOver = (e, globalIndex) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        setDragOverIndex(globalIndex);
+    };
+
+    const handleImageDrop = (e, targetGlobalIndex) => {
+        e.preventDefault();
+        if (dragImageIndex === null || dragImageIndex === targetGlobalIndex) {
+            setDragImageIndex(null);
+            setDragOverIndex(null);
+            setDragRoomId(null);
+            return;
+        }
+        setFormData(prev => {
+            const images = [...prev.images];
+            const [moved] = images.splice(dragImageIndex, 1);
+            images.splice(targetGlobalIndex, 0, moved);
+            return { ...prev, images };
+        });
+        setDragImageIndex(null);
+        setDragOverIndex(null);
+        setDragRoomId(null);
     };
 
     return (
@@ -586,8 +620,30 @@ export default function RoomManager({
                             {/* Images Grid */}
                             {(visibleRoomImages[room.id] || mode === 'desktop') && (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1rem' }}>
-                                    {formData.images.filter(img => img.roomId === room.id).map((img, idx) => (
-                                        <div key={idx} style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start', border: '1px solid var(--border)', padding: '0.5rem', borderRadius: '6px', backgroundColor: 'var(--background)' }}>
+                                    {formData.images.map((img, globalIdx) => img.roomId !== room.id ? null : (
+                                        <div
+                                            key={globalIdx}
+                                            draggable={mode === 'desktop'}
+                                            onDragStart={(e) => handleImageDragStart(e, globalIdx, room.id)}
+                                            onDragOver={(e) => handleImageDragOver(e, globalIdx)}
+                                            onDrop={(e) => handleImageDrop(e, globalIdx)}
+                                            onDragEnd={() => { setDragImageIndex(null); setDragOverIndex(null); }}
+                                            style={{
+                                                display: 'flex', gap: '0.75rem', alignItems: 'flex-start',
+                                                border: dragOverIndex === globalIdx && dragRoomId === room.id ? '2px solid var(--primary)' : '1px solid var(--border)',
+                                                padding: '0.5rem', borderRadius: '6px',
+                                                backgroundColor: dragImageIndex === globalIdx ? 'rgba(56, 189, 248, 0.08)' : 'var(--background)',
+                                                opacity: dragImageIndex === globalIdx ? 0.5 : 1,
+                                                cursor: mode === 'desktop' ? 'grab' : 'default',
+                                                transition: 'border-color 0.15s, opacity 0.15s'
+                                            }}
+                                        >
+                                            {/* Drag Handle (Desktop only) */}
+                                            {mode === 'desktop' && (
+                                                <div style={{ display: 'flex', alignItems: 'center', color: 'var(--text-muted)', cursor: 'grab', paddingTop: '2px', flexShrink: 0 }} title="Ziehen zum Sortieren">
+                                                    <GripVertical size={18} />
+                                                </div>
+                                            )}
                                             {/* Thumbnail & Toggles */}
                                             <div style={{ flex: '0 0 100px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
                                                 <div style={{ width: '100px', height: '100px', borderRadius: '6px', overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>

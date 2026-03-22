@@ -12,7 +12,7 @@ if (typeof window !== 'undefined') {
 
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Camera, Image, Trash, X, Plus, Edit3, Save, Upload, FileText, CheckCircle, Circle, AlertTriangle, Play, HelpCircle, ArrowLeft, Mail, Map, MapPin, Folder, Mic, Paperclip, Table, Download, Check, Settings, RotateCcw, ChevronDown, ChevronUp, Briefcase, Hammer, ClipboardList, MicOff, Eye, Database, Phone, UserPlus, Link, Unlink } from 'lucide-react'
+import { Camera, Image, Trash, X, Plus, Edit3, Save, Upload, FileText, CheckCircle, Circle, AlertTriangle, Play, HelpCircle, ArrowLeft, Mail, Map, MapPin, Folder, Mic, Paperclip, Table, Download, Check, Settings, RotateCcw, ChevronDown, ChevronUp, Briefcase, Hammer, ClipboardList, MicOff, Eye, Database, Phone, UserPlus, Link, Unlink, GripVertical } from 'lucide-react'
 import { supabase } from '../supabaseClient';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
@@ -2376,6 +2376,27 @@ END:VCARD`;
                                     style={{ width: '100%' }}
                                 />
                             </div>
+                            <div style={{ flex: '1 1 160px' }}>
+                                <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 600, marginBottom: '0.5rem', display: 'block' }}>Telefon (AG-Kontakt)</label>
+                                <input
+                                    className="form-input"
+                                    placeholder="+41 XX XXX XX XX"
+                                    value={formData.clientPhone || ''}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, clientPhone: e.target.value }))}
+                                    style={{ width: '100%' }}
+                                />
+                            </div>
+                            <div style={{ flex: '2 1 220px' }}>
+                                <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 600, marginBottom: '0.5rem', display: 'block' }}>E-Mail (AG-Kontakt)</label>
+                                <input
+                                    type="email"
+                                    className="form-input"
+                                    placeholder="email@firma.ch"
+                                    value={formData.clientEmail || ''}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, clientEmail: e.target.value }))}
+                                    style={{ width: '100%' }}
+                                />
+                            </div>
                             <div style={{ flex: '1 1 180px' }}>
                                 <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 600, marginBottom: '0.5rem', display: 'block' }}>Leistungsart</label>
                                 <select
@@ -2388,22 +2409,6 @@ END:VCARD`;
                                     <option value="Schimmel">Schimmel</option>
                                     <option value="Leckortung">Leckortung</option>
                                     <option value="Trocknung">Trocknung</option>
-                                </select>
-                            </div>
-                            <div style={{ flex: '1 1 200px' }}>
-                                <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 600, marginBottom: '0.5rem', display: 'block' }}>Art der Liegenschaft</label>
-                                <select
-                                    className="form-input"
-                                    value={formData.propertyType || ''}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, propertyType: e.target.value }))}
-                                    style={{ width: '100%' }}
-                                >
-                                    <option value="">Bitte wählen...</option>
-                                    <option value="Einfamilienhaus">Einfamilienhaus</option>
-                                    <option value="Mehrfamilienhaus">Mehrfamilienhaus</option>
-                                    <option value="Eigentumswohnung">Eigentumswohnung</option>
-                                    <option value="Gewerbe / Büro">Gewerbe / Büro</option>
-                                    <option value="Sonstiges">Sonstiges</option>
                                 </select>
                             </div>
                         </div>
@@ -2570,6 +2575,24 @@ END:VCARD`;
                                 />
                             </div>
                         </div>
+
+                        {/* Art der Liegenschaft */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                            <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 600 }}>Art der Liegenschaft</label>
+                            <select
+                                className="form-input"
+                                value={formData.propertyType || ''}
+                                onChange={(e) => setFormData(prev => ({ ...prev, propertyType: e.target.value }))}
+                                style={{ width: '100%' }}
+                            >
+                                <option value="">Bitte wählen...</option>
+                                <option value="Einfamilienhaus">Einfamilienhaus</option>
+                                <option value="Mehrfamilienhaus">Mehrfamilienhaus</option>
+                                <option value="Eigentumswohnung">Eigentumswohnung</option>
+                                <option value="Gewerbe / Büro">Gewerbe / Büro</option>
+                                <option value="Sonstiges">Sonstiges</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
 
@@ -2715,81 +2738,98 @@ END:VCARD`;
                                         img.name?.toLowerCase().endsWith('.txt');
                                     return img && !img.roomId && !isDoc;
                                 }).map((img, idx) => (
-                                    <div key={idx}
-                                        className="btn-glass"
-                                        style={{
-                                            position: 'relative', width: '100px', height: '100px', borderRadius: '12px', overflow: 'hidden',
-                                            cursor: 'pointer',
-                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                            border: img.includeInReport !== false ? '2px solid #0F6EA3' : '1px solid var(--border)'
-                                        }}
-                                    >
-                                        <img
-                                            src={img.preview}
-                                            alt="Schadensbild"
-                                            className="hover-zoom"
-                                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                                            onError={(e) => { e.target.style.display = 'none'; }}
-                                            onClick={() => setGlobalPreviewImage(img.preview)}
-                                        />
-
-                                        {/* Bericht Toggle Checkbox */}
+                                    <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '4px', marginBottom: '8px' }}>
                                         <div
+                                            className="btn-glass"
                                             style={{
-                                                position: 'absolute', top: 4, left: 4,
-                                                zIndex: 15, display: 'flex'
+                                                position: 'relative', width: '100px', height: '100px', borderRadius: '12px', overflow: 'hidden',
+                                                cursor: 'pointer',
+                                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                border: img.includeInReport !== false ? '2px solid #0F6EA3' : '1px solid var(--border)'
                                             }}
-                                            onClick={(e) => e.stopPropagation()}
                                         >
-                                            <input
-                                                type="checkbox"
-                                                checked={img.includeInReport !== false}
-                                                onChange={(e) => {
-                                                    const checked = e.target.checked;
+                                            <img
+                                                src={img.preview}
+                                                alt="Schadensbild"
+                                                className="hover-zoom"
+                                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                                onError={(e) => { e.target.style.display = 'none'; }}
+                                                onClick={() => setGlobalPreviewImage(img.preview)}
+                                            />
+
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
                                                     setFormData(prev => ({
                                                         ...prev,
-                                                        images: prev.images.map(i => i === img ? { ...i, includeInReport: checked } : i)
+                                                        images: prev.images.filter(i => i !== img)
                                                     }));
                                                 }}
-                                                style={{ width: '18px', height: '18px', accentColor: '#0F6EA3', cursor: 'pointer' }}
-                                                title="Übernahme in Bericht steuern"
+                                                style={{
+                                                    position: 'absolute', top: 6, right: 6,
+                                                    background: 'rgba(239, 68, 68, 0.9)', color: 'white',
+                                                    border: 'none', borderRadius: '50%',
+                                                    width: 24, height: 24,
+                                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                    cursor: 'pointer', padding: 0,
+                                                    zIndex: 10,
+                                                    backdropFilter: 'blur(4px)'
+                                                }}
+                                                title="Löschen"
+                                            >
+                                                <X size={14} />
+                                            </button>
+
+                                            {/* Click layer for Zoom */}
+                                            <div
+                                                style={{
+                                                    position: 'absolute', inset: 0,
+                                                    zIndex: 5, cursor: 'zoom-in'
+                                                }}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setGlobalPreviewImage(img.preview);
+                                                }}
                                             />
                                         </div>
 
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setFormData(prev => ({
-                                                    ...prev,
-                                                    images: prev.images.filter(i => i !== img)
-                                                }));
-                                            }}
-                                            style={{
-                                                position: 'absolute', top: 6, right: 6,
-                                                background: 'rgba(239, 68, 68, 0.9)', color: 'white',
-                                                border: 'none', borderRadius: '50%',
-                                                width: 24, height: 24,
-                                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                                cursor: 'pointer', padding: 0,
-                                                zIndex: 10,
-                                                backdropFilter: 'blur(4px)'
-                                            }}
-                                            title="Löschen"
-                                        >
-                                            <X size={14} />
-                                        </button>
-
-                                        {/* Click layer for Zoom */}
-                                        <div
-                                            style={{
-                                                position: 'absolute', inset: 0,
-                                                zIndex: 5, cursor: 'zoom-in'
-                                            }}
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setGlobalPreviewImage(img.preview);
-                                            }}
-                                        />
+                                        {/* Action Bar Below Image */}
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', padding: '0 2px', alignItems: 'center' }}>
+                                            <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', fontSize: '0.75rem', cursor: 'pointer', color: 'var(--text-main)' }}>
+                                                <input
+                                                    type="checkbox"
+                                                    style={{ width: '20px', height: '20px', accentColor: 'var(--primary)' }}
+                                                    checked={img.includeInReport !== false}
+                                                    onChange={(e) => {
+                                                        const isChecked = e.target.checked;
+                                                        setFormData(prev => ({
+                                                            ...prev,
+                                                            images: prev.images.map(i => i.id === img.id ? { ...i, includeInReport: isChecked } : i)
+                                                        }));
+                                                    }}
+                                                />
+                                                <span style={{ fontWeight: 600 }}>Bericht</span>
+                                            </label>
+                                            <button
+                                                type="button"
+                                                title="Bearbeiten"
+                                                style={{
+                                                    border: '1px solid var(--border)',
+                                                    backgroundColor: '#1E293B',
+                                                    color: 'white',
+                                                    cursor: 'pointer',
+                                                    padding: '8px',
+                                                    borderRadius: '8px',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
+                                                }}
+                                                onClick={() => setEditingImage(img)}
+                                            >
+                                                <Edit3 size={22} />
+                                            </button>
+                                        </div>
                                     </div>
                                 ))}
 
@@ -2862,7 +2902,7 @@ END:VCARD`;
                         </div>
 
                         {/* Dokumente & Anhänge Section */}
-                        {formData.images && formData.images.some(img => img && !img.roomId && (img.type === 'document' || img.name?.toLowerCase().endsWith('.pdf') || img.name?.toLowerCase().endsWith('.msg') || img.name?.toLowerCase().endsWith('.txt'))) && (
+                        {formData.images && formData.images.some(img => img && !img.roomId && (img.type === 'document' || img.name?.toLowerCase().endsWith('.msg') || img.name?.toLowerCase().endsWith('.pdf') || img.name?.toLowerCase().endsWith('.txt'))) && (
                             <div style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid var(--border)' }}>
                                 <label style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1rem' }}>
                                     <FileText size={18} /> Dokumente & Anhänge (PDF, MSG)
@@ -3074,7 +3114,7 @@ END:VCARD`;
                         </h3>
                         <div style={{ color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                             <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>{isContactsExpanded ? 'Einklappen' : 'Ausklappen'}</span>
-                            <ChevronDown size={20} style={{ transform: isContactsExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.3s ease' }} />
+                            <ChevronDown size={20} style={{ transform: isContactsExpanded ? 'rotate(180deg)' : '0deg', transition: 'transform 0.3s ease' }} />
                         </div>
                     </div>
 
@@ -3796,7 +3836,7 @@ END:VCARD`;
                                                 flex: 1,
                                                 minHeight: mode === 'technician' ? '44px' : 'auto',
                                                 fontWeight: 700,
-                                                gridColumn: mode === 'technician' && !room.measurementData ? 'span 1' : 'auto'
+                                                gridColumn: mode === 'technician' && !(room.measurementData && room.measurementData.measurements && room.measurementData.measurements.length > 0) ? 'span 1' : 'auto'
                                             }}
                                         >
                                             <RotateCcw size={14} /> Messverlauf
@@ -3867,17 +3907,47 @@ END:VCARD`;
                                                 )}
 
                                                 {isVisible && (
-                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1rem' }}>
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1rem' }}
+                                                        onDragOver={(e) => e.preventDefault()}
+                                                    >
                                                         {roomImages.filter(img => !img.linkedToOriginal).map((img, idx, filteredArray) => {
                                                             const thermalImg = roomImages.find(i => i.linkedToOriginal === img.id);
                                                             const isLinkingThis = linkingImageId === img.id;
                                                             return (
-                                                                <div key={idx} style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start', border: '1px solid var(--border)', padding: '0.5rem', borderRadius: '6px', backgroundColor: isLinkingThis ? 'rgba(15, 110, 163, 0.1)' : 'var(--background)' }}>
-                                                                    {/* Thumbnail check */}
-                                                                    <div style={{ flex: '0 0 100px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
+                                                                <div
+                                                                    key={idx}
+                                                                    draggable
+                                                                    onDragStart={(e) => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(idx)); }}
+                                                                    onDragOver={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = 'var(--primary)'; }}
+                                                                    onDragLeave={(e) => { e.currentTarget.style.borderColor = isLinkingThis ? '#0F6EA3' : 'var(--border)'; }}
+                                                                    onDrop={(e) => {
+                                                                        e.preventDefault();
+                                                                        e.currentTarget.style.borderColor = isLinkingThis ? '#0F6EA3' : 'var(--border)';
+                                                                        const fromIdx = parseInt(e.dataTransfer.getData('text/plain'));
+                                                                        const toIdx = idx;
+                                                                        if (fromIdx === toIdx) return;
+                                                                        setFormData(prev => {
+                                                                            const allImages = [...prev.images];
+                                                                            const visible = roomImages.filter(i => !i.linkedToOriginal);
+                                                                            const fromGlobal = allImages.findIndex(i => i.id === visible[fromIdx].id);
+                                                                            const toGlobal = allImages.findIndex(i => i.id === visible[toIdx].id);
+                                                                            const [moved] = allImages.splice(fromGlobal, 1);
+                                                                            allImages.splice(toGlobal, 0, moved);
+                                                                            return { ...prev, images: allImages };
+                                                                        });
+                                                                    }}
+                                                                    onDragEnd={(e) => { e.currentTarget.style.borderColor = isLinkingThis ? '#0F6EA3' : 'var(--border)'; }}
+                                                                    style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start', border: `1px solid ${isLinkingThis ? '#0F6EA3' : 'var(--border)'}`, padding: '0.5rem', borderRadius: '6px', backgroundColor: isLinkingThis ? 'rgba(15, 110, 163, 0.1)' : 'var(--background)', cursor: 'grab', transition: 'border-color 0.15s' }}
+                                                                >
+                                                                    {/* Drag Handle */}
+                                                                    <div style={{ display: 'flex', alignItems: 'center', color: 'var(--text-muted)', cursor: 'grab', paddingTop: '4px', flexShrink: 0 }} title="Ziehen zum Sortieren">
+                                                                        <GripVertical size={18} />
+                                                                    </div>
+                                                                    {/* Thumbnail */}
+                                                                    <div style={{ flex: '0 0 160px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
                                                                         <div style={{
-                                                                            width: '100px',
-                                                                            height: '100px',
+                                                                            width: '160px',
+                                                                            height: '160px',
                                                                             borderRadius: '6px',
                                                                             overflow: 'hidden',
                                                                             backgroundColor: '#E5E7EB',
@@ -3924,7 +3994,7 @@ END:VCARD`;
                                                                                         const isChecked = e.target.checked;
                                                                                         setFormData(prev => ({
                                                                                             ...prev,
-                                                                                            images: prev.images.map(i => i === img ? { ...i, includeInReport: isChecked } : i)
+                                                                                            images: prev.images.map(i => i.id === img.id ? { ...i, includeInReport: isChecked } : i)
                                                                                         }));
                                                                                     }}
                                                                                 />
@@ -4005,60 +4075,16 @@ END:VCARD`;
 
                                                                     {/* Second Thumbnail (Thermal if exists) */}
                                                                     {thermalImg && (
-                                                                        <div style={{ flex: '0 0 100px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', opacity: linkingImageId ? 0.5 : 1 }}>
-                                                                            <div style={{ width: '100px', height: '100px', borderRadius: '6px', overflow: 'hidden', backgroundColor: '#E5E7EB', border: '2px solid #10B981', position: 'relative' }}>
+                                                                        <div style={{ flex: '0 0 160px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', opacity: linkingImageId ? 0.5 : 1 }}>
+                                                                            <div style={{ width: '160px', height: '160px', borderRadius: '6px', overflow: 'hidden', backgroundColor: '#E5E7EB', border: '2px solid #10B981', position: 'relative' }}>
                                                                                 <img src={thermalImg.preview} alt="Thermobild" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onClick={() => window.open(thermalImg.preview, '_blank')} />
                                                                                 <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(16, 185, 129, 0.9)', color: 'white', fontSize: '0.65rem', textAlign: 'center', padding: '3px 0', fontWeight: 'bold', textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>THERMO</div>
                                                                             </div>
                                                                         </div>
                                                                     )}
 
-                                                                    {/* Actions: Delete, Up, Down, Link */}
+                                                                    {/* Actions: Delete, Link – sortiere per Drag & Drop */}
                                                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                                                                        <button
-                                                                            type="button"
-                                                                            className="btn btn-ghost"
-                                                                            title="Bild nach oben verschieben"
-                                                                            disabled={idx === 0}
-                                                                            style={{ color: '#3B82F6', padding: '0', backgroundColor: '#1E293B', border: '1px solid var(--border)', borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 2px rgba(0,0,0,0.1)', cursor: idx === 0 ? 'not-allowed' : 'pointer', opacity: idx === 0 ? 0.5 : 1 }}
-                                                                            onClick={() => {
-                                                                                setFormData(prev => {
-                                                                                    const newImages = [...prev.images];
-                                                                                    const visible = roomImages.filter(i => !i.linkedToOriginal);
-                                                                                    const gCurIdx = newImages.findIndex(i => i.id === img.id);
-                                                                                    const gTarIdx = newImages.findIndex(i => i.id === visible[idx - 1].id);
-                                                                                    const temp = newImages[gCurIdx];
-                                                                                    newImages[gCurIdx] = newImages[gTarIdx];
-                                                                                    newImages[gTarIdx] = temp;
-                                                                                    return { ...prev, images: newImages };
-                                                                                });
-                                                                            }}
-                                                                        >
-                                                                            <ChevronUp size={16} />
-                                                                        </button>
-
-                                                                        <button
-                                                                            type="button"
-                                                                            className="btn btn-ghost"
-                                                                            title="Bild nach unten verschieben"
-                                                                            disabled={idx === filteredArray.length - 1}
-                                                                            style={{ color: '#3B82F6', padding: '0', backgroundColor: '#1E293B', border: '1px solid var(--border)', borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 2px rgba(0,0,0,0.1)', cursor: idx === filteredArray.length - 1 ? 'not-allowed' : 'pointer', opacity: idx === filteredArray.length - 1 ? 0.5 : 1 }}
-                                                                            onClick={() => {
-                                                                                setFormData(prev => {
-                                                                                    const newImages = [...prev.images];
-                                                                                    const visible = roomImages.filter(i => !i.linkedToOriginal);
-                                                                                    const gCurIdx = newImages.findIndex(i => i.id === img.id);
-                                                                                    const gTarIdx = newImages.findIndex(i => i.id === visible[idx + 1].id);
-                                                                                    const temp = newImages[gCurIdx];
-                                                                                    newImages[gCurIdx] = newImages[gTarIdx];
-                                                                                    newImages[gTarIdx] = temp;
-                                                                                    return { ...prev, images: newImages };
-                                                                                });
-                                                                            }}
-                                                                        >
-                                                                            <ChevronDown size={16} />
-                                                                        </button>
-
                                                                         {!thermalImg ? (
                                                                             <button
                                                                                 type="button"

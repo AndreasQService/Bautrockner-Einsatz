@@ -43,7 +43,7 @@ const PDFMetaData = ({ data }) => {
                     <View style={{ flex: 1 }}>
                         <View style={styles.metaRow}>
                             <Text style={styles.metaLabel}>Berichtsdatum:</Text>
-                            <Text style={styles.metaValue}>{new Date().toLocaleString('de-CH', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })} Uhr</Text>
+                            <Text style={styles.metaValue}>{new Date().toLocaleDateString('de-CH')}</Text>
                         </View>
                         {data.damageReportDate && (
                             <View style={styles.metaRow}>
@@ -76,18 +76,26 @@ const PDFMetaData = ({ data }) => {
                 )}
                 {/* Lage / Details - Improved Display */}
                 {(() => {
-                    const details = [
+                    let details = [
                         data.locationDetails,
                         data.contacts?.[0]?.floor,
                         data.contacts?.[0]?.stockwerk,
                         data.contacts?.[0]?.apartment
                     ].filter(p => p !== null && p !== undefined && String(p).trim() !== '').map(p => String(p).trim());
 
-                    if (details.length > 0) {
+                    // Echte Duplikate entfernen
+                    details = [...new Set(details)];
+
+                    // Kürzere Teilstrings entfernen (z.B. "2. OG" entfernen, wenn "2. OG Whg Schwarz" schon existiert)
+                    const uniqueDetails = details.filter((d1, i, arr) => {
+                        return !arr.some((d2, j) => i !== j && d2.toLowerCase().includes(d1.toLowerCase()) && d2 !== d1);
+                    });
+
+                    if (uniqueDetails.length > 0) {
                         return (
                             <View style={styles.metaRow}>
                                 <Text style={styles.metaLabel}>Lage / Details:</Text>
-                                <Text style={styles.metaValue}>{details.join(', ')}</Text>
+                                <Text style={styles.metaValue}>{uniqueDetails.join(', ')}</Text>
                             </View>
                         );
                     }

@@ -13,6 +13,7 @@ import PlansSection from './sections/PlansSection';
 import CauseSection from './sections/CauseSection';
 import MeasuresSection from './sections/MeasuresSection';
 import MeasurementsSection from './sections/MeasurementsSection';
+import DataLoggerSection from './sections/DataLoggerSection';
 
 // Helper to sort rooms
 const sortRooms = (rooms) => {
@@ -101,6 +102,8 @@ const DamageReportDocument = ({ data }) => {
                 <MeasuresSection data={data} />
 
                 <MeasurementsSection data={data} />
+
+                <DataLoggerSection data={data} />
 
                 <PDFFooter data={data} />
 
