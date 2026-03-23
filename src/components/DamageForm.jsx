@@ -1628,7 +1628,7 @@ END:VCARD`;
             const tempProcessedImages = await Promise.all(
                 (dataToUse.images || []).map(async (img) => {
                     const category = String(img.assignedTo || '').trim().toLowerCase();
-                    const isDocCategory = ['schadensbericht', 'arbeitsrapporte', 'messprotokolle'].includes(category);
+                    const isDocCategory = ['schadensbericht', 'arbeitsrapporte', 'messprotokolle', 'sonstiges', 'pläne', 'lieferantenrechnungen'].includes(category);
                     const isProbablyPDF = img.preview?.toLowerCase().includes('.pdf') || img.type?.includes('pdf');
 
                     if (img.includeInReport === false || isDocCategory || isProbablyPDF) {
