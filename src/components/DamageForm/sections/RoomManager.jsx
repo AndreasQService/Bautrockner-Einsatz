@@ -36,6 +36,27 @@ export default function RoomManager({
     const [dragImageIndex, setDragImageIndex] = useState(null);
     const [dragOverIndex, setDragOverIndex] = useState(null);
     const [dragRoomId, setDragRoomId] = useState(null);
+    const [isDictating, setIsDictating] = useState(false);
+    const recognitionRef = React.useRef(null);
+
+    const startDictation = (onResult) => {
+        const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SR) { alert('Diktat wird von diesem Browser nicht unterstützt.'); return; }
+        if (isDictating) { recognitionRef.current?.stop(); return; }
+        const rec = new SR();
+        rec.lang = 'de-CH';
+        rec.continuous = true;
+        rec.interimResults = false;
+        rec.onresult = (e) => {
+            const text = Array.from(e.results).map(r => r[0].transcript).join(' ');
+            onResult(text);
+        };
+        rec.onerror = () => setIsDictating(false);
+        rec.onend = () => setIsDictating(false);
+        recognitionRef.current = rec;
+        rec.start();
+        setIsDictating(true);
+    };
 
     const toggleRoomImages = (roomId) => {
         setVisibleRoomImages(prev => ({
@@ -97,7 +118,25 @@ export default function RoomManager({
                             </div>
 
                             <div style={{ marginBottom: '1.25rem' }}>
-                                <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 600, marginBottom: '0.5rem', display: 'block' }}>Beschreibung der Ursache</label>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                                    <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 600 }}>Beschreibung der Ursache</label>
+                                    <button
+                                        type="button"
+                                        onClick={() => startDictation(text => setFormData(prev => ({ ...prev, cause: (prev.cause ? prev.cause + ' ' : '') + text })))}
+                                        title={isDictating ? 'Diktat stoppen' : 'Diktieren'}
+                                        style={{
+                                            display: 'flex', alignItems: 'center', gap: '0.3rem',
+                                            padding: '0.3rem 0.7rem', borderRadius: '6px', border: 'none',
+                                            backgroundColor: isDictating ? 'rgba(239,68,68,0.15)' : 'rgba(14,165,233,0.12)',
+                                            color: isDictating ? '#ef4444' : '#38bdf8',
+                                            cursor: 'pointer', fontSize: '0.75rem', fontWeight: 700,
+                                            animation: isDictating ? 'pulse 1s infinite' : 'none'
+                                        }}
+                                    >
+                                        {isDictating ? <MicOff size={14} /> : <Mic size={14} />}
+                                        {isDictating ? 'Stopp' : 'Diktieren'}
+                                    </button>
+                                </div>
                                 <textarea
                                     className="form-input"
                                     value={formData.cause || ''}
@@ -331,7 +370,24 @@ export default function RoomManager({
                     {/* Cause / Description */}
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem', marginBottom: '2rem' }}>
                         <label style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                            <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>Schadenursache</span>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>Schadenursache</span>
+                                <button
+                                    type="button"
+                                    onClick={() => startDictation(text => setFormData(prev => ({ ...prev, cause: (prev.cause ? prev.cause + ' ' : '') + text })))}
+                                    title={isDictating ? 'Diktat stoppen' : 'Diktieren'}
+                                    style={{
+                                        display: 'flex', alignItems: 'center', gap: '0.3rem',
+                                        padding: '0.3rem 0.7rem', borderRadius: '6px', border: 'none',
+                                        backgroundColor: isDictating ? 'rgba(239,68,68,0.15)' : 'rgba(14,165,233,0.12)',
+                                        color: isDictating ? '#ef4444' : '#38bdf8',
+                                        cursor: 'pointer', fontSize: '0.75rem', fontWeight: 700
+                                    }}
+                                >
+                                    {isDictating ? <MicOff size={14} /> : <Mic size={14} />}
+                                    {isDictating ? 'Stopp' : 'Diktieren'}
+                                </button>
+                            </div>
                             <textarea
                                 className="form-input"
                                 rows={3}

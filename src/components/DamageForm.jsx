@@ -2704,11 +2704,56 @@ END:VCARD`;
                                 </div>
                             ))}
                             {(!formData.images || formData.images.filter(img => !img.roomId && !(img.type === 'document' || img.name?.toLowerCase().endsWith('.msg') || img.name?.toLowerCase().endsWith('.pdf') || img.name?.toLowerCase().endsWith('.txt'))).length === 0) && (
-                                <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', width: '100%', textAlign: 'center', padding: '1rem' }}>Keine Bilder vorhanden.</div>
+                                <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', width: '100%', textAlign: 'center', padding: '0.5rem' }}>Keine Bilder vorhanden.</div>
                             )}
+
+                            {/* Grosse Drag-and-Drop Zone – volle Breite */}
+                            <div style={{ width: '100%', marginTop: '0.5rem' }}>
+                                <div
+                                    onDragOver={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = '#0ea5e9'; e.currentTarget.style.backgroundColor = 'rgba(14,165,233,0.08)'; e.currentTarget.querySelector('span').style.color = '#0ea5e9'; }}
+                                    onDragLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.querySelector('span').style.color = 'var(--text-muted)'; }}
+                                    onDrop={(e) => {
+                                        e.preventDefault();
+                                        e.currentTarget.style.borderColor = 'var(--border)';
+                                        e.currentTarget.style.backgroundColor = 'transparent';
+                                        e.currentTarget.querySelector('span').style.color = 'var(--text-muted)';
+                                        const dropped = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+                                        if (dropped.length > 0) handleImageUpload(dropped, { assignedTo: 'Schadenfotos' });
+                                    }}
+                                    onClick={() => document.getElementById('schadensbilder-upload-input').click()}
+                                    style={{
+                                        width: '100%', minHeight: '80px', borderRadius: '10px',
+                                        border: '2px dashed var(--border)',
+                                        display: 'flex', flexDirection: 'column',
+                                        alignItems: 'center', justifyContent: 'center',
+                                        cursor: 'pointer', gap: '6px',
+                                        transition: 'all 0.2s ease',
+                                        padding: '1rem'
+                                    }}
+                                    title="Bilder hier ablegen oder klicken zum Auswählen"
+                                >
+                                    <Upload size={22} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                                    <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', transition: 'color 0.2s', textAlign: 'center' }}>
+                                        Bilder hier ablegen oder <u>klicken zum Auswählen</u>
+                                    </span>
+                                </div>
+                                <input
+                                    id="schadensbilder-upload-input"
+                                    type="file"
+                                    accept="image/*"
+                                    multiple
+                                    style={{ display: 'none' }}
+                                    onChange={(e) => {
+                                        const files = Array.from(e.target.files);
+                                        if (files.length > 0) handleImageUpload(files, { assignedTo: 'Schadenfotos' });
+                                        e.target.value = '';
+                                    }}
+                                />
+                            </div>
                         </div>
                     </div>
                 )}
+
 
                 {/* Desktop-Only: Schadenbeschreibung (AI Extracted) */}
                 {mode === 'desktop' && (
