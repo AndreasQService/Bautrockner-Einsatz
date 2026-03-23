@@ -1903,31 +1903,57 @@ END:VCARD`;
     };
 
     const handleEmailImport = (data) => {
-        console.log("handleEmailImport v2026.1 called with:", data);
+        console.log("handleEmailImport v2026.2 called with:", data);
         if (!data) return;
 
         setFormData(prev => {
             const newConflicts = { ...conflicts };
             const nextData = { ...prev };
 
-            // --- Helper: Merge Field with Fill-if-Empty & Conflict Detect ---
             const mergeField = (path, newVal) => {
                 if (!newVal) return;
                 const currentVal = prev[path];
-
                 if (!currentVal || currentVal.toString().trim() === "") {
-                    // Empty? Fill it!
                     nextData[path] = newVal;
                 } else if (currentVal.toString().trim() !== newVal.toString().trim()) {
-                    // Mismatch? Mark as conflict for the Rollback-Icon
                     newConflicts[path] = { original: currentVal, newValue: newVal };
-                    // Optionally: overwrite if Recency Priority is desired, but user said "merkte" und "Warn-Icon"
-                    // Let's stick to Recency Priority for the actual value but show the warning
                     nextData[path] = newVal;
                 }
             };
 
-            // Mapping (Schema 2026.1 to formData)
+            // --- NEUE Struktur (auftraggeber, eigentuemer, schadenort, schaden) ---
+            if (data.auftraggeber) {
+                mergeField('client', data.auftraggeber.firma || data.auftraggeber.name);
+                mergeField('assignedTo', data.auftraggeber.name);
+                mergeField('clientPhone', data.auftraggeber.telefon);
+                mergeField('clientEmail', data.auftraggeber.email);
+                mergeField('clientStreet', data.auftraggeber.strasse_nr);
+                mergeField('clientZip',  data.auftraggeber.plz);
+                mergeField('clientCity', data.auftraggeber.ort);
+            }
+            // Fallback: wenn KI Auftraggeber-Kontakt in handwerker-Block gelegt hat
+            if (!data.auftraggeber?.telefon && data.handwerker?.telefon) {
+                mergeField('clientPhone', data.handwerker.telefon);
+            }
+            if (!data.auftraggeber?.email && data.handwerker?.email) {
+                mergeField('clientEmail', data.handwerker.email);
+            }
+            if (data.eigentuemer) {
+                mergeField('ownerName', data.eigentuemer.name);
+                mergeField('ownerEmail', data.eigentuemer.email);
+            }
+            if (data.schaden) {
+                mergeField('damageCategory', data.schaden.art);
+                mergeField('description', data.schaden.beschreibung);
+            }
+            if (data.schadenort) {
+                mergeField('street', data.schadenort.strasse_nr);
+                mergeField('locationDetails', data.schadenort.bezeichnung);
+                mergeField('zip',  data.schadenort.plz);
+                mergeField('city', data.schadenort.ort);
+            }
+
+            // --- ALTE Struktur (Rückwärtskompatibilität) ---
             if (data.projekt_daten) {
                 mergeField('projectNumber', data.projekt_daten.interne_id);
                 mergeField('orderNumber', data.projekt_daten.externe_ref);
@@ -1936,62 +1962,68 @@ END:VCARD`;
             if (data.auftrag_verwaltung) {
                 mergeField('client', data.auftrag_verwaltung.firma);
                 mergeField('assignedTo', data.auftrag_verwaltung.sachbearbeiter);
-                if (data.auftrag_verwaltung.leistungsart) {
-                    mergeField('damageCategory', data.auftrag_verwaltung.leistungsart);
-                }
             }
             if (data.rechnungs_details) {
                 mergeField('ownerName', data.rechnungs_details.eigentuemer);
                 mergeField('ownerEmail', data.rechnungs_details.email_rechnung);
                 mergeField('invoiceReference', data.rechnungs_details.vermerk);
             }
-            if (data.schadenort) {
-                mergeField('street', data.schadenort.strasse_nr);
-                mergeField('locationDetails', data.schadenort.etage_wohnung);
 
-                // PLZ / Ort Split
-                if (data.schadenort.plz_ort) {
-                    const parts = data.schadenort.plz_ort.trim().split(/\s+/);
-                    if (parts.length >= 1) {
-                        const zipCandidate = parts[0];
-                        if (zipCandidate.length === 4 && /^\d+$/.test(zipCandidate)) {
-                            mergeField('zip', zipCandidate);
-                            mergeField('city', parts.slice(1).join(' '));
-                        } else {
-                            mergeField('city', data.schadenort.plz_ort);
-                        }
-                    }
+            // --- KONTAKTE aufbauen ---
+            let currentContacts = [...(prev.contacts || [])];
+
+            const addOrMerge = (name, telefon, rolle, email, wohnung = '', contactPerson = '') => {
+                if (!name) return;
+                const existingIdx = currentContacts.findIndex(c =>
+                    c.name && c.name.trim().toLowerCase() === name.trim().toLowerCase()
+                );
+                // Rolle-Kürzel → Dropdown-Wert
+                const rolleMap = { 'Handw.': 'Handwerker', 'Verw.': 'Verwaltung', 'Eig.': 'Eigentümer', 'HW': 'Hauswart', 'Mieter': 'Mieter', 'AG': 'Auftraggeber', 'Auftraggeber': 'Auftraggeber' };
+                const mappedRole = rolleMap[rolle] || rolle || 'Mieter';
+
+                if (existingIdx !== -1) {
+                    currentContacts[existingIdx] = {
+                        ...currentContacts[existingIdx],
+                        phone: currentContacts[existingIdx].phone || telefon || '',
+                        role: currentContacts[existingIdx].role || mappedRole,
+                        email: currentContacts[existingIdx].email || email || '',
+                        floor: currentContacts[existingIdx].floor || wohnung || '',
+                        contactPerson: currentContacts[existingIdx].contactPerson || contactPerson || '',
+                    };
+                } else {
+                    currentContacts.push({ name, phone: telefon || '', role: mappedRole, email: email || '', apartment: '', floor: wohnung || '', contactPerson: contactPerson || '' });
                 }
+            };
+
+            // Neue Struktur: Block-Überschrift = Kontaktrolle
+            // _blockRolle = im Modal per Dropdown korrigierte Rolle (hat Vorrang)
+            const blockRoleMap = {
+                'auftraggeber': 'Auftraggeber',
+                'verwaltung':   'Verwaltung',
+                'eigentuemer':  'Eig.',
+                'hauswart':     'HW',
+                'handwerker':   'Handw.',
+                'mieter':       'Mieter',
+            };
+            const neueRollen = ['auftraggeber','verwaltung','eigentuemer','hauswart','handwerker'];
+            neueRollen.forEach(key => {
+                const k = data[key];
+                if (!k) return;
+                const displayName = k.firma || k.name;
+                const rolle = blockRoleMap[k._blockRolle || key];
+                const contactPerson = k.firma ? (k.name || '') : '';
+                if (displayName) addOrMerge(displayName, k.telefon, rolle, k.email, '', contactPerson);
+            });
+            // Mieter: Array mit wohnung → floor
+            if (Array.isArray(data.mieter)) {
+                data.mieter.forEach(m => { if (m?.name) addOrMerge(m.name, m.telefon, 'Mieter', m.email, m.wohnung || ''); });
+            } else if (data.mieter?.name) {
+                addOrMerge(data.mieter.name, data.mieter.telefon, 'Mieter', data.mieter.email, '');
             }
 
-            // --- SMART CONTACT MERGE ---
-            let currentContacts = [...(prev.contacts || [])];
+            // Alte Struktur: kontakte-Array
             if (data.kontakte && Array.isArray(data.kontakte)) {
-                data.kontakte.forEach(newContact => {
-                    // Find existing by name match (case insensitive, stripped)
-                    const existingIdx = currentContacts.findIndex(c =>
-                        c.name && newContact.name &&
-                        c.name.trim().toLowerCase() === newContact.name.trim().toLowerCase()
-                    );
-
-                    if (existingIdx !== -1) {
-                        // MERGE EXISTING
-                        const existing = currentContacts[existingIdx];
-                        currentContacts[existingIdx] = {
-                            ...existing,
-                            phone: existing.phone || newContact.telefon, // Fill empty phone
-                            role: existing.role || newContact.rolle,     // Fill empty role
-                        };
-                    } else {
-                        // ADD NEW (Unique)
-                        currentContacts.push({
-                            name: newContact.name,
-                            phone: newContact.telefon,
-                            role: newContact.rolle || 'Mieter',
-                            apartment: ''
-                        });
-                    }
-                });
+                data.kontakte.forEach(c => addOrMerge(c.name, c.telefon, c.rolle, c.email));
             }
 
             nextData.contacts = currentContacts;
@@ -2366,16 +2398,7 @@ END:VCARD`;
                         </div>
 
                         <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
-                            <div style={{ flex: '1 1 200px' }}>
-                                <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 600, marginBottom: '0.5rem', display: 'block' }}>Bewirtschafter/in</label>
-                                <input
-                                    className="form-input"
-                                    placeholder="Vorname Name"
-                                    value={formData.assignedTo || ''}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, assignedTo: e.target.value }))}
-                                    style={{ width: '100%' }}
-                                />
-                            </div>
+
                             <div style={{ flex: '1 1 160px' }}>
                                 <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 600, marginBottom: '0.5rem', display: 'block' }}>Telefon (AG-Kontakt)</label>
                                 <input
@@ -2663,18 +2686,20 @@ END:VCARD`;
                                             backgroundColor: img.includeInReport === false ? 'rgba(0,0,0,0.3)' : 'transparent'
                                         }}
                                     >
-                                        <input
-                                            type="checkbox"
-                                            checked={img.includeInReport !== false}
-                                            onChange={(e) => {
-                                                const checked = e.target.checked;
-                                                setFormData(prev => ({
-                                                    ...prev,
-                                                    images: prev.images.map(i => i === img ? { ...i, includeInReport: checked } : i)
-                                                }));
-                                            }}
-                                            style={{ pointerEvents: 'auto', width: '18px', height: '18px', cursor: 'pointer', accentColor: '#0F6EA3' }}
-                                        />
+                                        <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: '36px', minHeight: '36px', pointerEvents: 'auto', cursor: 'pointer' }}>
+                                            <input
+                                                type="checkbox"
+                                                checked={img.includeInReport !== false}
+                                                onChange={(e) => {
+                                                    const checked = e.target.checked;
+                                                    setFormData(prev => ({
+                                                        ...prev,
+                                                        images: prev.images.map(i => i === img ? { ...i, includeInReport: checked } : i)
+                                                    }));
+                                                }}
+                                                style={{ width: '22px', height: '22px', cursor: 'pointer', accentColor: '#0F6EA3' }}
+                                            />
+                                        </label>
                                     </div>
                                 </div>
                             ))}
@@ -3126,16 +3151,21 @@ END:VCARD`;
                                 gridTemplateColumns: mode === 'desktop' ? 'repeat(3, 1fr)' : '1fr',
                                 gap: '1.25rem'
                             }}>
-                                {formData.contacts.map((contact, idx) => (
+                                {formData.contacts.map((contact, idx) => {
+                                    const roleColorMap = { 'Auftraggeber':'#3b82f6','Verwaltung':'#f59e0b','Eigentümer':'#8b5cf6','Handwerker':'#ef4444','Hauswart':'#94a3b8','Mieter':'#10b981','Sonstiges':'#64748b' };
+                                    const rc = roleColorMap[contact.role] || '#64748b';
+                                    return (
                                     <div key={idx} className="glass-card" style={{
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        gap: '1rem',
-                                        padding: '1.5rem',
-                                        position: 'relative',
+                                        display: 'flex', flexDirection: 'column', gap: '0',
+                                        padding: '0', position: 'relative',
                                         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                                        minWidth: 0
+                                        minWidth: 0, overflow: 'hidden', borderTop: `3px solid ${rc}`
                                     }}>
+                                        {/* Rollen-Header */}
+                                        <div style={{ fontSize: '0.72rem', fontWeight: 700, color: rc, textTransform: 'uppercase', letterSpacing: '0.07em', padding: '0.6rem 1.2rem 0.4rem', borderBottom: `1px solid ${rc}22` }}>
+                                            {contact.role || 'Kontakt'}
+                                        </div>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '1.25rem 1.5rem 1.5rem' }}>
                                         {/* Row 1: Name & vCard (Blue Button) */}
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
                                             <label style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)', fontWeight: 750 }}>Name</label>
@@ -3175,7 +3205,25 @@ END:VCARD`;
                                             </div>
                                         </div>
 
-                                        {/* Row 2: Etage / Rolle (STRICTLY ON ONE ROW) */}
+                                        {/* Row 1b: Ansprechperson – nur bei Firma-Rollen */}
+                                        {contact.role !== 'Mieter' && (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                                            <label style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)', fontWeight: 750 }}>Ansprechperson</label>
+                                            <input
+                                                type="text"
+                                                placeholder="Vorname Name"
+                                                className="form-input"
+                                                value={contact.contactPerson || ''}
+                                                onChange={(e) => {
+                                                    const newContacts = [...formData.contacts];
+                                                    newContacts[idx].contactPerson = e.target.value;
+                                                    setFormData({ ...formData, contacts: newContacts });
+                                                }}
+                                                style={{ fontSize: '0.85rem', padding: '0.45rem 0.7rem' }}
+                                            />
+                                        </div>
+                                        )}
+
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
                                             <label style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)', fontWeight: 750 }}>Etage / Rolle</label>
                                             <div style={{
@@ -3220,6 +3268,7 @@ END:VCARD`;
                                                         textAlign: 'center'
                                                     }}
                                                 >
+                                                    <option value="Auftraggeber">AG</option>
                                                     <option value="Mieter">Mieter</option>
                                                     <option value="Eigentümer">Eig.</option>
                                                     <option value="Hauswart">HW</option>
@@ -3261,6 +3310,23 @@ END:VCARD`;
                                                     }
                                                 }}
                                                 style={{ width: '100%', fontSize: '0.95rem', fontWeight: 600, padding: '0.55rem 0.7rem' }}
+                                            />
+                                        </div>
+
+                                        {/* Row 4: E-Mail */}
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                                            <label style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)', fontWeight: 750 }}>E-Mail</label>
+                                            <input
+                                                type="email"
+                                                placeholder="email@firma.ch"
+                                                className="form-input"
+                                                value={contact.email || ''}
+                                                onChange={(e) => {
+                                                    const newContacts = [...formData.contacts];
+                                                    newContacts[idx].email = e.target.value;
+                                                    setFormData({ ...formData, contacts: newContacts });
+                                                }}
+                                                style={{ width: '100%', fontSize: '0.9rem', padding: '0.55rem 0.7rem' }}
                                             />
                                         </div>
 
@@ -3315,8 +3381,10 @@ END:VCARD`;
 
                                         {/* Delete Button (Absolute top-right or separate) */}
 
+                                        </div> {/* end inner padding div */}
                                     </div>
-                                ))}
+                                    );
+                                })}
                             </div>
 
                             {/* Add Contact Button - Moved below the tiles */}
@@ -3496,14 +3564,17 @@ END:VCARD`;
                                                 className="form-input"
 
 
-                                                value={newRoom.apartment && ![...new Set([...formData.rooms.map(r => r.apartment).filter(Boolean), ...(formData.contacts || []).map(c => c.name ? (c.name.toLowerCase().includes('whg') || c.name.toLowerCase().includes('wohnung') ? c.name.trim().split(/\s+/).pop() : 'Whg. ' + c.name.trim().split(/\s+/).pop()) : '').filter(Boolean)])].sort().includes(newRoom.apartment) ? 'Sonstiges' : newRoom.apartment}
+                                                value={newRoom.apartment && ![...new Set([
+                                                    ...formData.rooms.map(r => r.apartment).filter(Boolean),
+                                                    ...(formData.contacts || []).filter(c => c.role === 'Mieter' || c.role === 'Eigentümer').map(c => c.name).filter(Boolean)
+                                                ])].sort().includes(newRoom.apartment) ? 'Sonstiges' : newRoom.apartment}
                                                 onChange={(e) => {
                                                     const val = e.target.value;
                                                     if (val === 'Sonstiges') {
                                                         setNewRoom(prev => ({ ...prev, apartment: '' }));
                                                     } else {
                                                         let relatedStockwerk = '';
-                                                        const matchingContact = (formData.contacts || []).find(c => c.name && c.name.trim().split(/\s+/).pop() === val);
+                                                        const matchingContact = (formData.contacts || []).find(c => c.name === val);
                                                         if (matchingContact) {
                                                             relatedStockwerk = matchingContact.floor || matchingContact.apartment || '';
                                                         } else {
@@ -3518,23 +3589,29 @@ END:VCARD`;
                                                 style={{ padding: '0.5rem', fontSize: '0.9rem' }}
                                             >
                                                 <option value="">Wohnung wählen... (Optional)</option>
-                                                {[...new Set([...formData.rooms.map(r => r.apartment).filter(Boolean), ...(formData.contacts || []).map(c => c.name ? (c.name.toLowerCase().includes('whg') || c.name.toLowerCase().includes('wohnung') ? c.name.trim().split(/\s+/).pop() : 'Whg. ' + c.name.trim().split(/\s+/).pop()) : '').filter(Boolean)])].sort().map(apt => (
+                                                {[...new Set([
+                                                    ...formData.rooms.map(r => r.apartment).filter(Boolean),
+                                                    ...(formData.contacts || []).filter(c => c.role === 'Mieter' || c.role === 'Eigentümer').map(c => c.name).filter(Boolean)
+                                                ])].sort().map(apt => (
                                                     <option key={apt} value={apt}>{apt}</option>
                                                 ))}
                                                 <option value="Sonstiges">Neue Wohnung eingeben...</option>
                                             </select>
 
                                             {/* Custom Apartment Input */}
-                                            {(!newRoom.apartment || (newRoom.apartment && ![...new Set([...formData.rooms.map(r => r.apartment).filter(Boolean), ...(formData.contacts || []).map(c => c.name ? (c.name.toLowerCase().includes('whg') || c.name.toLowerCase().includes('wohnung') ? c.name.trim().split(/\s+/).pop() : 'Whg. ' + c.name.trim().split(/\s+/).pop()) : '').filter(Boolean)])].sort().includes(newRoom.apartment))) && (
-                                                <input
-                                                    type="text"
-                                                    placeholder="Wohnung eingeben"
-                                                    value={newRoom.apartment}
-                                                    onChange={(e) => setNewRoom(prev => ({ ...prev, apartment: e.target.value }))}
-                                                    className="form-input"
-                                                    style={{ padding: '0.5rem', fontSize: '0.9rem' }}
-                                                />
-                                            )}
+                                            {(!newRoom.apartment || (newRoom.apartment && ![...new Set([
+                                                ...formData.rooms.map(r => r.apartment).filter(Boolean),
+                                                ...(formData.contacts || []).filter(c => c.role === 'Mieter' || c.role === 'Eigentümer').map(c => c.name).filter(Boolean)
+                                            ])].sort().includes(newRoom.apartment))) && (
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Wohnung eingeben"
+                                                        value={newRoom.apartment}
+                                                        onChange={(e) => setNewRoom(prev => ({ ...prev, apartment: e.target.value }))}
+                                                        className="form-input"
+                                                        style={{ padding: '0.5rem', fontSize: '0.9rem' }}
+                                                    />
+                                                )}
                                         </div>
 
                                         <input
@@ -4286,23 +4363,29 @@ END:VCARD`;
                                     style={{ padding: '0.5rem', fontSize: '0.9rem' }}
                                 >
                                     <option value="">Wohnung wählen... (Optional)</option>
-                                    {[...new Set([...formData.rooms.map(r => r.apartment).filter(Boolean), ...(formData.contacts || []).map(c => c.name ? (c.name.toLowerCase().includes('whg') || c.name.toLowerCase().includes('wohnung') ? c.name.trim().split(/\s+/).pop() : 'Whg. ' + c.name.trim().split(/\s+/).pop()) : '').filter(Boolean)])].sort().map(apt => (
+                                    {[...new Set([
+                                        ...formData.rooms.map(r => r.apartment).filter(Boolean),
+                                        ...(formData.contacts || []).filter(c => c.role === 'Mieter' || c.role === 'Eigentümer').map(c => c.name).filter(Boolean)
+                                    ])].sort().map(apt => (
                                         <option key={apt} value={apt}>{apt}</option>
                                     ))}
                                     <option value="Sonstiges">Neue Wohnung eingeben...</option>
                                 </select>
 
                                 {/* Custom Apartment Input */}
-                                {(!newRoom.apartment || (newRoom.apartment && ![...new Set([...formData.rooms.map(r => r.apartment).filter(Boolean), ...(formData.contacts || []).map(c => c.name ? (c.name.toLowerCase().includes('whg') || c.name.toLowerCase().includes('wohnung') ? c.name.trim().split(/\s+/).pop() : 'Whg. ' + c.name.trim().split(/\s+/).pop()) : '').filter(Boolean)])].sort().includes(newRoom.apartment))) && (
-                                    <input
-                                        type="text"
-                                        placeholder="Wohnung eingeben"
-                                        value={newRoom.apartment}
-                                        onChange={(e) => setNewRoom(prev => ({ ...prev, apartment: e.target.value }))}
-                                        className="form-input"
-                                        style={{ padding: '0.5rem', fontSize: '0.9rem' }}
-                                    />
-                                )}
+                                {(!newRoom.apartment || (newRoom.apartment && ![...new Set([
+                                    ...formData.rooms.map(r => r.apartment).filter(Boolean),
+                                    ...(formData.contacts || []).filter(c => c.role === 'Mieter' || c.role === 'Eigentümer').map(c => c.name).filter(Boolean)
+                                ])].sort().includes(newRoom.apartment))) && (
+                                        <input
+                                            type="text"
+                                            placeholder="Wohnung eingeben"
+                                            value={newRoom.apartment}
+                                            onChange={(e) => setNewRoom(prev => ({ ...prev, apartment: e.target.value }))}
+                                            className="form-input"
+                                            style={{ padding: '0.5rem', fontSize: '0.9rem' }}
+                                        />
+                                    )}
                             </div>
 
                             <input
@@ -4356,8 +4439,8 @@ END:VCARD`;
                     )}
                 </div>
 
-                {/* Massnahmen & Feststellungen */}
-                {(formData.status === 'Schadenaufnahme' || formData.status === 'Leckortung' || true) && (
+                {/* Massnahmen & Feststellungen - nur Desktop */}
+                {mode === 'desktop' && (formData.status === 'Schadenaufnahme' || formData.status === 'Leckortung') && (
                     <div style={{ marginBottom: '1.5rem', backgroundColor: 'var(--surface)', padding: '1.25rem', borderRadius: '12px', border: '1px solid var(--border)', color: 'var(--text-main)', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}>
                         <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.6rem', color: 'var(--primary)' }}>
                             <Eye size={18} /> Feststellungen & Massnahmen

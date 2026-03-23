@@ -216,14 +216,17 @@ export default function RoomManager({
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                                     <select
                                         className="form-input"
-                                        value={newRoom.apartment && ![...new Set([...formData.rooms.map(r => r.apartment).filter(Boolean), ...(formData.contacts || []).map(c => c.name ? (c.name.toLowerCase().includes('whg') || c.name.toLowerCase().includes('wohnung') ? c.name.trim().split(/\s+/).pop() : 'Whg. ' + c.name.trim().split(/\s+/).pop()) : '').filter(Boolean)])].sort().includes(newRoom.apartment) ? 'Sonstiges' : newRoom.apartment}
+                                        value={newRoom.apartment && ![...new Set([
+                                            ...formData.rooms.map(r => r.apartment).filter(Boolean),
+                                            ...(formData.contacts || []).filter(c => c.role === 'Mieter' || c.role === 'Eigentümer').map(c => c.name).filter(Boolean)
+                                        ])].sort().includes(newRoom.apartment) ? 'Sonstiges' : newRoom.apartment}
                                         onChange={(e) => {
                                             const val = e.target.value;
                                             if (val === 'Sonstiges') {
                                                 setNewRoom(prev => ({ ...prev, apartment: '' }));
                                             } else {
                                                 let relatedStockwerk = '';
-                                                const matchingContact = (formData.contacts || []).find(c => c.name && c.name.trim().split(/\s+/).pop() === val);
+                                                const matchingContact = (formData.contacts || []).find(c => c.name === val);
                                                 if (matchingContact) {
                                                     relatedStockwerk = matchingContact.floor || matchingContact.apartment || '';
                                                 } else {
@@ -238,13 +241,19 @@ export default function RoomManager({
                                         style={{ padding: '0.5rem', fontSize: '0.9rem' }}
                                     >
                                         <option value="">Wohnung wählen... (Optional)</option>
-                                        {[...new Set([...formData.rooms.map(r => r.apartment).filter(Boolean), ...(formData.contacts || []).map(c => c.name ? (c.name.toLowerCase().includes('whg') || c.name.toLowerCase().includes('wohnung') ? c.name.trim().split(/\s+/).pop() : 'Whg. ' + c.name.trim().split(/\s+/).pop()) : '').filter(Boolean)])].sort().map(apt => (
+                                        {[...new Set([
+                                            ...formData.rooms.map(r => r.apartment).filter(Boolean),
+                                            ...(formData.contacts || []).filter(c => c.role === 'Mieter' || c.role === 'Eigentümer').map(c => c.name).filter(Boolean)
+                                        ])].sort().map(apt => (
                                             <option key={apt} value={apt}>{apt}</option>
                                         ))}
                                         <option value="Sonstiges">Neue Wohnung eingeben...</option>
                                     </select>
 
-                                    {(!newRoom.apartment || (newRoom.apartment && ![...new Set([...formData.rooms.map(r => r.apartment).filter(Boolean), ...(formData.contacts || []).map(c => c.name ? (c.name.toLowerCase().includes('whg') || c.name.toLowerCase().includes('wohnung') ? c.name.trim().split(/\s+/).pop() : 'Whg. ' + c.name.trim().split(/\s+/).pop()) : '').filter(Boolean)])].sort().includes(newRoom.apartment))) && (
+                                    {(!newRoom.apartment || (newRoom.apartment && ![...new Set([
+                                        ...formData.rooms.map(r => r.apartment).filter(Boolean),
+                                        ...(formData.contacts || []).filter(c => c.role === 'Mieter' || c.role === 'Eigentümer').map(c => c.name).filter(Boolean)
+                                    ])].sort().includes(newRoom.apartment))) && (
                                         <input
                                             type="text"
                                             placeholder="Wohnung eingeben"

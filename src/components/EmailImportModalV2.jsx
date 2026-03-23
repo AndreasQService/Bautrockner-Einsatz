@@ -101,13 +101,13 @@ const EmailImportModalV2 = ({ onClose, onImport, audioDevices, selectedDeviceId,
    → firma = "Neukom Marzolo AG" (aus der EIGENEN Signatur VOR "Von:")
    → NICHT "STUMP + PARTNER AG" (das ist im weitergeleiteten Teil)
 
-   AUFTRAGGEBER-ADRESSE: Adresse der Auftraggeber-Firma gehört in 'auftrag_verwaltung.adresse' und 'auftrag_verwaltung.plz_ort'. NICHT in 'schadenort'!
+   AUFTRAGGEBER-ADRESSE: Adresse der Auftraggeber-Firma gehört in 'auftrag_verwaltung.adresse', 'auftrag_verwaltung.plz' und 'auftrag_verwaltung.ort'. NICHT in 'schadenort'!
 
 2b. SCHADENORT-EXTRAKTION (PFLICHT):
    - BETREFF als Quelle: Wenn der Email-Betreff eine Strasse enthält (Muster: "Wasserschaden Strassename Nr"), IST DAS DER SCHADENORT. Extrahiere Strasse + Hausnummer daraus.
    - Beispiel: "Betreff: Wasserschaden Leutschenbachstrasse 30 B1804" → schadenort.strasse_nr = "Leutschenbachstrasse 30", schadenort.etage_wohnung = "B1804"
    - WOHNUNGSNUMMERN erkennen: Codes wie "B1804", "EG", "3OG", "DG", "W12", "OG3", "C204" gehören in schadenort.etage_wohnung, NICHT in strasse_nr.
-   - PLZ/ORT: Falls PLZ nicht im Text steht, lass schadenort.plz_ort leer (""). NICHT raten!
+   - PLZ/ORT: PLZ separat in schadenort.plz, Ort separat in schadenort.ort. Falls nicht im Text, leer lassen. NICHT raten! NIEMALS kombiniert als plz_ort!
    - MEHRFACH-QUELLEN: Die Adresse kann auch in einer Signatur, Cc-Liste oder Weiterleitungszeile vorkommen ("Betreff:", "Subject:", "Objekt:").
 
 3. ROLLEN-LOGIK (STRIKTE REGELN):
@@ -145,7 +145,8 @@ AUSGABE-FORMAT (JSON):
     "email": "",
     "leistungsart": "Wasserschaden",
     "adresse": "",
-    "plz_ort": ""
+    "plz": "",
+    "ort": ""
   },
   "rechnungs_details": {
     "eigentuemer": "",
@@ -154,7 +155,8 @@ AUSGABE-FORMAT (JSON):
   },
   "schadenort": {
     "strasse_nr": "",
-    "plz_ort": "",
+    "plz": "",
+    "ort": "",
     "etage_wohnung": ""
   },
   "kontakte": [
@@ -351,8 +353,12 @@ ${text}`;
                                     <input className="form-input" style={{ width: '100%' }} value={previewData.schadenort?.etage_wohnung || ''} onChange={e => setPreviewData({ ...previewData, schadenort: { ...previewData.schadenort, etage_wohnung: e.target.value } })} />
                                 </div>
                                 <div>
-                                    <label style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8' }}>PLZ & Ort</label>
-                                    <input className="form-input" style={{ width: '100%' }} value={previewData.schadenort?.plz_ort || ''} onChange={e => setPreviewData({ ...previewData, schadenort: { ...previewData.schadenort, plz_ort: e.target.value } })} />
+                                    <label style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8' }}>PLZ</label>
+                                    <input className="form-input" style={{ width: '100%' }} value={previewData.schadenort?.plz || ''} onChange={e => setPreviewData({ ...previewData, schadenort: { ...previewData.schadenort, plz: e.target.value } })} />
+                                </div>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8' }}>Ort</label>
+                                    <input className="form-input" style={{ width: '100%' }} value={previewData.schadenort?.ort || ''} onChange={e => setPreviewData({ ...previewData, schadenort: { ...previewData.schadenort, ort: e.target.value } })} />
                                 </div>
                             </div>
                         </div>

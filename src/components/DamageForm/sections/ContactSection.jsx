@@ -60,16 +60,7 @@ const ContactSection = ({ formData, setFormData, mode, renderConflictWarn }) => 
                     </div>
 
                     <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
-                        <div style={{ flex: '1 1 200px' }}>
-                            <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 600, marginBottom: '0.5rem', display: 'block' }}>Bewirtschafter/in</label>
-                            <input
-                                className="form-input"
-                                placeholder="Vorname Name"
-                                value={formData.assignedTo || ''}
-                                onChange={(e) => setFormData(prev => ({ ...prev, assignedTo: e.target.value }))}
-                                style={{ width: '100%' }}
-                            />
-                        </div>
+
                         <div style={{ flex: '1 1 160px' }}>
                             <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 600, marginBottom: '0.5rem', display: 'block' }}>Telefon (AG-Kontakt)</label>
                             <input

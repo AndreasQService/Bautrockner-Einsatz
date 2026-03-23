@@ -56,65 +56,200 @@ export default function UploadPanel({ caseId, onCaseCreated, onExtractionComplet
       const genAI = new GoogleGenerativeAI(apiKey);
       console.log("Analyzing with AI. Text length:", textContext.length);
 
-      const prompt = `Du bist ein technischer Daten-Parser für die AG-App (Q-Service). Deine Aufgabe ist es, unstrukturierte Texte (E-Mails, PDF-Inhalte) in ein exaktes JSON-Format zu überführen.
+      const prompt = `Du bist ein technischer Daten-Parser für die AG-App (Q-Service).
 
-1. REGEL FÜR ADRESS-SPLIT (PFLICHT):
-   - FELD 'EIGENTÜMER': Suche nach dem Namen der Organisation oder Person.
-   - CUT-OFF: Sobald ein Wort erscheint, das eine Adresse einleitet (Strasse, Str., Weg, PLZ, Ort), muss dieses Wort und alles danach aus dem Feld 'EIGENTÜMER' entfernt werden.
-   - MAPPING: Diese entfernten Teile müssen in 'strasse_nr' und 'plz_ort' des Schadenorts geschrieben werden.
+Deine Aufgabe ist es, unstrukturierte Texte aus E-Mails, PDF-Inhalten oder kopierten Schadensmeldungen in exakt ein valides JSON-Objekt zu überführen.
 
-2. ROLLEN-LOGIK (NUR DIESE WERTE):
-   Ordne jedem Kontakt ausschliesslich eines dieser Kürzel zu:
-   - 'Handw.': Firmen, Techniker, Sanitär.
-   - 'Verw.': Verwaltungen, Bewirtschaftungen.
-   - 'Mieter': Bewohner des Objekts.
-   - 'Eig.': Der Eigentümer (wie oben extrahiert).
-   - 'HW': Hauswart.
+WICHTIG:
+- Gib ausschliesslich valides JSON zurück.
+- Keine Erklärungen.
+- Keine Markdown-Backticks.
+- Keine Kommentare.
+- Keine Platzhalter wie "string", "unknown", "n/a", null oder ähnliche Werte.
+- Fehlende Werte immer als leerer String "" ausgeben.
+- Erfinde niemals Informationen.
+- Alle Felder der vorgegebenen JSON-Struktur müssen immer vorhanden sein.
+- Keine zusätzlichen Felder erzeugen.
+- Wenn mehrere mögliche Werte vorhanden sind, wähle den direktesten und eindeutigigsten Wert aus dem Text.
+- Wenn eine Information nicht eindeutig zuordenbar ist, Feld leer lassen.
+- Leere Arrays sind erlaubt, wenn keine Einträge vorhanden sind.
 
-3. VERBOT VON PLATZHALTERN:
-   - Gib niemals das Wort "string" oder ähnliche Platzhalter aus.
-   - Falls eine Information nicht existiert, gib einen leeren String ("") aus.
+ROLLENLOGIK
+Nur diese Rollen sind erlaubt:
+- "Handw." = Firmen, Techniker, Sanitär, Handwerker
+- "Verw." = Verwaltung, Bewirtschaftung, Immobilienfirma
+- "Mieter" = Bewohner oder Nutzer des Objekts
+- "Eig." = Eigentümer
+- "HW" = Hauswart
 
-4. FORMATIERUNG:
-   - Telefon: +41 XX XXX XX XX (wo möglich).
+ALLGEMEINE ZUORDNUNGSREGEL
+- Trenne konsequent zwischen Firma und Person:
+  - "firma" = Firmenname / Organisation
+  - "name" = Vorname + Nachname der Kontaktperson
+- Wenn es sich um eine Privatperson handelt:
+  - "firma" = ""
+  - "name" = Vorname + Nachname
+- Wenn keine Kontaktperson genannt ist:
+  - "name" = ""
+- Rollen nur gemäss der erlaubten Rollenlogik setzen.
 
-AUSGABE-FORMAT (JSON):
+AUFTRAGGEBER-REGEL
+Der Auftraggeber ist immer die Partei, die Q-Service direkt kontaktiert und den Einsatz auslöst.
+Massgebend ist der direkte Absender bzw. die Partei, die Q-Service zur Intervention auffordert.
+
+Für "auftraggeber" gilt:
+- "firma" = Firmenname, wenn der Auftraggeber eine Firma oder Organisation ist
+- "firma" = "" wenn der Auftraggeber eine Privatperson ist
+- "name" = Vorname + Nachname der direkten Kontaktperson
+- "rolle" = gemäss Rollenlogik
+- "telefon" = Haupttelefonnummer des Auftraggebers
+- "email" = Haupt-E-Mail-Adresse des Auftraggebers
+- "strasse_nr" = Strasse + Hausnummer des Auftraggebers
+- "plz" = PLZ des Auftraggebers
+- "ort" = Ort des Auftraggebers
+- Niemals kombiniert als "plz_ort"
+
+WICHTIG:
+- Eigentümer ist nicht automatisch Auftraggeber.
+- Verwaltung ist nicht automatisch Auftraggeber.
+- Wenn eine Sanitärfirma / Handwerker Q-Service direkt kontaktiert:
+  → Auftraggeber = diese Firma, Rolle = "Handw."
+- Wenn eine Verwaltung Q-Service direkt kontaktiert:
+  → Auftraggeber = diese Verwaltung, Rolle = "Verw."
+- Wenn ein Mieter Q-Service direkt kontaktiert:
+  → Auftraggeber = dieser Mieter, Rolle = "Mieter"
+- Wenn mehrere Telefonnummern vorhanden sind, nimm die wichtigste direkte Kontaktnummer.
+- Wenn mehrere E-Mails vorhanden sind, nimm die direkte Hauptadresse der Kontaktpartei.
+- Wenn mehrere Adressen vorhanden sind, nimm die Adresse des direkten Auftraggebers.
+- Die Adresse des Auftraggebers stammt häufig aus der E-Mail-Signatur.
+- Auftraggeberadresse und Schadenort strikt getrennt halten.
+
+VERWALTUNG
+Für "verwaltung" gilt:
+- "firma" = Name der Verwaltungsfirma
+- "name" = Vorname + Nachname der Ansprechperson in der Verwaltung
+- "rolle" = "Verw."
+- "telefon" = direkte Telefonnummer oder Hauptnummer
+- "email" = direkte E-Mail oder Hauptadresse
+
+MIETER-REGEL
+- Es können mehrere Mieter vorhanden sein.
+- Jeden Mieter separat im Array "mieter" erfassen.
+- Wohnungsangaben niemals in "name" integrieren.
+- "wohnung" = Wohnungsangabe (z.B. "EG links", "2. OG rechts", "Attika", "B1804")
+- "firma" = "", "rolle" = "Mieter"
+- Wenn keine Wohnungsangabe: "wohnung" = ""
+
+EIGENTÜMER-REGEL
+- "firma" = Firmenname / Organisation (leer bei Privatperson)
+- "name" = nur der Personenname, keine Adresse
+- "rolle" = "Eig."
+
+HAUSWART-REGEL
+- "firma" = Firmenname wenn vorhanden, sonst ""
+- "rolle" = "HW"
+
+HANDWERKER-REGEL
+- Weitere Handwerker/Sanitärfirmen (nicht Auftraggeber) als Array in "handwerker"
+- "rolle" = "Handw."
+
+SCHADENORT-REGEL
+- Der Schadenort hat Vorrang gegenüber Absenderadresse/Verwaltungsadresse.
+- "bezeichnung" = Wohnungs- oder Lagebezeichnung
+- "plz" = PLZ des Schadenorts – niemals kombiniert als "plz_ort"
+- "ort" = Ort des Schadenorts – niemals kombiniert als "plz_ort"
+- Schadenort nicht aus Eigentümer- oder Verwaltungsadresse ableiten.
+
+SCHADEN-REGEL
+- "art" = kurze Bezeichnung (z.B. "Wasserschaden", "Leckage", "Rohrbruch")
+- "beschreibung" = kurze sachliche Zusammenfassung
+
+TELEFONFORMAT: +41 XX XXX XX XX (079 123 45 67 → +41 79 123 45 67)
+
+AUSGABEREGELN
+- Gib ausschliesslich ein einziges valides JSON-Objekt zurück
+- Keine Einleitung, kein Nachsatz, keine Kommentare
+- Leere Arrays verwenden, wenn keine Einträge vorhanden sind
+
+Verwende exakt diese JSON-Struktur:
 {
-  "projekt_daten": { "interne_id": "", "externe_ref": "", "auftrags_nr": "" },
-  "auftrag_verwaltung": { "firma": "", "sachbearbeiter": "", "leistungsart": "" },
-  "rechnungs_details": { "eigentuemer": "", "email_rechnung": "", "vermerk": "" },
-  "schadenort": { "strasse_nr": "", "plz_ort": "", "etage_wohnung": "" },
-  "kontakte": [ { "name": "", "rolle": "Handw.|Verw.|Mieter|Eig.|HW", "telefon": "" } ],
-  "gap_analysis": []
+  "auftraggeber": {
+    "firma": "",
+    "name": "",
+    "rolle": "",
+    "telefon": "",
+    "email": "",
+    "strasse_nr": "",
+    "plz": "",
+    "ort": ""
+  },
+  "verwaltung": {
+    "firma": "",
+    "name": "",
+    "rolle": "Verw.",
+    "telefon": "",
+    "email": ""
+  },
+  "mieter": [],
+  "eigentuemer": {
+    "firma": "",
+    "name": "",
+    "rolle": "Eig.",
+    "telefon": "",
+    "email": ""
+  },
+  "hauswart": {
+    "firma": "",
+    "name": "",
+    "rolle": "HW",
+    "telefon": "",
+    "email": ""
+  },
+  "handwerker": [],
+  "schadenort": {
+    "bezeichnung": "",
+    "strasse_nr": "",
+    "plz": "",
+    "ort": ""
+  },
+  "schaden": {
+    "art": "",
+    "beschreibung": ""
+  }
 }
-
-WICHTIG: Antworte NUR mit dem validen JSON-Code, ohne Markdown-Backticks.
 
 INPUT DATEN:
 ${textContext}`;
 
       let result;
-      let discoveryModels = [];
-      try {
-        const discoveryRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
-        const discoveryData = await discoveryRes.json();
-        if (discoveryData && discoveryData.models) {
-          discoveryModels = discoveryData.models
-            .map(m => m.name.replace('models/', ''))
-            .filter(name => name.includes('flash') || name.includes('pro'))
-            .filter(name => !name.includes('vision') && !name.includes('experimental'));
-          console.log("Dynamisch gefundene Modelle:", discoveryModels);
-        }
-      } catch (e) {
-        console.warn("Discovery failed, using hardcoded fallback...", e);
-      }
+      // Modell-Erkennung: einmal pro Session gecacht → kein wiederholter Discovery-Call
+      let attempts;
+      const cachedModel = sessionStorage.getItem('gemini_working_model');
+      if (cachedModel) {
+        attempts = [JSON.parse(cachedModel)];
+        console.log("Verwende gecachtes Modell:", cachedModel);
+      } else {
+        // Einmalige Discovery um das richtige Modell zu finden
+        let discoveredModels = [];
+        try {
+          const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+          const data = await res.json();
+          if (data?.models) {
+            discoveredModels = data.models
+              .map(m => m.name.replace('models/', ''))
+              .filter(n => n.includes('flash') && !n.includes('vision') && !n.includes('exp'));
+            console.log("Verfügbare Flash-Modelle:", discoveredModels);
+          }
+        } catch (e) { console.warn("Discovery fehlgeschlagen:", e); }
 
-      const baseModels = discoveryModels.length > 0 ? discoveryModels : ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-1.5-flash-8b"];
-      const attempts = [];
-      baseModels.slice(0, 6).forEach(m => {
-        attempts.push({ model: m, version: "v1beta" });
-        attempts.push({ model: m, version: "v1" });
-      });
+        // Fallback-Reihenfolge wenn Discovery nichts liefert
+        const fallback = ["gemini-2.0-flash-lite", "gemini-2.0-flash", "gemini-1.5-flash-latest", "gemini-1.5-flash"];
+        const modelList = discoveredModels.length > 0 ? discoveredModels : fallback;
+        attempts = modelList.slice(0, 4).flatMap(m => [
+          { model: m, version: "v1beta" },
+          { model: m, version: "v1" }
+        ]);
+      }
 
       let lastError;
       let hasQuotaError = false;
@@ -126,6 +261,8 @@ ${textContext}`;
           result = await model.generateContent(prompt);
           if (result) {
             console.log(`ERFOLG! Antwort von ${attempt.model} (${attempt.version})`);
+            // Erfolgreiches Modell für diese Session cachen → kein Discovery mehr nötig
+            sessionStorage.setItem('gemini_working_model', JSON.stringify(attempt));
             break;
           }
         } catch (err) {
@@ -156,7 +293,7 @@ ${textContext}`;
       aiContent = aiContent.replace(/^```json/, '').replace(/^```/, '').replace(/```$/, '').trim();
 
       const parsedData = JSON.parse(aiContent);
-      console.log("Successfully parsed AI results:", parsedData.projekt_daten?.interne_id);
+      console.log('[UploadPanel] parsedData:', { auftraggeber: parsedData.auftraggeber, schadenort: parsedData.schadenort });
       return parsedData;
 
     } catch (e) {
@@ -202,17 +339,7 @@ ${textContext}`;
     }
   }, [files]);
 
-  // 2. Text Paste / Debounce Trigger
-  useEffect(() => {
-    if (!textInput.trim() || loading) return;
-
-    const timer = setTimeout(() => {
-      console.log("Auto-starting handleAnalyzeText...");
-      handleAnalyzeText();
-    }, 1500);
-
-    return () => clearTimeout(timer);
-  }, [textInput]);
+  // 2. Text: Nur per Button-Klick analysieren (kein Auto-Debounce = weniger API-Calls)
 
 
   // --- File Handling ---
@@ -422,121 +549,104 @@ ${textContext}`;
   // --- PREVIEW RENDERER (Overlay) ---
   const renderPreview = () => {
     if (!previewData) return null;
+    const upd = (key, field, val) => setPreviewData(p => ({ ...p, [key]: { ...p[key], [field]: val } }));
+    const updMieter = (idx, field, val) => setPreviewData(p => ({
+      ...p, mieter: (Array.isArray(p.mieter) ? p.mieter : [p.mieter]).map((m, i) => i === idx ? { ...m, [field]: val } : m)
+    }));
+    const singleRoles = [
+      { key: 'auftraggeber', label: 'Auftraggeber', color: '#3b82f6', fields: [['firma', 'Firma'], ['name', 'Ansprechperson'], ['telefon', 'Telefon'], ['email', 'E-Mail']] },
+      { key: 'verwaltung', label: 'Verwaltung', color: '#f59e0b', fields: [['firma', 'Firma'], ['name', 'Ansprechperson'], ['telefon', 'Telefon'], ['email', 'E-Mail']] },
+      { key: 'eigentuemer', label: 'Eigentümer', color: '#8b5cf6', fields: [['name', 'Name'], ['telefon', 'Telefon'], ['email', 'E-Mail']] },
+      { key: 'handwerker', label: 'Handwerker', color: '#ef4444', fields: [['name', 'Name'], ['telefon', 'Telefon'], ['email', 'E-Mail']] },
+      { key: 'hauswart', label: 'Hauswart', color: '#94a3b8', fields: [['name', 'Name'], ['telefon', 'Telefon'], ['email', 'E-Mail']] },
+    ];
+    const mieterList = Array.isArray(previewData.mieter) ? previewData.mieter : (previewData.mieter?.name ? [previewData.mieter] : []);
+
     return createPortal(
-      <div style={{
-        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-        backgroundColor: 'rgba(0,0,0,0.7)', zIndex: 99999,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        backdropFilter: 'blur(4px)'
-      }}>
-        <div style={{
-          backgroundColor: '#1e293b', padding: '2rem', borderRadius: '16px',
-          width: '900px', maxWidth: '95%', maxHeight: '90vh', overflowY: 'auto',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)', border: '1px solid rgba(255,255,255,0.1)',
-          color: 'white'
-        }}>
+      <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.75)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }}>
+        <div style={{ backgroundColor: '#1e293b', padding: '2rem', borderRadius: '16px', width: '920px', maxWidth: '95%', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.1)', color: 'white' }}>
+
+          {/* Header */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '1rem' }}>
-            <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 800, color: '#10b981' }}>KI-Analyse Ergebnis (v2026.1)</h2>
+            <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800, color: '#10b981' }}>KI-Analyse Ergebnis</h2>
             <button onClick={() => setPreviewData(null)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}><X size={24} /></button>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1.5rem', marginBottom: '2rem' }}>
-            {/* Projekt & Verwaltung */}
-            <div style={{ backgroundColor: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: '12px' }}>
-              <h4 style={{ marginTop: 0, color: '#3b82f6', fontSize: '0.9rem', textTransform: 'uppercase' }}>Projekt & Auftrag</h4>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8' }}>Projekt-Nr (2026xxxx)</label>
-                  <input className="form-input" style={{ width: '100%' }} value={previewData.projekt_daten?.interne_id || ''} onChange={e => setPreviewData({ ...previewData, projekt_daten: { ...previewData.projekt_daten, interne_id: e.target.value } })} />
+          {/* Schadenort + Schaden */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+            <div style={{ backgroundColor: 'rgba(239,68,68,0.08)', padding: '1rem', borderRadius: '12px', border: '1px solid rgba(239,68,68,0.2)' }}>
+              <h4 style={{ marginTop: 0, color: '#ef4444', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Schadenort</h4>
+              {[['bezeichnung', 'Bezeichnung / Wohnung'], ['strasse_nr', 'Strasse & Nr.'], ['plz', 'PLZ'], ['ort', 'Ort']].map(([f, l]) => (
+                <div key={f} style={{ marginBottom: '0.6rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8', marginBottom: '2px' }}>{l}</label>
+                  <input className="form-input" style={{ width: '100%' }} value={previewData.schadenort?.[f] || ''} onChange={e => upd('schadenort', f, e.target.value)} />
                 </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8' }}>Auftraggeber (Firma)</label>
-                  <input className="form-input" style={{ width: '100%' }} value={previewData.auftrag_verwaltung?.firma || ''} onChange={e => setPreviewData({ ...previewData, auftrag_verwaltung: { ...previewData.auftrag_verwaltung, firma: e.target.value } })} />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8' }}>Sachbearbeiter</label>
-                  <input className="form-input" style={{ width: '100%' }} value={previewData.auftrag_verwaltung?.sachbearbeiter || ''} onChange={e => setPreviewData({ ...previewData, auftrag_verwaltung: { ...previewData.auftrag_verwaltung, sachbearbeiter: e.target.value } })} />
-                </div>
-              </div>
+              ))}
             </div>
-
-            {/* Rechnung */}
-            <div style={{ backgroundColor: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: '12px' }}>
-              <h4 style={{ marginTop: 0, color: '#f59e0b', fontSize: '0.9rem', textTransform: 'uppercase' }}>Rechnungs-Details</h4>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8' }}>Eigentümer / c/o</label>
-                  <input className="form-input" style={{ width: '100%' }} value={previewData.rechnungs_details?.eigentuemer || ''} onChange={e => setPreviewData({ ...previewData, rechnungs_details: { ...previewData.rechnungs_details, eigentuemer: e.target.value } })} />
+            <div style={{ backgroundColor: 'rgba(139,92,246,0.08)', padding: '1rem', borderRadius: '12px', border: '1px solid rgba(139,92,246,0.2)' }}>
+              <h4 style={{ marginTop: 0, color: '#8b5cf6', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Schaden</h4>
+              {[['art', 'Art des Schadens'], ['beschreibung', 'Beschreibung']].map(([f, l]) => (
+                <div key={f} style={{ marginBottom: '0.6rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8', marginBottom: '2px' }}>{l}</label>
+                  <input className="form-input" style={{ width: '100%' }} value={previewData.schaden?.[f] || ''} onChange={e => upd('schaden', f, e.target.value)} />
                 </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8' }}>E-Mail Rechnung</label>
-                  <input className="form-input" style={{ width: '100%' }} value={previewData.rechnungs_details?.email_rechnung || ''} onChange={e => setPreviewData({ ...previewData, rechnungs_details: { ...previewData.rechnungs_details, email_rechnung: e.target.value } })} />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8' }}>Rechnungsvermerk (Ref)</label>
-                  <input className="form-input" style={{ width: '100%' }} value={previewData.rechnungs_details?.vermerk || ''} onChange={e => setPreviewData({ ...previewData, rechnungs_details: { ...previewData.rechnungs_details, vermerk: e.target.value } })} />
-                </div>
-              </div>
-            </div>
-
-            {/* Schadenort */}
-            <div style={{ gridColumn: 'span 2', backgroundColor: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: '12px' }}>
-              <h4 style={{ marginTop: 0, color: '#ef4444', fontSize: '0.9rem', textTransform: 'uppercase' }}>Schadenort</h4>
-              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 2fr', gap: '1rem' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8' }}>Strasse & Nr.</label>
-                  <input className="form-input" style={{ width: '100%' }} value={previewData.schadenort?.strasse_nr || ''} onChange={e => setPreviewData({ ...previewData, schadenort: { ...previewData.schadenort, strasse_nr: e.target.value } })} />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8' }}>Etage / Details</label>
-                  <input className="form-input" style={{ width: '100%' }} value={previewData.schadenort?.etage_wohnung || ''} onChange={e => setPreviewData({ ...previewData, schadenort: { ...previewData.schadenort, etage_wohnung: e.target.value } })} />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8' }}>PLZ & Ort</label>
-                  <input className="form-input" style={{ width: '100%' }} value={previewData.schadenort?.plz_ort || ''} onChange={e => setPreviewData({ ...previewData, schadenort: { ...previewData.schadenort, plz_ort: e.target.value } })} />
-                </div>
-              </div>
+              ))}
             </div>
           </div>
 
-          <h4 style={{ color: '#10b981', fontSize: '0.9rem', textTransform: 'uppercase', marginBottom: '1rem' }}>Identifizierte Kontakte</h4>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '2rem' }}>
-            {previewData.kontakte && previewData.kontakte.map((c, idx) => (
-              <div key={idx} style={{ display: 'grid', gridTemplateColumns: '150px 1fr 180px 40px', gap: '0.75rem', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.2)', padding: '0.75rem', borderRadius: '8px' }}>
-                <input className="form-input" placeholder="Rolle" value={c.rolle || ''} onChange={e => {
-                  const newC = [...previewData.kontakte]; newC[idx].rolle = e.target.value; setPreviewData({ ...previewData, kontakte: newC });
-                }} />
-                <input className="form-input" placeholder="Name" value={c.name || ''} onChange={e => {
-                  const newC = [...previewData.kontakte]; newC[idx].name = e.target.value; setPreviewData({ ...previewData, kontakte: newC });
-                }} />
-                <input className="form-input" placeholder="Telefon" value={c.telefon || ''} onChange={e => {
-                  const newC = [...previewData.kontakte]; newC[idx].telefon = e.target.value; setPreviewData({ ...previewData, kontakte: newC });
-                }} />
-                <button onClick={() => {
-                  const newC = previewData.kontakte.filter((_, i) => i !== idx);
-                  setPreviewData({ ...previewData, kontakte: newC });
-                }} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '38px', width: '38px', borderRadius: '8px', border: '1px solid #ef4444', color: '#ef4444', backgroundColor: 'transparent', cursor: 'pointer' }}><X size={16} /></button>
+          {/* Kontakte – Einzelrollen */}
+          <h4 style={{ color: '#10b981', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.75rem' }}>Kontakte</h4>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
+            {singleRoles.map(({ key, label, color, fields }) => (
+              <div key={key} style={{ backgroundColor: 'rgba(255,255,255,0.03)', padding: '0.85rem', borderRadius: '10px', borderLeft: `3px solid ${color}` }}>
+                {/* Überschrift = Dropdown zur Rollenkorrektur */}
+                <select
+                  value={previewData[key]?._blockRolle || key}
+                  onChange={e => upd(key, '_blockRolle', e.target.value)}
+                  style={{
+                    fontSize: '0.75rem', fontWeight: 700, color, marginBottom: '0.6rem',
+                    textTransform: 'uppercase', letterSpacing: '0.05em',
+                    background: 'transparent', border: 'none', borderBottom: `1px solid ${color}`,
+                    cursor: 'pointer', width: '100%', padding: '0 0 2px 0',
+                    appearance: 'auto', outline: 'none'
+                  }}
+                >
+                  <option value="auftraggeber">AUFTRAGGEBER (AG)</option>
+                  <option value="verwaltung">VERWALTUNG (Verw.)</option>
+                  <option value="eigentuemer">EIGENTÜMER (Eig.)</option>
+                  <option value="hauswart">HAUSWART (HW)</option>
+                  <option value="handwerker">HANDWERKER (Handw.)</option>
+                  <option value="mieter">MIETER</option>
+                </select>
+                {fields.map(([f, l]) => (
+                  <div key={f} style={{ marginBottom: '0.4rem' }}>
+                    <label style={{ display: 'block', fontSize: '0.65rem', color: '#64748b', marginBottom: '1px' }}>{l}</label>
+                    <input className="form-input" style={{ width: '100%', fontSize: '0.85rem', padding: '0.3rem 0.5rem' }} value={previewData[key]?.[f] || ''} onChange={e => upd(key, f, e.target.value)} />
+                  </div>
+                ))}
               </div>
             ))}
-            <button onClick={() => setPreviewData({ ...previewData, kontakte: [...(previewData.kontakte || []), { rolle: '', name: '', telefon: '' }] })} className="btn btn-ghost" style={{ alignSelf: 'start', fontSize: '0.8rem' }}>+ Weiteren Kontakt hinzufügen</button>
           </div>
 
-          {/* Gap Analysis */}
-          {previewData.gap_analysis && previewData.gap_analysis.length > 0 && (
-            <div style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', borderLeft: '4px solid #ef4444', padding: '1rem', borderRadius: '8px', marginBottom: '2rem' }}>
-              <h5 style={{ margin: 0, color: '#ef4444', fontSize: '0.85rem', textTransform: 'uppercase', marginBottom: '0.5rem' }}>Fehlende Daten (Gap Analysis)</h5>
-              <ul style={{ margin: 0, paddingLeft: '1.25rem', fontSize: '0.9rem', color: '#fca5a5' }}>
-                {previewData.gap_analysis.map((gap, i) => <li key={i}>{gap}</li>)}
-              </ul>
-            </div>
-          )}
+          {/* Mieter – Array */}
+          <div style={{ marginBottom: '1.5rem' }}>
+            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#10b981', marginBottom: '0.5rem', textTransform: 'uppercase' }}>Mieter ({mieterList.length})</div>
+            {mieterList.map((m, idx) => (
+              <div key={idx} style={{ backgroundColor: 'rgba(16,185,129,0.06)', padding: '0.75rem', borderRadius: '10px', borderLeft: '3px solid #10b981', marginBottom: '0.5rem', display: 'grid', gridTemplateColumns: '1fr 120px 1fr 1fr', gap: '0.5rem' }}>
+                {[['name', 'Name'], ['wohnung', 'Wohnung'], ['telefon', 'Telefon'], ['email', 'E-Mail']].map(([f, l]) => (
+                  <div key={f}>
+                    <label style={{ display: 'block', fontSize: '0.65rem', color: '#64748b', marginBottom: '1px' }}>{l}</label>
+                    <input className="form-input" style={{ width: '100%', fontSize: '0.85rem', padding: '0.3rem 0.5rem' }} value={m[f] || ''} onChange={e => updMieter(idx, f, e.target.value)} />
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '1.5rem' }}>
+          {/* Footer */}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '1.25rem' }}>
             <button onClick={() => setPreviewData(null)} className="btn btn-outline" style={{ minWidth: '120px' }}>Abbrechen</button>
-            <button onClick={() => {
-              if (onExtractionComplete) onExtractionComplete(previewData);
-              setPreviewData(null);
-            }} className="btn btn-primary" style={{ minWidth: '180px', backgroundColor: '#10b981', border: 'none' }}>Daten übernehmen</button>
+            <button onClick={() => { if (onExtractionComplete) onExtractionComplete(previewData); setPreviewData(null); }} className="btn btn-primary" style={{ minWidth: '180px', backgroundColor: '#10b981', border: 'none' }}>Daten übernehmen</button>
           </div>
         </div>
       </div>,
