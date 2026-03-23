@@ -3485,10 +3485,6 @@ END:VCARD`;
                 </div>
 
 
-
-
-
-
                 {/* 3. Rooms & Photos */}
                 <div style={{ marginBottom: '2rem' }}>
                     <div style={{ marginBottom: '1rem' }}>
@@ -3780,130 +3776,6 @@ END:VCARD`;
                 </div>
 
 
-                {/* Schadenursache - Cause & Photos (Desktop Only) */}
-                {mode === 'desktop' && (
-                    <div className="card" style={{ marginBottom: '2rem', border: '1px solid var(--border)', padding: '1.5rem', backgroundColor: 'var(--surface)' }}>
-                        <h3 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '1.5rem', color: 'var(--text-main)' }}>Schadenursache</h3>
-
-                        {/* Cause / Description */}
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem', marginBottom: '2rem' }}>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                    <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>Schadenursache</span>
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-                                            if (!SR) { alert('Diktat wird von diesem Browser nicht unterstützt.'); return; }
-                                            if (window.__dictRec) { window.__dictRec.stop(); window.__dictRec = null; return; }
-                                            const rec = new SR();
-                                            rec.lang = 'de-DE';
-                                            rec.continuous = true;
-                                            rec.interimResults = false;
-                                            rec.onresult = (e) => {
-                                                const text = Array.from(e.results).map(r => r[0].transcript).join(' ');
-                                                setFormData(prev => ({ ...prev, cause: (prev.cause ? prev.cause + ' ' : '') + text }));
-                                            };
-                                            rec.onerror = (e) => { console.error('Diktat Fehler:', e); window.__dictRec = null; };
-                                            rec.onend = () => { window.__dictRec = null; };
-                                            window.__dictRec = rec;
-                                            rec.start();
-                                        }}
-                                        style={{
-                                            display: 'flex', alignItems: 'center', gap: '0.4rem',
-                                            padding: '0.35rem 0.8rem', borderRadius: '6px', border: 'none',
-                                            backgroundColor: 'rgba(14,165,233,0.15)',
-                                            color: '#38bdf8', cursor: 'pointer',
-                                            fontSize: '0.8rem', fontWeight: 700
-                                        }}
-                                        title="Diktieren starten / stoppen"
-                                    >
-                                        <Mic size={15} /> Diktieren
-                                    </button>
-                                </div>
-                                <textarea
-                                    className="form-input"
-                                    rows={3}
-                                    value={formData.cause || ''}
-                                    onChange={e => setFormData({ ...formData, cause: e.target.value })}
-                                    placeholder="Beschreibung der Ursache..."
-                                />
-                            </div>
-                        </div>
-
-                        {/* Photos (Schadenfotos) */}
-                        <div>
-
-
-                            <h4 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--text-main)' }}>Fotos zur Ursache</h4>
-
-                            {/* Upload Zone */}
-                            <div
-                                style={{
-                                    border: '2px dashed var(--border)',
-                                    borderRadius: 'var(--radius)',
-                                    padding: '2rem 1rem',
-                                    textAlign: 'center',
-                                    cursor: 'pointer',
-                                    backgroundColor: 'rgba(255,255,255,0.02)',
-                                    transition: 'all 0.2s',
-                                    marginBottom: '1rem',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    color: 'var(--text-muted)'
-                                }}
-                                onClick={() => document.getElementById('file-upload-Schadenfotos-desktop').click()}
-                                onDragOver={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.backgroundColor = 'rgba(56, 189, 248, 0.1)'; e.currentTarget.style.color = 'var(--primary)'; }}
-                                onDragLeave={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.02)'; e.currentTarget.style.color = 'var(--text-muted)'; }}
-                                onDrop={(e) => handleCategoryDrop(e, 'Schadenfotos')}
-                            >
-                                <Plus size={24} style={{ marginBottom: '0.5rem', opacity: 0.5 }} />
-                                <span style={{ fontSize: '0.85rem' }}>Schadenfoto hochladen / Drop</span>
-                                <input id="file-upload-Schadenfotos-desktop" type="file" multiple accept="image/*" style={{ display: 'none' }} onChange={(e) => handleCategorySelect(e, 'Schadenfotos')} />
-                            </div>
-
-                            {/* List */}
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                                {formData.images.filter(img => img.assignedTo === 'Schadenfotos').map((item, idx) => (
-                                    <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem', backgroundColor: '#1E293B', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
-                                        <div style={{ width: '80px', height: '80px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: '4px', border: item.includeInReport !== false ? '2px solid #0F6EA3' : 'none' }}>
-                                            <img src={item.preview} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '4px' }} />
-                                        </div>
-
-                                        {/* Unified Toggle */}
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', padding: '0 0.5rem', cursor: 'pointer' }}
-                                            title="In PDF Bericht anzeigen"
-                                            onClick={() => setFormData(prev => ({
-                                                ...prev,
-                                                images: prev.images.map(i => i.preview === item.preview ? { ...i, includeInReport: i.includeInReport === false } : i)
-                                            }))}>
-                                            <input
-                                                type="checkbox"
-                                                checked={item.includeInReport !== false}
-                                                readOnly
-                                                style={{ width: '1.25rem', height: '1.25rem', cursor: 'pointer', accentColor: '#0F6EA3' }}
-                                            />
-                                        </div>
-
-                                        <div style={{ flex: 1, fontWeight: 500, color: 'var(--text-main)' }}>
-                                            {item.name}
-                                            {item.includeInReport !== false && (
-                                                <div style={{ fontSize: '0.8rem', color: '#0F6EA3', fontWeight: 600 }}>In Bericht</div>
-                                            )}
-                                        </div>
-
-                                        <button type="button" className="btn btn-ghost" onClick={() => setFormData(prev => ({ ...prev, images: prev.images.filter(i => i !== item) }))} style={{ color: '#EF4444', padding: '0.5rem', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(239, 68, 68, 0.1)' }}><Trash size={18} /></button>
-                                    </div>
-                                ))}
-                                {formData.images.filter(img => img.assignedTo === 'Schadenfotos').length === 0 && (
-                                    <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.9rem', fontStyle: 'italic' }}>Keine Schadenfotos vorhanden.</div>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                )}
 
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
@@ -4575,6 +4447,100 @@ END:VCARD`;
                         </div>
                     )}
                 </div>
+
+                {/* Schadenursache - Cause & Photos (Desktop Only) */}
+                {mode === 'desktop' && (
+                    <div className="card" style={{ marginBottom: '2rem', border: '1px solid var(--border)', padding: '1.5rem', backgroundColor: 'var(--surface)' }}>
+                        <h3 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '1.5rem', color: 'var(--text-main)' }}>Schadenursache</h3>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem', marginBottom: '2rem' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                    <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>Schadenursache</span>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+                                            if (!SR) { alert('Diktat wird von diesem Browser nicht unterst\u00fctzt.'); return; }
+                                            if (window.__dictRec) { window.__dictRec.stop(); window.__dictRec = null; return; }
+                                            const rec = new SR();
+                                            rec.lang = 'de-DE';
+                                            rec.continuous = true;
+                                            rec.interimResults = false;
+                                            rec.onresult = (e) => {
+                                                const text = Array.from(e.results).map(r => r[0].transcript).join(' ');
+                                                setFormData(prev => ({ ...prev, cause: (prev.cause ? prev.cause + ' ' : '') + text }));
+                                            };
+                                            rec.onerror = (e) => { console.error('Diktat Fehler:', e); window.__dictRec = null; };
+                                            rec.onend = () => { window.__dictRec = null; };
+                                            window.__dictRec = rec;
+                                            rec.start();
+                                        }}
+                                        style={{
+                                            display: 'flex', alignItems: 'center', gap: '0.4rem',
+                                            padding: '0.35rem 0.8rem', borderRadius: '6px', border: 'none',
+                                            backgroundColor: 'rgba(14,165,233,0.15)',
+                                            color: '#38bdf8', cursor: 'pointer',
+                                            fontSize: '0.8rem', fontWeight: 700
+                                        }}
+                                        title="Diktieren starten / stoppen"
+                                    >
+                                        <Mic size={15} /> Diktieren
+                                    </button>
+                                </div>
+                                <textarea
+                                    className="form-input"
+                                    rows={3}
+                                    value={formData.cause || ''}
+                                    onChange={e => setFormData({ ...formData, cause: e.target.value })}
+                                    placeholder="Beschreibung der Ursache..."
+                                />
+                            </div>
+                        </div>
+
+                        <div>
+                            <h4 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--text-main)' }}>Fotos zur Ursache</h4>
+                            <div
+                                style={{
+                                    border: '2px dashed var(--border)', borderRadius: 'var(--radius)',
+                                    padding: '2rem 1rem', textAlign: 'center', cursor: 'pointer',
+                                    backgroundColor: 'rgba(255,255,255,0.02)', transition: 'all 0.2s',
+                                    marginBottom: '1rem', display: 'flex', flexDirection: 'column',
+                                    alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)'
+                                }}
+                                onClick={() => document.getElementById('file-upload-Schadenfotos-desktop').click()}
+                                onDragOver={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.backgroundColor = 'rgba(56, 189, 248, 0.1)'; e.currentTarget.style.color = 'var(--primary)'; }}
+                                onDragLeave={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.02)'; e.currentTarget.style.color = 'var(--text-muted)'; }}
+                                onDrop={(e) => handleCategoryDrop(e, 'Schadenfotos')}
+                            >
+                                <Plus size={24} style={{ marginBottom: '0.5rem', opacity: 0.5 }} />
+                                <span style={{ fontSize: '0.85rem' }}>Schadenfoto hochladen / Drop</span>
+                                <input id="file-upload-Schadenfotos-desktop" type="file" multiple accept="image/*" style={{ display: 'none' }} onChange={(e) => handleCategorySelect(e, 'Schadenfotos')} />
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                {formData.images.filter(img => img.assignedTo === 'Schadenfotos').map((item, idx) => (
+                                    <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem', backgroundColor: '#1E293B', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
+                                        <div style={{ width: '80px', height: '80px', flexShrink: 0, borderRadius: '4px', border: item.includeInReport !== false ? '2px solid #0F6EA3' : 'none', overflow: 'hidden' }}>
+                                            <img src={item.preview} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                        </div>
+                                        <div style={{ display: 'flex', alignItems: 'center', padding: '0 0.5rem', cursor: 'pointer' }}
+                                            onClick={() => setFormData(prev => ({ ...prev, images: prev.images.map(i => i.preview === item.preview ? { ...i, includeInReport: i.includeInReport === false } : i) }))}>
+                                            <input type="checkbox" checked={item.includeInReport !== false} readOnly style={{ width: '1.25rem', height: '1.25rem', cursor: 'pointer', accentColor: '#0F6EA3' }} />
+                                        </div>
+                                        <div style={{ flex: 1, fontWeight: 500, color: 'var(--text-main)' }}>
+                                            {item.name}
+                                            {item.includeInReport !== false && <div style={{ fontSize: '0.8rem', color: '#0F6EA3', fontWeight: 600 }}>In Bericht</div>}
+                                        </div>
+                                        <button type="button" className="btn btn-ghost" onClick={() => setFormData(prev => ({ ...prev, images: prev.images.filter(i => i !== item) }))} style={{ color: '#EF4444', padding: '0.5rem', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(239, 68, 68, 0.1)' }}><Trash size={18} /></button>
+                                    </div>
+                                ))}
+                                {formData.images.filter(img => img.assignedTo === 'Schadenfotos').length === 0 && (
+                                    <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.9rem', fontStyle: 'italic' }}>Keine Schadenfotos vorhanden.</div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {/* Massnahmen & Feststellungen - nur Desktop */}
                 {mode === 'desktop' && (formData.status === 'Schadenaufnahme' || formData.status === 'Leckortung') && (
