@@ -5081,7 +5081,7 @@ END:VCARD`;
                         </div>
                         <div className="card" style={{ padding: '1.5rem' }}>
                             <h3 className="section-header">
-                                <FileText size={18} /> Sonstiges
+                                <FileText size={18} /> Lieferantenrechnungen
                             </h3>
                             <div
                                 className="btn-glass"
@@ -5110,7 +5110,7 @@ END:VCARD`;
                                 }}>
                                     <Plus size={20} />
                                 </div>
-                                <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>Sonstiges Dokument hochladen / Drop</span>
+                                <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>Lieferantenrechnung hochladen / Drop</span>
                                 <input id="file-upload-Sonstiges-desktop" type="file" multiple accept="image/*,.heic,.heif,application/pdf" style={{ display: 'none' }} onChange={(e) => handleCategorySelect(e, 'Sonstiges')} />
                             </div>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
@@ -5134,7 +5134,7 @@ END:VCARD`;
                                         <button type="button" onClick={() => setFormData(prev => ({ ...prev, images: prev.images.filter(i => i !== item) }))} style={{ border: 'none', background: 'rgba(239, 68, 68, 0.1)', color: '#EF4444', cursor: 'pointer', padding: '6px', borderRadius: '50%', display: 'flex' }}><X size={14} /></button>
                                     </div>
                                 ))}
-                                {formData.images.filter(img => img.assignedTo === 'Sonstiges').length === 0 && <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem', fontStyle: 'italic' }}>Keine sonstigen Dokumente.</div>}
+                                {formData.images.filter(img => img.assignedTo === 'Sonstiges').length === 0 && <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem', fontStyle: 'italic' }}>Keine Lieferantenrechnungen vorhanden.</div>}
                             </div>
                         </div>
 
