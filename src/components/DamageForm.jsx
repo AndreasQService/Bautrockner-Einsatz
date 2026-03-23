@@ -3483,7 +3483,38 @@ END:VCARD`;
                                     </div>
 
                                     <div style={{ marginBottom: '1.25rem' }}>
-                                        <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 600, marginBottom: '0.5rem', display: 'block' }}>Beschreibung der Ursache</label>
+                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                                            <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 600 }}>Beschreibung der Ursache</label>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+                                                    if (!SR) { alert('Diktat wird von diesem Browser nicht unterstützt.'); return; }
+                                                    if (window.__dictRec) { window.__dictRec.stop(); window.__dictRec = null; return; }
+                                                    const rec = new SR();
+                                                    rec.lang = 'de-CH';
+                                                    rec.continuous = true;
+                                                    rec.interimResults = false;
+                                                    rec.onresult = (e) => {
+                                                        const text = Array.from(e.results).map(r => r[0].transcript).join(' ');
+                                                        setFormData(prev => ({ ...prev, cause: (prev.cause ? prev.cause + ' ' : '') + text }));
+                                                    };
+                                                    rec.onend = () => { window.__dictRec = null; };
+                                                    window.__dictRec = rec;
+                                                    rec.start();
+                                                }}
+                                                style={{
+                                                    display: 'flex', alignItems: 'center', gap: '0.3rem',
+                                                    padding: '0.3rem 0.7rem', borderRadius: '6px', border: 'none',
+                                                    backgroundColor: 'rgba(14,165,233,0.12)',
+                                                    color: '#38bdf8', cursor: 'pointer',
+                                                    fontSize: '0.75rem', fontWeight: 700
+                                                }}
+                                                title="Diktieren starten / stoppen"
+                                            >
+                                                <Mic size={14} /> Diktieren
+                                            </button>
+                                        </div>
                                         <textarea
                                             className="form-input"
                                             value={formData.cause || ''}
