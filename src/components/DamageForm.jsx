@@ -2292,6 +2292,25 @@ END:VCARD`;
                             </select>
                         </div>
 
+                        {/* Lieferantenrechnung Badge */}
+                        {mode === 'desktop' && formData.images?.some(img => img.assignedTo === 'Sonstiges') && (
+                            <div style={{
+                                display: 'flex', flexDirection: 'column', gap: '0.2rem'
+                            }}>
+                                <label style={{ fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#F59E0B', fontWeight: 700 }}>Rechnung</label>
+                                <div style={{
+                                    display: 'flex', alignItems: 'center', gap: '0.4rem',
+                                    padding: '0.3rem 0.7rem', borderRadius: '8px', height: '38px',
+                                    backgroundColor: 'rgba(245,158,11,0.15)',
+                                    border: '1.5px solid rgba(245,158,11,0.4)',
+                                    color: '#F59E0B', fontWeight: 700, fontSize: '0.78rem',
+                                    whiteSpace: 'nowrap'
+                                }}>
+                                    <FileText size={14} /> Lieferantenrechnung vorhanden
+                                </div>
+                            </div>
+                        )}
+
                         {/* Calendar Push Button */}
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
                             <label style={{ fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 700 }}>Export</label>
@@ -3864,7 +3883,7 @@ END:VCARD`;
                                                 <Edit3 size={16} /> Bearbeiten
                                             </button>
                                         </>
-                                    ) : (
+                                    ) : mode !== 'desktop' ? (
                                         <button
                                             type="button"
                                             onClick={(e) => {
@@ -3875,7 +3894,7 @@ END:VCARD`;
                                                 setShowMeasurementModal(true);
                                             }}
                                             style={{
-                                                padding: mode === 'technician' ? '0.8rem 0.5rem' : '0.4rem 0.6rem',
+                                                padding: '0.8rem 0.5rem',
                                                 borderRadius: '6px',
                                                 border: '1px solid #059669',
                                                 backgroundColor: 'rgba(16, 185, 129, 0.2)',
@@ -3884,17 +3903,17 @@ END:VCARD`;
                                                 alignItems: 'center',
                                                 justifyContent: 'center',
                                                 gap: '0.4rem',
-                                                fontSize: mode === 'technician' ? '1rem' : '0.75rem',
+                                                fontSize: '1rem',
                                                 cursor: 'pointer',
                                                 flex: 1,
-                                                minHeight: mode === 'technician' ? '50px' : 'auto',
+                                                minHeight: '50px',
                                                 fontWeight: 700,
-                                                gridColumn: mode === 'technician' ? 'span 2' : 'auto'
+                                                gridColumn: 'span 2'
                                             }}
                                         >
                                             <Plus size={18} /> Messung starten
                                         </button>
-                                    )}
+                                    ) : null}
 
                                     {/* History Button */}
                                     {room.measurementHistory && room.measurementHistory.length > 0 && (
@@ -5079,6 +5098,19 @@ END:VCARD`;
                                 {formData.images.filter(img => img.assignedTo === 'Arbeitsrappporte').length === 0 && <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.9rem', fontStyle: 'italic' }}>Keine Arbeitsrapporte vorhanden.</div>}
                             </div>
                         </div>
+                        {formData.images?.some(img => img.assignedTo === 'Sonstiges') && (
+                            <div style={{
+                                display: 'flex', alignItems: 'center', gap: '0.75rem',
+                                padding: '0.75rem 1.25rem', borderRadius: '10px',
+                                backgroundColor: 'rgba(245,158,11,0.12)',
+                                border: '1.5px solid rgba(245,158,11,0.4)',
+                                color: '#F59E0B', fontWeight: 700, fontSize: '0.9rem',
+                                marginBottom: '0.75rem'
+                            }}>
+                                <FileText size={18} />
+                                Lieferantenrechnung vorhanden
+                            </div>
+                        )}
                         <div className="card" style={{ padding: '1.5rem' }}>
                             <h3 className="section-header">
                                 <FileText size={18} /> Lieferantenrechnungen

@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Filter, MapPin, Calendar, ArrowRight, Search, Trash2 } from 'lucide-react'
+import { Filter, MapPin, Calendar, ArrowRight, Search, Trash2, FileText } from 'lucide-react'
 
 // Helper to calculate days difference
 const getDaysDiff = (startDate) => {
@@ -547,12 +547,14 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
                                     <th style={{ minWidth: '120px', position: 'sticky', top: 0, zIndex: 20, backgroundColor: 'var(--background)', textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.05em' }}>Kunde von</th>
 
                                     <th style={{ width: '80px', textAlign: 'center', position: 'sticky', top: 0, zIndex: 20, backgroundColor: 'var(--background)', textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.05em' }}>Geräte</th>
+                                    <th style={{ width: '90px', textAlign: 'center', position: 'sticky', top: 0, zIndex: 20, backgroundColor: 'var(--background)', textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.05em' }}>Rechnung</th>
                                     <th style={{ width: '80px', position: 'sticky', top: 0, zIndex: 20, backgroundColor: 'var(--background)' }}></th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {paginatedReports.map((report) => {
                                     const activeDevices = report.equipment ? report.equipment.length : 0;
+                                    const hasLieferantenrechnung = report.images?.some(img => img.assignedTo === 'Sonstiges');
                                     return (
                                         <tr key={report.id} onClick={() => onSelectReport(report)} style={{ cursor: 'pointer' }}>
                                             <td style={{ fontWeight: 600, fontSize: '0.9rem' }}>{report.projectNumber || report.projectTitle || report.id}</td>
@@ -614,6 +616,23 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
                                                     </span>
                                                 ) : (
                                                     <span style={{ color: 'var(--border)' }}>-</span>
+                                                )}
+                                            </td>
+                                            <td style={{ textAlign: 'center' }}>
+                                                {hasLieferantenrechnung && (
+                                                    <span title="Lieferantenrechnung vorhanden" style={{
+                                                        display: 'inline-flex', alignItems: 'center', gap: '0.25rem',
+                                                        backgroundColor: 'rgba(245,158,11,0.15)',
+                                                        color: '#F59E0B',
+                                                        padding: '0.2rem 0.5rem',
+                                                        borderRadius: '6px',
+                                                        fontSize: '0.7rem',
+                                                        fontWeight: 700,
+                                                        border: '1px solid rgba(245,158,11,0.3)',
+                                                        whiteSpace: 'nowrap'
+                                                    }}>
+                                                        <FileText size={11} /> Rechnung
+                                                    </span>
                                                 )}
                                             </td>
                                             <td>
