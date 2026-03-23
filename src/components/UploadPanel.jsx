@@ -155,10 +155,11 @@ HANDWERKER-REGEL
 
 SCHADENORT-REGEL
 - Der Schadenort hat Vorrang gegenüber Absenderadresse/Verwaltungsadresse.
-- "bezeichnung" = Wohnungs- oder Lagebezeichnung
+- "bezeichnung" = Wohnungs- oder Lagebezeichnung (z.B. "B1804 Penthouse", "2. OG links")
 - "plz" = PLZ des Schadenorts – niemals kombiniert als "plz_ort"
 - "ort" = Ort des Schadenorts – niemals kombiniert als "plz_ort"
 - Schadenort nicht aus Eigentümer- oder Verwaltungsadresse ableiten.
+- PLZ/Ort DÜRFEN aus deinem Wissen über Schweizer Geographie ergänzt werden, wenn die Strasse eindeutig einem Ort zugeordnet werden kann (z.B. Leutschenbachstrasse → PLZ 8050, Ort Zürich). Nur wenn wirklich keine Zuordnung möglich ist, Felder leer lassen.
 
 SCHADEN-REGEL
 - "art" = kurze Bezeichnung (z.B. "Wasserschaden", "Leckage", "Rohrbruch")
