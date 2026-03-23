@@ -356,6 +356,35 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         recognition.start();
     };
 
+    // Feststellungen Diktat
+    const [isListeningFindings, setIsListeningFindings] = useState(false);
+    const recognitionRefFindings = useRef(null);
+
+    const toggleFindingsListening = () => {
+        if (isListeningFindings) {
+            recognitionRefFindings.current?.stop();
+            setIsListeningFindings(false);
+            return;
+        }
+        const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SR) { alert('Ihr Browser unterstützt keine Spracherkennung.'); return; }
+        const rec = new SR();
+        rec.lang = 'de-DE';
+        rec.interimResults = false;
+        rec.continuous = false;
+        rec.onstart = () => setIsListeningFindings(true);
+        rec.onend = () => setIsListeningFindings(false);
+        rec.onerror = (e) => { console.error('Speech error', e.error); setIsListeningFindings(false); };
+        rec.onresult = (event) => {
+            const transcript = event.results[0][0].transcript;
+            if (transcript) {
+                setFormData(prev => ({ ...prev, findings: (prev.findings ? prev.findings + ' ' : '') + transcript }));
+            }
+        };
+        recognitionRefFindings.current = rec;
+        rec.start();
+    };
+
     const addMeasure = (text) => {
         const current = formData.measures ? formData.measures + '\n' : '';
         setFormData(prev => ({ ...prev, measures: current + text }));
@@ -3758,8 +3787,40 @@ END:VCARD`;
 
                         {/* Cause / Description */}
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem', marginBottom: '2rem' }}>
-                            <label style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                                <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>Schadenursache</span>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                    <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>Schadenursache</span>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+                                            if (!SR) { alert('Diktat wird von diesem Browser nicht unterstützt.'); return; }
+                                            if (window.__dictRec) { window.__dictRec.stop(); window.__dictRec = null; return; }
+                                            const rec = new SR();
+                                            rec.lang = 'de-DE';
+                                            rec.continuous = true;
+                                            rec.interimResults = false;
+                                            rec.onresult = (e) => {
+                                                const text = Array.from(e.results).map(r => r[0].transcript).join(' ');
+                                                setFormData(prev => ({ ...prev, cause: (prev.cause ? prev.cause + ' ' : '') + text }));
+                                            };
+                                            rec.onerror = (e) => { console.error('Diktat Fehler:', e); window.__dictRec = null; };
+                                            rec.onend = () => { window.__dictRec = null; };
+                                            window.__dictRec = rec;
+                                            rec.start();
+                                        }}
+                                        style={{
+                                            display: 'flex', alignItems: 'center', gap: '0.4rem',
+                                            padding: '0.35rem 0.8rem', borderRadius: '6px', border: 'none',
+                                            backgroundColor: 'rgba(14,165,233,0.15)',
+                                            color: '#38bdf8', cursor: 'pointer',
+                                            fontSize: '0.8rem', fontWeight: 700
+                                        }}
+                                        title="Diktieren starten / stoppen"
+                                    >
+                                        <Mic size={15} /> Diktieren
+                                    </button>
+                                </div>
                                 <textarea
                                     className="form-input"
                                     rows={3}
@@ -3767,7 +3828,7 @@ END:VCARD`;
                                     onChange={e => setFormData({ ...formData, cause: e.target.value })}
                                     placeholder="Beschreibung der Ursache..."
                                 />
-                            </label>
+                            </div>
                         </div>
 
                         {/* Photos (Schadenfotos) */}
@@ -4523,7 +4584,24 @@ END:VCARD`;
                         </h3>
 
                         <div style={{ marginBottom: '1.5rem', width: '100%' }}>
-                            <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.4rem', display: 'block', fontWeight: 600 }}>Feststellungen</label>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                                <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600 }}>Feststellungen</label>
+                                <button
+                                    type="button"
+                                    className={`btn btn-ghost ${isListeningFindings ? 'listening' : ''}`}
+                                    style={{
+                                        color: isListeningFindings ? '#ef4444' : 'var(--text-muted)',
+                                        padding: '2px 8px', fontSize: '0.8rem',
+                                        display: 'flex', alignItems: 'center', gap: '4px',
+                                        border: '1px solid var(--border)', borderRadius: '4px'
+                                    }}
+                                    onClick={toggleFindingsListening}
+                                    title="Diktieren"
+                                >
+                                    {isListeningFindings ? <MicOff size={14} /> : <Mic size={14} />}
+                                    <span>Diktieren</span>
+                                </button>
+                            </div>
                             <textarea
                                 className="form-input"
                                 style={{ minHeight: '120px', resize: 'vertical', width: '100%' }}
