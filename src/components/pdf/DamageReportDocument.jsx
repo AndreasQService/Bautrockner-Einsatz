@@ -86,23 +86,23 @@ const DamageReportDocument = ({ data }) => {
                 <PDFMetaData data={data} />
 
                 {/* Karte und/oder Aussenbild unter den Projektinfos */}
-                {(data.staticMapUrl || data.exteriorPhoto) && (
-                    <View wrap={false}>
+                {(data.staticMapUrl || (data.exteriorPhoto && data.exteriorPhoto.startsWith('data:'))) && (
+                    <View>
                         <View style={styles.divider} />
                         <View style={{ flexDirection: 'row', gap: 6, marginBottom: 6, marginTop: 6 }}>
                             {data.staticMapUrl && (
                                 <Image
                                     src={data.staticMapUrl}
                                     style={{
-                                        flex: data.exteriorPhoto ? 1 : undefined,
-                                        width: data.exteriorPhoto ? undefined : '100%',
+                                        flex: (data.exteriorPhoto && data.exteriorPhoto.startsWith('data:')) ? 1 : undefined,
+                                        width: (data.exteriorPhoto && data.exteriorPhoto.startsWith('data:')) ? undefined : '100%',
                                         height: 160,
                                         objectFit: 'cover',
                                         borderRadius: 4,
                                     }}
                                 />
                             )}
-                            {data.exteriorPhoto && (
+                            {data.exteriorPhoto && data.exteriorPhoto.startsWith('data:') && (
                                 <Image
                                     src={data.exteriorPhoto}
                                     style={{
@@ -118,6 +118,7 @@ const DamageReportDocument = ({ data }) => {
                         <View style={styles.divider} />
                     </View>
                 )}
+
 
                 <DescriptionSection data={data} />
 

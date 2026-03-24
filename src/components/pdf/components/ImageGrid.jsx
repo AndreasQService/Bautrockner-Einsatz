@@ -18,9 +18,9 @@ const ImageGrid = ({ images, showName = false, imageStyle = styles.image, contai
                             </View>
                         )}
                         {showName ? (
-                            img.name && <Text style={styles.imageDescription}>{img.name}</Text>
+                            img.name && <Text style={styles.imageDescription}>{img.name.length > 80 ? img.name.substring(0, 80) + '…' : img.name}</Text>
                         ) : (
-                            img.description && <Text style={styles.imageDescription}>{img.description}</Text>
+                            img.description && <Text style={styles.imageDescription}>{img.description.length > 80 ? img.description.substring(0, 80) + '…' : img.description}</Text>
                         )}
                     </View>
 

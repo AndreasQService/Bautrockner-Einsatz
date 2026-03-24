@@ -64,33 +64,13 @@ const PDFMetaData = ({ data }) => {
                         <Text style={styles.metaValue}>{`${data.zip || ''} ${data.city || ''}`.trim()}</Text>
                     </View>
                 )}
-                {/* Lage / Details - Improved Display */}
-                {(() => {
-                    let details = [
-                        data.locationDetails,
-                        data.contacts?.[0]?.floor,
-                        data.contacts?.[0]?.stockwerk,
-                        data.contacts?.[0]?.apartment
-                    ].filter(p => p !== null && p !== undefined && String(p).trim() !== '').map(p => String(p).trim());
-
-                    // Echte Duplikate entfernen
-                    details = [...new Set(details)];
-
-                    // Kürzere Teilstrings entfernen (z.B. "2. OG" entfernen, wenn "2. OG Whg Schwarz" schon existiert)
-                    const uniqueDetails = details.filter((d1, i, arr) => {
-                        return !arr.some((d2, j) => i !== j && d2.toLowerCase().includes(d1.toLowerCase()) && d2 !== d1);
-                    });
-
-                    if (uniqueDetails.length > 0) {
-                        return (
-                            <View style={styles.metaRow}>
-                                <Text style={styles.metaLabel}>Lage / Details:</Text>
-                                <Text style={styles.metaValue}>{uniqueDetails.join(', ')}</Text>
-                            </View>
-                        );
-                    }
-                    return null;
-                })()}
+                {/* Lage / Details */}
+                {data.locationDetails && String(data.locationDetails).trim() !== '' && (
+                    <View style={styles.metaRow}>
+                        <Text style={styles.metaLabel}>Lage / Details:</Text>
+                        <Text style={styles.metaValue}>{String(data.locationDetails).trim()}</Text>
+                    </View>
+                )}
                 {data.clientSource && (
                     <View style={styles.metaRow}>
                         <Text style={styles.metaLabel}>Sachbearbeiter:</Text>

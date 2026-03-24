@@ -3,7 +3,7 @@ import { StyleSheet } from '@react-pdf/renderer';
 export const styles = StyleSheet.create({
     page: {
         padding: 30,
-        paddingBottom: 90, // Increased to provide more safety for the footer
+        paddingBottom: 60, // Footer is at bottom:30, height ~50 → 60 is sufficient
         fontFamily: 'Helvetica',
         fontSize: 10,
         color: '#000000',

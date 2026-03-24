@@ -107,6 +107,7 @@ const EmailImportModalV2 = ({ onClose, onImport, audioDevices, selectedDeviceId,
    - BETREFF als Quelle: Wenn der Email-Betreff eine Strasse enthält (Muster: "Wasserschaden Strassename Nr"), IST DAS DER SCHADENORT. Extrahiere Strasse + Hausnummer daraus.
    - Beispiel: "Betreff: Wasserschaden Leutschenbachstrasse 30 B1804" → schadenort.strasse_nr = "Leutschenbachstrasse 30", schadenort.etage_wohnung = "B1804"
    - WOHNUNGSNUMMERN erkennen: Codes wie "B1804", "EG", "3OG", "DG", "W12", "OG3", "C204" gehören in schadenort.etage_wohnung, NICHT in strasse_nr.
+   - ETAGE_WOHNUNG – NUR EINE ANGABE: Dieses Feld darf NUR DIE PRIMÄRE/ERSTE Schadenlokalität enthalten. Wenn mehrere Wohnungen oder Etagen erwähnt werden (z.B. "3. OG rechts" UND "EG links"), nimm NUR die erstgenannte oder spezifischste. KEINE Komma-Listen! KEIN "3. OG rechts Wohnung Strehler, EG links" – nur "3. OG rechts Wohnung Strehler".
    - PLZ/ORT: PLZ separat in schadenort.plz, Ort separat in schadenort.ort. Falls nicht im Text, leer lassen. NICHT raten! NIEMALS kombiniert als plz_ort!
    - MEHRFACH-QUELLEN: Die Adresse kann auch in einer Signatur, Cc-Liste oder Weiterleitungszeile vorkommen ("Betreff:", "Subject:", "Objekt:").
 

@@ -18,7 +18,7 @@ const DescriptionSection = ({ data }) => {
     if (!hasDescription && !hasUnassignedImages) return null;
 
     return (
-        <View wrap={false}>
+        <View>
 
             {/* Schadensbeschreibung – Titel + Text nur wenn wirklich Beschreibung vorhanden */}
             {hasUnassignedImages && !hasDescription && (
