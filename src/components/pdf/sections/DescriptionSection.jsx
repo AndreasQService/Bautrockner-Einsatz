@@ -15,21 +15,10 @@ const DescriptionSection = ({ data }) => {
     const hasUnassignedImages = unassignedImages.length > 0;
     const hasDescription = data.description && data.description.trim().length > 0 && data.includeDescriptionInReport !== false;
 
-    if (!data.exteriorPhoto && !hasDescription && !hasUnassignedImages) return null;
+    if (!hasDescription && !hasUnassignedImages) return null;
 
     return (
         <View wrap={false}>
-            {/* Hero / Exterior Photo */}
-            {data.exteriorPhoto && (
-                <View style={{ marginBottom: 20, alignItems: 'flex-start' }} wrap={false}>
-                    <View style={{ width: '100%' }}>
-                        <View style={styles.imageContainer}>
-                            <Image src={data.exteriorPhoto} style={[styles.image, { height: 250 }]} />
-                            <Text style={styles.imageDescription}>Außenansicht / Übersicht</Text>
-                        </View>
-                    </View>
-                </View>
-            )}
 
             {/* Schadensbeschreibung – Titel + Text nur wenn wirklich Beschreibung vorhanden */}
             {hasUnassignedImages && !hasDescription && (

@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Document, Page } from '@react-pdf/renderer';
+import { Document, Page, View, Image } from '@react-pdf/renderer';
 
 // Import styles
 import { styles } from './PDFStyles';
@@ -84,6 +84,40 @@ const DamageReportDocument = ({ data }) => {
                 <PDFHeader data={data} />
 
                 <PDFMetaData data={data} />
+
+                {/* Karte und/oder Aussenbild unter den Projektinfos */}
+                {(data.staticMapUrl || data.exteriorPhoto) && (
+                    <View wrap={false}>
+                        <View style={styles.divider} />
+                        <View style={{ flexDirection: 'row', gap: 6, marginBottom: 6, marginTop: 6 }}>
+                            {data.staticMapUrl && (
+                                <Image
+                                    src={data.staticMapUrl}
+                                    style={{
+                                        flex: data.exteriorPhoto ? 1 : undefined,
+                                        width: data.exteriorPhoto ? undefined : '100%',
+                                        height: 160,
+                                        objectFit: 'cover',
+                                        borderRadius: 4,
+                                    }}
+                                />
+                            )}
+                            {data.exteriorPhoto && (
+                                <Image
+                                    src={data.exteriorPhoto}
+                                    style={{
+                                        flex: data.staticMapUrl ? 1 : undefined,
+                                        width: data.staticMapUrl ? undefined : '100%',
+                                        height: 160,
+                                        objectFit: 'cover',
+                                        borderRadius: 4,
+                                    }}
+                                />
+                            )}
+                        </View>
+                        <View style={styles.divider} />
+                    </View>
+                )}
 
                 <DescriptionSection data={data} />
 

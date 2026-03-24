@@ -19,48 +19,38 @@ const PDFMetaData = ({ data }) => {
             {/* Meta Data */}
             <View style={styles.divider} />
             <View style={styles.metaSection}>
-                <View style={{ flexDirection: 'row', gap: 20 }}>
-                    <View style={{ flex: 1 }}>
-                        {data.projectNumber && (
-                            <View style={styles.metaRow}>
-                                <Text style={styles.metaLabel}>Projektnummer:</Text>
-                                <Text style={styles.metaValue}>{data.projectNumber}</Text>
-                            </View>
-                        )}
-                        {data.orderNumber && (
-                            <View style={styles.metaRow}>
-                                <Text style={styles.metaLabel}>Auftragsnummer:</Text>
-                                <Text style={styles.metaValue}>{data.orderNumber}</Text>
-                            </View>
-                        )}
-                        {data.damageNumber && (
-                            <View style={styles.metaRow}>
-                                <Text style={styles.metaLabel}>Schaden-Nr:</Text>
-                                <Text style={styles.metaValue}>{data.damageNumber}</Text>
-                            </View>
-                        )}
-                    </View>
-                    <View style={{ flex: 1 }}>
-                        <View style={styles.metaRow}>
-                            <Text style={styles.metaLabel}>Berichtsdatum:</Text>
-                            <Text style={styles.metaValue}>{new Date().toLocaleDateString('de-CH')}</Text>
-                        </View>
-                        {data.damageReportDate && (
-                            <View style={styles.metaRow}>
-                                <Text style={styles.metaLabel}>Eingangsdatum:</Text>
-                                <Text style={styles.metaValue}>{new Date(data.damageReportDate).toLocaleDateString('de-CH')}</Text>
-                            </View>
-                        )}
-                        {data.damageDate && (
-                            <View style={styles.metaRow}>
-                                <Text style={styles.metaLabel}>Schadendatum:</Text>
-                                <Text style={styles.metaValue}>{new Date(data.damageDate).toLocaleDateString('de-CH')}</Text>
-                            </View>
-                        )}
-                    </View>
+                <View style={styles.metaRow}>
+                    <Text style={styles.metaLabel}>Projektnummer:</Text>
+                    <Text style={styles.metaValue}>{data.projectNumber || ''}</Text>
                 </View>
-
-                <View style={{ height: 10 }} />
+                {data.orderNumber && (
+                    <View style={styles.metaRow}>
+                        <Text style={styles.metaLabel}>Auftragsnummer:</Text>
+                        <Text style={styles.metaValue}>{data.orderNumber}</Text>
+                    </View>
+                )}
+                {data.damageNumber && (
+                    <View style={styles.metaRow}>
+                        <Text style={styles.metaLabel}>Schaden-Nr:</Text>
+                        <Text style={styles.metaValue}>{data.damageNumber}</Text>
+                    </View>
+                )}
+                <View style={styles.metaRow}>
+                    <Text style={styles.metaLabel}>Berichtsdatum:</Text>
+                    <Text style={styles.metaValue}>{new Date().toLocaleDateString('de-CH')}</Text>
+                </View>
+                {data.damageReportDate && (
+                    <View style={styles.metaRow}>
+                        <Text style={styles.metaLabel}>Eingangsdatum:</Text>
+                        <Text style={styles.metaValue}>{new Date(data.damageReportDate).toLocaleDateString('de-CH')}</Text>
+                    </View>
+                )}
+                {data.damageDate && (
+                    <View style={styles.metaRow}>
+                        <Text style={styles.metaLabel}>Schadendatum:</Text>
+                        <Text style={styles.metaValue}>{new Date(data.damageDate).toLocaleDateString('de-CH')}</Text>
+                    </View>
+                )}
 
                 {data.street && (
                     <View style={styles.metaRow}>

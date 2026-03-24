@@ -1623,6 +1623,57 @@ END:VCARD`;
                 }
             } catch (e) { console.error("Logo load error", e); }
 
+            // Build Static Map via OSM tiles (fetch blob → objectURL → canvas, no CORS taint)
+            let staticMapUrl = null;
+            try {
+                const mapAddress = dataToUse.street
+                    ? `${dataToUse.street}, ${dataToUse.zip || ''} ${dataToUse.city || ''}`
+                    : dataToUse.address;
+                if (mapAddress) {
+                    const geoResp = await fetch(`/nominatim/search?q=${encodeURIComponent(mapAddress)}&format=json&limit=1`);
+                    const geoData = await geoResp.json();
+                    if (geoData && geoData.length > 0) {
+                        const lat = parseFloat(geoData[0].lat);
+                        const lon = parseFloat(geoData[0].lon);
+                        const zoom = 15;
+                        const lon2tile = (l, z) => Math.floor((l + 180) / 360 * Math.pow(2, z));
+                        const lat2tile = (l, z) => Math.floor((1 - Math.log(Math.tan(l * Math.PI / 180) + 1 / Math.cos(l * Math.PI / 180)) / Math.PI) / 2 * Math.pow(2, z));
+                        const tileX = lon2tile(lon, zoom);
+                        const tileY = lat2tile(lat, zoom);
+                        const cols = 3, rows = 2, tileSize = 256;
+                        const offX = Math.floor(cols / 2), offY = Math.floor(rows / 2);
+                        const canvas = document.createElement('canvas');
+                        canvas.width = cols * tileSize;
+                        canvas.height = rows * tileSize;
+                        const ctx = canvas.getContext('2d');
+                        // Fetch tiles as blobs → objectURLs (avoids canvas CORS taint)
+                        await Promise.all(
+                            Array.from({ length: rows }, (_, r) =>
+                                Array.from({ length: cols }, (_, c) =>
+                                    fetch(`/osm-tile/${zoom}/${tileX + c - offX}/${tileY + r - offY}.png`)
+                                        .then(r => r.blob())
+                                        .then(blob => new Promise(res => {
+                                            const oUrl = URL.createObjectURL(blob);
+                                            const img = new Image();
+                                            img.onload = () => { ctx.drawImage(img, c * tileSize, r * tileSize); URL.revokeObjectURL(oUrl); res(); };
+                                            img.onerror = () => { URL.revokeObjectURL(oUrl); res(); };
+                                            img.src = oUrl;
+                                        }))
+                                        .catch(() => Promise.resolve())
+                                )
+                            ).flat()
+                        );
+                        // Red pin marker
+                        const cx = offX * tileSize + tileSize / 2;
+                        const cy = offY * tileSize + tileSize / 2;
+                        ctx.beginPath(); ctx.arc(cx, cy - 10, 9, 0, 2 * Math.PI);
+                        ctx.fillStyle = '#e53e3e'; ctx.fill();
+                        ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+                        staticMapUrl = canvas.toDataURL('image/jpeg', 0.9);
+                    }
+                }
+            } catch (e) { console.warn("Static map error", e); }
+
             // Pre-process images - Filter out PDFs and non-renderable documents
             console.log("PDF GEN: Starting image processing...");
             const tempProcessedImages = await Promise.all(
@@ -1680,6 +1731,7 @@ END:VCARD`;
                 damageTypeImage: processedHeroImages[0] || null, // Primary one for fallback
                 exteriorPhoto: processedExteriorPhoto,
                 logo: logoData,
+                staticMapUrl: staticMapUrl,
             };
 
             // Generate Blob using @react-pdf
@@ -1786,18 +1838,30 @@ END:VCARD`;
         }));
     };
 
-    const handleExteriorPhotoUpload = (e) => {
+    const handleExteriorPhotoUpload = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
 
+        // Show base64 preview immediately
         const reader = new FileReader();
         reader.onloadend = () => {
-            setFormData(prev => ({
-                ...prev,
-                exteriorPhoto: reader.result
-            }));
+            setFormData(prev => ({ ...prev, exteriorPhoto: reader.result }));
         };
         reader.readAsDataURL(file);
+
+        // Upload to Supabase Storage and replace with public URL
+        if (supabase) {
+            try {
+                const ext = file.name.split('.').pop();
+                const fileName = `cases/${formData.id || 'temp'}/exterior/${Date.now()}.${ext}`;
+                const { error } = await supabase.storage.from('case-files').upload(fileName, file);
+                if (error) throw error;
+                const { data: { publicUrl } } = supabase.storage.from('case-files').getPublicUrl(fileName);
+                setFormData(prev => ({ ...prev, exteriorPhoto: publicUrl }));
+            } catch (err) {
+                console.warn('Exterior photo upload failed, keeping base64:', err);
+            }
+        }
     };
 
     const removeExteriorPhoto = () => {

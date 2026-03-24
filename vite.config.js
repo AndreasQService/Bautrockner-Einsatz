@@ -97,6 +97,18 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/openai-api/, ''),
       },
+      '/osm-tile': {
+        target: 'https://tile.openstreetmap.org',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/osm-tile/, ''),
+        headers: { 'User-Agent': 'QTool/1.0 (q-service.ch)' },
+      },
+      '/nominatim': {
+        target: 'https://nominatim.openstreetmap.org',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/nominatim/, ''),
+        headers: { 'User-Agent': 'QTool/1.0 (q-service.ch)', 'Accept-Language': 'de' },
+      },
     }
   }
 })
