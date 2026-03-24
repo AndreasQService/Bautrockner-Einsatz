@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Filter, MapPin, Calendar, ArrowRight, Search, Trash2, FileText } from 'lucide-react'
+import InboxTodo from './InboxTodo'
 
 // Helper to calculate days difference
 const getDaysDiff = (startDate) => {
@@ -451,6 +452,7 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
             {/* Pass Filtered Reports to Monitors (only when not in Archive OR Technician Mode) */}
             {!showArchive && mode !== 'technician' && (
                 <>
+                    <InboxTodo />
                     <MeasurementControlOverview reports={filteredReports} onSelectReport={onSelectReport} />
                     <DryingMonitor reports={filteredReports} onSelectReport={onSelectReport} />
                 </>

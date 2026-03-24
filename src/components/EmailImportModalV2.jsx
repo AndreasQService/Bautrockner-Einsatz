@@ -104,11 +104,13 @@ const EmailImportModalV2 = ({ onClose, onImport, audioDevices, selectedDeviceId,
    AUFTRAGGEBER-ADRESSE: Adresse der Auftraggeber-Firma gehört in 'auftrag_verwaltung.adresse', 'auftrag_verwaltung.plz' und 'auftrag_verwaltung.ort'. NICHT in 'schadenort'!
 
 2b. SCHADENORT-EXTRAKTION (PFLICHT):
-   - BETREFF als Quelle: Wenn der Email-Betreff eine Strasse enthält (Muster: "Wasserschaden Strassename Nr"), IST DAS DER SCHADENORT. Extrahiere Strasse + Hausnummer daraus.
+   - BETREFF als Quelle: Wenn der Email-Betreff eine Strasse enthält (Muster: "Wasserschaden Strassename Nr"), IST DAS DER SCHADENORT. Extrahiere Strasse + Hausnummer daraus. Wenn nach der Hausnummer noch ein Ortsname folgt (z.B. "Bühlwiesenstrasse 6, Dübendorf"), extrahiere diesen als schadenort.ort.
    - Beispiel: "Betreff: Wasserschaden Leutschenbachstrasse 30 B1804" → schadenort.strasse_nr = "Leutschenbachstrasse 30", schadenort.etage_wohnung = "B1804"
+   - Beispiel: "Betreff: Wasser tropft Bühlwiesenstrasse 6, Dübendorf" → schadenort.strasse_nr = "Bühlwiesenstrasse 6", schadenort.ort = "Dübendorf"
    - WOHNUNGSNUMMERN erkennen: Codes wie "B1804", "EG", "3OG", "DG", "W12", "OG3", "C204" gehören in schadenort.etage_wohnung, NICHT in strasse_nr.
    - ETAGE_WOHNUNG – NUR EINE ANGABE: Dieses Feld darf NUR DIE PRIMÄRE/ERSTE Schadenlokalität enthalten. Wenn mehrere Wohnungen oder Etagen erwähnt werden (z.B. "3. OG rechts" UND "EG links"), nimm NUR die erstgenannte oder spezifischste. KEINE Komma-Listen! KEIN "3. OG rechts Wohnung Strehler, EG links" – nur "3. OG rechts Wohnung Strehler".
-   - PLZ/ORT: PLZ separat in schadenort.plz, Ort separat in schadenort.ort. Falls nicht im Text, leer lassen. NICHT raten! NIEMALS kombiniert als plz_ort!
+   - AUFLISTUNG MÖGLICHER WOHNUNGEN: Wenn eine Liste von "möglichen" oder "betroffenen" Wohnungen vorhanden ist (z.B. "EG rechts, Banz", "1 OG rechts, Gantner"), nimm immer die ERSTE in der Liste (z.B. "EG rechts"). Lass das Feld NIEMALS leer, wenn Wohnungsangaben im Text vorhanden sind.
+   - PLZ/ORT: PLZ separat in schadenort.plz, Ort separat in schadenort.ort. Wenn die PLZ NICHT im Text steht, aber der Ort eindeutig identifizierbar ist, ergänze die Schweizer PLZ aus deinem Wissen (z.B. Dübendorf=8600, Zürich=8001, Winterthur=8400, Bern=3000, Basel=4051). NIEMALS kombiniert als plz_ort!
    - MEHRFACH-QUELLEN: Die Adresse kann auch in einer Signatur, Cc-Liste oder Weiterleitungszeile vorkommen ("Betreff:", "Subject:", "Objekt:").
 
 3. ROLLEN-LOGIK (STRIKTE REGELN):
@@ -164,7 +166,9 @@ AUSGABE-FORMAT (JSON):
     {
       "name": "",
       "rolle": "Handw. | Verw. | Mieter | Eig. | HW",
-      "telefon": "+41 XX XXX XX XX"
+      "telefon": "+41 XX XXX XX XX",
+      "etage": "",
+      "email": ""
     }
   ],
   "gap_analysis": []

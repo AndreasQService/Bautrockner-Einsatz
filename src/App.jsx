@@ -289,9 +289,10 @@ function App() {
     const client = importedData.auftrag_verwaltung?.firma || importedData.client || '';
     const street = importedData.schadenort?.strasse_nr || importedData.street || '';
 
-    let zip = importedData.zip || '';
-    let city = importedData.city || '';
-    if (importedData.schadenort?.plz_ort) {
+    // Schadenort PLZ + Ort
+    let zip = importedData.zip || importedData.schadenort?.plz || '';
+    let city = importedData.city || importedData.schadenort?.ort || '';
+    if (!zip && !city && importedData.schadenort?.plz_ort) {
       const parts = String(importedData.schadenort.plz_ort).trim().split(/\s+/);
       if (parts.length >= 2 && /^\d{4,5}$/.test(parts[0])) {
         zip = parts[0];
@@ -301,11 +302,11 @@ function App() {
       }
     }
 
-    // Auftraggeber-Adresse
+    // Verwaltungs-Adresse PLZ + Ort
     let clientStreet = importedData.auftrag_verwaltung?.adresse || '';
-    let clientZip = '';
-    let clientCity = '';
-    if (importedData.auftrag_verwaltung?.plz_ort) {
+    let clientZip = importedData.auftrag_verwaltung?.plz || '';
+    let clientCity = importedData.auftrag_verwaltung?.ort || '';
+    if (!clientZip && !clientCity && importedData.auftrag_verwaltung?.plz_ort) {
       const clientParts = String(importedData.auftrag_verwaltung.plz_ort).trim().split(/\s+/);
       if (clientParts.length >= 2 && /^\d{4,5}$/.test(clientParts[0])) {
         clientZip = clientParts[0];
@@ -358,9 +359,10 @@ function App() {
         return {
           name: c.name || '',
           phone: c.telefon || '',
+          email: c.email || '',
           role: mappedRole,
-          apartment: '',
-          floor: ''
+          apartment: c.etage || '',
+          floor: c.etage || ''
         };
       }),
       rooms: [],
