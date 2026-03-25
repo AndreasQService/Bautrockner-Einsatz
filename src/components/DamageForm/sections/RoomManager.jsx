@@ -255,51 +255,53 @@ export default function RoomManager({
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                                     <select
                                         className="form-input"
-                                        value={newRoom.apartment && ![...new Set([
-                                            ...formData.rooms.map(r => r.apartment).filter(Boolean),
-                                            ...(formData.contacts || []).filter(c => c.role === 'Mieter' || c.role === 'Eigentümer').map(c => c.name).filter(Boolean)
-                                        ])].sort().includes(newRoom.apartment) ? 'Sonstiges' : newRoom.apartment}
+                                        value={newRoom.apartment || ''}
                                         onChange={(e) => {
                                             const val = e.target.value;
-                                            if (val === 'Sonstiges') {
-                                                setNewRoom(prev => ({ ...prev, apartment: '' }));
-                                            } else {
-                                                let relatedStockwerk = '';
+                                            if (val === '__neue__') {
+                                                setNewRoom(prev => ({ ...prev, apartment: '__neue__', apartmentCustom: '', stockwerk: '' }));
+                                            } else if (val) {
                                                 const matchingContact = (formData.contacts || []).find(c => c.name === val);
-                                                if (matchingContact) {
-                                                    relatedStockwerk = matchingContact.floor || matchingContact.apartment || '';
-                                                } else {
-                                                    const existingRoom = formData.rooms.find(r => r.apartment === val);
-                                                    if (existingRoom) {
-                                                        relatedStockwerk = existingRoom.stockwerk || '';
-                                                    }
-                                                }
-                                                setNewRoom(prev => ({ ...prev, apartment: val, stockwerk: relatedStockwerk || prev.stockwerk }));
+                                                const existingRoom = formData.rooms.find(r => r.apartment === val);
+                                                const stock = matchingContact?.floor || matchingContact?.apartment || existingRoom?.stockwerk || '';
+                                                setNewRoom(prev => ({ ...prev, apartment: val, stockwerk: stock }));
+                                            } else {
+                                                setNewRoom(prev => ({ ...prev, apartment: '', stockwerk: '' }));
                                             }
                                         }}
                                         style={{ padding: '0.5rem', fontSize: '0.9rem' }}
                                     >
-                                        <option value="">Wohnung wählen... (Optional)</option>
-                                        {[...new Set([
-                                            ...formData.rooms.map(r => r.apartment).filter(Boolean),
-                                            ...(formData.contacts || []).filter(c => c.role === 'Mieter' || c.role === 'Eigentümer').map(c => c.name).filter(Boolean)
-                                        ])].sort().map(apt => (
+                                        <option value="">Mieter / Wohnung wählen...</option>
+                                        {/* Bestehende Räume */}
+                                        {formData.rooms.map(r => r.apartment).filter(Boolean).filter((v, i, a) => a.indexOf(v) === i).sort().map(apt => (
                                             <option key={apt} value={apt}>{apt}</option>
                                         ))}
-                                        <option value="Sonstiges">Neue Wohnung eingeben...</option>
+                                        {/* Kontakte (Mieter/Eigentümer) – Name + Etage */}
+                                        {(formData.contacts || [])
+                                            .filter(c => (c.role === 'Mieter' || c.role === 'Eigentümer') && c.name)
+                                            .filter((c, i, a) => a.findIndex(x => x.name === c.name) === i)
+                                            .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+                                            .map(c => {
+                                                const etage = c.floor || c.apartment || '';
+                                                const label = etage ? `${c.name} (${etage})` : c.name;
+                                                return (
+                                                    <option key={c.name} value={c.name}>{label}</option>
+                                                );
+                                            })
+                                        }
+                                        <option value="__neue__">Neue Wohnung eingeben...</option>
                                     </select>
 
-                                    {(!newRoom.apartment || (newRoom.apartment && ![...new Set([
-                                        ...formData.rooms.map(r => r.apartment).filter(Boolean),
-                                        ...(formData.contacts || []).filter(c => c.role === 'Mieter' || c.role === 'Eigentümer').map(c => c.name).filter(Boolean)
-                                    ])].sort().includes(newRoom.apartment))) && (
+                                    {/* Manuelle Eingabe wenn "Neue Wohnung" gewählt */}
+                                    {newRoom.apartment === '__neue__' && (
                                         <input
                                             type="text"
-                                            placeholder="Wohnung eingeben"
-                                            value={newRoom.apartment}
-                                            onChange={(e) => setNewRoom(prev => ({ ...prev, apartment: e.target.value }))}
+                                            placeholder="Mieter / Wohnungsbezeichnung eingeben"
+                                            value={newRoom.apartmentCustom || ''}
+                                            onChange={(e) => setNewRoom(prev => ({ ...prev, apartmentCustom: e.target.value }))}
                                             className="form-input"
                                             style={{ padding: '0.5rem', fontSize: '0.9rem' }}
+                                            autoFocus
                                         />
                                     )}
                                 </div>
@@ -897,7 +899,7 @@ export default function RoomManager({
                                     onChange={(e) => {
                                         const val = e.target.value;
                                         if (val === 'Sonstiges') {
-                                            setNewRoom(prev => ({ ...prev, apartment: '' }));
+                                            setNewRoom(prev => ({ ...prev, apartment: 'Sonstiges', apartmentCustom: '' }));
                                         } else {
                                             let relatedStockwerk = '';
                                             const matchingContact = (formData.contacts || []).find(c => c.name && c.name.trim().split(/\s+/).pop() === val);
@@ -919,13 +921,14 @@ export default function RoomManager({
                                     ))}
                                     <option value="Sonstiges">Handeingabe...</option>
                                 </select>
-                                {(!newRoom.apartment || (newRoom.apartment && ![...new Set([...formData.rooms.map(r => r.apartment).filter(Boolean), ...(formData.contacts || []).map(c => c.name ? (c.name.toLowerCase().includes('whg') || c.name.toLowerCase().includes('wohnung') ? c.name.trim().split(/\s+/).pop() : 'Whg. ' + c.name.trim().split(/\s+/).pop()) : '').filter(Boolean)])].sort().includes(newRoom.apartment))) && (
+                                {newRoom.apartment === 'Sonstiges' && (
                                     <input
                                         type="text"
                                         placeholder="Wohnungsbezeichnung"
-                                        value={newRoom.apartment}
-                                        onChange={(e) => setNewRoom(prev => ({ ...prev, apartment: e.target.value }))}
+                                        value={newRoom.apartmentCustom || ''}
+                                        onChange={(e) => setNewRoom(prev => ({ ...prev, apartmentCustom: e.target.value }))}
                                         className="form-input"
+                                        autoFocus
                                     />
                                 )}
                             </div>

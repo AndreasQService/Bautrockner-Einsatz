@@ -435,7 +435,8 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         name: '',
         apartment: '',
         stockwerk: '',
-        customName: ''
+        customName: '',
+        apartmentCustom: ''
     })
 
     const [showImageSelector, setShowImageSelector] = useState(false);
@@ -1485,10 +1486,14 @@ END:VCARD`;
 
         if (!finalRoomName) return;
 
+        const finalApartment = (newRoom.apartment === '__neue__' || newRoom.apartment === 'Sonstiges')
+            ? (newRoom.apartmentCustom || '').trim()
+            : newRoom.apartment;
+
         const roomEntry = {
             id: Date.now(),
             name: finalRoomName,
-            apartment: newRoom.apartment,
+            apartment: finalApartment,
             stockwerk: newRoom.stockwerk
         };
 
@@ -2776,7 +2781,7 @@ END:VCARD`;
                                     img.name?.toLowerCase().endsWith('.msg') ||
                                     img.name?.toLowerCase().endsWith('.pdf') ||
                                     img.name?.toLowerCase().endsWith('.txt');
-                                return img && !img.roomId && !isDoc;
+                                return img && !img.roomId && !isDoc && img.assignedTo !== 'Schadenfotos' && img.assignedTo !== 'Messprotokolle' && img.assignedTo !== 'Pläne';
                             }).map((img, idx) => (
                                 <div key={idx}
                                     style={{
@@ -2815,7 +2820,7 @@ END:VCARD`;
                                     </div>
                                 </div>
                             ))}
-                            {(!formData.images || formData.images.filter(img => !img.roomId && !(img.type === 'document' || img.name?.toLowerCase().endsWith('.msg') || img.name?.toLowerCase().endsWith('.pdf') || img.name?.toLowerCase().endsWith('.txt'))).length === 0) && (
+                            {(!formData.images || formData.images.filter(img => !img.roomId && img.assignedTo !== 'Schadenfotos' && img.assignedTo !== 'Messprotokolle' && img.assignedTo !== 'Pläne' && !(img.type === 'document' || img.name?.toLowerCase().endsWith('.msg') || img.name?.toLowerCase().endsWith('.pdf') || img.name?.toLowerCase().endsWith('.txt'))).length === 0) && (
                                 <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', width: '100%', textAlign: 'center', padding: '0.5rem' }}>Keine Bilder vorhanden.</div>
                             )}
 
@@ -2829,9 +2834,65 @@ END:VCARD`;
                                         e.currentTarget.style.borderColor = 'var(--border)';
                                         e.currentTarget.style.backgroundColor = 'transparent';
                                         e.currentTarget.querySelector('span').style.color = 'var(--text-muted)';
+
+                                        // 1. Echte Dateien (Desktop Outlook, Explorer)
                                         const dropped = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
-                                        if (dropped.length > 0) handleImageUpload(dropped, { assignedTo: 'Schadenfotos' });
+                                        if (dropped.length > 0) {
+                                            handleImageUpload(dropped, { assignedTo: 'Schadensbilder' });
+                                            return;
+                                        }
+
+                                        // 2. Bilder aus Web-E-Mails (Gmail, Outlook.com) als HTML <img src="...">
+                                        const html = e.dataTransfer.getData('text/html');
+                                        if (html) {
+                                            const parser = new DOMParser();
+                                            const doc = parser.parseFromString(html, 'text/html');
+                                            const imgs = Array.from(doc.querySelectorAll('img'));
+                                            const urls = imgs.map(i => i.src).filter(s => s && !s.startsWith('cid:'));
+                                            if (urls.length > 0) {
+                                                urls.forEach(async (url) => {
+                                                    try {
+                                                        let dataUrl = url;
+                                                        if (!url.startsWith('data:')) {
+                                                            const resp = await fetch(url, { mode: 'cors' });
+                                                            const blob = await resp.blob();
+                                                            dataUrl = await new Promise(res => { const r = new FileReader(); r.onloadend = () => res(r.result); r.readAsDataURL(blob); });
+                                                        }
+                                                        const newImg = { id: Date.now() + Math.random(), preview: dataUrl, name: 'email-bild.jpg', description: '', assignedTo: 'Schadensbilder', includeInReport: true };
+                                                        setFormData(prev => ({ ...prev, images: [...(prev.images || []), newImg] }));
+                                                    } catch (err) { console.warn('E-Mail Bild konnte nicht geladen werden (CORS):', url, err); }
+                                                });
+                                                return;
+                                            }
+                                        }
+
+                                        // 3. URL-Liste (text/uri-list)
+                                        const uriList = e.dataTransfer.getData('text/uri-list') || e.dataTransfer.getData('URL');
+                                        if (uriList) {
+                                            const urls = uriList.split('\n').map(u => u.trim()).filter(u => u && !u.startsWith('#'));
+                                            urls.forEach(async (url) => {
+                                                try {
+                                                    const resp = await fetch(url, { mode: 'cors' });
+                                                    const blob = await resp.blob();
+                                                    if (blob.type.startsWith('image/')) {
+                                                        const dataUrl = await new Promise(res => { const r = new FileReader(); r.onloadend = () => res(r.result); r.readAsDataURL(blob); });
+                                                        const newImg = { id: Date.now() + Math.random(), preview: dataUrl, name: 'email-bild.jpg', description: '', assignedTo: 'Schadensbilder', includeInReport: true };
+                                                        setFormData(prev => ({ ...prev, images: [...(prev.images || []), newImg] }));
+                                                    }
+                                                } catch (err) { console.warn('URI-Bild konnte nicht geladen werden:', url, err); }
+                                            });
+                                        }
                                     }}
+                                    onPaste={(e) => {
+                                        const items = Array.from(e.clipboardData?.items || []);
+                                        const imageItems = items.filter(i => i.type.startsWith('image/'));
+                                        if (imageItems.length > 0) {
+                                            e.preventDefault();
+                                            const pastedFiles = imageItems.map(i => i.getAsFile()).filter(Boolean);
+                                            if (pastedFiles.length > 0) handleImageUpload(pastedFiles, { assignedTo: 'Schadensbilder' });
+                                        }
+                                    }}
+                                    tabIndex={0}
                                     onClick={() => document.getElementById('schadensbilder-upload-input').click()}
                                     style={{
                                         width: '100%', minHeight: '80px', borderRadius: '10px',
@@ -2846,7 +2907,7 @@ END:VCARD`;
                                 >
                                     <Upload size={22} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
                                     <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', transition: 'color 0.2s', textAlign: 'center' }}>
-                                        Bilder hier ablegen oder <u>klicken zum Auswählen</u>
+                                        Bilder hier ablegen, <u>klicken</u> oder <kbd style={{fontSize:'0.75rem', padding:'1px 4px', background:'var(--border)', borderRadius:'3px'}}>Ctrl+V</kbd> zum Einfügen
                                     </span>
                                 </div>
                                 <input
@@ -2857,7 +2918,7 @@ END:VCARD`;
                                     style={{ display: 'none' }}
                                     onChange={(e) => {
                                         const files = Array.from(e.target.files);
-                                        if (files.length > 0) handleImageUpload(files, { assignedTo: 'Schadenfotos' });
+                                        if (files.length > 0) handleImageUpload(files, { assignedTo: 'Schadensbilder' });
                                         e.target.value = '';
                                     }}
                                 />
@@ -2918,7 +2979,7 @@ END:VCARD`;
                                         img.name?.toLowerCase().endsWith('.msg') ||
                                         img.name?.toLowerCase().endsWith('.pdf') ||
                                         img.name?.toLowerCase().endsWith('.txt');
-                                    return img && !img.roomId && !isDoc;
+                                    return img && !img.roomId && !isDoc && img.assignedTo !== 'Schadenfotos' && img.assignedTo !== 'Messprotokolle' && img.assignedTo !== 'Pläne';
                                 }).map((img, idx) => (
                                     <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '4px', marginBottom: '8px' }}>
                                         <div
@@ -3080,6 +3141,59 @@ END:VCARD`;
                                         }}
                                     />
                                 </label>
+
+                                {/* Drop Zone */}
+                                <div
+                                    style={{ width: '100%', marginTop: '0.75rem', flexBasis: '100%' }}
+                                    onDragOver={(e) => { e.preventDefault(); e.currentTarget.firstChild.style.borderColor = '#0ea5e9'; e.currentTarget.firstChild.style.background = 'rgba(14,165,233,0.12)'; }}
+                                    onDragLeave={(e) => { e.currentTarget.firstChild.style.borderColor = '#0F6EA3'; e.currentTarget.firstChild.style.background = 'rgba(15,110,163,0.06)'; }}
+                                    onDrop={async (e) => {
+                                        e.preventDefault();
+                                        e.currentTarget.firstChild.style.borderColor = '#0F6EA3';
+                                        e.currentTarget.firstChild.style.background = 'rgba(15,110,163,0.06)';
+
+                                        // 1. Echte Dateien (Explorer, Desktop Outlook wenn unterstützt)
+                                        const dropped = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+                                        if (dropped.length > 0) {
+                                            handleImageUpload(dropped, { assignedTo: 'Schadensbilder' });
+                                            return;
+                                        }
+
+                                        // 2. HTML-Bilder aus Web-Mails (Gmail, Outlook.com)
+                                        const html = e.dataTransfer.getData('text/html');
+                                        if (html) {
+                                            const imgs = Array.from(new DOMParser().parseFromString(html, 'text/html').querySelectorAll('img'));
+                                            for (const imgEl of imgs) {
+                                                const src = imgEl.src;
+                                                if (!src || src.startsWith('cid:')) continue;
+                                                try {
+                                                    const resp = await fetch(src, { mode: 'cors' });
+                                                    const blob = await resp.blob();
+                                                    if (blob.type.startsWith('image/')) {
+                                                        const file = new File([blob], 'email-bild.jpg', { type: blob.type });
+                                                        handleImageUpload([file], { assignedTo: 'Schadensbilder' });
+                                                    }
+                                                } catch (err) { console.warn('CORS Fehler bei E-Mail Bild:', err); }
+                                            }
+                                        }
+                                    }}
+                                >
+                                    <div
+                                        tabIndex={0}
+                                        onPaste={async (e) => {
+                                            const items = Array.from(e.clipboardData?.items || []).filter(i => i.type.startsWith('image/'));
+                                            if (items.length > 0) {
+                                                e.preventDefault();
+                                                const files = items.map(i => i.getAsFile()).filter(Boolean);
+                                                if (files.length > 0) handleImageUpload(files, { assignedTo: 'Schadensbilder' });
+                                            }
+                                        }}
+                                        style={{ border: '2px dashed #0F6EA3', borderRadius: '10px', padding: '0.75rem 1rem', textAlign: 'center', fontSize: '0.82rem', color: '#0F6EA3', cursor: 'text', transition: 'all 0.2s', outline: 'none', background: 'rgba(15,110,163,0.06)' }}
+                                    >
+                                        📎 Bilder hier ablegen · <kbd style={{ fontSize: '0.72rem', padding: '1px 5px', background: 'rgba(15,110,163,0.2)', borderRadius: '3px', border: '1px solid #0F6EA3' }}>Ctrl+V</kbd> zum Einfügen
+                                    </div>
+                                </div>
+
                             </div>
                         </div>
 
@@ -3744,18 +3858,13 @@ END:VCARD`;
                                 {showAddRoomForm && (
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '0.5rem', backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid var(--border)' }}>
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                                            <select
+                                             <select
                                                 className="form-input"
-
-
-                                                value={newRoom.apartment && ![...new Set([
-                                                    ...formData.rooms.map(r => r.apartment).filter(Boolean),
-                                                    ...(formData.contacts || []).filter(c => c.role === 'Mieter' || c.role === 'Eigentümer').map(c => c.name).filter(Boolean)
-                                                ])].sort().includes(newRoom.apartment) ? 'Sonstiges' : newRoom.apartment}
+                                                value={newRoom.apartment || ''}
                                                 onChange={(e) => {
                                                     const val = e.target.value;
                                                     if (val === 'Sonstiges') {
-                                                        setNewRoom(prev => ({ ...prev, apartment: '' }));
+                                                        setNewRoom(prev => ({ ...prev, apartment: 'Sonstiges', apartmentCustom: '', stockwerk: '' }));
                                                     } else {
                                                         let relatedStockwerk = '';
                                                         const matchingContact = (formData.contacts || []).find(c => c.name === val);
@@ -3782,20 +3891,18 @@ END:VCARD`;
                                                 <option value="Sonstiges">Neue Wohnung eingeben...</option>
                                             </select>
 
-                                            {/* Custom Apartment Input */}
-                                            {(!newRoom.apartment || (newRoom.apartment && ![...new Set([
-                                                ...formData.rooms.map(r => r.apartment).filter(Boolean),
-                                                ...(formData.contacts || []).filter(c => c.role === 'Mieter' || c.role === 'Eigentümer').map(c => c.name).filter(Boolean)
-                                            ])].sort().includes(newRoom.apartment))) && (
-                                                    <input
-                                                        type="text"
-                                                        placeholder="Wohnung eingeben"
-                                                        value={newRoom.apartment}
-                                                        onChange={(e) => setNewRoom(prev => ({ ...prev, apartment: e.target.value }))}
-                                                        className="form-input"
-                                                        style={{ padding: '0.5rem', fontSize: '0.9rem' }}
-                                                    />
-                                                )}
+                                            {/* Freitext nur wenn "Neue Wohnung" gewählt */}
+                                            {newRoom.apartment === 'Sonstiges' && (
+                                                <input
+                                                    type="text"
+                                                    placeholder="Wohnung eingeben"
+                                                    value={newRoom.apartmentCustom || ''}
+                                                    onChange={(e) => setNewRoom(prev => ({ ...prev, apartmentCustom: e.target.value }))}
+                                                    className="form-input"
+                                                    style={{ padding: '0.5rem', fontSize: '0.9rem' }}
+                                                    autoFocus
+                                                />
+                                            )}
                                         </div>
 
                                         <input
@@ -4428,19 +4535,14 @@ END:VCARD`;
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                                 <select
                                     className="form-input"
-                                    value={newRoom.apartment && ![...new Set([...formData.rooms.map(r => r.apartment).filter(Boolean), ...(formData.contacts || []).map(c => c.name ? (c.name.toLowerCase().includes('whg') || c.name.toLowerCase().includes('wohnung') ? c.name.trim().split(/\s+/).pop() : 'Whg. ' + c.name.trim().split(/\s+/).pop()) : '').filter(Boolean)])].sort().includes(newRoom.apartment) ? 'Sonstiges' : newRoom.apartment}
+                                    value={newRoom.apartment || ''}
                                     onChange={(e) => {
                                         const val = e.target.value;
                                         if (val === 'Sonstiges') {
-                                            setNewRoom(prev => ({ ...prev, apartment: '' }));
+                                            setNewRoom(prev => ({ ...prev, apartment: 'Sonstiges', apartmentCustom: '', stockwerk: '' }));
                                         } else {
                                             let relatedStockwerk = '';
-                                            const matchingContact = (formData.contacts || []).find(c => {
-                                                if (!c.name) return false;
-                                                const lastName = c.name.trim().split(/\s+/).pop();
-                                                const withWhg = `Whg. ${lastName}`;
-                                                return lastName === val || withWhg === val;
-                                            });
+                                            const matchingContact = (formData.contacts || []).find(c => c.name === val);
                                             if (matchingContact) {
                                                 relatedStockwerk = matchingContact.floor || matchingContact.apartment || '';
                                             } else {
@@ -4464,20 +4566,18 @@ END:VCARD`;
                                     <option value="Sonstiges">Neue Wohnung eingeben...</option>
                                 </select>
 
-                                {/* Custom Apartment Input */}
-                                {(!newRoom.apartment || (newRoom.apartment && ![...new Set([
-                                    ...formData.rooms.map(r => r.apartment).filter(Boolean),
-                                    ...(formData.contacts || []).filter(c => c.role === 'Mieter' || c.role === 'Eigentümer').map(c => c.name).filter(Boolean)
-                                ])].sort().includes(newRoom.apartment))) && (
-                                        <input
-                                            type="text"
-                                            placeholder="Wohnung eingeben"
-                                            value={newRoom.apartment}
-                                            onChange={(e) => setNewRoom(prev => ({ ...prev, apartment: e.target.value }))}
-                                            className="form-input"
-                                            style={{ padding: '0.5rem', fontSize: '0.9rem' }}
-                                        />
-                                    )}
+                                {/* Freitext nur wenn "Neue Wohnung" gewählt */}
+                                {newRoom.apartment === 'Sonstiges' && (
+                                    <input
+                                        type="text"
+                                        placeholder="Wohnung eingeben"
+                                        value={newRoom.apartmentCustom || ''}
+                                        onChange={(e) => setNewRoom(prev => ({ ...prev, apartmentCustom: e.target.value }))}
+                                        className="form-input"
+                                        style={{ padding: '0.5rem', fontSize: '0.9rem' }}
+                                        autoFocus
+                                    />
+                                )}
                             </div>
 
                             <input
