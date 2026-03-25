@@ -1,6 +1,7 @@
 import UploadPanel from "./UploadPanel";
 import AiSuggestionsPanel from "./AiSuggestionsPanel";
 import { Buffer } from 'buffer';
+import QRCode from 'qrcode';
 
 // Unified Polyfill for @react-pdf and other Node-dependencies in Browser/Vite
 if (typeof window !== 'undefined') {
@@ -441,6 +442,48 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
 
     const [showImageSelector, setShowImageSelector] = useState(false);
     const [globalPreviewImage, setGlobalPreviewImage] = useState(null);
+    const [qrModal, setQrModal] = useState(null);       // { dataUrl }
+    const [qrEditFields, setQrEditFields] = useState({}); // { name, phone, email, note }
+    const [qrSessionKey, setQrSessionKey] = useState(0); // stabil pro Modal-Session
+
+    // QR-Code aus Feldern generieren
+    const buildQR = async (fields) => {
+        const lines = ['BEGIN:VCARD', 'VERSION:3.0'];
+        if (fields.name)  lines.push(`FN:${fields.name}`);
+        if (fields.name)  lines.push(`ORG:${fields.name}`);
+        if (fields.phone) lines.push(`TEL;TYPE=CELL:${fields.phone}`);
+        if (fields.email) lines.push(`EMAIL:${fields.email}`);
+        if (fields.note)  lines.push(`NOTE:${fields.note}`);
+        lines.push('END:VCARD');
+        try {
+            const dataUrl = await QRCode.toDataURL(lines.join('\n'), {
+                width: 280, margin: 2,
+                color: { dark: '#0F172A', light: '#FFFFFF' }
+            });
+            setQrModal({ dataUrl });
+        } catch (err) { console.error('QR-Fehler:', err); }
+    };
+
+    // QR-Modal öffnen
+    const handleContactQR = (contact) => {
+        const fields = {
+            name:  contact.name  || '',
+            phone: contact.phone || '',
+            email: contact.email || '',
+            note:  [contact.floor, contact.role].filter(Boolean).join(' · '),
+        };
+        setQrEditFields(fields);
+        setQrSessionKey(Date.now()); // neuer Key = Inputs neu mounten
+        setQrModal({ dataUrl: null });
+        buildQR(fields);
+    };
+
+    // QR-Feld ändern
+    const handleQrFieldChange = (key, value) => {
+        const updated = { ...qrEditFields, [key]: value };
+        setQrEditFields(updated);  // Sofort text updaten
+        buildQR(updated);          // QR async neu generieren
+    };
     // const dialogRef = useRef(null); // Unused
 
     useEffect(() => {
@@ -3473,8 +3516,31 @@ END:VCARD`;
                                                 >
                                                     <VcfIcon size={20} />
                                                 </button>
+                                                {/* QR-Code Button */}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleContactQR(contact)}
+                                                    style={{
+                                                        padding: '0 0.6rem',
+                                                        height: '36px',
+                                                        borderRadius: '8px',
+                                                        cursor: 'pointer',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        backgroundColor: 'rgba(16, 185, 129, 0.12)',
+                                                        border: '1px solid rgba(16, 185, 129, 0.35)',
+                                                        color: '#10b981',
+                                                        flexShrink: 0,
+                                                        fontSize: '15px',
+                                                    }}
+                                                    title="QR-Code zum Scannen"
+                                                >
+                                                    QR
+                                                </button>
                                             </div>
                                         </div>
+
 
                                         {/* Row 1b: Ansprechperson – nur bei Firma-Rollen */}
                                         {contact.role !== 'Mieter' && (
@@ -6241,6 +6307,85 @@ END:VCARD`;
                     </div>
                 )}
             </div >
+
+            {/* ── QR-Code Modal (mit editierbaren Feldern) ─────────────── */}
+            {qrModal && (
+                <div
+                    onClick={() => setQrModal(null)}
+                    style={{
+                        position: 'fixed', inset: 0, zIndex: 99999,
+                        backgroundColor: 'rgba(0,0,0,0.85)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        padding: '1rem',
+                    }}
+                >
+                    <div
+                        onClick={e => e.stopPropagation()}
+                        style={{
+                            background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)',
+                            borderRadius: '20px',
+                            border: '1px solid rgba(16,185,129,0.3)',
+                            boxShadow: '0 25px 60px rgba(0,0,0,0.6)',
+                            padding: '1.5rem',
+                            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem',
+                            maxWidth: '400px', width: '100%',
+                        }}
+                    >
+                        {/* Titel */}
+                        <div style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#10b981', fontWeight: 700 }}>
+                            Kontakt QR-Code
+                        </div>
+
+                        {/* QR-Code */}
+                        <div style={{ background: '#FFFFFF', borderRadius: '12px', padding: '0.6rem', boxShadow: '0 8px 24px rgba(0,0,0,0.4)', flexShrink: 0 }}>
+                            <img src={qrModal.dataUrl} alt="QR-Code" style={{ display: 'block', width: '240px', height: '240px' }} />
+                        </div>
+
+                        {/* Editierbare Felder */}
+                        <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                            {[
+                                { key: 'name',  label: 'Name',    placeholder: 'Name' },
+                                { key: 'phone', label: 'Telefon', placeholder: '+41 ...' },
+                                { key: 'email', label: 'E-Mail',  placeholder: 'email@...' },
+                                { key: 'note',  label: 'Notiz',   placeholder: 'Etage, Hinweis...' },
+                            ].map(({ key, label, placeholder }) => (
+                                <div key={key} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    <label style={{ fontSize: '0.7rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600, width: '52px', flexShrink: 0 }}>{label}</label>
+                                    <input
+                                        key={`qr-${key}-${qrSessionKey}`}
+                                        defaultValue={qrEditFields[key] || ''}
+                                        placeholder={placeholder}
+                                        onInput={e => handleQrFieldChange(key, e.target.value)}
+                                        style={{
+                                            flex: 1, padding: '0.4rem 0.7rem',
+                                            borderRadius: '8px', fontSize: '0.85rem',
+                                            border: '1px solid rgba(255,255,255,0.1)',
+                                            background: 'rgba(255,255,255,0.06)',
+                                            color: '#F1F5F9', outline: 'none',
+                                        }}
+                                    />
+                                </div>
+                            ))}
+                        </div>
+
+                        <div style={{ fontSize: '0.75rem', color: '#475569', textAlign: 'center' }}>
+                            📱 Kamera-App öffnen · QR scannen · Kontakt speichern
+                        </div>
+                        <button
+                            onClick={() => setQrModal(null)}
+                            style={{
+                                padding: '0.55rem 2rem', borderRadius: '10px',
+                                border: '1px solid rgba(16,185,129,0.3)',
+                                background: 'rgba(16,185,129,0.1)',
+                                color: '#10b981', fontWeight: 700, fontSize: '0.9rem',
+                                cursor: 'pointer', width: '100%',
+                            }}
+                        >
+                            Schliessen
+                        </button>
+                    </div>
+                </div>
+            )}
         </>
     );
 }
