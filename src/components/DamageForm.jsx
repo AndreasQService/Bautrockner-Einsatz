@@ -17,7 +17,7 @@ import { Camera, Image, Trash, X, Plus, Edit3, Save, Upload, FileText, CheckCirc
 import { supabase } from '../supabaseClient';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
-import { buildProjectFolderName, uploadReport } from '../services/OneDriveService';
+import { buildProjectFolderName, uploadReport, uploadPhotoFile } from '../services/OneDriveService';
 import { swissPLZ } from '../data/swiss_plz';
 import { DEVICE_INVENTORY } from '../data/device_inventory';
 import { pdf } from '@react-pdf/renderer';
@@ -1244,6 +1244,22 @@ END:VCARD`;
                             img.id === tempId ? { ...img, preview: publicUrl, storagePath: fileName, uploading: false } : img
                         )
                     }));
+
+                    // OneDrive: Bild hochladen (nur echte Bilder, keine Dokumente)
+                    if (!isDoc) {
+                        try {
+                            const odFolder = buildProjectFolderName(
+                                formData.projectNumber || formData.id || 'Unbekannt',
+                                formData
+                            );
+                            const subFolder = contextData.assignedTo || contextData.roomName || 'Sonstiges';
+                            uploadPhotoFile(odFolder, subFolder, file).catch(e =>
+                                console.warn('[OneDrive] Foto-Upload fehlgeschlagen:', e.message)
+                            );
+                        } catch (e) {
+                            console.warn('[OneDrive] Foto-Upload fehlgeschlagen:', e.message);
+                        }
+                    }
 
                 } catch (error) {
                     console.error('Upload failed:', error);

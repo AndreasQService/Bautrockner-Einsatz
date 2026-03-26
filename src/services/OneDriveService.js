@@ -171,6 +171,22 @@ export async function uploadPhoto(folderName, projectNr, subFolder, index, blob,
 }
 
 /**
+ * Bild hochladen — vereinfachte Version direkt mit File-Objekt
+ * Dateiname: [subFolder]_[timestamp].[ext]
+ */
+export async function uploadPhotoFile(folderName, subFolder, file) {
+  if (!(await getAccessToken())) return;
+  const safe = (s) => (s || 'Sonstiges').replace(/[^a-zA-Z0-9]/g, '_').replace(/_+/g, '_');
+  const ext = file.name.split('.').pop().toLowerCase() || 'jpg';
+  const fileName = `${safe(subFolder)}_${Date.now()}.${ext}`;
+  const folder = `${ROOT_FOLDER}/${folderName}/Fotos/${safe(subFolder)}`;
+  await ensureFolder(`${ROOT_FOLDER}/${folderName}/Fotos`, safe(subFolder));
+  await uploadFile(folder, fileName, file);
+  console.log(`[OneDrive] ✅ Foto ${fileName} hochgeladen`);
+}
+
+
+/**
  * Excel-Protokoll hochladen
  */
 export async function uploadExcel(folderName, blob) {
