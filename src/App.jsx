@@ -11,6 +11,7 @@ import EmailImportModalV2 from './components/EmailImportModalV2'
 import i18n from './i18n'
 import { useIsAuthenticated, useMsal } from "@azure/msal-react";
 import { loginRequest } from "./msalConfig";
+import { setMsalInstance, buildProjectFolderName, uploadProjectJson } from "./services/OneDriveService";
 
 function App() {
   const [view, setView] = useState(() => localStorage.getItem('qservice_current_view') || 'dashboard') // 'dashboard', 'new-report', 'details'
@@ -42,15 +43,18 @@ function App() {
   const { instance, accounts } = useMsal();
   const isAuthenticated = useIsAuthenticated();
 
+  // OneDrive: MSAL-Instanz sofort registrieren sobald verfügbar
+  useEffect(() => { setMsalInstance(instance); }, [instance]);
+
   const handleLoginOneDrive = () => {
-    instance.loginPopup(loginRequest).catch(e => {
+    instance.loginRedirect(loginRequest).catch(e => {
       console.error("MSAL Login Error:", e);
       alert("MSAL Fehler: " + e.message);
     });
   };
 
   const handleLogoutOneDrive = () => {
-    instance.logoutPopup().catch(e => {
+    instance.logoutRedirect().catch(e => {
       console.error("MSAL Logout Error:", e);
     });
   };
@@ -233,8 +237,20 @@ function App() {
 
       supabase.from('damage_reports').upsert(rowData).then(({ error }) => {
         if (error) {
-          // Error handling
           console.error('Error saving to Supabase:', error);
+        } else {
+          // OneDrive JSON-Backup (silent)
+          try {
+            const odFolder = buildProjectFolderName(
+              finalReport.projectNumber || finalReport.id || 'Unbekannt',
+              finalReport
+            );
+            uploadProjectJson(odFolder, finalReport).catch(e =>
+              console.warn('[OneDrive] JSON-Backup fehlgeschlagen:', e.message)
+            );
+          } catch (e) {
+            console.warn('[OneDrive] JSON-Backup fehlgeschlagen:', e.message);
+          }
         }
       });
     }

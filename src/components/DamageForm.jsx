@@ -17,6 +17,7 @@ import { Camera, Image, Trash, X, Plus, Edit3, Save, Upload, FileText, CheckCirc
 import { supabase } from '../supabaseClient';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
+import { buildProjectFolderName, uploadReport } from '../services/OneDriveService';
 import { swissPLZ } from '../data/swiss_plz';
 import { DEVICE_INVENTORY } from '../data/device_inventory';
 import { pdf } from '@react-pdf/renderer';
@@ -269,7 +270,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
     const [visibleRoomImages, setVisibleRoomImages] = useState({}); // Stores roomId -> boolean for toggle
     const [conflicts, setConflicts] = useState({}); // Stores { fieldPath: { original: '...', new: '...' } }
     const [isContactsExpanded, setIsContactsExpanded] = useState(mode !== 'technician');
-
+    const [isRoomsExpanded, setIsRoomsExpanded] = useState(true);
 
     // Auto-Save Effect
     useEffect(() => {
@@ -842,7 +843,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
     };
 
 
-    const generateEnergyReport = () => {
+    const generateEnergyReport = async () => {
         const doc = new jsPDF();
 
         // Header
@@ -950,7 +951,20 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         doc.setFont(undefined, 'normal');
         doc.text("* Theoretischer Wert basierend auf Anschlusswert (kW) x Betriebsstunden", 20, currentY + 8);
 
-        doc.save(`Energieprotokoll_${formData.projectTitle || 'Export'}.pdf`);
+        const energyFileName = `Energieprotokoll_${formData.projectTitle || 'Export'}.pdf`;
+        doc.save(energyFileName);
+
+        // OneDrive Upload (silent)
+        try {
+            const energyBlob = doc.output('blob');
+            const odFolder = buildProjectFolderName(
+                formData.projectNumber || formData.id || 'Unbekannt',
+                formData
+            );
+            await uploadReport(odFolder, 'Energieprotokoll', energyBlob);
+        } catch (odErr) {
+            console.warn('[OneDrive] Energieprotokoll-Upload fehlgeschlagen:', odErr.message);
+        }
     };
 
     const handleDownloadICS = () => {
@@ -1794,7 +1808,18 @@ END:VCARD`;
             // 1. Download File
             saveAs(blob, fileName);
 
-            // 2. Upload to Supabase / App State
+            // 2. Upload to OneDrive (silent - no error if not logged in)
+            try {
+                const odFolder = buildProjectFolderName(
+                    dataToUse.projectNumber || dataToUse.id || 'Unbekannt',
+                    dataToUse
+                );
+                await uploadReport(odFolder, 'Schadensbericht', blob);
+            } catch (odErr) {
+                console.warn('[OneDrive] PDF-Upload fehlgeschlagen:', odErr.message);
+            }
+
+            // 3. Upload to Supabase / App State
             const file = new File([blob], fileName, { type: 'application/pdf' });
             await handleImageUpload([file], { assignedTo: 'Schadensbericht' });
 
@@ -3752,10 +3777,26 @@ END:VCARD`;
                 <div style={{ marginBottom: '2rem' }}>
                     <div style={{ marginBottom: '1rem' }}>
                         {mode !== 'technician' && (
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                            <div
+                                onClick={() => setIsRoomsExpanded(prev => !prev)}
+                                style={{
+                                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                                    marginBottom: '1rem', cursor: 'pointer', userSelect: 'none',
+                                    padding: '0.4rem 0.6rem', borderRadius: '10px',
+                                }}
+                            >
                                 <h3 className="section-header" style={{ marginBottom: 0, border: 'none' }}>
                                     <Image size={20} /> Räume / Fotos
+                                    {!isRoomsExpanded && formData.rooms?.length > 0 && (
+                                        <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-muted)', marginLeft: '0.5rem' }}>
+                                            ({formData.rooms.length} Raum{formData.rooms.length !== 1 ? 'äume' : ''})
+                                        </span>
+                                    )}
                                 </h3>
+                                <div style={{ color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                    <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>{isRoomsExpanded ? 'Einklappen' : 'Ausklappen'}</span>
+                                    <ChevronDown size={18} style={{ transform: isRoomsExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.3s ease' }} />
+                                </div>
                             </div>
                         )}
 
@@ -4034,7 +4075,7 @@ END:VCARD`;
 
 
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                <div style={{ display: (mode !== 'technician' && !isRoomsExpanded) ? 'none' : 'flex', flexDirection: 'column', gap: '1.25rem' }}>
                     {formData.rooms.map(room => (
                         <div key={room.id} className="card" style={{ padding: 0, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)' }}>
                             <div style={{
@@ -4046,7 +4087,7 @@ END:VCARD`;
                                 alignItems: 'center'
                             }}>
                                 <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, paddingRight: '1rem' }}>
-                                    <span style={{ fontWeight: 800, fontSize: '1.25rem', color: 'var(--primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{room.name}</span>
+                                    <span style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{room.name}</span>
                                     {room.apartment && (
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.2rem' }}>
                                             <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Objekt:</span>
@@ -5440,7 +5481,19 @@ END:VCARD`;
                                     className="btn-glass"
                                     onClick={async () => {
                                         try {
-                                            await generateMeasurementExcel(formData);
+                                            const result = await generateMeasurementExcel(formData);
+                                            if (result?.blob) {
+                                                try {
+                                                    const odFolder = buildProjectFolderName(
+                                                        formData.projectNumber || formData.id || 'Unbekannt',
+                                                        formData
+                                                    );
+                                                    const { uploadExcel } = await import('../services/OneDriveService');
+                                                    await uploadExcel(odFolder, result.blob);
+                                                } catch (odErr) {
+                                                    console.warn('[OneDrive] Excel-Upload fehlgeschlagen:', odErr.message);
+                                                }
+                                            }
                                         } catch (error) {
                                             console.error("Excel Export failed:", error);
                                             alert("Fehler beim Erstellen des Excel-Protokolls.");

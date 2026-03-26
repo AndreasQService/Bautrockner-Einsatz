@@ -7,7 +7,7 @@ export const msalConfig = {
         redirectUri: window.location.origin, // e.g., http://localhost:5173
     },
     cache: {
-        cacheLocation: "sessionStorage", // This configures where your cache will be stored
+        cacheLocation: "localStorage",
         storeAuthStateInCookie: false, // Set this to "true" if you are having issues on IE11 or Edge
     },
     system: {

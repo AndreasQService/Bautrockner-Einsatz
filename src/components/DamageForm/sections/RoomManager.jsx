@@ -37,6 +37,7 @@ export default function RoomManager({
     const [dragOverIndex, setDragOverIndex] = useState(null);
     const [dragRoomId, setDragRoomId] = useState(null);
     const [isDictating, setIsDictating] = useState(false);
+    const [isRoomsExpanded, setIsRoomsExpanded] = useState(true);
     const recognitionRef = React.useRef(null);
 
     const startDictation = (onResult) => {
@@ -100,10 +101,27 @@ export default function RoomManager({
         <div style={{ marginBottom: '2rem' }}>
             <div style={{ marginBottom: '1rem' }}>
                 {mode !== 'technician' && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                    <div
+                        onClick={() => setIsRoomsExpanded(prev => !prev)}
+                        style={{
+                            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                            marginBottom: '1rem', cursor: 'pointer', userSelect: 'none',
+                            padding: '0.5rem 0.75rem', borderRadius: '10px',
+                            transition: 'background 0.2s',
+                        }}
+                    >
                         <h3 className="section-header" style={{ marginBottom: 0, border: 'none' }}>
                             <Image size={20} /> Räume / Fotos
+                            {!isRoomsExpanded && formData.rooms?.length > 0 && (
+                                <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-muted)', marginLeft: '0.5rem' }}>
+                                    ({formData.rooms.length} vorhanden)
+                                </span>
+                            )}
                         </h3>
+                        <div style={{ color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>{isRoomsExpanded ? 'Einklappen' : 'Ausklappen'}</span>
+                            <ChevronDown size={20} style={{ transform: isRoomsExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.3s ease' }} />
+                        </div>
                     </div>
                 )}
 
@@ -363,6 +381,10 @@ export default function RoomManager({
                     </h3>
                 )}
             </div>
+
+            {/* Schadenursache + Raumliste: in Desktop-Modus ein/ausklappbar */}
+            {(mode !== 'desktop' || isRoomsExpanded) && (
+            <>
 
             {/* Schadenursache - Cause & Photos (Desktop Only) */}
             {mode === 'desktop' && (
@@ -991,6 +1013,8 @@ export default function RoomManager({
                         </div>
                     </div>
                 </div>
+            )}
+            </>
             )}
         </div>
     );

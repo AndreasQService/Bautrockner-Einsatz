@@ -733,10 +733,59 @@ ${textContext}`;
 
         {/* --- Text Input Area --- */}
         <div style={{ padding: "1rem", border: "1px solid var(--border)", borderRadius: "8px", backgroundColor: "var(--surface)" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.5rem" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.75rem" }}>
             <FileText size={18} style={{ color: "var(--text-muted)" }} />
-            <strong style={{ fontSize: "0.9rem", color: "var(--text-main)" }}>Text direkt einfügen</strong>
+            <strong style={{ fontSize: "0.9rem", color: "var(--text-main)" }}>Projektimport</strong>
           </div>
+
+          {/* PDF Drop Zone */}
+          <div
+            onDragOver={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = '#2563eb'; e.currentTarget.style.backgroundColor = 'rgba(37,99,235,0.08)'; }}
+            onDragLeave={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'; e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.03)'; }}
+            onDrop={async (e) => {
+              e.preventDefault();
+              e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)';
+              e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.03)';
+              const file = e.dataTransfer.files[0];
+              if (!file || !file.name.toLowerCase().endsWith('.pdf')) return;
+              setStatus('⏳ PDF wird gelesen...');
+              try {
+                const text = await processPdfFile(file);
+                setTextInput(prev => prev ? prev + '\n\n' + text : text);
+                setStatus('✅ PDF-Text extrahiert — jetzt analysieren');
+              } catch {
+                setStatus('❌ PDF konnte nicht gelesen werden');
+              }
+            }}
+            onClick={() => document.getElementById('pdf-text-input').click()}
+            style={{
+              border: '1.5px dashed rgba(255,255,255,0.12)',
+              borderRadius: '8px',
+              padding: '0.6rem 1rem',
+              display: 'flex', alignItems: 'center', gap: '0.6rem',
+              backgroundColor: 'rgba(255,255,255,0.03)',
+              cursor: 'pointer', marginBottom: '0.75rem',
+              fontSize: '0.8rem', color: 'var(--text-muted)',
+              transition: 'all 0.2s',
+            }}
+          >
+            <input id="pdf-text-input" type="file" accept=".pdf" style={{ display: 'none' }} onChange={async (e) => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+              setStatus('⏳ PDF wird gelesen...');
+              try {
+                const text = await processPdfFile(file);
+                setTextInput(prev => prev ? prev + '\n\n' + text : text);
+                setStatus('✅ PDF-Text extrahiert — jetzt analysieren');
+              } catch {
+                setStatus('❌ PDF konnte nicht gelesen werden');
+              }
+              e.target.value = '';
+            }} />
+            <FileText size={16} />
+            <span>PDF hier droppen oder klicken → Text wird extrahiert</span>
+          </div>
+
           <textarea
             value={textInput}
             onChange={(e) => setTextInput(e.target.value)}
