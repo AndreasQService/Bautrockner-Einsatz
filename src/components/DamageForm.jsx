@@ -17,7 +17,7 @@ import { Camera, Image, Trash, X, Plus, Edit3, Save, Upload, FileText, CheckCirc
 import { supabase } from '../supabaseClient';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
-import { buildProjectFolderName, uploadReport, uploadPhotoFile, uploadPhotoAndGetUrl } from '../services/OneDriveService';
+import { buildProjectFolderName, uploadReport, uploadPhotoFile, uploadPhotoAndGetUrl, getPhotoDownloadUrl } from '../services/OneDriveService';
 import { swissPLZ } from '../data/swiss_plz';
 import { DEVICE_INVENTORY } from '../data/device_inventory';
 import { pdf } from '@react-pdf/renderer';
@@ -4376,8 +4376,21 @@ END:VCARD`;
                                                                                 }
                                                                             }}
                                                                         >
-                                                                            <img src={img.preview} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onClick={(e) => {
-                                                                                e.stopPropagation(); if (!linkingImageId) window.open(img.preview, '_blank'); else {
+                                                                            <img src={img.preview} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onClick={async (e) => {
+                                                                                e.stopPropagation();
+                                                                                if (!linkingImageId) {
+                                                                                    // OneDrive-Bild: frische URL holen
+                                                                                    if (img.oneDriveItemId) {
+                                                                                        try {
+                                                                                            const freshUrl = await getPhotoDownloadUrl(img.oneDriveItemId);
+                                                                                            window.open(freshUrl || img.preview, '_blank');
+                                                                                        } catch {
+                                                                                            window.open(img.preview, '_blank');
+                                                                                        }
+                                                                                    } else {
+                                                                                        window.open(img.preview, '_blank');
+                                                                                    }
+                                                                                } else {
                                                                                     setFormData(prev => ({
                                                                                         ...prev,
                                                                                         images: prev.images.map(i => i.id === linkingImageId ? { ...i, linkedToOriginal: img.id } : i)
