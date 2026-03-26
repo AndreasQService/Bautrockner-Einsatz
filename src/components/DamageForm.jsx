@@ -17,7 +17,7 @@ import { Camera, Image, Trash, X, Plus, Edit3, Save, Upload, FileText, CheckCirc
 import { supabase } from '../supabaseClient';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
-import { buildProjectFolderName, uploadReport, uploadPhotoFile } from '../services/OneDriveService';
+import { buildProjectFolderName, uploadReport, uploadPhotoFile, uploadPhotoAndGetUrl } from '../services/OneDriveService';
 import { swissPLZ } from '../data/swiss_plz';
 import { DEVICE_INVENTORY } from '../data/device_inventory';
 import { pdf } from '@react-pdf/renderer';
@@ -1192,91 +1192,97 @@ END:VCARD`;
     const handleImageUpload = async (files, contextData = {}) => {
         if (!files || files.length === 0) return;
 
-        const newImages = [];
         for (const file of files) {
-            // Optimistic UI: Show local preview immediately
             const previewUrl = URL.createObjectURL(file);
             const tempId = Math.random().toString(36).substring(7);
             const fileExt = file.name.split('.').pop().toLowerCase();
             const isDoc = ['pdf', 'msg', 'txt'].includes(fileExt);
 
-            // Basic metadata
             const imageEntry = {
                 id: tempId,
-                file, // Keep file for potential retry or local usage
+                file,
                 preview: previewUrl,
                 name: file.name,
                 date: new Date().toISOString(),
                 ...contextData,
-                includeInReport: true, // Default to true
-                uploading: true, // Mark as uploading
+                includeInReport: true,
+                uploading: true,
                 type: isDoc ? 'document' : 'image',
-                fileType: fileExt
+                fileType: fileExt,
             };
 
-            // Add to state immediately (optimistic)
-            setFormData(prev => ({
-                ...prev,
-                images: [...prev.images, imageEntry]
-            }));
+            setFormData(prev => ({ ...prev, images: [...prev.images, imageEntry] }));
 
-            // Upload to Supabase if client exists
-            if (supabase) {
-                try {
-                    const fileExt = file.name.split('.').pop();
-                    const fileName = `cases/${formData.id || 'temp'}/images/${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
+            try {
+                const subFolder = contextData.assignedTo || contextData.roomName || 'Sonstiges';
+                const odFolder = buildProjectFolderName(
+                    formData.projectNumber || formData.id || 'Unbekannt',
+                    formData
+                );
 
-                    const { data, error } = await supabase.storage
-                        .from('case-files')
-                        .upload(fileName, file);
+                // ── Primär: OneDrive ──────────────────────────────────────────
+                if (!isDoc) {
+                    console.log('[OneDrive] 🖼️ Foto-Upload startet:', file.name, '→', odFolder, '/', subFolder);
+                    let odResult = null;
+                    try {
+                        odResult = await uploadPhotoAndGetUrl(odFolder, subFolder, file);
+                    } catch (odErr) {
+                        console.warn('[OneDrive] Foto-Upload fehlgeschlagen, nutze Supabase als Fallback:', odErr.message);
+                    }
 
+                    if (!odResult) {
+                        console.warn('[OneDrive] ⚠️ uploadPhotoAndGetUrl gab null zurück (kein Token?) → Supabase-Fallback');
+                    }
+
+                    if (odResult) {
+                        // OneDrive erfolgreich → URL = temporäre Download-URL (gültig ~1h)
+                        // Lokale blob-URL bleibt als Fallback für aktuelle Session
+                        setFormData(prev => ({
+                            ...prev,
+                            images: prev.images.map(img =>
+                                img.id === tempId ? {
+                                    ...img,
+                                    preview: odResult.downloadUrl || previewUrl,
+                                    previewFallback: previewUrl,
+                                    oneDriveItemId: odResult.itemId,
+                                    oneDrivePath: odResult.odPath,
+                                    uploading: false,
+                                } : img
+                            )
+                        }));
+                        continue; // Supabase überspringen
+                    }
+                }
+
+                // ── Fallback: Supabase Storage (Dokumente oder kein OneDrive-Login) ──
+                if (supabase) {
+                    const ext = file.name.split('.').pop();
+                    const fileName = `cases/${formData.id || 'temp'}/images/${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${ext}`;
+                    const { error } = await supabase.storage.from('case-files').upload(fileName, file);
                     if (error) throw error;
-
-                    // Get Public URL
-                    const { data: { publicUrl } } = supabase.storage
-                        .from('case-files')
-                        .getPublicUrl(fileName);
-
-                    // Update state with real URL and remove uploading flag
+                    const { data: { publicUrl } } = supabase.storage.from('case-files').getPublicUrl(fileName);
                     setFormData(prev => ({
                         ...prev,
                         images: prev.images.map(img =>
                             img.id === tempId ? { ...img, preview: publicUrl, storagePath: fileName, uploading: false } : img
                         )
                     }));
-
-                    // OneDrive: Bild hochladen (nur echte Bilder, keine Dokumente)
-                    if (!isDoc) {
-                        try {
-                            const odFolder = buildProjectFolderName(
-                                formData.projectNumber || formData.id || 'Unbekannt',
-                                formData
-                            );
-                            const subFolder = contextData.assignedTo || contextData.roomName || 'Sonstiges';
-                            uploadPhotoFile(odFolder, subFolder, file).catch(e =>
-                                console.warn('[OneDrive] Foto-Upload fehlgeschlagen:', e.message)
-                            );
-                        } catch (e) {
-                            console.warn('[OneDrive] Foto-Upload fehlgeschlagen:', e.message);
-                        }
-                    }
-
-                } catch (error) {
-                    console.error('Upload failed:', error);
-                    // Mark as error
+                } else {
+                    // Offline: nur lokale Vorschau
                     setFormData(prev => ({
                         ...prev,
                         images: prev.images.map(img =>
-                            img.id === tempId ? { ...img, error: true, uploading: false } : img
+                            img.id === tempId ? { ...img, uploading: false } : img
                         )
                     }));
                 }
-            } else {
-                // Offline / No Supabase: Keep local preview, mark as not uploading (simulated success)
+
+            } catch (error) {
+                console.error('Upload failed:', error);
                 setFormData(prev => ({
                     ...prev,
                     images: prev.images.map(img =>
-                        img.id === tempId ? { ...img, uploading: false } : img
+                        img.id === tempId ? { ...img, error: true, uploading: false } : img
                     )
                 }));
             }

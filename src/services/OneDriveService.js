@@ -185,6 +185,68 @@ export async function uploadPhotoFile(folderName, subFolder, file) {
   console.log(`[OneDrive] ✅ Foto ${fileName} hochgeladen`);
 }
 
+/**
+ * Bild hochladen UND sofort nutzbare URL zurückgeben
+ * Ersetzt Supabase Storage für neue Fotos.
+ * @returns {{ itemId, odPath, downloadUrl }} oder null bei Fehler
+ */
+export async function uploadPhotoAndGetUrl(folderName, subFolder, file) {
+  const token = await getAccessToken();
+  if (!token) return null;
+
+  const safe = (s) => (s || 'Sonstiges').replace(/[^a-zA-Z0-9]/g, '_').replace(/_+/g, '_');
+  const ext = file.name.split('.').pop().toLowerCase() || 'jpg';
+  const fileName = `${safe(subFolder)}_${Date.now()}.${ext}`;
+  const folder = `${ROOT_FOLDER}/${folderName}/Fotos/${safe(subFolder)}`;
+  const odPath = `${folder}/${fileName}`;
+
+  // Unterordner sicherstellen
+  await ensureFolder(`${ROOT_FOLDER}/${folderName}/Fotos`, safe(subFolder));
+
+  // Upload – gleiche Methode wie bewährter PDF-Upload
+  await uploadFile(folder, fileName, file);
+
+  // Item-Details für downloadUrl und itemId
+  try {
+    const encodedItemPath = encodeURIComponent(odPath);
+    const res = await fetch(`${GRAPH_BASE}/me/drive/root:/${encodedItemPath}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (res.ok) {
+      const item = await res.json();
+      console.log(`[OneDrive] ✅ Foto hochgeladen: ${odPath}`);
+      return { itemId: item.id, odPath, downloadUrl: item['@microsoft.graph.downloadUrl'] || null };
+    }
+  } catch (e) {
+    console.warn('[OneDrive] Item-Details nicht abrufbar:', e.message);
+  }
+
+  console.log(`[OneDrive] ✅ Foto hochgeladen (ohne URL): ${odPath}`);
+  return { itemId: null, odPath, downloadUrl: null };
+}
+
+
+/**
+ * Frische Download-URL für ein gespeichertes OneDrive-Item holen
+ * (wird beim Laden älterer Projekte verwendet)
+ * @param {string} itemId  OneDrive Drive Item ID
+ */
+export async function getPhotoDownloadUrl(itemId) {
+  const token = await getAccessToken();
+  if (!token || !itemId) return null;
+  try {
+    const res = await fetch(
+      `${GRAPH_BASE}/me/drive/items/${itemId}?$select=id,@microsoft.graph.downloadUrl`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data['@microsoft.graph.downloadUrl'] || null;
+  } catch {
+    return null;
+  }
+}
+
 
 /**
  * Excel-Protokoll hochladen
