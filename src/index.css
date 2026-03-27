@@ -49,6 +49,63 @@ body {
   padding: 1.5rem;
 }
 
+/* Techniker-Mode: Responsive Projektgrid */
+.tech-projects-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+  width: 100%;
+}
+
+/* iPad 11" Portrait (820px+) → 2 Spalten */
+@media (min-width: 820px) {
+  .tech-projects-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+  }
+}
+
+/* iPad 12.9" Portrait (1024px+) → 3 Spalten */
+@media (min-width: 1024px) {
+  .tech-projects-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.25rem;
+  }
+}
+
+/* Techniker-Karte: Touch-optimiert */
+.tech-project-card {
+  background-color: var(--surface);
+  padding: 1rem;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  min-height: 72px;
+  transition: background 0.15s, border-color 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.tech-project-card:active {
+  background-color: rgba(14, 165, 233, 0.08);
+  border-color: rgba(14, 165, 233, 0.3);
+}
+
+/* Techniker Suchleiste: volle Breite auf Handy, auto auf iPad */
+.tech-search-bar {
+  width: 100%;
+  max-width: 100%;
+}
+
+@media (min-width: 820px) {
+  .tech-search-bar {
+    max-width: 400px;
+  }
+}
+
+
 /* Glassmorphism Cards */
 .card {
   background: var(--glass-bg);

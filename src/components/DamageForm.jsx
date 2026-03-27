@@ -1731,22 +1731,31 @@ END:VCARD`;
                         canvas.height = rows * tileSize;
                         const ctx = canvas.getContext('2d');
                         // Fetch tiles as blobs → objectURLs (avoids canvas CORS taint)
-                        await Promise.all(
-                            Array.from({ length: rows }, (_, r) =>
-                                Array.from({ length: cols }, (_, c) =>
-                                    fetch(`/osm-tile/${zoom}/${tileX + c - offX}/${tileY + r - offY}.png`)
-                                        .then(r => r.blob())
-                                        .then(blob => new Promise(res => {
-                                            const oUrl = URL.createObjectURL(blob);
-                                            const img = new Image();
-                                            img.onload = () => { ctx.drawImage(img, c * tileSize, r * tileSize); URL.revokeObjectURL(oUrl); res(); };
-                                            img.onerror = () => { URL.revokeObjectURL(oUrl); res(); };
-                                            img.src = oUrl;
-                                        }))
-                                        .catch(() => Promise.resolve())
-                                )
-                            ).flat()
-                        );
+                        // Each promise resolves only AFTER img.onload draws the tile onto the canvas
+                        const tilePromises = [];
+                        for (let r = 0; r < rows; r++) {
+                            for (let c = 0; c < cols; c++) {
+                                const tileUrl = `/osm-tile/${zoom}/${tileX + c - offX}/${tileY + r - offY}.png`;
+                                const col = c; // capture for closure
+                                const row = r;
+                                const p = fetch(tileUrl)
+                                    .then(resp => resp.blob())
+                                    .then(blob => new Promise(res => {
+                                        const oUrl = URL.createObjectURL(blob);
+                                        const img = new Image();
+                                        img.onload = () => {
+                                            ctx.drawImage(img, col * tileSize, row * tileSize);
+                                            URL.revokeObjectURL(oUrl);
+                                            res();
+                                        };
+                                        img.onerror = () => { URL.revokeObjectURL(oUrl); res(); };
+                                        img.src = oUrl;
+                                    }))
+                                    .catch(() => Promise.resolve());
+                                tilePromises.push(p);
+                            }
+                        }
+                        await Promise.all(tilePromises);
                         // Red pin marker
                         const cx = offX * tileSize + tileSize / 2;
                         const cy = offY * tileSize + tileSize / 2;

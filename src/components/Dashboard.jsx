@@ -426,7 +426,7 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
                 </div>
 
                 {/* Search Input */}
-                <div style={{ position: 'relative', width: '300px' }}>
+                <div style={{ position: 'relative', width: '100%', maxWidth: mode === 'technician' ? '100%' : '300px' }} className={mode === 'technician' ? 'tech-search-bar' : ''}>
                     <input
                         type="text"
                         placeholder="Suche (Name, Adresse, Gerät...)"
@@ -461,26 +461,16 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
             )}
 
             {mode === 'technician' ? (
-                <div data-testid="techniker-list" style={{ paddingBottom: '4rem', maxWidth: '600px', margin: '0 auto', width: '100%' }}>
+                <div data-testid="techniker-list" style={{ paddingBottom: '4rem', width: '100%' }}>
                     <div style={{ marginBottom: '0.75rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
                         {paginatedReports.length} Projekte gefunden
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    <div className="tech-projects-grid">
                         {paginatedReports.map(report => (
                             <div
                                 key={report.id}
                                 onClick={() => onSelectReport(report)}
-                                style={{
-                                    backgroundColor: 'var(--surface)',
-                                    padding: '0.75rem',
-                                    borderRadius: '10px',
-                                    border: '1px solid var(--border)',
-                                    boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    justifyContent: 'space-between',
-                                    alignItems: 'center'
-                                }}
+                                className="tech-project-card"
                             >
                                 <div style={{ flex: 1, minWidth: 0 }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.15rem' }}>
