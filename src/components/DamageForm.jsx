@@ -1771,7 +1771,14 @@ END:VCARD`;
                     }
 
                     try {
-                        const base64 = await urlToDataUrl(img.preview, img);
+                        // OneDrive-Bild: frische URL holen bevor wir Base64 konvertieren
+                        let previewUrl = img.preview;
+                        if (img.oneDriveItemId) {
+                            const freshUrl = await getPhotoDownloadUrl(img.oneDriveItemId).catch(() => null);
+                            if (freshUrl) previewUrl = freshUrl;
+                        }
+
+                        const base64 = await urlToDataUrl(previewUrl, img);
                         if (base64) {
                             return { ...img, preview: base64, isRenderable: true };
                         } else {
@@ -2218,6 +2225,35 @@ END:VCARD`;
             setConflicts(newConflicts);
             return nextData;
         });
+
+        // Geocoding-Fallback: Falls Strasse vorhanden aber PLZ/Ort fehlen → OpenStreetMap
+        if (data.schadenort?.strasse_nr && !data.schadenort?.plz && !data.schadenort?.ort) {
+            const geocodeStreet = async (street) => {
+                try {
+                    const q = encodeURIComponent(street + ', Schweiz');
+                    const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${q}&format=json&countrycodes=ch&addressdetails=1&limit=1`, {
+                        headers: { 'Accept-Language': 'de' }
+                    });
+                    const geoData = await res.json();
+                    if (geoData && geoData.length > 0) {
+                        const addr = geoData[0].address;
+                        const plz = addr.postcode || '';
+                        const ort = addr.city || addr.town || addr.village || addr.municipality || '';
+                        if (plz || ort) {
+                            console.log(`[Geocoding] ${street} → PLZ: ${plz}, Ort: ${ort}`);
+                            setFormData(prev => ({
+                                ...prev,
+                                zip: prev.zip || plz,
+                                city: prev.city || ort
+                            }));
+                        }
+                    }
+                } catch (e) {
+                    console.warn('Geocoding fehlgeschlagen:', e);
+                }
+            };
+            geocodeStreet(data.schadenort.strasse_nr);
+        }
 
         setShowEmailImport(false);
     };

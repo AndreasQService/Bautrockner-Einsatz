@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Filter, MapPin, Calendar, ArrowRight, Search, Trash2, FileText } from 'lucide-react'
 import InboxTodo from './InboxTodo'
+import WorkflowStatusOverview from './WorkflowStatusOverview'
 
 // Helper to calculate days difference
 const getDaysDiff = (startDate) => {
@@ -452,6 +453,7 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
             {/* Pass Filtered Reports to Monitors (only when not in Archive OR Technician Mode) */}
             {!showArchive && mode !== 'technician' && (
                 <>
+                    <WorkflowStatusOverview reports={filteredReports} onSelectReport={onSelectReport} />
                     <InboxTodo />
                     <MeasurementControlOverview reports={filteredReports} onSelectReport={onSelectReport} />
                     <DryingMonitor reports={filteredReports} onSelectReport={onSelectReport} />
@@ -497,7 +499,25 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
                                         {report.projectNumber || report.projectTitle || report.id}
                                     </div>
                                 </div>
-                                <ArrowRight size={18} style={{ color: 'var(--primary)', marginLeft: '0.5rem', flexShrink: 0 }} />
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', marginLeft: '0.5rem', flexShrink: 0 }}>
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (window.confirm(`Projekt "${report.projectTitle || report.id}" wirklich löschen?`)) {
+                                                onDeleteReport(report.id);
+                                            }
+                                        }}
+                                        style={{
+                                            background: 'none', border: 'none', cursor: 'pointer',
+                                            color: '#EF4444', padding: '0.3rem', borderRadius: '6px',
+                                            display: 'flex', alignItems: 'center'
+                                        }}
+                                        title="Projekt löschen"
+                                    >
+                                        <Trash2 size={16} />
+                                    </button>
+                                    <ArrowRight size={18} style={{ color: 'var(--primary)' }} />
+                                </div>
                             </div>
                         ))}
                     </div>
@@ -538,6 +558,7 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
                         <table className="data-table">
                             <thead>
                                 <tr>
+                                    <th style={{ width: '36px', position: 'sticky', top: 0, zIndex: 20, backgroundColor: 'var(--background)' }}></th>
                                     <th style={{ width: '100px', position: 'sticky', top: 0, zIndex: 20, backgroundColor: 'var(--background)', textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.05em' }}>Nr.</th>
                                     <th style={{ width: '100px', position: 'sticky', top: 0, zIndex: 20, backgroundColor: 'var(--background)', textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.05em' }}>Datum</th>
                                     <th style={{ minWidth: '150px', position: 'sticky', top: 0, zIndex: 20, backgroundColor: 'var(--background)', textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.05em' }}>Schadenort</th>
@@ -559,6 +580,18 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
                                     const hasLieferantenrechnung = report.images?.some(img => img.assignedTo === 'Sonstiges');
                                     return (
                                         <tr key={report.id} onClick={() => onSelectReport(report)} style={{ cursor: 'pointer' }}>
+                                            <td style={{ padding: '0.25rem 0.4rem', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        if (window.confirm(`Projekt löschen?`)) onDeleteReport(report.id);
+                                                    }}
+                                                    title="Projekt löschen"
+                                                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#EF4444', padding: '0.2rem', borderRadius: '4px', display: 'flex', alignItems: 'center', opacity: 0.6 }}
+                                                    onMouseEnter={e => e.currentTarget.style.opacity = 1}
+                                                    onMouseLeave={e => e.currentTarget.style.opacity = 0.6}
+                                                ><Trash2 size={14} /></button>
+                                            </td>
                                             <td style={{ fontWeight: 600, fontSize: '0.9rem' }}>{report.projectNumber || report.projectTitle || report.id}</td>
                                             <td style={{ fontSize: '0.875rem', whiteSpace: 'nowrap' }}>{formatDate(report.date)}</td>
                                             <td style={{ fontWeight: 500 }}>{report.locationDetails || '-'}</td>

@@ -87,13 +87,17 @@ const EmailImportModalV2 = ({ onClose, onImport, audioDevices, selectedDeviceId,
    ALLES VOR dieser Trennlinie = das äussere/eigene Email des Absenders.
    ALLES NACH dieser Trennlinie = weitergeleitete Inhalte anderer Personen → IGNORIEREN für Auftraggeber-Erkennung.
 
-   SCHRITT 2 – ABSENDER-SIGNATUR LESEN:
-   Die Signatur am Ende des äusseren Emails (vor der Trennlinie) enthält den Auftraggeber.
-   Erkennungsmuster: Vorname Name + Jobtitel + Firmenname + Adresse + Telefon/Email.
-   → 'auftrag_verwaltung.firma' = Firmenname aus dieser Signatur.
-   → 'auftrag_verwaltung.sachbearbeiter' = Person aus dieser Signatur.
-   → 'auftrag_verwaltung.telefon' = Telefon aus dieser Signatur.
-   → 'auftrag_verwaltung.email' = E-Mail aus dieser Signatur.
+   SCHRITT 2 – ABSENDER LESEN:
+   Die E-Mail-Adresse und Kontaktdaten des Absenders bestimmen den Auftraggeber.
+   Suche die Absender-Adresse in dieser Reihenfolge:
+   a) Header-Zeile am Textanfang: "Von: name@firma.ch", "From: Vorname Name <name@firma.ch>"
+   b) In der Signatur: jede Zeichenfolge mit @domain (z.B. sonja.streuli@matma.ch)
+   c) Nach "E-Mail:", "Email:", "Mail:" gefolgt von einer Adresse
+   AUSNAHME: datenschutz@, info@, noreply@ sind keine persönlichen Adressen → überspringen.
+   → 'auftrag_verwaltung.firma' = Firmenname aus der Signatur (auch aus @domain ableitbar falls im Text erwähnt).
+   → 'auftrag_verwaltung.sachbearbeiter' = Person aus der Signatur.
+   → 'auftrag_verwaltung.telefon' = Telefon aus der Signatur.
+   → 'auftrag_verwaltung.email' = E-Mail-Adresse wie oben gefunden.
 
    KONKRETES BEISPIEL:
    Text: "...Nikola Komani / Serviceleiter / Neukom Marzolo AG / Gewerbestrasse 13 / 8197 Rafz / nikola.komani@neukom-marzolo.ch
@@ -113,16 +117,24 @@ const EmailImportModalV2 = ({ onClose, onImport, audioDevices, selectedDeviceId,
    - PLZ/ORT: PLZ separat in schadenort.plz, Ort separat in schadenort.ort. Wenn die PLZ NICHT im Text steht, aber der Ort eindeutig identifizierbar ist, ergänze die Schweizer PLZ aus deinem Wissen (z.B. Dübendorf=8600, Zürich=8001, Winterthur=8400, Bern=3000, Basel=4051). NIEMALS kombiniert als plz_ort!
    - MEHRFACH-QUELLEN: Die Adresse kann auch in einer Signatur, Cc-Liste oder Weiterleitungszeile vorkommen ("Betreff:", "Subject:", "Objekt:").
 
-3. ROLLEN-LOGIK (STRIKTE REGELN):
+3. KONTAKT-EXTRAKTION (VOLLSTÄNDIG – PFLICHT):
+   Extrahiere ALLE im Text erwähnten Personen als separate Kontakteinträge. Jede Person mit Name UND/ODER Telefon muss als eigener Eintrag erscheinen.
+   
+   AUFLISTUNGEN: Wenn Personen nummeriert aufgelistet sind (1. Name Tel..., 2. Name Tel...), extrahiere JEDEN Eintrag separat.
+   MEHRERE TELEFONNUMMERN: Wenn eine Person 2 Nummern hat (z.B. "076 390 96 05, 043 399 57 39"), nimm die Mobilnummer (076/079) als primäre Telefonnummer.
+
+   ROLLEN-LOGIK (STRIKTE REGELN):
    Jede Person bekommt GENAU EINE Rolle. KEINE Doppelzuweisung erlaubt.
    Prioritätsreihenfolge bei Unklarheit: Handw. > Verw. > Eig. > HW > Mieter
-   
+
    - 'Handw.': Techniker, Sanitär, Heizung, Monteure, Handwerker-Firmen – NUR wenn sie am Schaden gearbeitet haben UND NICHT der Auftraggeber sind.
    - 'Verw.': Firmen mit Bezeichnung Verwaltung, Bewirtschaftung, Immobilien AG, Partner.
    - 'Mieter': NUR Personen die EXPLIZIT als "Mieter" bezeichnet werden, oder die in der beschädigten Wohnung wohnen (erkenntlich an: "wohnt in", "Mieter:", "bewohnt").
-   - 'Eig.': NUR die explizit als "Eigentümer:" oder "Eig.:" bezeichnete Person/Firma.
+   - 'Eig.': Personen/Firmen die explizit als "Eigentümer", "Eig.", "Stockwerkeigentümer", "Wohnungseigentümer" bezeichnet werden, ODER deren Wohnung/OG im Zusammenhang mit dem Schaden genannt wird (z.B. "1. OG: Bujar Morina", "2. OG: Peter Schmidlin").
    - 'HW': Hauswart.
    - FEHLER-KONTROLLE: Ein Sanitärtechniker ist KEIN Mieter. Eine Verwaltungsfirma ist kein Handwerker.
+   
+   ETAGE-FELD: Wenn die Etage/Wohnung der Person bekannt ist (z.B. "1. OG", "2. OG"), trage sie im Feld 'etage' ein.
 
 4. VERBOT VON PLATZHALTERN:
    - Die Ausgabe des Wortes "string" ist strengstens untersagt. 

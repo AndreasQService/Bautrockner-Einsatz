@@ -159,7 +159,7 @@ SCHADENORT-REGEL
 - "plz" = PLZ des Schadenorts – niemals kombiniert als "plz_ort"
 - "ort" = Ort des Schadenorts – niemals kombiniert als "plz_ort"
 - Schadenort nicht aus Eigentümer- oder Verwaltungsadresse ableiten.
-- PLZ/Ort DÜRFEN aus deinem Wissen über Schweizer Geographie ergänzt werden, wenn die Strasse eindeutig einem Ort zugeordnet werden kann (z.B. Leutschenbachstrasse → PLZ 8050, Ort Zürich). Nur wenn wirklich keine Zuordnung möglich ist, Felder leer lassen.
+- PLZ/Ort MÜSSEN aus deinem Wissen über Schweizer Geographie ergänzt werden, wenn die Strasse eindeutig einem Ort zugeordnet werden kann (z.B. Leutschenbachstrasse → PLZ 8050 Zürich, Rütiwisstrasse → PLZ 8604 Volketswil). Weitere Beispiele: Dübendorf=8600, Volketswil=8604, Zürich=80xx, Winterthur=8400, Bern=3000, Basel=4051. NUR wenn überhaupt keine Zuordnung möglich ist, Felder leer lassen.
 
 SCHADEN-REGEL
 - "art" = kurze Bezeichnung (z.B. "Wasserschaden", "Leckage", "Rohrbruch")
