@@ -5043,36 +5043,37 @@ END:VCARD`;
                                 }}
                             />
                         </div>
+                    </div>
+                )}
 
-                        {/* Centered Schadensbericht Button with PDF Logo */}
-                        <div style={{ display: 'flex', justifyContent: 'center', marginTop: '2.5rem', marginBottom: '1rem' }}>
-                            <button
-                                type="button"
-                                onClick={handleGeneratePDF}
-                                disabled={isGeneratingPDF}
-                                className="btn btn-primary"
-                                style={{
-                                    padding: '1.2rem 4rem',
-                                    fontSize: '1.5rem',
-                                    fontWeight: 900,
-                                    borderRadius: '24px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '1.25rem',
-                                    backgroundColor: '#0F6EA3', // Solid blue
-                                    color: 'white', // White text for maximum contrast
-                                    border: '3px solid rgba(255,255,255,0.2)',
-                                    boxShadow: '0 15px 35px -5px rgba(15, 110, 163, 0.6)',
-                                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                                    cursor: 'pointer',
-                                    textTransform: 'uppercase',
-                                    letterSpacing: '1px'
-                                }}
-                            >
-                                <PdfIcon size={32} />
-                                <span>Schadensbericht</span>
-                            </button>
-                        </div>
+                {/* PDF Button - Desktop Mode (immer sichtbar) */}
+                {mode === 'desktop' && (
+                    <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1rem', marginBottom: '2rem' }}>
+                        <button
+                            type="button"
+                            onClick={handleGeneratePDF}
+                            disabled={isGeneratingPDF}
+                            style={{
+                                padding: '1.1rem 3.5rem',
+                                fontSize: '1.3rem',
+                                fontWeight: 900,
+                                borderRadius: '20px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '1rem',
+                                backgroundColor: isGeneratingPDF ? '#555' : '#0F6EA3',
+                                color: 'white',
+                                border: '3px solid rgba(255,255,255,0.2)',
+                                boxShadow: isGeneratingPDF ? 'none' : '0 12px 30px -5px rgba(15, 110, 163, 0.55)',
+                                transition: 'all 0.3s ease',
+                                cursor: isGeneratingPDF ? 'not-allowed' : 'pointer',
+                                textTransform: 'uppercase',
+                                letterSpacing: '1px'
+                            }}
+                        >
+                            <PdfIcon size={28} />
+                            <span>{isGeneratingPDF ? 'Wird erstellt...' : 'Schadensbericht PDF'}</span>
+                        </button>
                     </div>
                 )}
 
@@ -5274,38 +5275,40 @@ END:VCARD`;
                                 style={{ width: '100%', minHeight: '100px', fontFamily: 'inherit', lineHeight: '1.5' }}
                             />
                         </div>
+                    </div>
+                )}
 
-                        {/* Centered Schadensbericht Button for Technician Mode (Tablet) */}
-                        <div style={{ display: 'flex', justifyContent: 'center', marginTop: '2rem', marginBottom: '1rem' }}>
-                            <button
-                                type="button"
-                                onClick={handleGeneratePDF}
-                                disabled={isGeneratingPDF}
-                                className="btn btn-primary"
-                                style={{
-                                    padding: '1.2rem 4rem',
-                                    fontSize: '1.5rem',
-                                    fontWeight: 900,
-                                    borderRadius: '24px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '1.25rem',
-                                    backgroundColor: '#0F6EA3',
-                                    color: 'white',
-                                    border: '3px solid rgba(255,255,255,0.2)',
-                                    boxShadow: '0 15px 35px -5px rgba(15, 110, 163, 0.6)',
-                                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                                    cursor: 'pointer',
-                                    textTransform: 'uppercase',
-                                    letterSpacing: '1px',
-                                    width: '100%', // Full width on tablet for better touch target
-                                    maxWidth: '500px'
-                                }}
-                            >
-                                <PdfIcon size={32} />
-                                <span>Schadensbericht</span>
-                            </button>
-                        </div>
+                {/* PDF Button - Techniker Mode (immer sichtbar) */}
+                {mode === 'technician' && (
+                    <div style={{ display: 'flex', justifyContent: 'center', marginTop: '0.5rem', marginBottom: '1.5rem' }}>
+                        <button
+                            type="button"
+                            onClick={handleGeneratePDF}
+                            disabled={isGeneratingPDF}
+                            style={{
+                                padding: '1.1rem 2rem',
+                                fontSize: '1.2rem',
+                                fontWeight: 900,
+                                borderRadius: '20px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '1rem',
+                                backgroundColor: isGeneratingPDF ? '#555' : '#0F6EA3',
+                                color: 'white',
+                                border: '3px solid rgba(255,255,255,0.2)',
+                                boxShadow: isGeneratingPDF ? 'none' : '0 12px 30px -5px rgba(15, 110, 163, 0.55)',
+                                transition: 'all 0.3s ease',
+                                cursor: isGeneratingPDF ? 'not-allowed' : 'pointer',
+                                textTransform: 'uppercase',
+                                letterSpacing: '1px',
+                                width: '100%',
+                                maxWidth: '480px',
+                                justifyContent: 'center'
+                            }}
+                        >
+                            <PdfIcon size={26} />
+                            <span>{isGeneratingPDF ? 'Wird erstellt...' : 'Schadensbericht PDF'}</span>
+                        </button>
                     </div>
                 )}
 

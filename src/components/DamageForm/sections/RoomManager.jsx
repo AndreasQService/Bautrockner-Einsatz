@@ -38,6 +38,7 @@ export default function RoomManager({
     const [dragRoomId, setDragRoomId] = useState(null);
     const [isDictating, setIsDictating] = useState(false);
     const [isRoomsExpanded, setIsRoomsExpanded] = useState(true);
+    const [lightboxImage, setLightboxImage] = useState(null);
     const recognitionRef = React.useRef(null);
 
     const startDictation = (onResult) => {
@@ -203,7 +204,12 @@ export default function RoomManager({
                                                 flexShrink: 0,
                                                 border: img.includeInReport !== false ? '2px solid #0F6EA3' : '1px solid var(--border)'
                                             }}>
-                                                <img src={img.preview} style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: 'pointer' }} onClick={() => setEditingImage(img)} />
+                                                <img
+                                                    src={img.preview}
+                                                    style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: 'zoom-in' }}
+                                                    onClick={() => setLightboxImage(img.preview)}
+                                                    title="Klicken zum Vergrössern"
+                                                />
 
                                                 {/* Include in Report Toggle */}
                                                 <div
@@ -235,6 +241,16 @@ export default function RoomManager({
                                                         style={{ width: '14px', height: '14px', cursor: 'pointer', accentColor: '#0F6EA3' }}
                                                     />
                                                 </div>
+
+                                                {/* Edit button */}
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => { e.stopPropagation(); setEditingImage(img); }}
+                                                    title="Bild bearbeiten"
+                                                    style={{ position: 'absolute', bottom: '2px', right: '20px', backgroundColor: 'rgba(14,165,233,0.85)', color: 'white', border: 'none', borderRadius: '50%', width: '18px', height: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, zIndex: 5, cursor: 'pointer' }}
+                                                >
+                                                    <Edit3 size={10} />
+                                                </button>
 
                                                 <button
                                                     type="button"
@@ -457,7 +473,10 @@ export default function RoomManager({
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                             {formData.images.filter(img => img.assignedTo === 'Schadenfotos').map((item, idx) => (
                                 <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem', backgroundColor: '#1E293B', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
-                                    <div style={{ width: '80px', height: '80px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: '4px', border: item.includeInReport !== false ? '2px solid #0F6EA3' : 'none' }}>
+                                    <div style={{ width: '80px', height: '80px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: '4px', border: item.includeInReport !== false ? '2px solid #0F6EA3' : 'none', cursor: 'zoom-in', overflow: 'hidden' }}
+                                        onClick={() => setLightboxImage(item.preview)}
+                                        title="Klicken zum Vergrössern"
+                                    >
                                         <img src={item.preview} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '4px' }} />
                                     </div>
 
@@ -1015,6 +1034,46 @@ export default function RoomManager({
                 </div>
             )}
             </>
+            )}
+
+            {/* Lightbox Overlay */}
+            {lightboxImage && (
+                <div
+                    onClick={() => setLightboxImage(null)}
+                    style={{
+                        position: 'fixed', inset: 0, zIndex: 9999,
+                        backgroundColor: 'rgba(0,0,0,0.92)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        cursor: 'zoom-out',
+                        backdropFilter: 'blur(4px)'
+                    }}
+                >
+                    <img
+                        src={lightboxImage}
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                            maxWidth: '92vw', maxHeight: '92vh',
+                            objectFit: 'contain',
+                            borderRadius: '8px',
+                            boxShadow: '0 8px 40px rgba(0,0,0,0.6)',
+                            cursor: 'default'
+                        }}
+                    />
+                    <button
+                        onClick={() => setLightboxImage(null)}
+                        style={{
+                            position: 'fixed', top: '1.5rem', right: '1.5rem',
+                            background: 'rgba(255,255,255,0.15)', border: 'none',
+                            color: 'white', borderRadius: '50%',
+                            width: '44px', height: '44px',
+                            fontSize: '1.4rem', cursor: 'pointer',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            backdropFilter: 'blur(4px)',
+                            transition: 'background 0.2s'
+                        }}
+                        title="Schliessen"
+                    >✕</button>
+                </div>
             )}
         </div>
     );
