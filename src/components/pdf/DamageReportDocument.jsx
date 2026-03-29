@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Document, Page, View, Image } from '@react-pdf/renderer';
+import { Document, Page, View, Image, Text } from '@react-pdf/renderer';
 
 // Import styles
 import { styles } from './PDFStyles';
@@ -87,20 +87,35 @@ const DamageReportDocument = ({ data }) => {
 
                 {/* Karte und/oder Aussenbild unter den Projektinfos */}
                 {(data.staticMapUrl || (data.exteriorPhoto && data.exteriorPhoto.startsWith('data:'))) && (
-                    <View>
+                    <View wrap={false}>
                         <View style={styles.divider} />
-                        <View style={{ flexDirection: 'row', gap: 6, marginBottom: 6, marginTop: 6 }}>
+                        <View style={{ flexDirection: 'row', gap: 6, marginBottom: 0, marginTop: 6 }}>
                             {data.staticMapUrl && (
-                                <Image
-                                    src={data.staticMapUrl}
-                                    style={{
-                                        flex: (data.exteriorPhoto && data.exteriorPhoto.startsWith('data:')) ? 1 : undefined,
-                                        width: (data.exteriorPhoto && data.exteriorPhoto.startsWith('data:')) ? undefined : '100%',
-                                        height: 160,
-                                        objectFit: 'cover',
-                                        borderRadius: 4,
-                                    }}
-                                />
+                                <View style={{
+                                    flex: (data.exteriorPhoto && data.exteriorPhoto.startsWith('data:')) ? 1 : undefined,
+                                    width: (data.exteriorPhoto && data.exteriorPhoto.startsWith('data:')) ? undefined : '100%',
+                                }}>
+                                    <Image
+                                        src={data.staticMapUrl}
+                                        style={{
+                                            width: '100%',
+                                            height: 150,
+                                            objectFit: 'cover',
+                                            borderRadius: 4,
+                                        }}
+                                    />
+                                    {/* Address caption below map */}
+                                    {(data.street || data.city) && (
+                                        <Text style={{
+                                            fontSize: 8,
+                                            color: '#475569',
+                                            marginTop: 3,
+                                            textAlign: 'center',
+                                        }}>
+                                            ▲ {[data.street, [data.zip, data.city].filter(Boolean).join(' ')].filter(Boolean).join(', ')}
+                                        </Text>
+                                    )}
+                                </View>
                             )}
                             {data.exteriorPhoto && data.exteriorPhoto.startsWith('data:') && (
                                 <Image
@@ -108,14 +123,14 @@ const DamageReportDocument = ({ data }) => {
                                     style={{
                                         flex: data.staticMapUrl ? 1 : undefined,
                                         width: data.staticMapUrl ? undefined : '100%',
-                                        height: 160,
+                                        height: 150,
                                         objectFit: 'cover',
                                         borderRadius: 4,
                                     }}
                                 />
                             )}
                         </View>
-                        <View style={styles.divider} />
+                        <View style={[styles.divider, { marginTop: 6 }]} />
                     </View>
                 )}
 

@@ -37,13 +37,15 @@ const RoomDocumentation = ({ rooms, images }) => {
                         return thermal ? { ...img, thermalImage: thermal } : img;
                     });
 
-                const firstImage = roomImages[0];
-                const restImages = roomImages.slice(1);
+                // First 2 images stay with header (wrap=false keeps them together)
+                // Remaining images flow freely across pages
+                const firstImages = roomImages.slice(0, 2);
+                const restImages = roomImages.slice(2);
 
                 return (
                     <View key={room.id || index} style={styles.roomContainer}>
-                        {/* Header Block + all images: keeps title with images on same page */}
-                    <View wrap={true}>
+                        {/* Header + first image pair: wrap=false keeps title with at least one row of images */}
+                        <View wrap={false}>
                             {isFirstRoom && (
                                 <View>
                                     <View style={styles.divider} />
@@ -68,11 +70,16 @@ const RoomDocumentation = ({ rooms, images }) => {
                             )}
                             <Text style={styles.roomHeader}>{room.name}</Text>
 
-                            {/* All room images – always 2 per row */}
-                            {roomImages.length > 0 && (
-                                <ImageGrid images={roomImages} />
+                            {/* First image pair stays with header */}
+                            {firstImages.length > 0 && (
+                                <ImageGrid images={firstImages} />
                             )}
                         </View>
+
+                        {/* Remaining images can flow across pages freely */}
+                        {restImages.length > 0 && (
+                            <ImageGrid images={restImages} />
+                        )}
                     </View>
                 );
             })}

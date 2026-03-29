@@ -1769,6 +1769,28 @@ END:VCARD`;
                         ctx.beginPath(); ctx.arc(cx, cy - 10, 9, 0, 2 * Math.PI);
                         ctx.fillStyle = '#e53e3e'; ctx.fill();
                         ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+
+                        // Address label under the pin
+                        const labelText = mapAddress;
+                        ctx.font = 'bold 15px Arial, sans-serif';
+                        const textMetrics = ctx.measureText(labelText);
+                        const labelW = textMetrics.width + 16;
+                        const labelH = 26;
+                        const labelX = cx - labelW / 2;
+                        const labelY = cy + 6;
+                        // White background box
+                        ctx.fillStyle = 'rgba(255,255,255,0.92)';
+                        ctx.beginPath();
+                        ctx.roundRect(labelX, labelY, labelW, labelH, 4);
+                        ctx.fill();
+                        // Border
+                        ctx.strokeStyle = '#cccccc';
+                        ctx.lineWidth = 1;
+                        ctx.stroke();
+                        // Text
+                        ctx.fillStyle = '#1a1a1a';
+                        ctx.fillText(labelText, labelX + 8, labelY + 17);
+
                         staticMapUrl = canvas.toDataURL('image/jpeg', 0.9);
                     }
                 }
