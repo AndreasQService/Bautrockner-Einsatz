@@ -1714,7 +1714,6 @@ END:VCARD`;
                     ? `${dataToUse.street}, ${dataToUse.zip || ''} ${dataToUse.city || ''}`
                     : dataToUse.address;
                 if (mapAddress) {
-                    window.__debugMap = { street: dataToUse?.street, zip: dataToUse?.zip, city: dataToUse?.city, mapAddress: mapAddress }; console.log("MAP_DEBUG:", JSON.stringify(window.__debugMap));
                     const geoResp = await fetch(`/nominatim/search?q=${encodeURIComponent(mapAddress)}&format=json&limit=1`);
                     const geoData = await geoResp.json();
                     if (geoData && geoData.length > 0) {
@@ -1731,9 +1730,6 @@ END:VCARD`;
                         canvas.width = cols * tileSize;
                         canvas.height = rows * tileSize;
                         const ctx = canvas.getContext('2d');
-                        // Fix 5: Weißer Hintergrund für JPEG (JPEG kennt keine Transparenz)
-                        ctx.fillStyle = '#ffffff';
-                        ctx.fillRect(0, 0, canvas.width, canvas.height);
                         // Fetch tiles as blobs → objectURLs (avoids canvas CORS taint)
                         // Each promise resolves only AFTER img.onload draws the tile onto the canvas
                         const tilePromises = [];
@@ -1779,9 +1775,7 @@ END:VCARD`;
                     const isDocCategory = ['schadensbericht', 'arbeitsrapporte', 'messprotokolle', 'sonstiges', 'pläne', 'lieferantenrechnungen'].includes(category);
                     const isProbablyPDF = img.preview?.toLowerCase().includes('.pdf') || img.type?.includes('pdf');
 
-                    const isImageFile = img.preview && /\.(jpg|jpeg|png|gif|webp|heic|heif)/i.test(img.preview);
-
-                    if (img.includeInReport === false || isProbablyPDF || (isDocCategory && !isImageFile)) {
+                    if (img.includeInReport === false || isDocCategory || isProbablyPDF) {
                         return { ...img, isRenderable: false };
                     }
 
@@ -1837,15 +1831,11 @@ END:VCARD`;
                 damageTypeImage: processedHeroImages[0] || null, // Primary one for fallback
                 exteriorPhoto: processedExteriorPhoto,
                 logo: logoData,
-                staticMapUrl: staticMapUrl ? await urlToDataUrl(staticMapUrl) : null,
+                staticMapUrl: staticMapUrl,
             };
 
             // Generate Blob using @react-pdf
-            const rawBlob = await pdf(<DamageReportDocument key={Math.random()} data={docData} />).toBlob();
-            if (!rawBlob || rawBlob.size === 0) {
-                throw new Error('PDF Blob ist leer - Layout-Fehler in react-pdf');
-            }
-            const blob = new Blob([rawBlob], { type: 'application/pdf' });
+            const blob = await pdf(<DamageReportDocument key={Math.random()} data={docData} />).toBlob();
             const now = new Date();
             const timeStr = `${String(now.getHours()).padStart(2, '0')}-${String(now.getMinutes()).padStart(2, '0')}`;
             const dateStr = now.toLocaleDateString('de-CH').replace(/\./g, '-');
@@ -1855,7 +1845,6 @@ END:VCARD`;
 
             // 1. Download File
             saveAs(blob, fileName);
-
 
             // 2. Upload to OneDrive (silent - no error if not logged in)
             try {

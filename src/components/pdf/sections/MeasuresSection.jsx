@@ -8,7 +8,7 @@ const MeasuresSection = ({ data }) => {
     if (!hasMeasures) return null;
 
     return (
-        <View style={{ marginBottom: 15 }} wrap={false}>
+        <View style={{ marginBottom: 15 }}>
             <View style={styles.divider} />
             <Text style={styles.sectionTitle}>MASSNAHMEN</Text>
             {data.selectedMeasures && data.selectedMeasures.length > 0 && (

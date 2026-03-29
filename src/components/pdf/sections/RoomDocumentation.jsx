@@ -43,7 +43,7 @@ const RoomDocumentation = ({ rooms, images }) => {
                 return (
                     <View key={room.id || index} style={styles.roomContainer}>
                         {/* Header Block + all images: keeps title with images on same page */}
-                        <View wrap={false}>
+                    <View wrap={true}>
                             {isFirstRoom && (
                                 <View>
                                     <View style={styles.divider} />
@@ -70,7 +70,7 @@ const RoomDocumentation = ({ rooms, images }) => {
 
                             {/* All room images – always 2 per row */}
                             {roomImages.length > 0 && (
-                                <ImageGrid images={roomImages} wrap={false} />
+                                <ImageGrid images={roomImages} />
                             )}
                         </View>
                     </View>

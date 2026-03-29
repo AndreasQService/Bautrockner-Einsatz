@@ -9,10 +9,10 @@ const PlansSection = ({ data }) => {
     if (plansImages.length === 0) return null;
 
     return (
-        <View style={{ marginBottom: 20 }} wrap={false}>
+        <View style={{ marginBottom: 20 }}>
             <View style={styles.divider} />
-            <Text style={styles.sectionTitle}>PLÄNE & GRUNDRISSE</Text>
-            <ImageGrid images={plansImages} showName={true} wrap={false} />
+            <Text style={styles.sectionTitle}>PLÄNE &amp; GRUNDRISSE</Text>
+            <ImageGrid images={plansImages} showName={true} />
         </View>
     );
 };

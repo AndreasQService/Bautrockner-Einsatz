@@ -9,7 +9,7 @@ const DataLoggerSection = ({ data }) => {
     if (!imagesToInclude || imagesToInclude.length === 0) return null;
 
     return (
-        <View wrap={false} style={{ marginTop: 20 }}>
+        <View style={{ marginTop: 20 }}>
             <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>Anlagen: Messprotokolle / Datenlogger</Text>
             </View>

@@ -2,43 +2,57 @@ import React from 'react';
 import { View, Image, Text } from '@react-pdf/renderer';
 import { styles } from '../PDFStyles';
 
-const ImageGrid = ({ images, showName = false, imageStyle = styles.image, containerStyle = styles.imageContainer, wrap = true }) => {
+const ImageGrid = ({ images, showName = false, imageStyle = styles.image, containerStyle = styles.imageContainer }) => {
     if (!images || images.length === 0) return null;
 
-    return (
-        <View style={styles.imageGrid}>
-            {images.map((img, i) => (
-                <React.Fragment key={i}>
-                    <View style={containerStyle} wrap={wrap}>
-                        {img.preview ? (
-                            <Image src={img.preview} style={imageStyle} />
-                        ) : (
-                            <View style={[imageStyle, { alignItems: 'center', justifyContent: 'center', backgroundColor: '#f1f5f9' }]}>
-                                <Text style={{ fontSize: 8, color: '#ef4444' }}>[ BILD NICHT VERFÜGBAR ]</Text>
-                            </View>
-                        )}
-                        {showName ? (
-                            img.name && <Text style={styles.imageDescription}>{img.name.length > 80 ? img.name.substring(0, 80) + '…' : img.name}</Text>
-                        ) : (
-                            img.description && <Text style={styles.imageDescription}>{img.description.length > 80 ? img.description.substring(0, 80) + '…' : img.description}</Text>
-                        )}
-                    </View>
+    // Flatten: expand thermalImage pairs into single list including thermal entries
+    const flatImages = [];
+    images.forEach(img => {
+        flatImages.push(img);
+        if (img.thermalImage) {
+            flatImages.push({
+                ...img.thermalImage,
+                _isThermal: true,
+                _parentDescription: img.description,
+            });
+        }
+    });
 
-                    {img.thermalImage && (
-                        <View style={containerStyle} wrap={wrap}>
-                            {img.thermalImage.preview ? (
-                                <Image src={img.thermalImage.preview} style={imageStyle} />
+    // Group into pairs for 2-column layout
+    // react-pdf can't paginate flexWrap:'wrap' rows, so we use explicit row Views
+    const pairs = [];
+    for (let i = 0; i < flatImages.length; i += 2) {
+        pairs.push(flatImages.slice(i, i + 2));
+    }
+
+    return (
+        <View>
+            {pairs.map((pair, pairIndex) => (
+                // Each row pair uses wrap={false} to keep 2 images together on same page
+                <View key={pairIndex} style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 }} wrap={false}>
+                    {pair.map((img, i) => (
+                        <View key={i} style={[containerStyle, { marginBottom: 0 }]}>
+                            {img.preview ? (
+                                <Image src={img.preview} style={imageStyle} />
                             ) : (
                                 <View style={[imageStyle, { alignItems: 'center', justifyContent: 'center', backgroundColor: '#f1f5f9' }]}>
                                     <Text style={{ fontSize: 8, color: '#ef4444' }}>[ BILD NICHT VERFÜGBAR ]</Text>
                                 </View>
                             )}
-                            <Text style={[styles.imageDescription, { color: '#ef4444', fontWeight: 'bold' }]}>
-                                [Thermobild] {img.thermalImage.description || img.description || ''}
-                            </Text>
+                            {img._isThermal ? (
+                                <Text style={[styles.imageDescription, { color: '#ef4444', fontWeight: 'bold' }]}>
+                                    [Thermobild] {img.description || img._parentDescription || ''}
+                                </Text>
+                            ) : showName ? (
+                                img.name && <Text style={styles.imageDescription}>{img.name.length > 80 ? img.name.substring(0, 80) + '…' : img.name}</Text>
+                            ) : (
+                                img.description && <Text style={styles.imageDescription}>{img.description.length > 80 ? img.description.substring(0, 80) + '…' : img.description}</Text>
+                            )}
                         </View>
-                    )}
-                </React.Fragment>
+                    ))}
+                    {/* Fill empty slot if odd number */}
+                    {pair.length === 1 && <View style={[containerStyle, { marginBottom: 0 }]} />}
+                </View>
             ))}
         </View>
     );
