@@ -1743,10 +1743,13 @@ END:VCARD`;
                                 const col = c; // capture for closure
                                 const row = r;
                                 const p = fetch(tileUrl)
-                                    .then(resp => resp.blob())
+                                    .then(resp => {
+                                        if (!resp.ok) throw new Error(`Tile HTTP ${resp.status}`);
+                                        return resp.blob();
+                                    })
                                     .then(blob => new Promise(res => {
                                         const oUrl = URL.createObjectURL(blob);
-                                        const img = new Image();
+                                        const img = new window.Image(); // use window.Image to avoid conflict with react-pdf Image import
                                         img.onload = () => {
                                             ctx.drawImage(img, col * tileSize, row * tileSize);
                                             URL.revokeObjectURL(oUrl);
@@ -1837,7 +1840,7 @@ END:VCARD`;
                 damageTypeImage: processedHeroImages[0] || null, // Primary one for fallback
                 exteriorPhoto: processedExteriorPhoto,
                 logo: logoData,
-                staticMapUrl: staticMapUrl ? await urlToDataUrl(staticMapUrl) : null,
+                staticMapUrl: staticMapUrl || null,
             };
 
             // Generate Blob using @react-pdf
