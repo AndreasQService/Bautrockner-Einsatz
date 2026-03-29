@@ -1720,18 +1720,18 @@ END:VCARD`;
                     if (geoData && geoData.length > 0) {
                         const lat = parseFloat(geoData[0].lat);
                         const lon = parseFloat(geoData[0].lon);
-                        const zoom = 15;
+                        const zoom = 17; // Street level – shows house numbers and address labels
                         const lon2tile = (l, z) => Math.floor((l + 180) / 360 * Math.pow(2, z));
                         const lat2tile = (l, z) => Math.floor((1 - Math.log(Math.tan(l * Math.PI / 180) + 1 / Math.cos(l * Math.PI / 180)) / Math.PI) / 2 * Math.pow(2, z));
                         const tileX = lon2tile(lon, zoom);
                         const tileY = lat2tile(lat, zoom);
-                        const cols = 3, rows = 2, tileSize = 256;
+                        const cols = 5, rows = 3, tileSize = 256;
                         const offX = Math.floor(cols / 2), offY = Math.floor(rows / 2);
                         const canvas = document.createElement('canvas');
                         canvas.width = cols * tileSize;
                         canvas.height = rows * tileSize;
                         const ctx = canvas.getContext('2d');
-                        // Fix 5: Weißer Hintergrund für JPEG (JPEG kennt keine Transparenz)
+                        // White background for JPEG (JPEG has no transparency)
                         ctx.fillStyle = '#ffffff';
                         ctx.fillRect(0, 0, canvas.width, canvas.height);
                         // Fetch tiles as blobs → objectURLs (avoids canvas CORS taint)
