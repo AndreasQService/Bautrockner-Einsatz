@@ -1720,12 +1720,12 @@ END:VCARD`;
                     if (geoData && geoData.length > 0) {
                         const lat = parseFloat(geoData[0].lat);
                         const lon = parseFloat(geoData[0].lon);
-                        const zoom = 17; // Street level – shows house numbers and address labels
+                        const zoom = 16; // Good street-level zoom – shows house numbers and street names
                         const lon2tile = (l, z) => Math.floor((l + 180) / 360 * Math.pow(2, z));
                         const lat2tile = (l, z) => Math.floor((1 - Math.log(Math.tan(l * Math.PI / 180) + 1 / Math.cos(l * Math.PI / 180)) / Math.PI) / 2 * Math.pow(2, z));
                         const tileX = lon2tile(lon, zoom);
                         const tileY = lat2tile(lat, zoom);
-                        const cols = 5, rows = 3, tileSize = 256;
+                        const cols = 4, rows = 3, tileSize = 256;
                         const offX = Math.floor(cols / 2), offY = Math.floor(rows / 2);
                         const canvas = document.createElement('canvas');
                         canvas.width = cols * tileSize;
