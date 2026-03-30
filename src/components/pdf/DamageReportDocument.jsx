@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Document, Page, View, Image, Text } from '@react-pdf/renderer';
+import { Document, Page, View, Image } from '@react-pdf/renderer';
 
 // Import styles
 import { styles } from './PDFStyles';
@@ -89,7 +89,7 @@ const DamageReportDocument = ({ data }) => {
                 {(data.staticMapUrl || (data.exteriorPhoto && data.exteriorPhoto.startsWith('data:'))) && (
                     <View>
                         <View style={styles.divider} />
-                        <View style={{ flexDirection: 'row', gap: 6, marginBottom: 2, marginTop: 6 }}>
+                        <View style={{ flexDirection: 'row', gap: 6, marginBottom: 6, marginTop: 6 }}>
                             {data.staticMapUrl && (
                                 <Image
                                     src={data.staticMapUrl}
@@ -115,12 +115,6 @@ const DamageReportDocument = ({ data }) => {
                                 />
                             )}
                         </View>
-                        {/* Address caption below map */}
-                        {data.staticMapUrl && (data.street || data.city) && (
-                            <Text style={{ fontSize: 8, color: '#475569', marginBottom: 4, textAlign: 'center' }}>
-                                {[data.street, data.zip, data.city].filter(Boolean).join(' ')}
-                            </Text>
-                        )}
                         <View style={styles.divider} />
                     </View>
                 )}

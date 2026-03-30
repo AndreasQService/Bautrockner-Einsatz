@@ -1714,42 +1714,36 @@ END:VCARD`;
                     ? `${dataToUse.street}, ${dataToUse.zip || ''} ${dataToUse.city || ''}`
                     : dataToUse.address;
                 if (mapAddress) {
-                    window.__debugMap = { street: dataToUse?.street, zip: dataToUse?.zip, city: dataToUse?.city, mapAddress: mapAddress }; console.log("MAP_DEBUG:", JSON.stringify(window.__debugMap));
-                    const geoResp = await fetch(`/nominatim/search?q=${encodeURIComponent(mapAddress)}&format=json&limit=1`);
+                    const geoResp = await fetch(`/nominatim/search?q=${encodeURIComponent(mapAddress)}&format=json&addressdetails=1&limit=1`);
                     const geoData = await geoResp.json();
                     if (geoData && geoData.length > 0) {
                         const lat = parseFloat(geoData[0].lat);
                         const lon = parseFloat(geoData[0].lon);
-                        const zoom = 16; // Good street-level zoom – shows house numbers and street names
+                        const zoom = 15;
                         const lon2tile = (l, z) => Math.floor((l + 180) / 360 * Math.pow(2, z));
                         const lat2tile = (l, z) => Math.floor((1 - Math.log(Math.tan(l * Math.PI / 180) + 1 / Math.cos(l * Math.PI / 180)) / Math.PI) / 2 * Math.pow(2, z));
                         const tileX = lon2tile(lon, zoom);
                         const tileY = lat2tile(lat, zoom);
-                        const cols = 4, rows = 3, tileSize = 256;
+                        const cols = 3, rows = 2, tileSize = 256;
                         const offX = Math.floor(cols / 2), offY = Math.floor(rows / 2);
                         const canvas = document.createElement('canvas');
                         canvas.width = cols * tileSize;
                         canvas.height = rows * tileSize;
                         const ctx = canvas.getContext('2d');
-                        // White background for JPEG (JPEG has no transparency)
                         ctx.fillStyle = '#ffffff';
                         ctx.fillRect(0, 0, canvas.width, canvas.height);
                         // Fetch tiles as blobs → objectURLs (avoids canvas CORS taint)
-                        // Each promise resolves only AFTER img.onload draws the tile onto the canvas
                         const tilePromises = [];
                         for (let r = 0; r < rows; r++) {
                             for (let c = 0; c < cols; c++) {
                                 const tileUrl = `/osm-tile/${zoom}/${tileX + c - offX}/${tileY + r - offY}.png`;
-                                const col = c; // capture for closure
+                                const col = c;
                                 const row = r;
                                 const p = fetch(tileUrl)
-                                    .then(resp => {
-                                        if (!resp.ok) throw new Error(`Tile HTTP ${resp.status}`);
-                                        return resp.blob();
-                                    })
+                                    .then(resp => resp.blob())
                                     .then(blob => new Promise(res => {
                                         const oUrl = URL.createObjectURL(blob);
-                                        const img = new window.Image(); // use window.Image to avoid conflict with react-pdf Image import
+                                        const img = new window.Image(); // window.Image avoids conflict with lucide-react Image import
                                         img.onload = () => {
                                             ctx.drawImage(img, col * tileSize, row * tileSize);
                                             URL.revokeObjectURL(oUrl);
@@ -1763,38 +1757,16 @@ END:VCARD`;
                             }
                         }
                         await Promise.all(tilePromises);
-                        // Red pin marker
+                        // Red pin marker at center
                         const cx = offX * tileSize + tileSize / 2;
                         const cy = offY * tileSize + tileSize / 2;
                         ctx.beginPath(); ctx.arc(cx, cy - 10, 9, 0, 2 * Math.PI);
                         ctx.fillStyle = '#e53e3e'; ctx.fill();
                         ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
-
-                        // Address label under the pin
-                        const labelText = mapAddress;
-                        ctx.font = 'bold 15px Arial, sans-serif';
-                        const textMetrics = ctx.measureText(labelText);
-                        const labelW = textMetrics.width + 16;
-                        const labelH = 26;
-                        const labelX = cx - labelW / 2;
-                        const labelY = cy + 6;
-                        // White background box
-                        ctx.fillStyle = 'rgba(255,255,255,0.92)';
-                        ctx.beginPath();
-                        ctx.roundRect(labelX, labelY, labelW, labelH, 4);
-                        ctx.fill();
-                        // Border
-                        ctx.strokeStyle = '#cccccc';
-                        ctx.lineWidth = 1;
-                        ctx.stroke();
-                        // Text
-                        ctx.fillStyle = '#1a1a1a';
-                        ctx.fillText(labelText, labelX + 8, labelY + 17);
-
                         staticMapUrl = canvas.toDataURL('image/jpeg', 0.9);
                     }
                 }
-            } catch (e) { console.warn("Static map error", e); }
+            } catch (e) { console.warn('Static map error', e); }
 
             // Pre-process images - Filter out PDFs and non-renderable documents
             console.log("PDF GEN: Starting image processing...");

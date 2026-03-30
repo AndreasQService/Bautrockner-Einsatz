@@ -103,6 +103,12 @@ export default defineConfig({
         rewrite: (path) => path.replace(/^\/osm-tile/, ''),
         headers: { 'User-Agent': 'QTool/1.0 (q-service.ch)' },
       },
+      '/carto-tile': {
+        target: 'https://basemaps.cartocdn.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/carto-tile/, ''),
+        headers: { 'User-Agent': 'QTool/1.0 (q-service.ch)' },
+      },
       '/nominatim': {
         target: 'https://nominatim.openstreetmap.org',
         changeOrigin: true,
