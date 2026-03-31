@@ -1826,12 +1826,25 @@ END:VCARD`;
             }
 
             // Prepare Data for Document Component
+            // Räume: Kontakt-Etage überschreibt altes room.stockwerk aus DB
+            const liveContacts = dataToUse.contacts || [];
+            const enrichedRooms = (dataToUse.rooms || []).map(room => {
+                const apt = (room.apartment || '').toLowerCase().trim();
+                const match = liveContacts.find(c => {
+                    const cn = (c.name || '').toLowerCase().trim();
+                    return cn && apt && (cn.includes(apt) || apt.includes(cn));
+                });
+                const floor = (match?.floor || '').trim();
+                return floor ? { ...room, stockwerk: floor } : room;
+            });
+
             const docData = {
                 ...dataToUse,
+                rooms: enrichedRooms,
                 damageType: dataToUse.damageCategory || '-',
                 images: processedImages,
-                damageTypeImages: processedHeroImages, // All selected cause photos
-                damageTypeImage: processedHeroImages[0] || null, // Primary one for fallback
+                damageTypeImages: processedHeroImages,
+                damageTypeImage: processedHeroImages[0] || null,
                 exteriorPhoto: processedExteriorPhoto,
                 logo: logoData,
                 staticMapUrl: staticMapUrl || null,

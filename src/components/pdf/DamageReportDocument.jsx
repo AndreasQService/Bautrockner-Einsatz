@@ -52,9 +52,11 @@ const DamageReportDocument = ({ data }) => {
 
                 // data.images is already pre-filtered for includeInReport in DamageForm.jsx,
                 // but we double check here for safety.
+                // Name-Fallback nur wenn Bild keine eigene roomId hat (sonst erscheinen
+                // Bilder gelöschter Räume via gleichem Raumnamen in falschen Räumen)
                 return img.includeInReport !== false && (
                     (imgRoomId && roomId && imgRoomId === roomId) ||
-                    (assignedTo === roomName)
+                    (!imgRoomId && assignedTo === roomName)
                 );
             });
 

@@ -26,7 +26,7 @@ const RoomDocumentation = ({ rooms, images, contacts = [] }) => {
                     const roomName = String(room.name || '').trim().toLowerCase();
                     return img.includeInReport !== false && (
                         (img.roomId && String(img.roomId) === String(room.id)) ||
-                        (assignedTo === roomName)
+                        (!img.roomId && assignedTo === roomName)
                     );
                 });
 
