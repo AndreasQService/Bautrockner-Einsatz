@@ -193,12 +193,12 @@ export default function RoomManager({
                                         Keine Schadenfotos vorhanden.
                                     </div>
                                 ) : (
-                                    <div style={{ display: 'flex', gap: '0.5rem', overflowX: 'auto', paddingBottom: '0.5rem', minHeight: '80px' }}>
+                                    <div style={{ display: 'flex', gap: '0.5rem', overflowX: 'auto', paddingBottom: '0.5rem', minHeight: '100px' }}>
                                         {formData.images.filter(img => img.assignedTo === 'Schadenfotos').map((img, idx) => (
                                             <div key={idx} style={{
                                                 position: 'relative',
-                                                width: '80px',
-                                                height: '80px',
+                                                width: '100px',
+                                                height: '100px',
                                                 borderRadius: '4px',
                                                 overflow: 'hidden',
                                                 flexShrink: 0,
@@ -472,37 +472,56 @@ export default function RoomManager({
                         {/* List */}
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                             {formData.images.filter(img => img.assignedTo === 'Schadenfotos').map((item, idx) => (
-                                <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem', backgroundColor: '#1E293B', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
-                                    <div style={{ width: '80px', height: '80px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: '4px', border: item.includeInReport !== false ? '2px solid #0F6EA3' : 'none', cursor: 'zoom-in', overflow: 'hidden' }}
-                                        onClick={() => setLightboxImage(item.preview)}
-                                        title="Klicken zum Vergrössern"
-                                    >
-                                        <img src={item.preview} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '4px' }} />
+                                <div key={idx} style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start', border: '1px solid var(--border)', padding: '0.5rem', borderRadius: '6px', backgroundColor: 'var(--background)' }}>
+                                    {/* Thumbnail + Controls */}
+                                    <div style={{ flex: '0 0 100px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
+                                        <div style={{ width: '100px', height: '100px', borderRadius: '6px', overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+                                            <img src={item.preview} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: 'pointer' }} onClick={() => setEditingImage(item)} />
+                                        </div>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', padding: '0 2px', alignItems: 'center' }}>
+                                            <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', fontSize: '0.75rem', cursor: 'pointer', color: 'var(--text-main)' }}>
+                                                <input
+                                                    type="checkbox"
+                                                    style={{ width: '16px', height: '16px', accentColor: 'var(--primary)', cursor: 'pointer' }}
+                                                    checked={item.includeInReport !== false}
+                                                    onChange={() => setFormData(prev => ({
+                                                        ...prev,
+                                                        images: prev.images.map(i => i.preview === item.preview ? { ...i, includeInReport: i.includeInReport === false } : i)
+                                                    }))}
+                                                />
+                                                <span style={{ fontWeight: 600 }}>Bericht</span>
+                                            </label>
+                                            <button
+                                                type="button"
+                                                title="Bearbeiten"
+                                                style={{ border: '1px solid var(--border)', backgroundColor: 'var(--surface)', color: 'var(--text-main)', cursor: 'pointer', padding: '6px', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                                onClick={() => setEditingImage(item)}
+                                            >
+                                                <Edit3 size={16} />
+                                            </button>
+                                        </div>
                                     </div>
 
-                                    {/* Unified Toggle */}
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', padding: '0 0.5rem', cursor: 'pointer' }}
-                                        title="In PDF Bericht anzeigen"
-                                        onClick={() => setFormData(prev => ({
-                                            ...prev,
-                                            images: prev.images.map(i => i.preview === item.preview ? { ...i, includeInReport: i.includeInReport === false } : i)
-                                        }))}>
-                                        <input
-                                            type="checkbox"
-                                            checked={item.includeInReport !== false}
-                                            readOnly
-                                            style={{ width: '1.25rem', height: '1.25rem', cursor: 'pointer', accentColor: '#0F6EA3' }}
+                                    {/* Description + Delete */}
+                                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100px' }}>
+                                        <textarea
+                                            placeholder="Beschreibung..."
+                                            className="form-input"
+                                            style={{ fontSize: '0.9rem', padding: '0.5rem', flex: 1, width: '100%', resize: 'none', backgroundColor: 'var(--surface)', color: 'var(--text-main)' }}
+                                            value={item.description || ''}
+                                            onChange={(e) => {
+                                                const newDesc = e.target.value;
+                                                setFormData(prev => ({
+                                                    ...prev,
+                                                    images: prev.images.map(i => i.preview === item.preview ? { ...i, description: newDesc } : i)
+                                                }));
+                                            }}
                                         />
                                     </div>
-
-                                    <div style={{ flex: 1, fontWeight: 500, color: 'var(--text-main)' }}>
-                                        {item.name}
-                                        {item.includeInReport !== false && (
-                                            <div style={{ fontSize: '0.8rem', color: '#0F6EA3', fontWeight: 600 }}>In Bericht</div>
-                                        )}
+                                    {/* Delete */}
+                                    <div style={{ display: 'flex', flexDirection: 'column', height: '100px', justifyContent: 'flex-start' }}>
+                                        <button type="button" onClick={() => setFormData(prev => ({ ...prev, images: prev.images.filter(i => i !== item) }))} style={{ color: '#EF4444', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '6px', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}><Trash size={16} /></button>
                                     </div>
-
-                                    <button type="button" className="btn btn-ghost" onClick={() => setFormData(prev => ({ ...prev, images: prev.images.filter(i => i !== item) }))} style={{ color: '#EF4444', padding: '0.5rem', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(239, 68, 68, 0.1)' }}><Trash size={18} /></button>
                                 </div>
                             ))}
                         </div>

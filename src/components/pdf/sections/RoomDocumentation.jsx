@@ -4,7 +4,7 @@ import { View, Image, Text } from '@react-pdf/renderer';
 import { styles } from '../PDFStyles';
 import ImageGrid from '../components/ImageGrid';
 
-const RoomDocumentation = ({ rooms, images }) => {
+const RoomDocumentation = ({ rooms, images, contacts = [] }) => {
     let currentApartment = null;
     let currentFloor = null;
 
@@ -58,8 +58,15 @@ const RoomDocumentation = ({ rooms, images }) => {
                                     <Text style={styles.apartmentHeader}>
                                         {(() => {
                                             const apt = room.apartment || '';
+                                            // Kontakt mit passendem Namen suchen → floor nehmen
+                                            const matchingContact = contacts.find(c =>
+                                                c.name && apt && c.name.toLowerCase().includes(apt.toLowerCase())
+                                            );
+                                            const floor = matchingContact?.floor || matchingContact?.apartment || room.stockwerk || '';
                                             const hasKeyword = apt.toLowerCase().includes('wohnung') || apt.toLowerCase().includes('whg');
-                                            const displayApt = (apt && !hasKeyword) ? `Whg. ${apt}` : apt;
+                                            // Nur Nachname (letztes Wort) für die Anzeige
+                                            const lastName = apt.trim().split(/\s+/).pop() || apt;
+                                            const displayApt = (apt && !hasKeyword) ? `Whg. ${lastName}` : apt;
                                             if (room.stockwerk && displayApt && displayApt.toLowerCase().includes(room.stockwerk.toLowerCase())) {
                                                 return displayApt;
                                             }

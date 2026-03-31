@@ -22,7 +22,7 @@ const CauseSection = ({ data }) => {
         <>
             {/* Findings */}
             {findings && (
-                <View style={{ marginBottom: 15, marginTop: 20 }}>
+                <View style={{ marginBottom: 15, marginTop: 20 }} wrap={false}>
                     <View style={styles.divider} />
                     <Text style={styles.sectionTitle}>FESTSTELLUNGEN</Text>
                     <Text style={styles.textBlock}>{findings}</Text>
@@ -31,7 +31,7 @@ const CauseSection = ({ data }) => {
 
             {/* Damage Cause Section & Hero Photos */}
             {hasCause && (
-                <View style={{ marginBottom: 15 }}>
+                <View style={{ marginBottom: 15 }} wrap={false}>
                     <View style={styles.divider} />
                     <View style={{ marginBottom: 10 }}>
                         <Text style={styles.sectionTitle}>SCHADENURSACHE</Text>

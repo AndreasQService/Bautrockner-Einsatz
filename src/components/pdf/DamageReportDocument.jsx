@@ -71,7 +71,19 @@ const DamageReportDocument = ({ data }) => {
             }
             return isValid;
         });
-        return sortRooms(roomsWithContent);
+        return sortRooms(roomsWithContent).map(room => {
+            // Kontakt-Etage hat Vorrang vor gespeichertem room.stockwerk
+            const apt = room.apartment || '';
+            const contacts = data.contacts || [];
+            const match = contacts.find(c =>
+                c.name && apt && (
+                    c.name.toLowerCase().includes(apt.toLowerCase()) ||
+                    apt.toLowerCase().includes(c.name.toLowerCase())
+                )
+            );
+            const floorFromContact = match?.floor && match.floor.trim() ? match.floor.trim() : null;
+            return floorFromContact ? { ...room, stockwerk: floorFromContact } : room;
+        });
     }, [data.rooms, data.images]);
 
 
@@ -125,7 +137,8 @@ const DamageReportDocument = ({ data }) => {
 
 
                 {/* Raumdokumentation Section */}
-                <RoomDocumentation rooms={validRooms} images={data.images} />
+                <RoomDocumentation rooms={validRooms} images={data.images} contacts={data.contacts} />
+
 
 
                 <PlansSection data={data} />
