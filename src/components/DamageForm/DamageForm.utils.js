@@ -86,9 +86,13 @@ export const urlToDataUrl = async (url, imgObj = null, supabase = null) => {
 
     if (supabase && (url.includes('supabase.co') || imgObj?.storagePath)) {
         try {
-            let path = imgObj?.storagePath || (url.includes('case-files/') ? url.split('case-files/').pop()?.split('?')[0] : null);
+            const bucketMatch = url.match(/\/object\/(?:public\/)?([^/?]+)\//);
+            const bucket = bucketMatch ? bucketMatch[1] : 'case-files';
+            let path = imgObj?.storagePath
+                ? String(imgObj.storagePath).replace(/^\/+/, '').replace(/^case-files\//i, '').replace(/^damage-images\//i, '').trim()
+                : (url.includes(`${bucket}/`) ? url.split(`${bucket}/`).pop()?.split('?')[0] : null);
             if (path) {
-                const { data, error } = await supabase.storage.from('case-files').download(path);
+                const { data, error } = await supabase.storage.from(bucket).download(path);
                 if (data && !error) {
                     const raw = await new Promise((resolve) => {
                         const reader = new FileReader();

@@ -14,7 +14,7 @@ const MapSection = ({ mapImageUrl }) => {
                     src={mapImageUrl}
                     style={{ width: '100%', height: 220 }}
                 />
-                <Text style={styles.imageDescription}>Standortkarte – {''}</Text>
+                <Text style={styles.imageDescription}>Standortkarte</Text>
             </View>
         </View>
     );

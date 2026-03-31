@@ -1496,28 +1496,23 @@ END:VCARD`;
         const urlToDataUrl = async (url, imgObj = null) => {
             if (!url) return null;
 
+            // Resize helper
             const resizeImage = async (dataUrl) => {
-                if (!dataUrl) return null;
+                if (!dataUrl || !dataUrl.startsWith('data:')) return null;
                 return new Promise((resolve) => {
                     const img = new window.Image();
-                    img.crossOrigin = "anonymous";
+                    img.crossOrigin = 'anonymous';
                     img.onload = () => {
-                        const MAX_SIZE = 1200; // Increased from 800 for better detail visibility
-                        let width = img.width;
-                        let height = img.height;
-                        if (width > height) {
-                            if (width > MAX_SIZE) { height *= MAX_SIZE / width; width = MAX_SIZE; }
-                        } else {
-                            if (height > MAX_SIZE) { width *= MAX_SIZE / height; height = MAX_SIZE; }
-                        }
+                        const MAX = 1200;
+                        let w = img.width, h = img.height;
+                        if (w > h) { if (w > MAX) { h *= MAX / w; w = MAX; } }
+                        else       { if (h > MAX) { w *= MAX / h; h = MAX; } }
                         const canvas = document.createElement('canvas');
-                        canvas.width = width;
-                        canvas.height = height;
-                        const ctx = canvas.getContext('2d');
-                        ctx.drawImage(img, 0, 0, width, height);
-                        resolve(canvas.toDataURL('image/jpeg', 0.85)); // Higher quality for PDF
+                        canvas.width = w; canvas.height = h;
+                        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+                        resolve(canvas.toDataURL('image/jpeg', 0.85));
                     };
-                    img.onerror = () => resolve(dataUrl.startsWith('data:') ? dataUrl : null);
+                    img.onerror = () => resolve(dataUrl);
                     img.src = dataUrl;
                 });
             };
@@ -1525,70 +1520,85 @@ END:VCARD`;
             // Force resize even for data URLs to prevent memory issues
             if (url.startsWith('data:')) return await resizeImage(url);
 
-            // Method A: Supabase
-            if (supabase && (url.includes('supabase.co') || imgObj?.storagePath)) {
+            // --- Method A: Supabase SDK (works for public + private buckets) ---
+            if (supabase && url.includes('supabase.co')) {
                 try {
-                    // Bucket aus URL erkennen
-                    const bucketMatch = url.match(/\/object\/public\/([^/]+)\//);
-                    const bucket = bucketMatch ? bucketMatch[1] : 'case-files';
-                    let path = imgObj?.storagePath || (url.includes(`${bucket}/`) ? url.split(`${bucket}/`).pop()?.split('?')[0] : null);
-                    console.log('[IMG_DEBUG] supabase path:', { bucket, storagePath: imgObj?.storagePath, extractedPath: path, url: url.substring(0, 80) });
-                    if (path) {
-                        const { data, error } = await supabase.storage.from(bucket).download(path);
+                    // Matches /object/public/BUCKET/ AND /object/BUCKET/ (private)
+                    const bucketMatch = url.match(/\/object\/(?:public\/)?([^/?]+)\//);
+                    const bucket = bucketMatch ? bucketMatch[1] : null;
+
+                    // Normalize path
+                    let objectPath = null;
+                    if (imgObj?.storagePath) {
+                        objectPath = String(imgObj.storagePath)
+                            .replace(/^\/+/, '')
+                            .replace(/^case-files\//i, '')
+                            .replace(/^damage-images\//i, '')
+                            .trim();
+                    } else if (bucket && url.includes(`${bucket}/`)) {
+                        objectPath = url.split(`${bucket}/`).pop()?.split('?')[0]?.replace(/^\/+/, '').trim();
+                    }
+
+                    console.log(`[PDF:IMG] bucket="${bucket}" path="${objectPath}"`);
+
+                    if (bucket && objectPath) {
+                        const { data, error } = await supabase.storage.from(bucket).download(objectPath);
                         if (data && !error) {
-                            const raw = await new Promise((resolve) => {
+                            const raw = await new Promise((res) => {
                                 const reader = new FileReader();
-                                reader.onloadend = () => resolve(reader.result);
+                                reader.onloadend = () => res(reader.result);
                                 reader.readAsDataURL(data);
                             });
+                            console.log(`[PDF:IMG] ✓ SDK OK (${raw.length} chars)`);
                             return await resizeImage(raw);
-                        } else {
-                            console.warn('[IMG_DEBUG] Supabase download error:', error?.message, 'bucket:', bucket, 'path:', path);
                         }
+                        console.warn(`[PDF:IMG] SDK error: ${error?.message} | bucket=${bucket} path=${objectPath}`);
                     }
-                } catch (e) { console.warn("PDF GEN: Supabase error", e); }
+                } catch (e) { console.warn('[PDF:IMG] SDK exception:', e.message); }
             }
 
-            // Method B: Fetch (Standard)
+            // --- Method B: Direct fetch (public buckets) ---
             try {
                 const response = await fetch(url, { cache: 'no-cache' });
                 if (response.ok) {
                     const blob = await response.blob();
-                    const raw = await new Promise((resolve) => {
+                    const raw = await new Promise((res) => {
                         const reader = new FileReader();
-                        reader.onloadend = () => resolve(reader.result);
+                        reader.onloadend = () => res(reader.result);
                         reader.readAsDataURL(blob);
                     });
+                    console.log(`[PDF:IMG] ✓ fetch OK (${raw.length} chars)`);
                     return await resizeImage(raw);
                 }
-            } catch (err) { /* silent fail, try next */ }
+                console.warn(`[PDF:IMG] fetch ${response.status}: ${url.substring(0, 70)}`);
+            } catch (err) { console.warn('[PDF:IMG] fetch exception:', err.message); }
 
-            // Method C: Canvas Backup (CORS fallback)
+            // --- Method C: Canvas (CORS fallback) ---
             try {
                 const raw = await new Promise((resolve) => {
                     const img = new window.Image();
-                    img.crossOrigin = "anonymous";
+                    img.crossOrigin = 'anonymous';
                     img.onload = () => {
                         try {
-                            const canvas = document.createElement('canvas');
-                            canvas.width = img.width;
-                            canvas.height = img.height;
-                            const ctx = canvas.getContext('2d');
-                            ctx.drawImage(img, 0, 0);
-                            resolve(canvas.toDataURL('image/jpeg', 0.9));
-                        } catch (e) { resolve(null); }
+                            const c = document.createElement('canvas');
+                            c.width = img.width; c.height = img.height;
+                            c.getContext('2d').drawImage(img, 0, 0);
+                            resolve(c.toDataURL('image/jpeg', 0.9));
+                        } catch { resolve(null); }
                     };
                     img.onerror = () => resolve(null);
                     img.src = url;
                 });
-                if (raw) return await resizeImage(raw);
-            } catch (err) { }
-            console.log('[IMG_DEBUG] Alle Methoden fehlgeschlagen, raw URL:', url.substring(0, 100));
-            return await resizeImage(url);
+                if (raw) { console.log('[PDF:IMG] ✓ canvas OK'); return await resizeImage(raw); }
+            } catch {}
+
+            console.warn('[PDF:IMG] ✗ alle Methoden fehlgeschlagen:', url.substring(0, 80));
+            return null;
         };
 
         try {
-            // Load Logo - High Quality Original
+            console.log('[PDF] start – Daten:', { id: dataToUse.id, street: dataToUse.street, zip: dataToUse.zip, city: dataToUse.city });
+            // Load Logo
             let logoData = null;
             try {
                 const logoResp = await fetch(window.location.origin + '/logo.png');
@@ -1674,21 +1684,51 @@ END:VCARD`;
                 logo: logoData,
             };
 
+            console.log('[PDF] before save – blob generieren...');
             // Generate Blob using @react-pdf
             const blob = await pdf(<DamageReportDocument key={Math.random()} data={docData} />).toBlob();
-            const now = new Date();
-            const timeStr = `${String(now.getHours()).padStart(2, '0')}-${String(now.getMinutes()).padStart(2, '0')}`;
-            const dateStr = now.toLocaleDateString('de-CH').replace(/\./g, '-');
-            const projNum = dataToUse.projectNumber || dataToUse.projectTitle || 'Project';
-            const location = dataToUse.locationDetails || dataToUse.city || 'Schadenort';
-            const fileName = `${projNum}_${location}_${dateStr}_${timeStr}.pdf`;
+            const pdfBlob = new Blob([blob], { type: 'application/pdf' });
+            const _now = new Date();
+            const _ts = `${_now.getFullYear()}-${String(_now.getMonth()+1).padStart(2,'0')}-${String(_now.getDate()).padStart(2,'0')}_${String(_now.getHours()).padStart(2,'0')}-${String(_now.getMinutes()).padStart(2,'0')}-${String(_now.getSeconds()).padStart(2,'0')}`;
+            const suggestedName = `Schadensbericht_${_ts}.pdf`;
 
-            // 1. Download File
-            saveAs(blob, fileName);
+            console.log('[PDF] blob OK, Größe:', pdfBlob.size, '| Name:', suggestedName);
 
-            // 2. Upload to Supabase / App State
-            const file = new File([blob], fileName, { type: 'application/pdf' });
+            // savePdfStrict: nativer Dialog wenn möglich, sonst Anchor-Download
+            const savePdfStrict = async () => {
+                if ('showSaveFilePicker' in window) {
+                    try {
+                        const handle = await window.showSaveFilePicker({
+                            suggestedName,
+                            types: [{ description: 'PDF', accept: { 'application/pdf': ['.pdf'] } }],
+                        });
+                        const writable = await handle.createWritable();
+                        await writable.write(pdfBlob);
+                        await writable.close();
+                        console.log('[PDF] ✓ saved via showSaveFilePicker:', suggestedName, pdfBlob.size);
+                        return;
+                    } catch (e) {
+                        console.warn('[PDF] showSaveFilePicker blocked, fallback:', e.message);
+                    }
+                }
+                // Fallback: klassischer Anchor-Download
+                const url = URL.createObjectURL(pdfBlob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = suggestedName;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                setTimeout(() => URL.revokeObjectURL(url), 10000);
+                console.log('[PDF] ✓ downloaded via anchor:', suggestedName, pdfBlob.size);
+            };
+
+            await savePdfStrict();
+
+            // Upload to Supabase / App State
+            const file = new File([blob], suggestedName, { type: 'application/pdf' });
             await handleImageUpload([file], { assignedTo: 'Schadensbericht' });
+
 
         } catch (error) {
             console.error("PDF Export failed", error);

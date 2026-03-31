@@ -93,6 +93,7 @@ const DamageReportDocument = ({ data }) => {
                 {/* Karte */}
                 <MapSection mapImageUrl={data.mapImageUrl} />
 
+
                 {/* Raumdokumentation Section */}
                 <RoomDocumentation rooms={validRooms} images={data.images} />
 
