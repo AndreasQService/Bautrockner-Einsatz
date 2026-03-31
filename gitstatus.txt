@@ -1,0 +1,7 @@
+﻿ M dev-dist/sw.js
+?? fri_pdf_doc.txt
+?? gitdiff_temp.txt
+?? gitlog_temp.txt
+?? gitshow_temp.txt
+?? gitstatus.txt
+?? pdfdiff_temp.txt

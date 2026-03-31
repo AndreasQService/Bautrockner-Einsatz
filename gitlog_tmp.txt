@@ -1,0 +1,25 @@
+﻿23d8e07|2026-03-30|Restore: Karte auf Freitag-Stand (OSM Zoom 15, 3x2, window.Image, kein Canvas-Text)
+f5008a6|2026-03-29|Fix: Karte Zoom 16 (4x3) - Strassennamen sichtbar, ausgewogener Zoom
+9c2f3eb|2026-03-29|Fix: Karten-Zoom 17 (Strassenniveau), 5x3 Tiles - Adresse auf Karte sichtbar
+96ffd24|2026-03-29|Fix: Adress-Beschriftung unter Karte als Text-Element im PDF
+d1cc191|2026-03-29|Fix: OSM-Karte im PDF - window.Image() statt Image() (react-pdf Import-Konflikt)
+c0b0437|2026-03-29|Fix: PDF-Generierung repariert - wrap-Overflow, MIME-Type, ImageGrid-2-Spalten
+9aa242a|2026-03-28|Fix: PDF-Button immer sichtbar (unabhaengig vom Status) + Lightbox fuer Schadenursache-Fotos
+07b46e4|2026-03-27|Update: DamageForm, Dashboard, CSS und dev-dist/sw.js
+eab5439|2026-03-27|feat: WorkflowStatusOverview, Dashboard improvements, EmailImport prompt fixes, full-width desktop mode
+0799e67|2026-03-26|feat: Bild-Klick holt frische OneDrive-URL - Vorschau funktioniert nach Reload
+bb67fba|2026-03-26|feat: Foto-Upload prim├ñr OneDrive, Supabase als Fallback - Storage Migration komplett
+b10a6a4|2026-03-26|feat: OneDrive Integration komplett - Fotos/PDF/Excel/JSON auto-upload
+849cb4f|2026-03-26|feat: OneDrive Integration - PDF/Excel/JSON auto-upload
+bb106ee|2026-03-25|feat: QR-Code fuer Kontakte mit editierbaren Feldern
+fce2ff7|2026-03-25|test: Playwright Deep Tests fuer Desktop und Schadensbericht (14/15 gruen)
+8a5bfba|2026-03-25|fix: Mieter-Dropdown + Schadensbilder/Schadenfotos Trennung
+8ceebbc|2026-03-24|Fix: E-Mail Import - Etage, Email, PLZ/Ort fuer Kontakte + Schadenort; InboxTodo Dashboard
+0f3625a|2026-03-24|Fix: PDF-Layout - 2 Bilder/Zeile, leere Seite, Metadaten, Bildtext-Truncation
+0f6be0e|2026-03-24|Feat: PDF Karte+Aussenbild, OSM-Proxy, Supabase Upload, PDF-Layout
+3b755e7|2026-03-23|Fix: PDF-Generierung - Lieferantenrechnungen und Plaene aus Bildverarbeitung ausschliessen
+18b02c1|2026-03-23|Feature: Lieferantenrechnung Badge in Header und Dashboard; Messung starten im Desktop ausgeblendet
+e5961ca|2026-03-23|Rename: Sonstiges -> Lieferantenrechnungen
+3ffedf4|2026-03-23|Fix: Reihenfolge Raeume-Ursache-Massnahmen, Encoding fix
+f32e635|2026-03-23|Feature: Diktat fuer Feststellungen, Schadenursache (Desktop)
+1781bf1|2026-03-23|Fix: Diktier-Button in DamageForm Schadenursache

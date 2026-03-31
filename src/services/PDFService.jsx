@@ -3,6 +3,7 @@ import { pdf } from '@react-pdf/renderer';
 import { saveAs } from 'file-saver';
 import DamageReportDocument from '../components/pdf/DamageReportDocument';
 import { urlToDataUrl } from '../components/DamageForm/DamageForm.utils';
+import { getMapDataUrl, geocodeAddress } from './MapService';
 import React from 'react';
 
 /**
@@ -66,6 +67,21 @@ export const PDFService = {
             }
         }
 
+        // Karte generieren
+        let mapImageUrl = null;
+        const addressQuery = [formData.street, formData.zip, formData.city].filter(Boolean).join(', ')
+            || formData.address || '';
+        console.log('[PDFService] Adresse für Karte:', addressQuery);
+        if (addressQuery) {
+            const coords = await geocodeAddress(addressQuery);
+            if (coords) {
+                mapImageUrl = await getMapDataUrl(coords);
+                console.log('[PDFService] mapImageUrl Länge:', mapImageUrl?.length);
+            } else {
+                console.warn('[PDFService] Geocoding: keine Koordinaten für:', addressQuery);
+            }
+        }
+
         const docData = {
             ...formData,
             damageType: formData.damageCategory || '-',
@@ -73,6 +89,7 @@ export const PDFService = {
             damageTypeImages: processedHeroImages,
             damageTypeImage: processedHeroImages[0] || null,
             exteriorPhoto: processedExteriorPhoto,
+            mapImageUrl,
             logo: logoData,
         };
 

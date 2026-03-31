@@ -36,27 +36,6 @@ export default function RoomManager({
     const [dragImageIndex, setDragImageIndex] = useState(null);
     const [dragOverIndex, setDragOverIndex] = useState(null);
     const [dragRoomId, setDragRoomId] = useState(null);
-    const [isDictating, setIsDictating] = useState(false);
-    const recognitionRef = React.useRef(null);
-
-    const startDictation = (onResult) => {
-        const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (!SR) { alert('Diktat wird von diesem Browser nicht unterstützt.'); return; }
-        if (isDictating) { recognitionRef.current?.stop(); return; }
-        const rec = new SR();
-        rec.lang = 'de-CH';
-        rec.continuous = true;
-        rec.interimResults = false;
-        rec.onresult = (e) => {
-            const text = Array.from(e.results).map(r => r[0].transcript).join(' ');
-            onResult(text);
-        };
-        rec.onerror = () => setIsDictating(false);
-        rec.onend = () => setIsDictating(false);
-        recognitionRef.current = rec;
-        rec.start();
-        setIsDictating(true);
-    };
 
     const toggleRoomImages = (roomId) => {
         setVisibleRoomImages(prev => ({
@@ -118,25 +97,7 @@ export default function RoomManager({
                             </div>
 
                             <div style={{ marginBottom: '1.25rem' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                                    <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 600 }}>Beschreibung der Ursache</label>
-                                    <button
-                                        type="button"
-                                        onClick={() => startDictation(text => setFormData(prev => ({ ...prev, cause: (prev.cause ? prev.cause + ' ' : '') + text })))}
-                                        title={isDictating ? 'Diktat stoppen' : 'Diktieren'}
-                                        style={{
-                                            display: 'flex', alignItems: 'center', gap: '0.3rem',
-                                            padding: '0.3rem 0.7rem', borderRadius: '6px', border: 'none',
-                                            backgroundColor: isDictating ? 'rgba(239,68,68,0.15)' : 'rgba(14,165,233,0.12)',
-                                            color: isDictating ? '#ef4444' : '#38bdf8',
-                                            cursor: 'pointer', fontSize: '0.75rem', fontWeight: 700,
-                                            animation: isDictating ? 'pulse 1s infinite' : 'none'
-                                        }}
-                                    >
-                                        {isDictating ? <MicOff size={14} /> : <Mic size={14} />}
-                                        {isDictating ? 'Stopp' : 'Diktieren'}
-                                    </button>
-                                </div>
+                                <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 600, marginBottom: '0.5rem', display: 'block' }}>Beschreibung der Ursache</label>
                                 <textarea
                                     className="form-input"
                                     value={formData.cause || ''}
@@ -255,53 +216,42 @@ export default function RoomManager({
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                                     <select
                                         className="form-input"
-                                        value={newRoom.apartment || ''}
+                                        value={newRoom.apartment && ![...new Set([...formData.rooms.map(r => r.apartment).filter(Boolean), ...(formData.contacts || []).map(c => c.name ? (c.name.toLowerCase().includes('whg') || c.name.toLowerCase().includes('wohnung') ? c.name.trim().split(/\s+/).pop() : 'Whg. ' + c.name.trim().split(/\s+/).pop()) : '').filter(Boolean)])].sort().includes(newRoom.apartment) ? 'Sonstiges' : newRoom.apartment}
                                         onChange={(e) => {
                                             const val = e.target.value;
-                                            if (val === '__neue__') {
-                                                setNewRoom(prev => ({ ...prev, apartment: '__neue__', apartmentCustom: '', stockwerk: '' }));
-                                            } else if (val) {
-                                                const matchingContact = (formData.contacts || []).find(c => c.name === val);
-                                                const existingRoom = formData.rooms.find(r => r.apartment === val);
-                                                const stock = matchingContact?.floor || matchingContact?.apartment || existingRoom?.stockwerk || '';
-                                                setNewRoom(prev => ({ ...prev, apartment: val, stockwerk: stock }));
+                                            if (val === 'Sonstiges') {
+                                                setNewRoom(prev => ({ ...prev, apartment: '' }));
                                             } else {
-                                                setNewRoom(prev => ({ ...prev, apartment: '', stockwerk: '' }));
+                                                let relatedStockwerk = '';
+                                                const matchingContact = (formData.contacts || []).find(c => c.name && c.name.trim().split(/\s+/).pop() === val);
+                                                if (matchingContact) {
+                                                    relatedStockwerk = matchingContact.floor || matchingContact.apartment || '';
+                                                } else {
+                                                    const existingRoom = formData.rooms.find(r => r.apartment === val);
+                                                    if (existingRoom) {
+                                                        relatedStockwerk = existingRoom.stockwerk || '';
+                                                    }
+                                                }
+                                                setNewRoom(prev => ({ ...prev, apartment: val, stockwerk: relatedStockwerk || prev.stockwerk }));
                                             }
                                         }}
                                         style={{ padding: '0.5rem', fontSize: '0.9rem' }}
                                     >
-                                        <option value="">Mieter / Wohnung wählen...</option>
-                                        {/* Bestehende Räume */}
-                                        {formData.rooms.map(r => r.apartment).filter(Boolean).filter((v, i, a) => a.indexOf(v) === i).sort().map(apt => (
+                                        <option value="">Wohnung wählen... (Optional)</option>
+                                        {[...new Set([...formData.rooms.map(r => r.apartment).filter(Boolean), ...(formData.contacts || []).map(c => c.name ? (c.name.toLowerCase().includes('whg') || c.name.toLowerCase().includes('wohnung') ? c.name.trim().split(/\s+/).pop() : 'Whg. ' + c.name.trim().split(/\s+/).pop()) : '').filter(Boolean)])].sort().map(apt => (
                                             <option key={apt} value={apt}>{apt}</option>
                                         ))}
-                                        {/* Kontakte (Mieter/Eigentümer) – Name + Etage */}
-                                        {(formData.contacts || [])
-                                            .filter(c => (c.role === 'Mieter' || c.role === 'Eigentümer') && c.name)
-                                            .filter((c, i, a) => a.findIndex(x => x.name === c.name) === i)
-                                            .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
-                                            .map(c => {
-                                                const etage = c.floor || c.apartment || '';
-                                                const label = etage ? `${c.name} (${etage})` : c.name;
-                                                return (
-                                                    <option key={c.name} value={c.name}>{label}</option>
-                                                );
-                                            })
-                                        }
-                                        <option value="__neue__">Neue Wohnung eingeben...</option>
+                                        <option value="Sonstiges">Neue Wohnung eingeben...</option>
                                     </select>
 
-                                    {/* Manuelle Eingabe wenn "Neue Wohnung" gewählt */}
-                                    {newRoom.apartment === '__neue__' && (
+                                    {(!newRoom.apartment || (newRoom.apartment && ![...new Set([...formData.rooms.map(r => r.apartment).filter(Boolean), ...(formData.contacts || []).map(c => c.name ? (c.name.toLowerCase().includes('whg') || c.name.toLowerCase().includes('wohnung') ? c.name.trim().split(/\s+/).pop() : 'Whg. ' + c.name.trim().split(/\s+/).pop()) : '').filter(Boolean)])].sort().includes(newRoom.apartment))) && (
                                         <input
                                             type="text"
-                                            placeholder="Mieter / Wohnungsbezeichnung eingeben"
-                                            value={newRoom.apartmentCustom || ''}
-                                            onChange={(e) => setNewRoom(prev => ({ ...prev, apartmentCustom: e.target.value }))}
+                                            placeholder="Wohnung eingeben"
+                                            value={newRoom.apartment}
+                                            onChange={(e) => setNewRoom(prev => ({ ...prev, apartment: e.target.value }))}
                                             className="form-input"
                                             style={{ padding: '0.5rem', fontSize: '0.9rem' }}
-                                            autoFocus
                                         />
                                     )}
                                 </div>
@@ -372,24 +322,7 @@ export default function RoomManager({
                     {/* Cause / Description */}
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem', marginBottom: '2rem' }}>
                         <label style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>Schadenursache</span>
-                                <button
-                                    type="button"
-                                    onClick={() => startDictation(text => setFormData(prev => ({ ...prev, cause: (prev.cause ? prev.cause + ' ' : '') + text })))}
-                                    title={isDictating ? 'Diktat stoppen' : 'Diktieren'}
-                                    style={{
-                                        display: 'flex', alignItems: 'center', gap: '0.3rem',
-                                        padding: '0.3rem 0.7rem', borderRadius: '6px', border: 'none',
-                                        backgroundColor: isDictating ? 'rgba(239,68,68,0.15)' : 'rgba(14,165,233,0.12)',
-                                        color: isDictating ? '#ef4444' : '#38bdf8',
-                                        cursor: 'pointer', fontSize: '0.75rem', fontWeight: 700
-                                    }}
-                                >
-                                    {isDictating ? <MicOff size={14} /> : <Mic size={14} />}
-                                    {isDictating ? 'Stopp' : 'Diktieren'}
-                                </button>
-                            </div>
+                            <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>Schadenursache</span>
                             <textarea
                                 className="form-input"
                                 rows={3}
@@ -899,7 +832,7 @@ export default function RoomManager({
                                     onChange={(e) => {
                                         const val = e.target.value;
                                         if (val === 'Sonstiges') {
-                                            setNewRoom(prev => ({ ...prev, apartment: 'Sonstiges', apartmentCustom: '' }));
+                                            setNewRoom(prev => ({ ...prev, apartment: '' }));
                                         } else {
                                             let relatedStockwerk = '';
                                             const matchingContact = (formData.contacts || []).find(c => c.name && c.name.trim().split(/\s+/).pop() === val);
@@ -921,14 +854,13 @@ export default function RoomManager({
                                     ))}
                                     <option value="Sonstiges">Handeingabe...</option>
                                 </select>
-                                {newRoom.apartment === 'Sonstiges' && (
+                                {(!newRoom.apartment || (newRoom.apartment && ![...new Set([...formData.rooms.map(r => r.apartment).filter(Boolean), ...(formData.contacts || []).map(c => c.name ? (c.name.toLowerCase().includes('whg') || c.name.toLowerCase().includes('wohnung') ? c.name.trim().split(/\s+/).pop() : 'Whg. ' + c.name.trim().split(/\s+/).pop()) : '').filter(Boolean)])].sort().includes(newRoom.apartment))) && (
                                     <input
                                         type="text"
                                         placeholder="Wohnungsbezeichnung"
-                                        value={newRoom.apartmentCustom || ''}
-                                        onChange={(e) => setNewRoom(prev => ({ ...prev, apartmentCustom: e.target.value }))}
+                                        value={newRoom.apartment}
+                                        onChange={(e) => setNewRoom(prev => ({ ...prev, apartment: e.target.value }))}
                                         className="form-input"
-                                        autoFocus
                                     />
                                 )}
                             </div>

@@ -1,0 +1,6 @@
+﻿C:\QTool\src\components\DamageForm\sections\MeasuresSection.jsx
+C:\QTool\src\components\pdf\layout\PDFMetaData.jsx
+C:\QTool\src\components\DamageForm.jsx
+C:\QTool\src\hooks\useDamageForm.js
+C:\QTool\src\services\OneDriveService.js
+C:\QTool\src\services\PDFService.jsx

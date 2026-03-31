@@ -200,32 +200,6 @@ export const useDamageForm = (initialData, onSave, mode = 'desktop') => {
         setFormData(prev => ({ ...prev, [name]: value }));
     }, []);
 
-    // Geocoding: Strasse → PLZ/Ort via OpenStreetMap wenn PLZ leer nach Import
-    const geocodeStreet = useCallback(async (street) => {
-        if (!street) return;
-        try {
-            const q = encodeURIComponent(street + ', Schweiz');
-            const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${q}&format=json&countrycodes=ch&addressdetails=1&limit=1`, {
-                headers: { 'Accept-Language': 'de' }
-            });
-            const data = await res.json();
-            if (data && data.length > 0) {
-                const addr = data[0].address;
-                const plz = addr.postcode || '';
-                const ort = addr.city || addr.town || addr.village || addr.municipality || '';
-                if (plz || ort) {
-                    setFormData(prev => ({
-                        ...prev,
-                        zip: prev.zip || plz,
-                        city: prev.city || ort
-                    }));
-                }
-            }
-        } catch (e) {
-            console.warn('Geocoding fehlgeschlagen:', e);
-        }
-    }, []);
-
     const handleEmailImport = useCallback((data) => {
         if (!data) return;
 
@@ -256,109 +230,76 @@ export const useDamageForm = (initialData, onSave, mode = 'desktop') => {
                 mergeField('orderNumber', data.projekt_daten.externe_ref);
                 mergeField('damageNumber', data.projekt_daten.auftrags_nr);
             }
-
-            // --- ALTES Format (auftrag_verwaltung) ---
             if (data.auftrag_verwaltung) {
                 mergeField('client', data.auftrag_verwaltung.firma);
                 mergeField('assignedTo', data.auftrag_verwaltung.sachbearbeiter);
                 mergeField('clientStreet', data.auftrag_verwaltung.adresse);
                 mergeField('clientPhone', data.auftrag_verwaltung.telefon);
                 mergeField('clientEmail', data.auftrag_verwaltung.email);
-                if (data.auftrag_verwaltung.leistungsart) mergeField('damageCategory', data.auftrag_verwaltung.leistungsart);
+                if (data.auftrag_verwaltung.leistungsart) {
+                    mergeField('damageCategory', data.auftrag_verwaltung.leistungsart);
+                }
                 if (data.auftrag_verwaltung.plz_ort) {
                     const cp = data.auftrag_verwaltung.plz_ort.trim().split(/\s+/);
-                    if (cp.length >= 2 && /^\d{4,5}$/.test(cp[0])) { mergeField('clientZip', cp[0]); mergeField('clientCity', cp.slice(1).join(' ')); }
-                    else { mergeField('clientCity', data.auftrag_verwaltung.plz_ort); }
+                    if (cp.length >= 2 && /^\d{4,5}$/.test(cp[0])) {
+                        mergeField('clientZip', cp[0]);
+                        mergeField('clientCity', cp.slice(1).join(' '));
+                    } else {
+                        mergeField('clientCity', data.auftrag_verwaltung.plz_ort);
+                    }
                 }
-            }
-
-            // --- NEUES Format (auftraggeber) ---
-            if (data.auftraggeber) {
-                mergeField('client', data.auftraggeber.firma || data.auftraggeber.name);
-                mergeField('assignedTo', data.auftraggeber.name);
-                mergeField('clientPhone', data.auftraggeber.telefon);
-                mergeField('clientEmail', data.auftraggeber.email);
-                mergeField('clientStreet', data.auftraggeber.strasse_nr);
-                mergeField('clientZip', data.auftraggeber.plz);
-                mergeField('clientCity', data.auftraggeber.ort);
-            }
-
-            if (data.eigentuemer) {
-                mergeField('ownerName', data.eigentuemer.firma || data.eigentuemer.name);
-                mergeField('ownerEmail', data.eigentuemer.email);
             }
             if (data.rechnungs_details) {
                 mergeField('ownerName', data.rechnungs_details.eigentuemer);
                 mergeField('ownerEmail', data.rechnungs_details.email_rechnung);
                 mergeField('invoiceReference', data.rechnungs_details.vermerk);
             }
-            if (data.schaden) {
-                mergeField('damageCategory', data.schaden.art);
-                mergeField('description', data.schaden.beschreibung);
-            }
-
-            // --- SCHADENORT (direkt in nextData) ---
             if (data.schadenort) {
-                if (data.schadenort.strasse_nr) nextData.street = data.schadenort.strasse_nr;
-                if (data.schadenort.bezeichnung || data.schadenort.etage_wohnung)
-                    nextData.locationDetails = data.schadenort.bezeichnung || data.schadenort.etage_wohnung;
-                if (data.schadenort.plz) nextData.zip = data.schadenort.plz;
-                if (data.schadenort.ort) nextData.city = data.schadenort.ort;
-                if (data.schadenort.plz_ort && !data.schadenort.plz) {
+                mergeField('street', data.schadenort.strasse_nr);
+                mergeField('locationDetails', data.schadenort.etage_wohnung);
+                if (data.schadenort.plz_ort) {
                     const parts = data.schadenort.plz_ort.trim().split(/\s+/);
-                    if (parts.length >= 1 && /^\d{4,5}$/.test(parts[0])) {
-                        nextData.zip = parts[0];
-                        nextData.city = parts.slice(1).join(' ');
+                    if (parts.length >= 1) {
+                        const zipCandidate = parts[0];
+                        if (zipCandidate.length === 4 && /^\d+$/.test(zipCandidate)) {
+                            mergeField('zip', zipCandidate);
+                            mergeField('city', parts.slice(1).join(' '));
+                        } else {
+                            mergeField('city', data.schadenort.plz_ort);
+                        }
                     }
                 }
             }
 
-
             let currentContacts = [...(prev.contacts || [])];
-            const addOrMerge = (name, telefon, rolle, email = '', wohnung = '') => {
-                if (!name) return;
-                const existingIdx = currentContacts.findIndex(c =>
-                    c.name && c.name.trim().toLowerCase() === name.trim().toLowerCase()
-                );
-                const mappedRole = rolleMap[rolle] || rolle || 'Mieter';
-                if (existingIdx !== -1) {
-                    currentContacts[existingIdx] = {
-                        ...currentContacts[existingIdx],
-                        phone: currentContacts[existingIdx].phone || telefon || '',
-                        role: currentContacts[existingIdx].role !== 'Mieter' ? currentContacts[existingIdx].role : mappedRole,
-                        email: currentContacts[existingIdx].email || email || '',
-                        floor: currentContacts[existingIdx].floor || wohnung || '',
-                    };
-                } else {
-                    currentContacts.push({ name, phone: telefon || '', role: mappedRole, email: email || '', apartment: '', floor: wohnung || '' });
-                }
-            };
-
-            // Altes Format: kontakte-Array
             if (data.kontakte && Array.isArray(data.kontakte)) {
-                data.kontakte.forEach(c => addOrMerge(c.name, c.telefon, c.rolle, c.email || ''));
-            }
-            // Neues Format: auftraggeber/verwaltung/eigentuemer/hauswart/mieter
-            const rollenMap2 = { auftraggeber: 'Auftraggeber', verwaltung: 'Verwaltung', eigentuemer: 'Eig.', hauswart: 'HW' };
-            ['auftraggeber', 'verwaltung', 'eigentuemer', 'hauswart'].forEach(key => {
-                const k = data[key]; if (!k) return;
-                addOrMerge(k.firma || k.name, k.telefon, k._blockRolle ? rollenMap2[k._blockRolle] : rollenMap2[key], k.email || '');
-            });
-            if (Array.isArray(data.mieter)) {
-                data.mieter.forEach(m => { if (m?.name) addOrMerge(m.name, m.telefon, 'Mieter', m.email || '', m.wohnung || ''); });
-            }
-            if (Array.isArray(data.handwerker)) {
-                data.handwerker.forEach(h => { if (h?.name || h?.firma) addOrMerge(h.firma || h.name, h.telefon, 'Handw.', h.email || ''); });
+                data.kontakte.forEach(newContact => {
+                    const existingIdx = currentContacts.findIndex(c =>
+                        c.name && newContact.name &&
+                        c.name.trim().toLowerCase() === newContact.name.trim().toLowerCase()
+                    );
+                    const mappedRole = rolleMap[newContact.rolle] || rolleMap[(newContact.rolle || '').trim()] || 'Mieter';
+                    if (existingIdx !== -1) {
+                        currentContacts[existingIdx] = {
+                            ...currentContacts[existingIdx],
+                            phone: currentContacts[existingIdx].phone || newContact.telefon,
+                            role: currentContacts[existingIdx].role !== 'Mieter' ? currentContacts[existingIdx].role : mappedRole,
+                        };
+                    } else {
+                        currentContacts.push({
+                            name: newContact.name,
+                            phone: newContact.telefon,
+                            role: mappedRole,
+                            apartment: ''
+                        });
+                    }
+                });
             }
             nextData.contacts = currentContacts;
             setConflicts(newConflicts);
             return nextData;
         });
-        // Geocoding: falls Strasse vorhanden aber PLZ fehlt → automatisch nachschlagen
-        if (data.schadenort?.strasse_nr && !data.schadenort?.plz) {
-            geocodeStreet(data.schadenort.strasse_nr);
-        }
-    }, [conflicts, geocodeStreet]);
+    }, [conflicts]);
 
     const handleAddRoom = useCallback((roomData) => {
         if (!roomData.name && !roomData.customName) return;

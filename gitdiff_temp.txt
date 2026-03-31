@@ -1,0 +1,15 @@
+﻿
+            let staticMapUrl = 
+null;
+                               
+     fetch(`/osm-tile/${zoom}/$
+{tileX + c - offX}/${tileY + r 
+- offY}.png`)
+                        
+staticMapUrl = 
+canvas.toDataURL('image/jpeg', 
+0.9);
+                staticMapUrl: 
+staticMapUrl,
+
+

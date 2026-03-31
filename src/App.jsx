@@ -289,10 +289,9 @@ function App() {
     const client = importedData.auftrag_verwaltung?.firma || importedData.client || '';
     const street = importedData.schadenort?.strasse_nr || importedData.street || '';
 
-    // Schadenort PLZ + Ort
-    let zip = importedData.zip || importedData.schadenort?.plz || '';
-    let city = importedData.city || importedData.schadenort?.ort || '';
-    if (!zip && !city && importedData.schadenort?.plz_ort) {
+    let zip = importedData.zip || '';
+    let city = importedData.city || '';
+    if (importedData.schadenort?.plz_ort) {
       const parts = String(importedData.schadenort.plz_ort).trim().split(/\s+/);
       if (parts.length >= 2 && /^\d{4,5}$/.test(parts[0])) {
         zip = parts[0];
@@ -302,11 +301,11 @@ function App() {
       }
     }
 
-    // Verwaltungs-Adresse PLZ + Ort
+    // Auftraggeber-Adresse
     let clientStreet = importedData.auftrag_verwaltung?.adresse || '';
-    let clientZip = importedData.auftrag_verwaltung?.plz || '';
-    let clientCity = importedData.auftrag_verwaltung?.ort || '';
-    if (!clientZip && !clientCity && importedData.auftrag_verwaltung?.plz_ort) {
+    let clientZip = '';
+    let clientCity = '';
+    if (importedData.auftrag_verwaltung?.plz_ort) {
       const clientParts = String(importedData.auftrag_verwaltung.plz_ort).trim().split(/\s+/);
       if (clientParts.length >= 2 && /^\d{4,5}$/.test(clientParts[0])) {
         clientZip = clientParts[0];
@@ -359,10 +358,9 @@ function App() {
         return {
           name: c.name || '',
           phone: c.telefon || '',
-          email: c.email || '',
           role: mappedRole,
-          apartment: c.etage || '',
-          floor: c.etage || ''
+          apartment: '',
+          floor: ''
         };
       }),
       rooms: [],
@@ -471,7 +469,35 @@ function App() {
             <span style={{ fontSize: '1.1rem', fontWeight: 700, letterSpacing: '-0.02em' }}>Q-Service AG</span>
           </div>
 
-          <nav style={{ flexGrow: 1, display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '0.5rem' }}>
+          {/* User Info & Logout (Centered) */}
+          <div style={{
+            position: 'absolute',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.75rem',
+            background: 'rgba(255, 255, 255, 0.03)',
+            padding: '4px 12px',
+            borderRadius: '9999px',
+            border: '1px solid var(--border)'
+          }}>
+            <div style={{ textAlign: 'right', fontSize: '0.75rem', lineHeight: 1.2 }}>
+              <div style={{ fontWeight: 700, color: 'var(--text-main)' }}>{currentUser.name}</div>
+              <div style={{ color: 'var(--q-primary)', fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase' }}>{currentUser.role}</div>
+            </div>
+            <div style={{ width: '1px', height: '20px', background: 'var(--border)' }}></div>
+            <button
+              onClick={handleLogout}
+              className="btn btn-ghost"
+              title="Abmelden"
+              style={{ padding: '0.75rem', color: '#F87171', borderRadius: '50%', minWidth: '44px', minHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            >
+              <LogOut size={16} />
+            </button>
+          </div>
+
+          <nav style={{ flexGrow: 1, display: 'flex', justifyContent: 'flex-end' }}>
             {view !== 'dashboard' && (
               <button className="btn btn-outline" onClick={handleCancelEntry} style={{ padding: '0.5rem 1rem' }}>
                 <LayoutDashboard size={18} />
@@ -503,6 +529,7 @@ function App() {
                       <span className="hide-mobile">Import</span>
                     </button>
 
+                    {/* OneDrive Test Button */}
                     {!isAuthenticated ? (
                       <button className="btn btn-outline" onClick={handleLoginOneDrive} style={{ color: '#0078D4', borderColor: '#0078D4', gap: '0.4rem' }}>
                         <Database size={18} />
@@ -527,6 +554,7 @@ function App() {
                     padding: '3px',
                     borderRadius: '9999px',
                     border: '1px solid var(--border)',
+                    marginLeft: '0.5rem'
                   }}>
                     <button
                       className="btn btn-ghost"
@@ -569,32 +597,6 @@ function App() {
                 )}
               </div>
             )}
-
-            {/* User-Info Pill – ganz rechts, immer sichtbar */}
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              background: 'rgba(255,255,255,0.04)',
-              padding: '4px 10px 4px 12px',
-              borderRadius: '9999px',
-              border: '1px solid var(--border)',
-              flexShrink: 0,
-              marginLeft: '0.25rem'
-            }}>
-              <div style={{ lineHeight: 1.2 }}>
-                <div style={{ fontWeight: 700, fontSize: '0.8rem', color: 'var(--text-main)' }}>{currentUser.name}</div>
-                <div style={{ color: 'var(--q-primary)', fontSize: '0.6rem', fontWeight: 800, textTransform: 'uppercase' }}>{currentUser.role}</div>
-              </div>
-              <button
-                onClick={handleLogout}
-                className="btn btn-ghost"
-                title="Abmelden"
-                style={{ padding: '0.35rem', color: '#F87171', borderRadius: '50%' }}
-              >
-                <LogOut size={14} />
-              </button>
-            </div>
           </nav>
         </div>
       </header>

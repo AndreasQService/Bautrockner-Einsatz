@@ -19,38 +19,48 @@ const PDFMetaData = ({ data }) => {
             {/* Meta Data */}
             <View style={styles.divider} />
             <View style={styles.metaSection}>
-                <View style={styles.metaRow}>
-                    <Text style={styles.metaLabel}>Projektnummer:</Text>
-                    <Text style={styles.metaValue}>{data.projectNumber || ''}</Text>
+                <View style={{ flexDirection: 'row', gap: 20 }}>
+                    <View style={{ flex: 1 }}>
+                        {data.projectNumber && (
+                            <View style={styles.metaRow}>
+                                <Text style={styles.metaLabel}>Projektnummer:</Text>
+                                <Text style={styles.metaValue}>{data.projectNumber}</Text>
+                            </View>
+                        )}
+                        {data.orderNumber && (
+                            <View style={styles.metaRow}>
+                                <Text style={styles.metaLabel}>Auftragsnummer:</Text>
+                                <Text style={styles.metaValue}>{data.orderNumber}</Text>
+                            </View>
+                        )}
+                        {data.damageNumber && (
+                            <View style={styles.metaRow}>
+                                <Text style={styles.metaLabel}>Schaden-Nr:</Text>
+                                <Text style={styles.metaValue}>{data.damageNumber}</Text>
+                            </View>
+                        )}
+                    </View>
+                    <View style={{ flex: 1 }}>
+                        <View style={styles.metaRow}>
+                            <Text style={styles.metaLabel}>Berichtsdatum:</Text>
+                            <Text style={styles.metaValue}>{new Date().toLocaleDateString('de-CH')}</Text>
+                        </View>
+                        {data.damageReportDate && (
+                            <View style={styles.metaRow}>
+                                <Text style={styles.metaLabel}>Eingangsdatum:</Text>
+                                <Text style={styles.metaValue}>{new Date(data.damageReportDate).toLocaleDateString('de-CH')}</Text>
+                            </View>
+                        )}
+                        {data.damageDate && (
+                            <View style={styles.metaRow}>
+                                <Text style={styles.metaLabel}>Schadendatum:</Text>
+                                <Text style={styles.metaValue}>{new Date(data.damageDate).toLocaleDateString('de-CH')}</Text>
+                            </View>
+                        )}
+                    </View>
                 </View>
-                {data.orderNumber && (
-                    <View style={styles.metaRow}>
-                        <Text style={styles.metaLabel}>Auftragsnummer:</Text>
-                        <Text style={styles.metaValue}>{data.orderNumber}</Text>
-                    </View>
-                )}
-                {data.damageNumber && (
-                    <View style={styles.metaRow}>
-                        <Text style={styles.metaLabel}>Schaden-Nr:</Text>
-                        <Text style={styles.metaValue}>{data.damageNumber}</Text>
-                    </View>
-                )}
-                <View style={styles.metaRow}>
-                    <Text style={styles.metaLabel}>Berichtsdatum:</Text>
-                    <Text style={styles.metaValue}>{new Date().toLocaleDateString('de-CH')}</Text>
-                </View>
-                {data.damageReportDate && (
-                    <View style={styles.metaRow}>
-                        <Text style={styles.metaLabel}>Eingangsdatum:</Text>
-                        <Text style={styles.metaValue}>{new Date(data.damageReportDate).toLocaleDateString('de-CH')}</Text>
-                    </View>
-                )}
-                {data.damageDate && (
-                    <View style={styles.metaRow}>
-                        <Text style={styles.metaLabel}>Schadendatum:</Text>
-                        <Text style={styles.metaValue}>{new Date(data.damageDate).toLocaleDateString('de-CH')}</Text>
-                    </View>
-                )}
+
+                <View style={{ height: 10 }} />
 
                 {data.street && (
                     <View style={styles.metaRow}>
@@ -64,13 +74,33 @@ const PDFMetaData = ({ data }) => {
                         <Text style={styles.metaValue}>{`${data.zip || ''} ${data.city || ''}`.trim()}</Text>
                     </View>
                 )}
-                {/* Lage / Details */}
-                {data.locationDetails && String(data.locationDetails).trim() !== '' && (
-                    <View style={styles.metaRow}>
-                        <Text style={styles.metaLabel}>Lage / Details:</Text>
-                        <Text style={styles.metaValue}>{String(data.locationDetails).trim()}</Text>
-                    </View>
-                )}
+                {/* Lage / Details - Improved Display */}
+                {(() => {
+                    let details = [
+                        data.locationDetails,
+                        data.contacts?.[0]?.floor,
+                        data.contacts?.[0]?.stockwerk,
+                        data.contacts?.[0]?.apartment
+                    ].filter(p => p !== null && p !== undefined && String(p).trim() !== '').map(p => String(p).trim());
+
+                    // Echte Duplikate entfernen
+                    details = [...new Set(details)];
+
+                    // Kürzere Teilstrings entfernen (z.B. "2. OG" entfernen, wenn "2. OG Whg Schwarz" schon existiert)
+                    const uniqueDetails = details.filter((d1, i, arr) => {
+                        return !arr.some((d2, j) => i !== j && d2.toLowerCase().includes(d1.toLowerCase()) && d2 !== d1);
+                    });
+
+                    if (uniqueDetails.length > 0) {
+                        return (
+                            <View style={styles.metaRow}>
+                                <Text style={styles.metaLabel}>Lage / Details:</Text>
+                                <Text style={styles.metaValue}>{uniqueDetails.join(', ')}</Text>
+                            </View>
+                        );
+                    }
+                    return null;
+                })()}
                 {data.clientSource && (
                     <View style={styles.metaRow}>
                         <Text style={styles.metaLabel}>Sachbearbeiter:</Text>

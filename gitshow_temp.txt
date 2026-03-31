@@ -1,0 +1,10 @@
+﻿commit 23d8e0767f4a892881842ec3be8cc5da5284dfb2
+Author: Andreas Q-Service <andreas@q-service.ch>
+Date:   Mon Mar 30 07:20:26 2026 +0200
+
+    Restore: Karte auf Freitag-Stand (OSM Zoom 15, 3x2, window.Image, kein Canvas-Text)
+
+ src/components/DamageForm.jsx               | 44 ++++++-----------------------
+ src/components/pdf/DamageReportDocument.jsx | 10 ++-----
+ vite.config.js                              |  6 ++++
+ 3 files changed, 16 insertions(+), 44 deletions(-)

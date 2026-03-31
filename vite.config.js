@@ -97,17 +97,20 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/openai-api/, ''),
       },
-      '/osm-tile': {
-        target: 'https://tile.openstreetmap.org',
+      '/carto-tile': {
+        target: 'https://a.basemaps.cartocdn.com',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/osm-tile/, ''),
-        headers: { 'User-Agent': 'QTool/1.0 (q-service.ch)' },
+        rewrite: (path) => path.replace(/^\/carto-tile/, ''),
       },
       '/nominatim': {
         target: 'https://nominatim.openstreetmap.org',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/nominatim/, ''),
-        headers: { 'User-Agent': 'QTool/1.0 (q-service.ch)', 'Accept-Language': 'de' },
+      },
+      '/osm-static': {
+        target: 'https://staticmap.openstreetmap.de',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/osm-static/, ''),
       },
     }
   }

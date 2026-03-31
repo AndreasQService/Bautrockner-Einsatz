@@ -1,7 +1,7 @@
 import UploadPanel from "./UploadPanel";
 import AiSuggestionsPanel from "./AiSuggestionsPanel";
 import { Buffer } from 'buffer';
-import QRCode from 'qrcode';
+import { geocodeAddress, getMapDataUrl } from '../services/MapService';
 
 // Unified Polyfill for @react-pdf and other Node-dependencies in Browser/Vite
 if (typeof window !== 'undefined') {
@@ -357,35 +357,6 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         recognition.start();
     };
 
-    // Feststellungen Diktat
-    const [isListeningFindings, setIsListeningFindings] = useState(false);
-    const recognitionRefFindings = useRef(null);
-
-    const toggleFindingsListening = () => {
-        if (isListeningFindings) {
-            recognitionRefFindings.current?.stop();
-            setIsListeningFindings(false);
-            return;
-        }
-        const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (!SR) { alert('Ihr Browser unterstützt keine Spracherkennung.'); return; }
-        const rec = new SR();
-        rec.lang = 'de-DE';
-        rec.interimResults = false;
-        rec.continuous = false;
-        rec.onstart = () => setIsListeningFindings(true);
-        rec.onend = () => setIsListeningFindings(false);
-        rec.onerror = (e) => { console.error('Speech error', e.error); setIsListeningFindings(false); };
-        rec.onresult = (event) => {
-            const transcript = event.results[0][0].transcript;
-            if (transcript) {
-                setFormData(prev => ({ ...prev, findings: (prev.findings ? prev.findings + ' ' : '') + transcript }));
-            }
-        };
-        recognitionRefFindings.current = rec;
-        rec.start();
-    };
-
     const addMeasure = (text) => {
         const current = formData.measures ? formData.measures + '\n' : '';
         setFormData(prev => ({ ...prev, measures: current + text }));
@@ -436,54 +407,11 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         name: '',
         apartment: '',
         stockwerk: '',
-        customName: '',
-        apartmentCustom: ''
+        customName: ''
     })
 
     const [showImageSelector, setShowImageSelector] = useState(false);
     const [globalPreviewImage, setGlobalPreviewImage] = useState(null);
-    const [qrModal, setQrModal] = useState(null);       // { dataUrl }
-    const [qrEditFields, setQrEditFields] = useState({}); // { name, phone, email, note }
-    const [qrSessionKey, setQrSessionKey] = useState(0); // stabil pro Modal-Session
-
-    // QR-Code aus Feldern generieren
-    const buildQR = async (fields) => {
-        const lines = ['BEGIN:VCARD', 'VERSION:3.0'];
-        if (fields.name)  lines.push(`FN:${fields.name}`);
-        if (fields.name)  lines.push(`ORG:${fields.name}`);
-        if (fields.phone) lines.push(`TEL;TYPE=CELL:${fields.phone}`);
-        if (fields.email) lines.push(`EMAIL:${fields.email}`);
-        if (fields.note)  lines.push(`NOTE:${fields.note}`);
-        lines.push('END:VCARD');
-        try {
-            const dataUrl = await QRCode.toDataURL(lines.join('\n'), {
-                width: 280, margin: 2,
-                color: { dark: '#0F172A', light: '#FFFFFF' }
-            });
-            setQrModal({ dataUrl });
-        } catch (err) { console.error('QR-Fehler:', err); }
-    };
-
-    // QR-Modal öffnen
-    const handleContactQR = (contact) => {
-        const fields = {
-            name:  contact.name  || '',
-            phone: contact.phone || '',
-            email: contact.email || '',
-            note:  [contact.floor, contact.role].filter(Boolean).join(' · '),
-        };
-        setQrEditFields(fields);
-        setQrSessionKey(Date.now()); // neuer Key = Inputs neu mounten
-        setQrModal({ dataUrl: null });
-        buildQR(fields);
-    };
-
-    // QR-Feld ändern
-    const handleQrFieldChange = (key, value) => {
-        const updated = { ...qrEditFields, [key]: value };
-        setQrEditFields(updated);  // Sofort text updaten
-        buildQR(updated);          // QR async neu generieren
-    };
     // const dialogRef = useRef(null); // Unused
 
     useEffect(() => {
@@ -1529,14 +1457,10 @@ END:VCARD`;
 
         if (!finalRoomName) return;
 
-        const finalApartment = (newRoom.apartment === '__neue__' || newRoom.apartment === 'Sonstiges')
-            ? (newRoom.apartmentCustom || '').trim()
-            : newRoom.apartment;
-
         const roomEntry = {
             id: Date.now(),
             name: finalRoomName,
-            apartment: finalApartment,
+            apartment: newRoom.apartment,
             stockwerk: newRoom.stockwerk
         };
 
@@ -1604,9 +1528,13 @@ END:VCARD`;
             // Method A: Supabase
             if (supabase && (url.includes('supabase.co') || imgObj?.storagePath)) {
                 try {
-                    let path = imgObj?.storagePath || (url.includes('case-files/') ? url.split('case-files/').pop()?.split('?')[0] : null);
+                    // Bucket aus URL erkennen
+                    const bucketMatch = url.match(/\/object\/public\/([^/]+)\//);
+                    const bucket = bucketMatch ? bucketMatch[1] : 'case-files';
+                    let path = imgObj?.storagePath || (url.includes(`${bucket}/`) ? url.split(`${bucket}/`).pop()?.split('?')[0] : null);
+                    console.log('[IMG_DEBUG] supabase path:', { bucket, storagePath: imgObj?.storagePath, extractedPath: path, url: url.substring(0, 80) });
                     if (path) {
-                        const { data, error } = await supabase.storage.from('case-files').download(path);
+                        const { data, error } = await supabase.storage.from(bucket).download(path);
                         if (data && !error) {
                             const raw = await new Promise((resolve) => {
                                 const reader = new FileReader();
@@ -1614,6 +1542,8 @@ END:VCARD`;
                                 reader.readAsDataURL(data);
                             });
                             return await resizeImage(raw);
+                        } else {
+                            console.warn('[IMG_DEBUG] Supabase download error:', error?.message, 'bucket:', bucket, 'path:', path);
                         }
                     }
                 } catch (e) { console.warn("PDF GEN: Supabase error", e); }
@@ -1653,6 +1583,7 @@ END:VCARD`;
                 });
                 if (raw) return await resizeImage(raw);
             } catch (err) { }
+            console.log('[IMG_DEBUG] Alle Methoden fehlgeschlagen, raw URL:', url.substring(0, 100));
             return await resizeImage(url);
         };
 
@@ -1671,63 +1602,12 @@ END:VCARD`;
                 }
             } catch (e) { console.error("Logo load error", e); }
 
-            // Build Static Map via OSM tiles (fetch blob → objectURL → canvas, no CORS taint)
-            let staticMapUrl = null;
-            try {
-                const mapAddress = dataToUse.street
-                    ? `${dataToUse.street}, ${dataToUse.zip || ''} ${dataToUse.city || ''}`
-                    : dataToUse.address;
-                if (mapAddress) {
-                    const geoResp = await fetch(`/nominatim/search?q=${encodeURIComponent(mapAddress)}&format=json&limit=1`);
-                    const geoData = await geoResp.json();
-                    if (geoData && geoData.length > 0) {
-                        const lat = parseFloat(geoData[0].lat);
-                        const lon = parseFloat(geoData[0].lon);
-                        const zoom = 15;
-                        const lon2tile = (l, z) => Math.floor((l + 180) / 360 * Math.pow(2, z));
-                        const lat2tile = (l, z) => Math.floor((1 - Math.log(Math.tan(l * Math.PI / 180) + 1 / Math.cos(l * Math.PI / 180)) / Math.PI) / 2 * Math.pow(2, z));
-                        const tileX = lon2tile(lon, zoom);
-                        const tileY = lat2tile(lat, zoom);
-                        const cols = 3, rows = 2, tileSize = 256;
-                        const offX = Math.floor(cols / 2), offY = Math.floor(rows / 2);
-                        const canvas = document.createElement('canvas');
-                        canvas.width = cols * tileSize;
-                        canvas.height = rows * tileSize;
-                        const ctx = canvas.getContext('2d');
-                        // Fetch tiles as blobs → objectURLs (avoids canvas CORS taint)
-                        await Promise.all(
-                            Array.from({ length: rows }, (_, r) =>
-                                Array.from({ length: cols }, (_, c) =>
-                                    fetch(`/osm-tile/${zoom}/${tileX + c - offX}/${tileY + r - offY}.png`)
-                                        .then(r => r.blob())
-                                        .then(blob => new Promise(res => {
-                                            const oUrl = URL.createObjectURL(blob);
-                                            const img = new Image();
-                                            img.onload = () => { ctx.drawImage(img, c * tileSize, r * tileSize); URL.revokeObjectURL(oUrl); res(); };
-                                            img.onerror = () => { URL.revokeObjectURL(oUrl); res(); };
-                                            img.src = oUrl;
-                                        }))
-                                        .catch(() => Promise.resolve())
-                                )
-                            ).flat()
-                        );
-                        // Red pin marker
-                        const cx = offX * tileSize + tileSize / 2;
-                        const cy = offY * tileSize + tileSize / 2;
-                        ctx.beginPath(); ctx.arc(cx, cy - 10, 9, 0, 2 * Math.PI);
-                        ctx.fillStyle = '#e53e3e'; ctx.fill();
-                        ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
-                        staticMapUrl = canvas.toDataURL('image/jpeg', 0.9);
-                    }
-                }
-            } catch (e) { console.warn("Static map error", e); }
-
             // Pre-process images - Filter out PDFs and non-renderable documents
             console.log("PDF GEN: Starting image processing...");
             const tempProcessedImages = await Promise.all(
                 (dataToUse.images || []).map(async (img) => {
                     const category = String(img.assignedTo || '').trim().toLowerCase();
-                    const isDocCategory = ['schadensbericht', 'arbeitsrapporte', 'messprotokolle', 'sonstiges', 'pläne', 'lieferantenrechnungen'].includes(category);
+                    const isDocCategory = ['schadensbericht', 'arbeitsrapporte', 'messprotokolle'].includes(category);
                     const isProbablyPDF = img.preview?.toLowerCase().includes('.pdf') || img.type?.includes('pdf');
 
                     if (img.includeInReport === false || isDocCategory || isProbablyPDF) {
@@ -1735,7 +1615,7 @@ END:VCARD`;
                     }
 
                     try {
-                        const base64 = await urlToDataUrl(img.preview, img);
+                        const base64 = await urlToDataUrl(img.preview, img, supabase);
                         if (base64) {
                             return { ...img, preview: base64, isRenderable: true };
                         } else {
@@ -1765,9 +1645,21 @@ END:VCARD`;
             let processedExteriorPhoto = dataToUse.exteriorPhoto;
             if (processedExteriorPhoto) {
                 try {
-                    const base64Exterior = await urlToDataUrl(processedExteriorPhoto);
+                    const base64Exterior = await urlToDataUrl(processedExteriorPhoto, null, supabase);
                     if (base64Exterior) processedExteriorPhoto = base64Exterior;
                 } catch (e) { console.warn("Failed to convert exterior photo:", e); }
+            }
+
+            // Karte generieren
+            let mapImageUrl = null;
+            const addressQuery = [dataToUse.street, dataToUse.zip, dataToUse.city].filter(Boolean).join(', ') || dataToUse.address || '';
+            console.log('[PDF] Adresse für Karte:', addressQuery);
+            if (addressQuery) {
+                const coords = await geocodeAddress(addressQuery);
+                if (coords) {
+                    mapImageUrl = await getMapDataUrl(coords);
+                    console.log('[PDF] Karte generiert, Länge:', mapImageUrl?.length);
+                }
             }
 
             // Prepare Data for Document Component
@@ -1775,11 +1667,11 @@ END:VCARD`;
                 ...dataToUse,
                 damageType: dataToUse.damageCategory || '-',
                 images: processedImages,
-                damageTypeImages: processedHeroImages, // All selected cause photos
-                damageTypeImage: processedHeroImages[0] || null, // Primary one for fallback
+                damageTypeImages: processedHeroImages,
+                damageTypeImage: processedHeroImages[0] || null,
                 exteriorPhoto: processedExteriorPhoto,
+                mapImageUrl,
                 logo: logoData,
-                staticMapUrl: staticMapUrl,
             };
 
             // Generate Blob using @react-pdf
@@ -1886,30 +1778,18 @@ END:VCARD`;
         }));
     };
 
-    const handleExteriorPhotoUpload = async (e) => {
+    const handleExteriorPhotoUpload = (e) => {
         const file = e.target.files[0];
         if (!file) return;
 
-        // Show base64 preview immediately
         const reader = new FileReader();
         reader.onloadend = () => {
-            setFormData(prev => ({ ...prev, exteriorPhoto: reader.result }));
+            setFormData(prev => ({
+                ...prev,
+                exteriorPhoto: reader.result
+            }));
         };
         reader.readAsDataURL(file);
-
-        // Upload to Supabase Storage and replace with public URL
-        if (supabase) {
-            try {
-                const ext = file.name.split('.').pop();
-                const fileName = `cases/${formData.id || 'temp'}/exterior/${Date.now()}.${ext}`;
-                const { error } = await supabase.storage.from('case-files').upload(fileName, file);
-                if (error) throw error;
-                const { data: { publicUrl } } = supabase.storage.from('case-files').getPublicUrl(fileName);
-                setFormData(prev => ({ ...prev, exteriorPhoto: publicUrl }));
-            } catch (err) {
-                console.warn('Exterior photo upload failed, keeping base64:', err);
-            }
-        }
     };
 
     const removeExteriorPhoto = () => {
@@ -2044,57 +1924,31 @@ END:VCARD`;
     };
 
     const handleEmailImport = (data) => {
-        console.log("handleEmailImport v2026.2 called with:", data);
+        console.log("handleEmailImport v2026.1 called with:", data);
         if (!data) return;
 
         setFormData(prev => {
             const newConflicts = { ...conflicts };
             const nextData = { ...prev };
 
+            // --- Helper: Merge Field with Fill-if-Empty & Conflict Detect ---
             const mergeField = (path, newVal) => {
                 if (!newVal) return;
                 const currentVal = prev[path];
+
                 if (!currentVal || currentVal.toString().trim() === "") {
+                    // Empty? Fill it!
                     nextData[path] = newVal;
                 } else if (currentVal.toString().trim() !== newVal.toString().trim()) {
+                    // Mismatch? Mark as conflict for the Rollback-Icon
                     newConflicts[path] = { original: currentVal, newValue: newVal };
+                    // Optionally: overwrite if Recency Priority is desired, but user said "merkte" und "Warn-Icon"
+                    // Let's stick to Recency Priority for the actual value but show the warning
                     nextData[path] = newVal;
                 }
             };
 
-            // --- NEUE Struktur (auftraggeber, eigentuemer, schadenort, schaden) ---
-            if (data.auftraggeber) {
-                mergeField('client', data.auftraggeber.firma || data.auftraggeber.name);
-                mergeField('assignedTo', data.auftraggeber.name);
-                mergeField('clientPhone', data.auftraggeber.telefon);
-                mergeField('clientEmail', data.auftraggeber.email);
-                mergeField('clientStreet', data.auftraggeber.strasse_nr);
-                mergeField('clientZip',  data.auftraggeber.plz);
-                mergeField('clientCity', data.auftraggeber.ort);
-            }
-            // Fallback: wenn KI Auftraggeber-Kontakt in handwerker-Block gelegt hat
-            if (!data.auftraggeber?.telefon && data.handwerker?.telefon) {
-                mergeField('clientPhone', data.handwerker.telefon);
-            }
-            if (!data.auftraggeber?.email && data.handwerker?.email) {
-                mergeField('clientEmail', data.handwerker.email);
-            }
-            if (data.eigentuemer) {
-                mergeField('ownerName', data.eigentuemer.name);
-                mergeField('ownerEmail', data.eigentuemer.email);
-            }
-            if (data.schaden) {
-                mergeField('damageCategory', data.schaden.art);
-                mergeField('description', data.schaden.beschreibung);
-            }
-            if (data.schadenort) {
-                mergeField('street', data.schadenort.strasse_nr);
-                mergeField('locationDetails', data.schadenort.bezeichnung);
-                mergeField('zip',  data.schadenort.plz);
-                mergeField('city', data.schadenort.ort);
-            }
-
-            // --- ALTE Struktur (Rückwärtskompatibilität) ---
+            // Mapping (Schema 2026.1 to formData)
             if (data.projekt_daten) {
                 mergeField('projectNumber', data.projekt_daten.interne_id);
                 mergeField('orderNumber', data.projekt_daten.externe_ref);
@@ -2103,68 +1957,62 @@ END:VCARD`;
             if (data.auftrag_verwaltung) {
                 mergeField('client', data.auftrag_verwaltung.firma);
                 mergeField('assignedTo', data.auftrag_verwaltung.sachbearbeiter);
+                if (data.auftrag_verwaltung.leistungsart) {
+                    mergeField('damageCategory', data.auftrag_verwaltung.leistungsart);
+                }
             }
             if (data.rechnungs_details) {
                 mergeField('ownerName', data.rechnungs_details.eigentuemer);
                 mergeField('ownerEmail', data.rechnungs_details.email_rechnung);
                 mergeField('invoiceReference', data.rechnungs_details.vermerk);
             }
+            if (data.schadenort) {
+                mergeField('street', data.schadenort.strasse_nr);
+                mergeField('locationDetails', data.schadenort.etage_wohnung);
 
-            // --- KONTAKTE aufbauen ---
-            let currentContacts = [...(prev.contacts || [])];
-
-            const addOrMerge = (name, telefon, rolle, email, wohnung = '', contactPerson = '') => {
-                if (!name) return;
-                const existingIdx = currentContacts.findIndex(c =>
-                    c.name && c.name.trim().toLowerCase() === name.trim().toLowerCase()
-                );
-                // Rolle-Kürzel → Dropdown-Wert
-                const rolleMap = { 'Handw.': 'Handwerker', 'Verw.': 'Verwaltung', 'Eig.': 'Eigentümer', 'HW': 'Hauswart', 'Mieter': 'Mieter', 'AG': 'Auftraggeber', 'Auftraggeber': 'Auftraggeber' };
-                const mappedRole = rolleMap[rolle] || rolle || 'Mieter';
-
-                if (existingIdx !== -1) {
-                    currentContacts[existingIdx] = {
-                        ...currentContacts[existingIdx],
-                        phone: currentContacts[existingIdx].phone || telefon || '',
-                        role: currentContacts[existingIdx].role || mappedRole,
-                        email: currentContacts[existingIdx].email || email || '',
-                        floor: currentContacts[existingIdx].floor || wohnung || '',
-                        contactPerson: currentContacts[existingIdx].contactPerson || contactPerson || '',
-                    };
-                } else {
-                    currentContacts.push({ name, phone: telefon || '', role: mappedRole, email: email || '', apartment: '', floor: wohnung || '', contactPerson: contactPerson || '' });
+                // PLZ / Ort Split
+                if (data.schadenort.plz_ort) {
+                    const parts = data.schadenort.plz_ort.trim().split(/\s+/);
+                    if (parts.length >= 1) {
+                        const zipCandidate = parts[0];
+                        if (zipCandidate.length === 4 && /^\d+$/.test(zipCandidate)) {
+                            mergeField('zip', zipCandidate);
+                            mergeField('city', parts.slice(1).join(' '));
+                        } else {
+                            mergeField('city', data.schadenort.plz_ort);
+                        }
+                    }
                 }
-            };
-
-            // Neue Struktur: Block-Überschrift = Kontaktrolle
-            // _blockRolle = im Modal per Dropdown korrigierte Rolle (hat Vorrang)
-            const blockRoleMap = {
-                'auftraggeber': 'Auftraggeber',
-                'verwaltung':   'Verwaltung',
-                'eigentuemer':  'Eig.',
-                'hauswart':     'HW',
-                'handwerker':   'Handw.',
-                'mieter':       'Mieter',
-            };
-            const neueRollen = ['auftraggeber','verwaltung','eigentuemer','hauswart','handwerker'];
-            neueRollen.forEach(key => {
-                const k = data[key];
-                if (!k) return;
-                const displayName = k.firma || k.name;
-                const rolle = blockRoleMap[k._blockRolle || key];
-                const contactPerson = k.firma ? (k.name || '') : '';
-                if (displayName) addOrMerge(displayName, k.telefon, rolle, k.email, '', contactPerson);
-            });
-            // Mieter: Array mit wohnung → floor
-            if (Array.isArray(data.mieter)) {
-                data.mieter.forEach(m => { if (m?.name) addOrMerge(m.name, m.telefon, 'Mieter', m.email, m.wohnung || ''); });
-            } else if (data.mieter?.name) {
-                addOrMerge(data.mieter.name, data.mieter.telefon, 'Mieter', data.mieter.email, '');
             }
 
-            // Alte Struktur: kontakte-Array
+            // --- SMART CONTACT MERGE ---
+            let currentContacts = [...(prev.contacts || [])];
             if (data.kontakte && Array.isArray(data.kontakte)) {
-                data.kontakte.forEach(c => addOrMerge(c.name, c.telefon, c.rolle, c.email));
+                data.kontakte.forEach(newContact => {
+                    // Find existing by name match (case insensitive, stripped)
+                    const existingIdx = currentContacts.findIndex(c =>
+                        c.name && newContact.name &&
+                        c.name.trim().toLowerCase() === newContact.name.trim().toLowerCase()
+                    );
+
+                    if (existingIdx !== -1) {
+                        // MERGE EXISTING
+                        const existing = currentContacts[existingIdx];
+                        currentContacts[existingIdx] = {
+                            ...existing,
+                            phone: existing.phone || newContact.telefon, // Fill empty phone
+                            role: existing.role || newContact.rolle,     // Fill empty role
+                        };
+                    } else {
+                        // ADD NEW (Unique)
+                        currentContacts.push({
+                            name: newContact.name,
+                            phone: newContact.telefon,
+                            role: newContact.rolle || 'Mieter',
+                            apartment: ''
+                        });
+                    }
+                });
             }
 
             nextData.contacts = currentContacts;
@@ -2404,25 +2252,6 @@ END:VCARD`;
                             </select>
                         </div>
 
-                        {/* Lieferantenrechnung Badge */}
-                        {mode === 'desktop' && formData.images?.some(img => img.assignedTo === 'Sonstiges') && (
-                            <div style={{
-                                display: 'flex', flexDirection: 'column', gap: '0.2rem'
-                            }}>
-                                <label style={{ fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#F59E0B', fontWeight: 700 }}>Rechnung</label>
-                                <div style={{
-                                    display: 'flex', alignItems: 'center', gap: '0.4rem',
-                                    padding: '0.3rem 0.7rem', borderRadius: '8px', height: '38px',
-                                    backgroundColor: 'rgba(245,158,11,0.15)',
-                                    border: '1.5px solid rgba(245,158,11,0.4)',
-                                    color: '#F59E0B', fontWeight: 700, fontSize: '0.78rem',
-                                    whiteSpace: 'nowrap'
-                                }}>
-                                    <FileText size={14} /> Lieferantenrechnung vorhanden
-                                </div>
-                            </div>
-                        )}
-
                         {/* Calendar Push Button */}
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
                             <label style={{ fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 700 }}>Export</label>
@@ -2558,7 +2387,16 @@ END:VCARD`;
                         </div>
 
                         <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
-
+                            <div style={{ flex: '1 1 200px' }}>
+                                <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 600, marginBottom: '0.5rem', display: 'block' }}>Bewirtschafter/in</label>
+                                <input
+                                    className="form-input"
+                                    placeholder="Vorname Name"
+                                    value={formData.assignedTo || ''}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, assignedTo: e.target.value }))}
+                                    style={{ width: '100%' }}
+                                />
+                            </div>
                             <div style={{ flex: '1 1 160px' }}>
                                 <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 600, marginBottom: '0.5rem', display: 'block' }}>Telefon (AG-Kontakt)</label>
                                 <input
@@ -2824,7 +2662,7 @@ END:VCARD`;
                                     img.name?.toLowerCase().endsWith('.msg') ||
                                     img.name?.toLowerCase().endsWith('.pdf') ||
                                     img.name?.toLowerCase().endsWith('.txt');
-                                return img && !img.roomId && !isDoc && img.assignedTo !== 'Schadenfotos' && img.assignedTo !== 'Messprotokolle' && img.assignedTo !== 'Pläne';
+                                return img && !img.roomId && !isDoc;
                             }).map((img, idx) => (
                                 <div key={idx}
                                     style={{
@@ -2846,130 +2684,27 @@ END:VCARD`;
                                             backgroundColor: img.includeInReport === false ? 'rgba(0,0,0,0.3)' : 'transparent'
                                         }}
                                     >
-                                        <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: '36px', minHeight: '36px', pointerEvents: 'auto', cursor: 'pointer' }}>
-                                            <input
-                                                type="checkbox"
-                                                checked={img.includeInReport !== false}
-                                                onChange={(e) => {
-                                                    const checked = e.target.checked;
-                                                    setFormData(prev => ({
-                                                        ...prev,
-                                                        images: prev.images.map(i => i === img ? { ...i, includeInReport: checked } : i)
-                                                    }));
-                                                }}
-                                                style={{ width: '22px', height: '22px', cursor: 'pointer', accentColor: '#0F6EA3' }}
-                                            />
-                                        </label>
+                                        <input
+                                            type="checkbox"
+                                            checked={img.includeInReport !== false}
+                                            onChange={(e) => {
+                                                const checked = e.target.checked;
+                                                setFormData(prev => ({
+                                                    ...prev,
+                                                    images: prev.images.map(i => i === img ? { ...i, includeInReport: checked } : i)
+                                                }));
+                                            }}
+                                            style={{ pointerEvents: 'auto', width: '18px', height: '18px', cursor: 'pointer', accentColor: '#0F6EA3' }}
+                                        />
                                     </div>
                                 </div>
                             ))}
-                            {(!formData.images || formData.images.filter(img => !img.roomId && img.assignedTo !== 'Schadenfotos' && img.assignedTo !== 'Messprotokolle' && img.assignedTo !== 'Pläne' && !(img.type === 'document' || img.name?.toLowerCase().endsWith('.msg') || img.name?.toLowerCase().endsWith('.pdf') || img.name?.toLowerCase().endsWith('.txt'))).length === 0) && (
-                                <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', width: '100%', textAlign: 'center', padding: '0.5rem' }}>Keine Bilder vorhanden.</div>
+                            {(!formData.images || formData.images.filter(img => !img.roomId && !(img.type === 'document' || img.name?.toLowerCase().endsWith('.msg') || img.name?.toLowerCase().endsWith('.pdf') || img.name?.toLowerCase().endsWith('.txt'))).length === 0) && (
+                                <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', width: '100%', textAlign: 'center', padding: '1rem' }}>Keine Bilder vorhanden.</div>
                             )}
-
-                            {/* Grosse Drag-and-Drop Zone – volle Breite */}
-                            <div style={{ width: '100%', marginTop: '0.5rem' }}>
-                                <div
-                                    onDragOver={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = '#0ea5e9'; e.currentTarget.style.backgroundColor = 'rgba(14,165,233,0.08)'; e.currentTarget.querySelector('span').style.color = '#0ea5e9'; }}
-                                    onDragLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.querySelector('span').style.color = 'var(--text-muted)'; }}
-                                    onDrop={(e) => {
-                                        e.preventDefault();
-                                        e.currentTarget.style.borderColor = 'var(--border)';
-                                        e.currentTarget.style.backgroundColor = 'transparent';
-                                        e.currentTarget.querySelector('span').style.color = 'var(--text-muted)';
-
-                                        // 1. Echte Dateien (Desktop Outlook, Explorer)
-                                        const dropped = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
-                                        if (dropped.length > 0) {
-                                            handleImageUpload(dropped, { assignedTo: 'Schadensbilder' });
-                                            return;
-                                        }
-
-                                        // 2. Bilder aus Web-E-Mails (Gmail, Outlook.com) als HTML <img src="...">
-                                        const html = e.dataTransfer.getData('text/html');
-                                        if (html) {
-                                            const parser = new DOMParser();
-                                            const doc = parser.parseFromString(html, 'text/html');
-                                            const imgs = Array.from(doc.querySelectorAll('img'));
-                                            const urls = imgs.map(i => i.src).filter(s => s && !s.startsWith('cid:'));
-                                            if (urls.length > 0) {
-                                                urls.forEach(async (url) => {
-                                                    try {
-                                                        let dataUrl = url;
-                                                        if (!url.startsWith('data:')) {
-                                                            const resp = await fetch(url, { mode: 'cors' });
-                                                            const blob = await resp.blob();
-                                                            dataUrl = await new Promise(res => { const r = new FileReader(); r.onloadend = () => res(r.result); r.readAsDataURL(blob); });
-                                                        }
-                                                        const newImg = { id: Date.now() + Math.random(), preview: dataUrl, name: 'email-bild.jpg', description: '', assignedTo: 'Schadensbilder', includeInReport: true };
-                                                        setFormData(prev => ({ ...prev, images: [...(prev.images || []), newImg] }));
-                                                    } catch (err) { console.warn('E-Mail Bild konnte nicht geladen werden (CORS):', url, err); }
-                                                });
-                                                return;
-                                            }
-                                        }
-
-                                        // 3. URL-Liste (text/uri-list)
-                                        const uriList = e.dataTransfer.getData('text/uri-list') || e.dataTransfer.getData('URL');
-                                        if (uriList) {
-                                            const urls = uriList.split('\n').map(u => u.trim()).filter(u => u && !u.startsWith('#'));
-                                            urls.forEach(async (url) => {
-                                                try {
-                                                    const resp = await fetch(url, { mode: 'cors' });
-                                                    const blob = await resp.blob();
-                                                    if (blob.type.startsWith('image/')) {
-                                                        const dataUrl = await new Promise(res => { const r = new FileReader(); r.onloadend = () => res(r.result); r.readAsDataURL(blob); });
-                                                        const newImg = { id: Date.now() + Math.random(), preview: dataUrl, name: 'email-bild.jpg', description: '', assignedTo: 'Schadensbilder', includeInReport: true };
-                                                        setFormData(prev => ({ ...prev, images: [...(prev.images || []), newImg] }));
-                                                    }
-                                                } catch (err) { console.warn('URI-Bild konnte nicht geladen werden:', url, err); }
-                                            });
-                                        }
-                                    }}
-                                    onPaste={(e) => {
-                                        const items = Array.from(e.clipboardData?.items || []);
-                                        const imageItems = items.filter(i => i.type.startsWith('image/'));
-                                        if (imageItems.length > 0) {
-                                            e.preventDefault();
-                                            const pastedFiles = imageItems.map(i => i.getAsFile()).filter(Boolean);
-                                            if (pastedFiles.length > 0) handleImageUpload(pastedFiles, { assignedTo: 'Schadensbilder' });
-                                        }
-                                    }}
-                                    tabIndex={0}
-                                    onClick={() => document.getElementById('schadensbilder-upload-input').click()}
-                                    style={{
-                                        width: '100%', minHeight: '80px', borderRadius: '10px',
-                                        border: '2px dashed var(--border)',
-                                        display: 'flex', flexDirection: 'column',
-                                        alignItems: 'center', justifyContent: 'center',
-                                        cursor: 'pointer', gap: '6px',
-                                        transition: 'all 0.2s ease',
-                                        padding: '1rem'
-                                    }}
-                                    title="Bilder hier ablegen oder klicken zum Auswählen"
-                                >
-                                    <Upload size={22} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-                                    <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', transition: 'color 0.2s', textAlign: 'center' }}>
-                                        Bilder hier ablegen, <u>klicken</u> oder <kbd style={{fontSize:'0.75rem', padding:'1px 4px', background:'var(--border)', borderRadius:'3px'}}>Ctrl+V</kbd> zum Einfügen
-                                    </span>
-                                </div>
-                                <input
-                                    id="schadensbilder-upload-input"
-                                    type="file"
-                                    accept="image/*"
-                                    multiple
-                                    style={{ display: 'none' }}
-                                    onChange={(e) => {
-                                        const files = Array.from(e.target.files);
-                                        if (files.length > 0) handleImageUpload(files, { assignedTo: 'Schadensbilder' });
-                                        e.target.value = '';
-                                    }}
-                                />
-                            </div>
                         </div>
                     </div>
                 )}
-
 
                 {/* Desktop-Only: Schadenbeschreibung (AI Extracted) */}
                 {mode === 'desktop' && (
@@ -3022,7 +2757,7 @@ END:VCARD`;
                                         img.name?.toLowerCase().endsWith('.msg') ||
                                         img.name?.toLowerCase().endsWith('.pdf') ||
                                         img.name?.toLowerCase().endsWith('.txt');
-                                    return img && !img.roomId && !isDoc && img.assignedTo !== 'Schadenfotos' && img.assignedTo !== 'Messprotokolle' && img.assignedTo !== 'Pläne';
+                                    return img && !img.roomId && !isDoc;
                                 }).map((img, idx) => (
                                     <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '4px', marginBottom: '8px' }}>
                                         <div
@@ -3184,59 +2919,6 @@ END:VCARD`;
                                         }}
                                     />
                                 </label>
-
-                                {/* Drop Zone */}
-                                <div
-                                    style={{ width: '100%', marginTop: '0.75rem', flexBasis: '100%' }}
-                                    onDragOver={(e) => { e.preventDefault(); e.currentTarget.firstChild.style.borderColor = '#0ea5e9'; e.currentTarget.firstChild.style.background = 'rgba(14,165,233,0.12)'; }}
-                                    onDragLeave={(e) => { e.currentTarget.firstChild.style.borderColor = '#0F6EA3'; e.currentTarget.firstChild.style.background = 'rgba(15,110,163,0.06)'; }}
-                                    onDrop={async (e) => {
-                                        e.preventDefault();
-                                        e.currentTarget.firstChild.style.borderColor = '#0F6EA3';
-                                        e.currentTarget.firstChild.style.background = 'rgba(15,110,163,0.06)';
-
-                                        // 1. Echte Dateien (Explorer, Desktop Outlook wenn unterstützt)
-                                        const dropped = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
-                                        if (dropped.length > 0) {
-                                            handleImageUpload(dropped, { assignedTo: 'Schadensbilder' });
-                                            return;
-                                        }
-
-                                        // 2. HTML-Bilder aus Web-Mails (Gmail, Outlook.com)
-                                        const html = e.dataTransfer.getData('text/html');
-                                        if (html) {
-                                            const imgs = Array.from(new DOMParser().parseFromString(html, 'text/html').querySelectorAll('img'));
-                                            for (const imgEl of imgs) {
-                                                const src = imgEl.src;
-                                                if (!src || src.startsWith('cid:')) continue;
-                                                try {
-                                                    const resp = await fetch(src, { mode: 'cors' });
-                                                    const blob = await resp.blob();
-                                                    if (blob.type.startsWith('image/')) {
-                                                        const file = new File([blob], 'email-bild.jpg', { type: blob.type });
-                                                        handleImageUpload([file], { assignedTo: 'Schadensbilder' });
-                                                    }
-                                                } catch (err) { console.warn('CORS Fehler bei E-Mail Bild:', err); }
-                                            }
-                                        }
-                                    }}
-                                >
-                                    <div
-                                        tabIndex={0}
-                                        onPaste={async (e) => {
-                                            const items = Array.from(e.clipboardData?.items || []).filter(i => i.type.startsWith('image/'));
-                                            if (items.length > 0) {
-                                                e.preventDefault();
-                                                const files = items.map(i => i.getAsFile()).filter(Boolean);
-                                                if (files.length > 0) handleImageUpload(files, { assignedTo: 'Schadensbilder' });
-                                            }
-                                        }}
-                                        style={{ border: '2px dashed #0F6EA3', borderRadius: '10px', padding: '0.75rem 1rem', textAlign: 'center', fontSize: '0.82rem', color: '#0F6EA3', cursor: 'text', transition: 'all 0.2s', outline: 'none', background: 'rgba(15,110,163,0.06)' }}
-                                    >
-                                        📎 Bilder hier ablegen · <kbd style={{ fontSize: '0.72rem', padding: '1px 5px', background: 'rgba(15,110,163,0.2)', borderRadius: '3px', border: '1px solid #0F6EA3' }}>Ctrl+V</kbd> zum Einfügen
-                                    </div>
-                                </div>
-
                             </div>
                         </div>
 
@@ -3465,21 +3147,16 @@ END:VCARD`;
                                 gridTemplateColumns: mode === 'desktop' ? 'repeat(3, 1fr)' : '1fr',
                                 gap: '1.25rem'
                             }}>
-                                {formData.contacts.map((contact, idx) => {
-                                    const roleColorMap = { 'Auftraggeber':'#3b82f6','Verwaltung':'#f59e0b','Eigentümer':'#8b5cf6','Handwerker':'#ef4444','Hauswart':'#94a3b8','Mieter':'#10b981','Sonstiges':'#64748b' };
-                                    const rc = roleColorMap[contact.role] || '#64748b';
-                                    return (
+                                {formData.contacts.map((contact, idx) => (
                                     <div key={idx} className="glass-card" style={{
-                                        display: 'flex', flexDirection: 'column', gap: '0',
-                                        padding: '0', position: 'relative',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        gap: '1rem',
+                                        padding: '1.5rem',
+                                        position: 'relative',
                                         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                                        minWidth: 0, overflow: 'hidden', borderTop: `3px solid ${rc}`
+                                        minWidth: 0
                                     }}>
-                                        {/* Rollen-Header */}
-                                        <div style={{ fontSize: '0.72rem', fontWeight: 700, color: rc, textTransform: 'uppercase', letterSpacing: '0.07em', padding: '0.6rem 1.2rem 0.4rem', borderBottom: `1px solid ${rc}22` }}>
-                                            {contact.role || 'Kontakt'}
-                                        </div>
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '1.25rem 1.5rem 1.5rem' }}>
                                         {/* Row 1: Name & vCard (Blue Button) */}
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
                                             <label style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)', fontWeight: 750 }}>Name</label>
@@ -3516,51 +3193,10 @@ END:VCARD`;
                                                 >
                                                     <VcfIcon size={20} />
                                                 </button>
-                                                {/* QR-Code Button */}
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleContactQR(contact)}
-                                                    style={{
-                                                        padding: '0 0.6rem',
-                                                        height: '36px',
-                                                        borderRadius: '8px',
-                                                        cursor: 'pointer',
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        justifyContent: 'center',
-                                                        backgroundColor: 'rgba(16, 185, 129, 0.12)',
-                                                        border: '1px solid rgba(16, 185, 129, 0.35)',
-                                                        color: '#10b981',
-                                                        flexShrink: 0,
-                                                        fontSize: '15px',
-                                                    }}
-                                                    title="QR-Code zum Scannen"
-                                                >
-                                                    QR
-                                                </button>
                                             </div>
                                         </div>
 
-
-                                        {/* Row 1b: Ansprechperson – nur bei Firma-Rollen */}
-                                        {contact.role !== 'Mieter' && (
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                                            <label style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)', fontWeight: 750 }}>Ansprechperson</label>
-                                            <input
-                                                type="text"
-                                                placeholder="Vorname Name"
-                                                className="form-input"
-                                                value={contact.contactPerson || ''}
-                                                onChange={(e) => {
-                                                    const newContacts = [...formData.contacts];
-                                                    newContacts[idx].contactPerson = e.target.value;
-                                                    setFormData({ ...formData, contacts: newContacts });
-                                                }}
-                                                style={{ fontSize: '0.85rem', padding: '0.45rem 0.7rem' }}
-                                            />
-                                        </div>
-                                        )}
-
+                                        {/* Row 2: Etage / Rolle (STRICTLY ON ONE ROW) */}
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
                                             <label style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)', fontWeight: 750 }}>Etage / Rolle</label>
                                             <div style={{
@@ -3605,7 +3241,6 @@ END:VCARD`;
                                                         textAlign: 'center'
                                                     }}
                                                 >
-                                                    <option value="Auftraggeber">AG</option>
                                                     <option value="Mieter">Mieter</option>
                                                     <option value="Eigentümer">Eig.</option>
                                                     <option value="Hauswart">HW</option>
@@ -3647,23 +3282,6 @@ END:VCARD`;
                                                     }
                                                 }}
                                                 style={{ width: '100%', fontSize: '0.95rem', fontWeight: 600, padding: '0.55rem 0.7rem' }}
-                                            />
-                                        </div>
-
-                                        {/* Row 4: E-Mail */}
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                                            <label style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)', fontWeight: 750 }}>E-Mail</label>
-                                            <input
-                                                type="email"
-                                                placeholder="email@firma.ch"
-                                                className="form-input"
-                                                value={contact.email || ''}
-                                                onChange={(e) => {
-                                                    const newContacts = [...formData.contacts];
-                                                    newContacts[idx].email = e.target.value;
-                                                    setFormData({ ...formData, contacts: newContacts });
-                                                }}
-                                                style={{ width: '100%', fontSize: '0.9rem', padding: '0.55rem 0.7rem' }}
                                             />
                                         </div>
 
@@ -3718,10 +3336,8 @@ END:VCARD`;
 
                                         {/* Delete Button (Absolute top-right or separate) */}
 
-                                        </div> {/* end inner padding div */}
                                     </div>
-                                    );
-                                })}
+                                ))}
                             </div>
 
                             {/* Add Contact Button - Moved below the tiles */}
@@ -3748,6 +3364,10 @@ END:VCARD`;
                 </div>
 
 
+
+
+
+
                 {/* 3. Rooms & Photos */}
                 <div style={{ marginBottom: '2rem' }}>
                     <div style={{ marginBottom: '1rem' }}>
@@ -3771,38 +3391,7 @@ END:VCARD`;
                                     </div>
 
                                     <div style={{ marginBottom: '1.25rem' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                                            <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 600 }}>Beschreibung der Ursache</label>
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-                                                    if (!SR) { alert('Diktat wird von diesem Browser nicht unterstützt.'); return; }
-                                                    if (window.__dictRec) { window.__dictRec.stop(); window.__dictRec = null; return; }
-                                                    const rec = new SR();
-                                                    rec.lang = 'de-CH';
-                                                    rec.continuous = true;
-                                                    rec.interimResults = false;
-                                                    rec.onresult = (e) => {
-                                                        const text = Array.from(e.results).map(r => r[0].transcript).join(' ');
-                                                        setFormData(prev => ({ ...prev, cause: (prev.cause ? prev.cause + ' ' : '') + text }));
-                                                    };
-                                                    rec.onend = () => { window.__dictRec = null; };
-                                                    window.__dictRec = rec;
-                                                    rec.start();
-                                                }}
-                                                style={{
-                                                    display: 'flex', alignItems: 'center', gap: '0.3rem',
-                                                    padding: '0.3rem 0.7rem', borderRadius: '6px', border: 'none',
-                                                    backgroundColor: 'rgba(14,165,233,0.12)',
-                                                    color: '#38bdf8', cursor: 'pointer',
-                                                    fontSize: '0.75rem', fontWeight: 700
-                                                }}
-                                                title="Diktieren starten / stoppen"
-                                            >
-                                                <Mic size={14} /> Diktieren
-                                            </button>
-                                        </div>
+                                        <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 600, marginBottom: '0.5rem', display: 'block' }}>Beschreibung der Ursache</label>
                                         <textarea
                                             className="form-input"
                                             value={formData.cause || ''}
@@ -3924,16 +3513,18 @@ END:VCARD`;
                                 {showAddRoomForm && (
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '0.5rem', backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid var(--border)' }}>
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                                             <select
+                                            <select
                                                 className="form-input"
-                                                value={newRoom.apartment || ''}
+
+
+                                                value={newRoom.apartment && ![...new Set([...formData.rooms.map(r => r.apartment).filter(Boolean), ...(formData.contacts || []).map(c => c.name ? (c.name.toLowerCase().includes('whg') || c.name.toLowerCase().includes('wohnung') ? c.name.trim().split(/\s+/).pop() : 'Whg. ' + c.name.trim().split(/\s+/).pop()) : '').filter(Boolean)])].sort().includes(newRoom.apartment) ? 'Sonstiges' : newRoom.apartment}
                                                 onChange={(e) => {
                                                     const val = e.target.value;
                                                     if (val === 'Sonstiges') {
-                                                        setNewRoom(prev => ({ ...prev, apartment: 'Sonstiges', apartmentCustom: '', stockwerk: '' }));
+                                                        setNewRoom(prev => ({ ...prev, apartment: '' }));
                                                     } else {
                                                         let relatedStockwerk = '';
-                                                        const matchingContact = (formData.contacts || []).find(c => c.name === val);
+                                                        const matchingContact = (formData.contacts || []).find(c => c.name && c.name.trim().split(/\s+/).pop() === val);
                                                         if (matchingContact) {
                                                             relatedStockwerk = matchingContact.floor || matchingContact.apartment || '';
                                                         } else {
@@ -3948,25 +3539,21 @@ END:VCARD`;
                                                 style={{ padding: '0.5rem', fontSize: '0.9rem' }}
                                             >
                                                 <option value="">Wohnung wählen... (Optional)</option>
-                                                {[...new Set([
-                                                    ...formData.rooms.map(r => r.apartment).filter(Boolean),
-                                                    ...(formData.contacts || []).filter(c => c.role === 'Mieter' || c.role === 'Eigentümer').map(c => c.name).filter(Boolean)
-                                                ])].sort().map(apt => (
+                                                {[...new Set([...formData.rooms.map(r => r.apartment).filter(Boolean), ...(formData.contacts || []).map(c => c.name ? (c.name.toLowerCase().includes('whg') || c.name.toLowerCase().includes('wohnung') ? c.name.trim().split(/\s+/).pop() : 'Whg. ' + c.name.trim().split(/\s+/).pop()) : '').filter(Boolean)])].sort().map(apt => (
                                                     <option key={apt} value={apt}>{apt}</option>
                                                 ))}
                                                 <option value="Sonstiges">Neue Wohnung eingeben...</option>
                                             </select>
 
-                                            {/* Freitext nur wenn "Neue Wohnung" gewählt */}
-                                            {newRoom.apartment === 'Sonstiges' && (
+                                            {/* Custom Apartment Input */}
+                                            {(!newRoom.apartment || (newRoom.apartment && ![...new Set([...formData.rooms.map(r => r.apartment).filter(Boolean), ...(formData.contacts || []).map(c => c.name ? (c.name.toLowerCase().includes('whg') || c.name.toLowerCase().includes('wohnung') ? c.name.trim().split(/\s+/).pop() : 'Whg. ' + c.name.trim().split(/\s+/).pop()) : '').filter(Boolean)])].sort().includes(newRoom.apartment))) && (
                                                 <input
                                                     type="text"
                                                     placeholder="Wohnung eingeben"
-                                                    value={newRoom.apartmentCustom || ''}
-                                                    onChange={(e) => setNewRoom(prev => ({ ...prev, apartmentCustom: e.target.value }))}
+                                                    value={newRoom.apartment}
+                                                    onChange={(e) => setNewRoom(prev => ({ ...prev, apartment: e.target.value }))}
                                                     className="form-input"
                                                     style={{ padding: '0.5rem', fontSize: '0.9rem' }}
-                                                    autoFocus
                                                 />
                                             )}
                                         </div>
@@ -4032,6 +3619,98 @@ END:VCARD`;
                 </div>
 
 
+                {/* Schadenursache - Cause & Photos (Desktop Only) */}
+                {mode === 'desktop' && (
+                    <div className="card" style={{ marginBottom: '2rem', border: '1px solid var(--border)', padding: '1.5rem', backgroundColor: 'var(--surface)' }}>
+                        <h3 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '1.5rem', color: 'var(--text-main)' }}>Schadenursache</h3>
+
+                        {/* Cause / Description */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem', marginBottom: '2rem' }}>
+                            <label style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>Schadenursache</span>
+                                <textarea
+                                    className="form-input"
+                                    rows={3}
+                                    value={formData.cause || ''}
+                                    onChange={e => setFormData({ ...formData, cause: e.target.value })}
+                                    placeholder="Beschreibung der Ursache..."
+                                />
+                            </label>
+                        </div>
+
+                        {/* Photos (Schadenfotos) */}
+                        <div>
+
+
+                            <h4 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--text-main)' }}>Fotos zur Ursache</h4>
+
+                            {/* Upload Zone */}
+                            <div
+                                style={{
+                                    border: '2px dashed var(--border)',
+                                    borderRadius: 'var(--radius)',
+                                    padding: '2rem 1rem',
+                                    textAlign: 'center',
+                                    cursor: 'pointer',
+                                    backgroundColor: 'rgba(255,255,255,0.02)',
+                                    transition: 'all 0.2s',
+                                    marginBottom: '1rem',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    color: 'var(--text-muted)'
+                                }}
+                                onClick={() => document.getElementById('file-upload-Schadenfotos-desktop').click()}
+                                onDragOver={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.backgroundColor = 'rgba(56, 189, 248, 0.1)'; e.currentTarget.style.color = 'var(--primary)'; }}
+                                onDragLeave={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.02)'; e.currentTarget.style.color = 'var(--text-muted)'; }}
+                                onDrop={(e) => handleCategoryDrop(e, 'Schadenfotos')}
+                            >
+                                <Plus size={24} style={{ marginBottom: '0.5rem', opacity: 0.5 }} />
+                                <span style={{ fontSize: '0.85rem' }}>Schadenfoto hochladen / Drop</span>
+                                <input id="file-upload-Schadenfotos-desktop" type="file" multiple accept="image/*" style={{ display: 'none' }} onChange={(e) => handleCategorySelect(e, 'Schadenfotos')} />
+                            </div>
+
+                            {/* List */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                {formData.images.filter(img => img.assignedTo === 'Schadenfotos').map((item, idx) => (
+                                    <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem', backgroundColor: '#1E293B', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
+                                        <div style={{ width: '80px', height: '80px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: '4px', border: item.includeInReport !== false ? '2px solid #0F6EA3' : 'none' }}>
+                                            <img src={item.preview} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '4px' }} />
+                                        </div>
+
+                                        {/* Unified Toggle */}
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', padding: '0 0.5rem', cursor: 'pointer' }}
+                                            title="In PDF Bericht anzeigen"
+                                            onClick={() => setFormData(prev => ({
+                                                ...prev,
+                                                images: prev.images.map(i => i.preview === item.preview ? { ...i, includeInReport: i.includeInReport === false } : i)
+                                            }))}>
+                                            <input
+                                                type="checkbox"
+                                                checked={item.includeInReport !== false}
+                                                readOnly
+                                                style={{ width: '1.25rem', height: '1.25rem', cursor: 'pointer', accentColor: '#0F6EA3' }}
+                                            />
+                                        </div>
+
+                                        <div style={{ flex: 1, fontWeight: 500, color: 'var(--text-main)' }}>
+                                            {item.name}
+                                            {item.includeInReport !== false && (
+                                                <div style={{ fontSize: '0.8rem', color: '#0F6EA3', fontWeight: 600 }}>In Bericht</div>
+                                            )}
+                                        </div>
+
+                                        <button type="button" className="btn btn-ghost" onClick={() => setFormData(prev => ({ ...prev, images: prev.images.filter(i => i !== item) }))} style={{ color: '#EF4444', padding: '0.5rem', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(239, 68, 68, 0.1)' }}><Trash size={18} /></button>
+                                    </div>
+                                ))}
+                                {formData.images.filter(img => img.assignedTo === 'Schadenfotos').length === 0 && (
+                                    <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.9rem', fontStyle: 'italic' }}>Keine Schadenfotos vorhanden.</div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )}
 
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
@@ -4120,7 +3799,7 @@ END:VCARD`;
                                                 <Edit3 size={16} /> Bearbeiten
                                             </button>
                                         </>
-                                    ) : mode !== 'desktop' ? (
+                                    ) : (
                                         <button
                                             type="button"
                                             onClick={(e) => {
@@ -4131,7 +3810,7 @@ END:VCARD`;
                                                 setShowMeasurementModal(true);
                                             }}
                                             style={{
-                                                padding: '0.8rem 0.5rem',
+                                                padding: mode === 'technician' ? '0.8rem 0.5rem' : '0.4rem 0.6rem',
                                                 borderRadius: '6px',
                                                 border: '1px solid #059669',
                                                 backgroundColor: 'rgba(16, 185, 129, 0.2)',
@@ -4140,17 +3819,17 @@ END:VCARD`;
                                                 alignItems: 'center',
                                                 justifyContent: 'center',
                                                 gap: '0.4rem',
-                                                fontSize: '1rem',
+                                                fontSize: mode === 'technician' ? '1rem' : '0.75rem',
                                                 cursor: 'pointer',
                                                 flex: 1,
-                                                minHeight: '50px',
+                                                minHeight: mode === 'technician' ? '50px' : 'auto',
                                                 fontWeight: 700,
-                                                gridColumn: 'span 2'
+                                                gridColumn: mode === 'technician' ? 'span 2' : 'auto'
                                             }}
                                         >
                                             <Plus size={18} /> Messung starten
                                         </button>
-                                    ) : null}
+                                    )}
 
                                     {/* History Button */}
                                     {room.measurementHistory && room.measurementHistory.length > 0 && (
@@ -4601,14 +4280,19 @@ END:VCARD`;
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                                 <select
                                     className="form-input"
-                                    value={newRoom.apartment || ''}
+                                    value={newRoom.apartment && ![...new Set([...formData.rooms.map(r => r.apartment).filter(Boolean), ...(formData.contacts || []).map(c => c.name ? (c.name.toLowerCase().includes('whg') || c.name.toLowerCase().includes('wohnung') ? c.name.trim().split(/\s+/).pop() : 'Whg. ' + c.name.trim().split(/\s+/).pop()) : '').filter(Boolean)])].sort().includes(newRoom.apartment) ? 'Sonstiges' : newRoom.apartment}
                                     onChange={(e) => {
                                         const val = e.target.value;
                                         if (val === 'Sonstiges') {
-                                            setNewRoom(prev => ({ ...prev, apartment: 'Sonstiges', apartmentCustom: '', stockwerk: '' }));
+                                            setNewRoom(prev => ({ ...prev, apartment: '' }));
                                         } else {
                                             let relatedStockwerk = '';
-                                            const matchingContact = (formData.contacts || []).find(c => c.name === val);
+                                            const matchingContact = (formData.contacts || []).find(c => {
+                                                if (!c.name) return false;
+                                                const lastName = c.name.trim().split(/\s+/).pop();
+                                                const withWhg = `Whg. ${lastName}`;
+                                                return lastName === val || withWhg === val;
+                                            });
                                             if (matchingContact) {
                                                 relatedStockwerk = matchingContact.floor || matchingContact.apartment || '';
                                             } else {
@@ -4623,25 +4307,21 @@ END:VCARD`;
                                     style={{ padding: '0.5rem', fontSize: '0.9rem' }}
                                 >
                                     <option value="">Wohnung wählen... (Optional)</option>
-                                    {[...new Set([
-                                        ...formData.rooms.map(r => r.apartment).filter(Boolean),
-                                        ...(formData.contacts || []).filter(c => c.role === 'Mieter' || c.role === 'Eigentümer').map(c => c.name).filter(Boolean)
-                                    ])].sort().map(apt => (
+                                    {[...new Set([...formData.rooms.map(r => r.apartment).filter(Boolean), ...(formData.contacts || []).map(c => c.name ? (c.name.toLowerCase().includes('whg') || c.name.toLowerCase().includes('wohnung') ? c.name.trim().split(/\s+/).pop() : 'Whg. ' + c.name.trim().split(/\s+/).pop()) : '').filter(Boolean)])].sort().map(apt => (
                                         <option key={apt} value={apt}>{apt}</option>
                                     ))}
                                     <option value="Sonstiges">Neue Wohnung eingeben...</option>
                                 </select>
 
-                                {/* Freitext nur wenn "Neue Wohnung" gewählt */}
-                                {newRoom.apartment === 'Sonstiges' && (
+                                {/* Custom Apartment Input */}
+                                {(!newRoom.apartment || (newRoom.apartment && ![...new Set([...formData.rooms.map(r => r.apartment).filter(Boolean), ...(formData.contacts || []).map(c => c.name ? (c.name.toLowerCase().includes('whg') || c.name.toLowerCase().includes('wohnung') ? c.name.trim().split(/\s+/).pop() : 'Whg. ' + c.name.trim().split(/\s+/).pop()) : '').filter(Boolean)])].sort().includes(newRoom.apartment))) && (
                                     <input
                                         type="text"
                                         placeholder="Wohnung eingeben"
-                                        value={newRoom.apartmentCustom || ''}
-                                        onChange={(e) => setNewRoom(prev => ({ ...prev, apartmentCustom: e.target.value }))}
+                                        value={newRoom.apartment}
+                                        onChange={(e) => setNewRoom(prev => ({ ...prev, apartment: e.target.value }))}
                                         className="form-input"
                                         style={{ padding: '0.5rem', fontSize: '0.9rem' }}
-                                        autoFocus
                                     />
                                 )}
                             </div>
@@ -4697,126 +4377,15 @@ END:VCARD`;
                     )}
                 </div>
 
-                {/* Schadenursache - Cause & Photos (Desktop Only) */}
-                {mode === 'desktop' && (
-                    <div className="card" style={{ marginBottom: '2rem', border: '1px solid var(--border)', padding: '1.5rem', backgroundColor: 'var(--surface)' }}>
-                        <h3 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '1.5rem', color: 'var(--text-main)' }}>Schadenursache</h3>
-
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem', marginBottom: '2rem' }}>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                    <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>Schadenursache</span>
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-                                            if (!SR) { alert('Diktat wird von diesem Browser nicht unterst\u00fctzt.'); return; }
-                                            if (window.__dictRec) { window.__dictRec.stop(); window.__dictRec = null; return; }
-                                            const rec = new SR();
-                                            rec.lang = 'de-DE';
-                                            rec.continuous = true;
-                                            rec.interimResults = false;
-                                            rec.onresult = (e) => {
-                                                const text = Array.from(e.results).map(r => r[0].transcript).join(' ');
-                                                setFormData(prev => ({ ...prev, cause: (prev.cause ? prev.cause + ' ' : '') + text }));
-                                            };
-                                            rec.onerror = (e) => { console.error('Diktat Fehler:', e); window.__dictRec = null; };
-                                            rec.onend = () => { window.__dictRec = null; };
-                                            window.__dictRec = rec;
-                                            rec.start();
-                                        }}
-                                        style={{
-                                            display: 'flex', alignItems: 'center', gap: '0.4rem',
-                                            padding: '0.35rem 0.8rem', borderRadius: '6px', border: 'none',
-                                            backgroundColor: 'rgba(14,165,233,0.15)',
-                                            color: '#38bdf8', cursor: 'pointer',
-                                            fontSize: '0.8rem', fontWeight: 700
-                                        }}
-                                        title="Diktieren starten / stoppen"
-                                    >
-                                        <Mic size={15} /> Diktieren
-                                    </button>
-                                </div>
-                                <textarea
-                                    className="form-input"
-                                    rows={3}
-                                    value={formData.cause || ''}
-                                    onChange={e => setFormData({ ...formData, cause: e.target.value })}
-                                    placeholder="Beschreibung der Ursache..."
-                                />
-                            </div>
-                        </div>
-
-                        <div>
-                            <h4 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--text-main)' }}>Fotos zur Ursache</h4>
-                            <div
-                                style={{
-                                    border: '2px dashed var(--border)', borderRadius: 'var(--radius)',
-                                    padding: '2rem 1rem', textAlign: 'center', cursor: 'pointer',
-                                    backgroundColor: 'rgba(255,255,255,0.02)', transition: 'all 0.2s',
-                                    marginBottom: '1rem', display: 'flex', flexDirection: 'column',
-                                    alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)'
-                                }}
-                                onClick={() => document.getElementById('file-upload-Schadenfotos-desktop').click()}
-                                onDragOver={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.backgroundColor = 'rgba(56, 189, 248, 0.1)'; e.currentTarget.style.color = 'var(--primary)'; }}
-                                onDragLeave={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.02)'; e.currentTarget.style.color = 'var(--text-muted)'; }}
-                                onDrop={(e) => handleCategoryDrop(e, 'Schadenfotos')}
-                            >
-                                <Plus size={24} style={{ marginBottom: '0.5rem', opacity: 0.5 }} />
-                                <span style={{ fontSize: '0.85rem' }}>Schadenfoto hochladen / Drop</span>
-                                <input id="file-upload-Schadenfotos-desktop" type="file" multiple accept="image/*" style={{ display: 'none' }} onChange={(e) => handleCategorySelect(e, 'Schadenfotos')} />
-                            </div>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                                {formData.images.filter(img => img.assignedTo === 'Schadenfotos').map((item, idx) => (
-                                    <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem', backgroundColor: '#1E293B', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
-                                        <div style={{ width: '80px', height: '80px', flexShrink: 0, borderRadius: '4px', border: item.includeInReport !== false ? '2px solid #0F6EA3' : 'none', overflow: 'hidden' }}>
-                                            <img src={item.preview} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                        </div>
-                                        <div style={{ display: 'flex', alignItems: 'center', padding: '0 0.5rem', cursor: 'pointer' }}
-                                            onClick={() => setFormData(prev => ({ ...prev, images: prev.images.map(i => i.preview === item.preview ? { ...i, includeInReport: i.includeInReport === false } : i) }))}>
-                                            <input type="checkbox" checked={item.includeInReport !== false} readOnly style={{ width: '1.25rem', height: '1.25rem', cursor: 'pointer', accentColor: '#0F6EA3' }} />
-                                        </div>
-                                        <div style={{ flex: 1, fontWeight: 500, color: 'var(--text-main)' }}>
-                                            {item.name}
-                                            {item.includeInReport !== false && <div style={{ fontSize: '0.8rem', color: '#0F6EA3', fontWeight: 600 }}>In Bericht</div>}
-                                        </div>
-                                        <button type="button" className="btn btn-ghost" onClick={() => setFormData(prev => ({ ...prev, images: prev.images.filter(i => i !== item) }))} style={{ color: '#EF4444', padding: '0.5rem', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(239, 68, 68, 0.1)' }}><Trash size={18} /></button>
-                                    </div>
-                                ))}
-                                {formData.images.filter(img => img.assignedTo === 'Schadenfotos').length === 0 && (
-                                    <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.9rem', fontStyle: 'italic' }}>Keine Schadenfotos vorhanden.</div>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* Massnahmen & Feststellungen - nur Desktop */}
-                {mode === 'desktop' && (formData.status === 'Schadenaufnahme' || formData.status === 'Leckortung') && (
+                {/* Massnahmen & Feststellungen */}
+                {(formData.status === 'Schadenaufnahme' || formData.status === 'Leckortung' || true) && (
                     <div style={{ marginBottom: '1.5rem', backgroundColor: 'var(--surface)', padding: '1.25rem', borderRadius: '12px', border: '1px solid var(--border)', color: 'var(--text-main)', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}>
                         <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.6rem', color: 'var(--primary)' }}>
                             <Eye size={18} /> Feststellungen & Massnahmen
                         </h3>
 
                         <div style={{ marginBottom: '1.5rem', width: '100%' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
-                                <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600 }}>Feststellungen</label>
-                                <button
-                                    type="button"
-                                    className={`btn btn-ghost ${isListeningFindings ? 'listening' : ''}`}
-                                    style={{
-                                        color: isListeningFindings ? '#ef4444' : 'var(--text-muted)',
-                                        padding: '2px 8px', fontSize: '0.8rem',
-                                        display: 'flex', alignItems: 'center', gap: '4px',
-                                        border: '1px solid var(--border)', borderRadius: '4px'
-                                    }}
-                                    onClick={toggleFindingsListening}
-                                    title="Diktieren"
-                                >
-                                    {isListeningFindings ? <MicOff size={14} /> : <Mic size={14} />}
-                                    <span>Diktieren</span>
-                                </button>
-                            </div>
+                            <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.4rem', display: 'block', fontWeight: 600 }}>Feststellungen</label>
                             <textarea
                                 className="form-input"
                                 style={{ minHeight: '120px', resize: 'vertical', width: '100%' }}
@@ -5328,22 +4897,9 @@ END:VCARD`;
                                 {formData.images.filter(img => img.assignedTo === 'Arbeitsrappporte').length === 0 && <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.9rem', fontStyle: 'italic' }}>Keine Arbeitsrapporte vorhanden.</div>}
                             </div>
                         </div>
-                        {formData.images?.some(img => img.assignedTo === 'Sonstiges') && (
-                            <div style={{
-                                display: 'flex', alignItems: 'center', gap: '0.75rem',
-                                padding: '0.75rem 1.25rem', borderRadius: '10px',
-                                backgroundColor: 'rgba(245,158,11,0.12)',
-                                border: '1.5px solid rgba(245,158,11,0.4)',
-                                color: '#F59E0B', fontWeight: 700, fontSize: '0.9rem',
-                                marginBottom: '0.75rem'
-                            }}>
-                                <FileText size={18} />
-                                Lieferantenrechnung vorhanden
-                            </div>
-                        )}
                         <div className="card" style={{ padding: '1.5rem' }}>
                             <h3 className="section-header">
-                                <FileText size={18} /> Lieferantenrechnungen
+                                <FileText size={18} /> Sonstiges
                             </h3>
                             <div
                                 className="btn-glass"
@@ -5372,7 +4928,7 @@ END:VCARD`;
                                 }}>
                                     <Plus size={20} />
                                 </div>
-                                <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>Lieferantenrechnung hochladen / Drop</span>
+                                <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>Sonstiges Dokument hochladen / Drop</span>
                                 <input id="file-upload-Sonstiges-desktop" type="file" multiple accept="image/*,.heic,.heif,application/pdf" style={{ display: 'none' }} onChange={(e) => handleCategorySelect(e, 'Sonstiges')} />
                             </div>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
@@ -5396,7 +4952,7 @@ END:VCARD`;
                                         <button type="button" onClick={() => setFormData(prev => ({ ...prev, images: prev.images.filter(i => i !== item) }))} style={{ border: 'none', background: 'rgba(239, 68, 68, 0.1)', color: '#EF4444', cursor: 'pointer', padding: '6px', borderRadius: '50%', display: 'flex' }}><X size={14} /></button>
                                     </div>
                                 ))}
-                                {formData.images.filter(img => img.assignedTo === 'Sonstiges').length === 0 && <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem', fontStyle: 'italic' }}>Keine Lieferantenrechnungen vorhanden.</div>}
+                                {formData.images.filter(img => img.assignedTo === 'Sonstiges').length === 0 && <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem', fontStyle: 'italic' }}>Keine sonstigen Dokumente.</div>}
                             </div>
                         </div>
 
@@ -6307,85 +5863,6 @@ END:VCARD`;
                     </div>
                 )}
             </div >
-
-            {/* ── QR-Code Modal (mit editierbaren Feldern) ─────────────── */}
-            {qrModal && (
-                <div
-                    onClick={() => setQrModal(null)}
-                    style={{
-                        position: 'fixed', inset: 0, zIndex: 99999,
-                        backgroundColor: 'rgba(0,0,0,0.85)',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        padding: '1rem',
-                    }}
-                >
-                    <div
-                        onClick={e => e.stopPropagation()}
-                        style={{
-                            background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)',
-                            borderRadius: '20px',
-                            border: '1px solid rgba(16,185,129,0.3)',
-                            boxShadow: '0 25px 60px rgba(0,0,0,0.6)',
-                            padding: '1.5rem',
-                            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem',
-                            maxWidth: '400px', width: '100%',
-                        }}
-                    >
-                        {/* Titel */}
-                        <div style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#10b981', fontWeight: 700 }}>
-                            Kontakt QR-Code
-                        </div>
-
-                        {/* QR-Code */}
-                        <div style={{ background: '#FFFFFF', borderRadius: '12px', padding: '0.6rem', boxShadow: '0 8px 24px rgba(0,0,0,0.4)', flexShrink: 0 }}>
-                            <img src={qrModal.dataUrl} alt="QR-Code" style={{ display: 'block', width: '240px', height: '240px' }} />
-                        </div>
-
-                        {/* Editierbare Felder */}
-                        <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                            {[
-                                { key: 'name',  label: 'Name',    placeholder: 'Name' },
-                                { key: 'phone', label: 'Telefon', placeholder: '+41 ...' },
-                                { key: 'email', label: 'E-Mail',  placeholder: 'email@...' },
-                                { key: 'note',  label: 'Notiz',   placeholder: 'Etage, Hinweis...' },
-                            ].map(({ key, label, placeholder }) => (
-                                <div key={key} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                    <label style={{ fontSize: '0.7rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600, width: '52px', flexShrink: 0 }}>{label}</label>
-                                    <input
-                                        key={`qr-${key}-${qrSessionKey}`}
-                                        defaultValue={qrEditFields[key] || ''}
-                                        placeholder={placeholder}
-                                        onInput={e => handleQrFieldChange(key, e.target.value)}
-                                        style={{
-                                            flex: 1, padding: '0.4rem 0.7rem',
-                                            borderRadius: '8px', fontSize: '0.85rem',
-                                            border: '1px solid rgba(255,255,255,0.1)',
-                                            background: 'rgba(255,255,255,0.06)',
-                                            color: '#F1F5F9', outline: 'none',
-                                        }}
-                                    />
-                                </div>
-                            ))}
-                        </div>
-
-                        <div style={{ fontSize: '0.75rem', color: '#475569', textAlign: 'center' }}>
-                            📱 Kamera-App öffnen · QR scannen · Kontakt speichern
-                        </div>
-                        <button
-                            onClick={() => setQrModal(null)}
-                            style={{
-                                padding: '0.55rem 2rem', borderRadius: '10px',
-                                border: '1px solid rgba(16,185,129,0.3)',
-                                background: 'rgba(16,185,129,0.1)',
-                                color: '#10b981', fontWeight: 700, fontSize: '0.9rem',
-                                cursor: 'pointer', width: '100%',
-                            }}
-                        >
-                            Schliessen
-                        </button>
-                    </div>
-                </div>
-            )}
         </>
     );
 }

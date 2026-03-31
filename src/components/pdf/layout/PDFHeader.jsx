@@ -4,7 +4,7 @@ import { styles } from '../PDFStyles';
 
 const PDFHeader = ({ data }) => {
     return (
-        <View style={styles.header}>
+        <View style={styles.header} fixed>
             <View style={{ alignItems: 'flex-start' }}>
                 {data.logo && <Image src={data.logo} style={styles.logo} />}
                 {data.projectNumber && (

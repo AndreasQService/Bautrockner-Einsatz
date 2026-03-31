@@ -1,0 +1,30 @@
+﻿23d8e0767f4a892881842ec3be8cc5da5284dfb2 2026-03-30 07:20:26 +0200 Restore: Karte auf Freitag-Stand (OSM Zoom 15, 3x2, window.Image, kein Canvas-Text)
+f5008a6ba3b03dbf9fa04a3df9317314c85dd9e2 2026-03-29 13:30:03 +0200 Fix: Karte Zoom 16 (4x3) - Strassennamen sichtbar, ausgewogener Zoom
+9c2f3eb8495ccfe1b2102892f165c10fba1928c0 2026-03-29 12:36:36 +0200 Fix: Karten-Zoom 17 (Strassenniveau), 5x3 Tiles - Adresse auf Karte sichtbar
+96ffd244f1d19f4e2225065b5cc4e99080cba18e 2026-03-29 10:52:46 +0200 Fix: Adress-Beschriftung unter Karte als Text-Element im PDF
+d1cc191b77b38e5b91909ad14dd59e500e5e1ab8 2026-03-29 10:11:24 +0200 Fix: OSM-Karte im PDF - window.Image() statt Image() (react-pdf Import-Konflikt)
+c0b04373363b7013bef8724e9bfce4fff2b6d8b6 2026-03-29 09:51:28 +0200 Fix: PDF-Generierung repariert - wrap-Overflow, MIME-Type, ImageGrid-2-Spalten
+9aa242a2efca53bd094d59fdcb90c3e7c334399c 2026-03-28 07:01:37 +0100 Fix: PDF-Button immer sichtbar (unabhaengig vom Status) + Lightbox fuer Schadenursache-Fotos
+07b46e411823afca6fec1096385d37d578cd1d2f 2026-03-27 12:40:01 +0100 Update: DamageForm, Dashboard, CSS und dev-dist/sw.js
+eab5439eef9f92b1245491c817f0f250a2d00677 2026-03-27 10:55:25 +0100 feat: WorkflowStatusOverview, Dashboard improvements, EmailImport prompt fixes, full-width desktop mode
+0799e67b077facdc6f36c2f6a5293b457f57edc4 2026-03-26 11:34:13 +0100 feat: Bild-Klick holt frische OneDrive-URL - Vorschau funktioniert nach Reload
+bb67fbaaa6e83bea84cf286a7253d2277f06dd8a 2026-03-26 11:24:49 +0100 feat: Foto-Upload prim├ñr OneDrive, Supabase als Fallback - Storage Migration komplett
+b10a6a498b6a7a0744abb7e57f251e522399eada 2026-03-26 09:07:42 +0100 feat: OneDrive Integration komplett - Fotos/PDF/Excel/JSON auto-upload
+849cb4f65df9f684866d750dd4a243f69192356c 2026-03-26 08:46:50 +0100 feat: OneDrive Integration - PDF/Excel/JSON auto-upload
+bb106ee2663e2ce65ce280a79fa33b60ff216447 2026-03-25 17:11:13 +0100 feat: QR-Code fuer Kontakte mit editierbaren Feldern
+fce2ff71fd8898348e592998ea58c60c0b1bf900 2026-03-25 13:51:05 +0100 test: Playwright Deep Tests fuer Desktop und Schadensbericht (14/15 gruen)
+8a5bfba134da17a1d58f5424edf4222198d0a57c 2026-03-25 12:38:31 +0100 fix: Mieter-Dropdown + Schadensbilder/Schadenfotos Trennung
+8ceebbcc601f2cdc6c076db5d13d8068e30333b5 2026-03-24 15:50:28 +0100 Fix: E-Mail Import - Etage, Email, PLZ/Ort fuer Kontakte + Schadenort; InboxTodo Dashboard
+0f3625ac64dc4a6a2cff6a88eba9a1b353207461 2026-03-24 15:14:29 +0100 Fix: PDF-Layout - 2 Bilder/Zeile, leere Seite, Metadaten, Bildtext-Truncation
+0f6be0ed51674ddd850ec02ffd5de5d0f12e0bbb 2026-03-24 12:18:55 +0100 Feat: PDF Karte+Aussenbild, OSM-Proxy, Supabase Upload, PDF-Layout
+3b755e7f8138a52e9dfc1015385e690c48b7d733 2026-03-23 17:25:20 +0100 Fix: PDF-Generierung - Lieferantenrechnungen und Plaene aus Bildverarbeitung ausschliessen
+18b02c1cb17eac59a610b51867f9299b190bcbd1 2026-03-23 17:07:16 +0100 Feature: Lieferantenrechnung Badge in Header und Dashboard; Messung starten im Desktop ausgeblendet
+e5961cac7595d72b97734ed34e1d86fd1fd0efe1 2026-03-23 16:46:11 +0100 Rename: Sonstiges -> Lieferantenrechnungen
+3ffedf46e2e28e8947f45d7f24ca44881f6372f4 2026-03-23 16:36:44 +0100 Fix: Reihenfolge Raeume-Ursache-Massnahmen, Encoding fix
+f32e635cf20c115477c42d4a142301841211ff48 2026-03-23 16:17:24 +0100 Feature: Diktat fuer Feststellungen, Schadenursache (Desktop)
+1781bf1ab477872aa4ef5525b90dad705ec0393d 2026-03-23 16:06:51 +0100 Fix: Diktier-Button in DamageForm Schadenursache
+7b2a3ab8e000ea79eed6e509f09eab069c0e54e8 2026-03-23 14:47:50 +0100 Feature: Bilder Upload/Drop Schadensbilder, Diktat Schadenursache
+ef73b332c4d853e5ff7709cc48493148d2b546c9 2026-03-23 14:34:57 +0100 Fix: Header Overlap, Geocoding PLZ/Ort, Mehrfach-Mieter Preview
+4463511e497f207e75b8bfa1d5ddf8adcb13cfd0 2026-03-23 13:48:03 +0100 Fix: Email-Import Schadenort, Mehrfach-Mieter, API-Key Update
+f7d3cf00460368f9c43814de2a23e82bce5044f6 2026-03-22 14:32:00 +0100 Sonntag Backup 22.03.2025 - ImageEditor, PDF, DamageForm Updates
+df625378de24128e4f4e8b4f8064f0b120b70bc8 2026-03-04 07:10:00 +0100 Backup: 2026-03-04 07:09 - Added Image Sorting and restored Thermobild linking

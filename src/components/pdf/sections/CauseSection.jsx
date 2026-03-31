@@ -15,8 +15,6 @@ const CauseSection = ({ data }) => {
         });
 
     const hasCause = cause || causeImages.length > 0;
-    const hasFindings = !!(findings && String(findings).trim());
-    if (!hasFindings && !hasCause) return null;
 
     return (
         <>
