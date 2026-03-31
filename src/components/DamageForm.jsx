@@ -3142,7 +3142,7 @@ END:VCARD`;
                                         <div
                                             className="btn-glass"
                                             style={{
-                                                position: 'relative', width: '100px', height: '100px', borderRadius: '12px', overflow: 'hidden',
+                                                position: 'relative', width: '140px', height: '140px', borderRadius: '12px', overflow: 'hidden',
                                                 cursor: 'pointer',
                                                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                                                 border: img.includeInReport !== false ? '2px solid #0F6EA3' : '1px solid var(--border)'
@@ -3204,7 +3204,7 @@ END:VCARD`;
                                                         const isChecked = e.target.checked;
                                                         setFormData(prev => ({
                                                             ...prev,
-                                                            images: prev.images.map(i => i.id === img.id ? { ...i, includeInReport: isChecked } : i)
+                                                            images: prev.images.map(i => i === img ? { ...i, includeInReport: isChecked } : i)
                                                         }));
                                                     }}
                                                 />
@@ -3234,7 +3234,7 @@ END:VCARD`;
                                 ))}
 
                                 <label style={{
-                                    width: '90px', height: '90px',
+                                    width: '140px', height: '140px',
                                     border: '1px dashed var(--border)', borderRadius: '8px',
                                     display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                                     cursor: 'pointer', backgroundColor: 'var(--surface-hover)',
@@ -4001,7 +4001,7 @@ END:VCARD`;
                                                                 e.stopPropagation();
                                                                 setFormData(prev => ({
                                                                     ...prev,
-                                                                    images: prev.images.map(i => i.preview === img.preview ? { ...i, includeInReport: i.includeInReport === false } : i)
+                                                                    images: prev.images.map(i => i === img ? { ...i, includeInReport: !img.includeInReport } : i)
                                                                 }));
                                                             }}
                                                             title="Im Bericht anzeigen"
@@ -4479,7 +4479,7 @@ END:VCARD`;
                                                                                         const isChecked = e.target.checked;
                                                                                         setFormData(prev => ({
                                                                                             ...prev,
-                                                                                            images: prev.images.map(i => i.id === img.id ? { ...i, includeInReport: isChecked } : i)
+                                                                                            images: prev.images.map(i => i === img ? { ...i, includeInReport: isChecked } : i)
                                                                                         }));
                                                                                     }}
                                                                                 />
@@ -4913,8 +4913,8 @@ END:VCARD`;
                                 {formData.images.filter(img => img.assignedTo === 'Schadenfotos').map((item, idx) => (
                                     <div key={idx} style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start', border: '1px solid var(--border)', padding: '0.5rem', borderRadius: '6px', backgroundColor: 'var(--background)' }}>
                                         {/* Thumbnail + Controls */}
-                                        <div style={{ flex: '0 0 100px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
-                                            <div style={{ width: '100px', height: '100px', borderRadius: '6px', overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+                                        <div style={{ flex: '0 0 140px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
+                                            <div style={{ width: '140px', height: '140px', borderRadius: '6px', overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
                                                 <img src={item.preview} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: 'pointer' }} onClick={() => setEditingImage(item)} />
                                             </div>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', padding: '0 2px', alignItems: 'center' }}>
@@ -4923,9 +4923,9 @@ END:VCARD`;
                                                         type="checkbox"
                                                         style={{ width: '16px', height: '16px', accentColor: 'var(--primary)', cursor: 'pointer' }}
                                                         checked={item.includeInReport !== false}
-                                                        onChange={() => setFormData(prev => ({
+                                                        onChange={(e) => setFormData(prev => ({
                                                             ...prev,
-                                                            images: prev.images.map(i => i.preview === item.preview ? { ...i, includeInReport: i.includeInReport === false } : i)
+                                                            images: prev.images.map(i => i === item ? { ...i, includeInReport: e.target.checked } : i)
                                                         }))}
                                                     />
                                                     <span style={{ fontWeight: 600 }}>Bericht</span>
@@ -4941,7 +4941,7 @@ END:VCARD`;
                                             </div>
                                         </div>
                                         {/* Description */}
-                                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100px' }}>
+                                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '140px' }}>
                                             <textarea
                                                 placeholder="Beschreibung..."
                                                 className="form-input"

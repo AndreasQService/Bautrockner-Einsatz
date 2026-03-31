@@ -129,7 +129,7 @@ function App() {
           ...report,
           images: (report.images || []).map(img => ({
             ...img,
-            includeInReport: true
+            includeInReport: img.includeInReport !== false
           }))
         }));
         if (loadedReports.length > 0) {
