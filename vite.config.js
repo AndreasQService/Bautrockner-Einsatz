@@ -71,13 +71,22 @@ export default defineConfig({
           },
           {
             // OpenAI API → NetworkOnly (kein Cache – funktioniert nur online)
-            // Wenn offline: App zeigt Fehlermeldung, aber stürzt nicht ab
             urlPattern: /^https:\/\/api\.openai\.com\/.*/i,
             handler: 'NetworkOnly',
           },
           {
-            // Supabase → NetworkOnly (Daten kommen aus localStorage wenn offline)
+            // Supabase → NetworkOnly (direkt ans Netz, kein SW-Cache der Bildabrufe blockiert)
             urlPattern: /supabase\.co/i,
+            handler: 'NetworkOnly',
+          },
+          {
+            // OneDrive / Microsoft Graph → NetworkOnly (Bilder für PDF-Export direkt laden)
+            urlPattern: /graph\.microsoft\.com|sharepoint\.com|1drv\.ms/i,
+            handler: 'NetworkOnly',
+          },
+          {
+            // Google Maps API → NetworkOnly (kein Cache)
+            urlPattern: /maps\.googleapis\.com/i,
             handler: 'NetworkOnly',
           },
         ],
@@ -114,6 +123,11 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/nominatim/, ''),
         headers: { 'User-Agent': 'QTool/1.0 (q-service.ch)', 'Accept-Language': 'de' },
+      },
+      '/google-staticmap': {
+        target: 'https://maps.googleapis.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/google-staticmap/, '/maps/api/staticmap'),
       },
     }
   }

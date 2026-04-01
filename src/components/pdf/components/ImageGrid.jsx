@@ -29,7 +29,7 @@ const ImageGrid = ({ images, showName = false, imageStyle = styles.image, contai
         <View>
             {pairs.map((pair, pairIndex) => (
                 // Each row pair uses wrap={false} to keep 2 images together on same page
-                <View key={pairIndex} style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 }} wrap={false}>
+                <View key={pairIndex} style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 }} wrap={false} minPresenceAhead={30}>
                     {pair.map((img, i) => (
                         <View key={i} style={[containerStyle, { marginBottom: 0 }]}>
                             {img.preview ? (

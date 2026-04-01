@@ -3,7 +3,7 @@ import { StyleSheet } from '@react-pdf/renderer';
 export const styles = StyleSheet.create({
     page: {
         padding: 30,
-        paddingBottom: 60, // Footer is at bottom:30, height ~50 → 60 is sufficient
+        paddingBottom: 90, // Footer: height 60 at bottom 30 → needs 90pt clearance
         fontFamily: 'Helvetica',
         fontSize: 10,
         color: '#000000',
@@ -124,7 +124,7 @@ export const styles = StyleSheet.create({
     },
     image: {
         width: '100%',
-        height: 200, // Slightly more height
+        height: 185, // Slightly reduced for footer clearance
         objectFit: 'contain',
         objectPosition: 'left',
         borderRadius: 2,

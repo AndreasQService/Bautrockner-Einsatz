@@ -571,13 +571,13 @@ export default function RoomManager({
                                     justifyContent: 'space-between',
                                     alignItems: 'center'
                                 }}>
-                                    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, paddingRight: '1rem' }}>
-                                        <span style={{ fontWeight: 800, fontSize: '1.25rem', color: 'var(--primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{room.name}</span>
+                                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem', flex: 1, minWidth: 0, paddingRight: '1rem', flexWrap: 'wrap' }}>
+                                        <span style={{ fontWeight: 800, fontSize: '1.25rem', color: 'var(--primary)', whiteSpace: 'nowrap' }}>{room.name}</span>
+                                        {room.stockwerk && (
+                                            <span style={{ fontWeight: 800, fontSize: '1.25rem', color: 'var(--primary)', opacity: 0.75, whiteSpace: 'nowrap' }}>• {room.stockwerk}</span>
+                                        )}
                                         {room.apartment && (
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.2rem' }}>
-                                                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Objekt:</span>
-                                                <span style={{ fontSize: '0.9rem', color: 'var(--text-main)', fontWeight: 600 }}>{room.apartment}</span>
-                                            </div>
+                                            <span style={{ fontWeight: 800, fontSize: '1.25rem', color: 'var(--primary)', opacity: 0.75, whiteSpace: 'nowrap' }}>• Whg {room.apartment}</span>
                                         )}
                                     </div>
                                     <div style={{

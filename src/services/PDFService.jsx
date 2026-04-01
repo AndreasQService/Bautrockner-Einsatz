@@ -1,6 +1,5 @@
 
 import { pdf } from '@react-pdf/renderer';
-import { saveAs } from 'file-saver';
 import DamageReportDocument from '../components/pdf/DamageReportDocument';
 import { urlToDataUrl } from '../components/DamageForm/DamageForm.utils';
 import React from 'react';
@@ -32,7 +31,7 @@ export const PDFService = {
             console.error("PDF Service: Logo load error", e);
         }
 
-        // Process images
+        // Process images – convert all to base64, skip non-renderables
         const tempProcessedImages = await Promise.all(
             (formData.images || []).map(async (img) => {
                 const category = String(img.assignedTo || '').trim().toLowerCase();
@@ -45,12 +44,41 @@ export const PDFService = {
 
                 try {
                     const base64 = await urlToDataUrl(img.preview, img, supabase);
-                    return base64 ? { ...img, preview: base64, isRenderable: true } : { ...img, isRenderable: false };
+                    if (base64) {
+                        return { ...img, preview: base64, isRenderable: true };
+                    } else {
+                        console.warn(`PDF Service: Bild konnte nicht geladen werden: ${img.preview}`);
+                        return { ...img, isRenderable: false };
+                    }
                 } catch (e) {
+                    console.warn(`PDF Service: Fehler beim Laden von ${img.preview}:`, e);
                     return { ...img, isRenderable: false };
                 }
             })
         );
+
+        // Vorab-Validierung: Prüfen ob alle Pflicht-Bilder geladen wurden
+        const expectedImages = (formData.images || []).filter(img => {
+            const category = String(img.assignedTo || '').trim().toLowerCase();
+            const isDocCategory = ['schadensbericht', 'arbeitsrapporte', 'messprotokolle'].includes(category);
+            const isProbablyPDF = img.preview?.toLowerCase().includes('.pdf') || img.type?.includes('pdf');
+            return img.includeInReport !== false && !isDocCategory && !isProbablyPDF;
+        });
+        const failedImages = tempProcessedImages.filter(img =>
+            img.includeInReport !== false && img.isRenderable === false &&
+            !['schadensbericht', 'arbeitsrapporte', 'messprotokolle'].includes(String(img.assignedTo || '').trim().toLowerCase())
+        );
+
+        if (failedImages.length > 0 && expectedImages.length > 0) {
+            const ratio = failedImages.length / expectedImages.length;
+            if (ratio > 0.5) {
+                // Mehr als 50% der Bilder nicht geladen – Fehler werfen
+                throw new Error(
+                    `${failedImages.length} von ${expectedImages.length} Bildern konnten nicht geladen werden. ` +
+                    `Bitte Internetverbindung prüfen und erneut versuchen.`
+                );
+            }
+        }
 
         const processedImages = tempProcessedImages.filter(img => img.isRenderable);
         const causePhotos = processedImages.filter(img => img.assignedTo === 'Schadenfotos');
@@ -66,6 +94,36 @@ export const PDFService = {
             }
         }
 
+        // Load Google Static Map
+        let staticMapUrl = null;
+        try {
+            const mapAddress = formData.street
+                ? `${formData.street}, ${formData.zip || ''} ${formData.city || ''}`
+                : formData.address;
+            if (mapAddress) {
+                const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+                const params = new URLSearchParams({
+                    center: mapAddress,
+                    zoom: '15',
+                    size: '640x300',
+                    scale: '2',
+                    maptype: 'roadmap',
+                    markers: `color:red|${mapAddress}`,
+                    key: apiKey,
+                    language: 'de',
+                });
+                const resp = await fetch(`/google-staticmap?${params.toString()}`);
+                if (resp.ok) {
+                    const blob = await resp.blob();
+                    staticMapUrl = await new Promise((resolve) => {
+                        const reader = new FileReader();
+                        reader.onloadend = () => resolve(reader.result);
+                        reader.readAsDataURL(blob);
+                    });
+                }
+            }
+        } catch (e) { console.warn('PDF Service: Google Static Map error', e); }
+
         const docData = {
             ...formData,
             damageType: formData.damageCategory || '-',
@@ -74,6 +132,7 @@ export const PDFService = {
             damageTypeImage: processedHeroImages[0] || null,
             exteriorPhoto: processedExteriorPhoto,
             logo: logoData,
+            staticMapUrl,
         };
 
         const blob = await pdf(<DamageReportDocument data={docData} />).toBlob();
@@ -88,7 +147,18 @@ export const PDFService = {
         return { blob, fileName };
     },
 
+    // Chrome-kompatibler Download: <a download> statt saveAs()
     downloadBlob: (blob, fileName) => {
-        saveAs(blob, fileName);
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        // Kurz warten damit Chrome den Download starten kann, dann aufräumen
+        setTimeout(() => {
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }, 500);
     }
 };
