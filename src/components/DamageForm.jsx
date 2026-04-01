@@ -152,6 +152,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         return { street, zip, city };
     }
     const [caseId, setCaseId] = useState(null);
+    const [isCauseExpanded, setIsCauseExpanded] = useState(true);
 
     const initialAddressParts = parseAddress(initialData?.address);
 
@@ -2334,6 +2335,7 @@ END:VCARD`;
             <button
                 onClick={(e) => {
                     e.stopPropagation();
+                    if (!window.confirm(`Dokument "${img.name}" wirklich löschen?`)) return;
                     setFormData(prev => ({
                         ...prev,
                         images: prev.images.filter(i => i !== img)
@@ -4843,7 +4845,35 @@ END:VCARD`;
                 {/* Schadenursache - Cause & Photos (Desktop Only) */}
                 {mode === 'desktop' && (
                     <div className="card" style={{ marginBottom: '2rem', border: '1px solid var(--border)', padding: '1.5rem', backgroundColor: 'var(--surface)' }}>
-                        <h3 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '1.5rem', color: 'var(--text-main)' }}>Schadenursache</h3>
+                        {/* Collapsible Header */}
+                        <div
+                            onClick={() => setIsCauseExpanded(prev => !prev)}
+                            style={{
+                                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                                cursor: 'pointer', userSelect: 'none',
+                                marginBottom: isCauseExpanded ? '1.5rem' : 0,
+                                paddingBottom: isCauseExpanded ? '1rem' : 0,
+                                borderBottom: isCauseExpanded ? '1px solid var(--border)' : 'none',
+                                transition: 'margin 0.2s, padding 0.2s'
+                            }}
+                        >
+                            <h3 style={{ marginBottom: 0, fontSize: '1.1rem', fontWeight: 700, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <AlertTriangle size={18} /> Schadenursache
+                                {!isCauseExpanded && (
+                                    <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-muted)', marginLeft: '0.5rem' }}>
+                                        {formData.images?.filter(img => img.assignedTo === 'Schadenfotos').length > 0
+                                            ? `(${formData.images.filter(img => img.assignedTo === 'Schadenfotos').length} Fotos)`
+                                            : formData.cause ? '(Ausgefüllt)' : ''}
+                                    </span>
+                                )}
+                            </h3>
+                            <div style={{ color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>{isCauseExpanded ? 'Einklappen' : 'Ausklappen'}</span>
+                                <ChevronDown size={20} style={{ transform: isCauseExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.3s ease' }} />
+                            </div>
+                        </div>
+
+                        {isCauseExpanded && (<>
 
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem', marginBottom: '2rem' }}>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
@@ -4967,6 +4997,7 @@ END:VCARD`;
                                 )}
                             </div>
                         </div>
+                        </>)}
                     </div>
                 )}
 

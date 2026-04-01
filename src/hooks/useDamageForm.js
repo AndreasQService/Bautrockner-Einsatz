@@ -54,7 +54,7 @@ export const useDamageForm = (initialData, onSave, mode = 'desktop') => {
         images: Array.isArray(initialData.images)
             ? initialData.images.map(img => typeof img === 'string'
                 ? { preview: img, name: 'Existing Image', date: new Date().toISOString(), includeInReport: true }
-                : { ...img, includeInReport: true })
+                : { ...img, includeInReport: img.includeInReport !== false })
             : [],
         projectNumber: initialData.projectNumber || '',
         orderNumber: initialData.orderNumber || '',
