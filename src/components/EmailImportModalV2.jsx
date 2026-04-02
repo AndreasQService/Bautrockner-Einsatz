@@ -73,11 +73,12 @@ const EmailImportModalV2 = ({ onClose, onImport, audioDevices, selectedDeviceId,
 
             const prompt = `Du bist ein technischer Daten-Parser. Deine einzige Aufgabe ist es, unstrukturierte Texte in ein JSON-Format zu überführen, das exakt auf die Felder der AG-App passt.
 
-1. REGEL FÜR ADRESS-SPLIT (PFLICHT):
-   - FELD 'EIGENTÜMER': Suche nach dem Namen der Organisation. 
-   - CUT-OFF: Sobald ein Wort erscheint, das eine Adresse einleitet (Strasse, Str., Weg, PLZ, Hausnummer), MUSS dieses Wort und alles danach aus dem Feld 'EIGENTÜMER' entfernt werden.
-   - MAPPING: Diese entfernten Teile müssen zwingend in die Felder 'STRASSE & NR.', 'PLZ' und 'ORT' geschrieben werden. 
-   - KONTROLLE: Ein leeres Feld 'STRASSE & NR.' bei gleichzeitigem Text im Feld 'EIGENTÜMER' ist ein Systemfehler und muss korrigiert werden.
+1. REGEL FÜR EIGENTÜMER-FELD (PFLICHT):
+   - FELD 'rechnungs_details.eigentuemer': Enthält NUR den Firmennamen / Organisationsnamen des Eigentümers.
+   - 'c/o'-Zeilen (z.B. 'c/o Avadis Vorsorge AG') gehören zum Organisationsnamen und müssen MITGENOMMEN werden (z.B. 'Avadis Anlagestiftung c/o Avadis Vorsorge AG').
+   - CUT-OFF: Sobald ein Wort erscheint, das eine Strassen-Adresse einleitet (Strasse, Str., Weg, Hausnummer), MUSS dieses und alles danach aus dem Feld entfernt werden.
+   - ADRESSE: Die Strassen-Adresse des Eigentümers kommt in 'rechnungs_details.strasse', die PLZ in 'rechnungs_details.plz', der Ort in 'rechnungs_details.ort'. Sie geht NICHT in 'schadenort'!
+   - KONTROLLE: Wenn ein Block explizit mit 'Eigentümer:' beschriftet ist, MUSS der Organisationsname in 'rechnungs_details.eigentuemer' erscheinen.
 
 2. AUFTRAGGEBER-LOGIK (PFLICHT):
    Der Auftraggeber ist die Person/Firma, die das Email AN Q-Service geschrieben hat.
@@ -165,6 +166,9 @@ AUSGABE-FORMAT (JSON):
   },
   "rechnungs_details": {
     "eigentuemer": "",
+    "strasse": "",
+    "plz": "",
+    "ort": "",
     "email_rechnung": "",
     "vermerk": ""
   },

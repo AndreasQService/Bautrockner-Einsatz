@@ -2162,8 +2162,16 @@ END:VCARD`;
             }
             if (data.rechnungs_details) {
                 mergeField('ownerName', data.rechnungs_details.eigentuemer);
+                mergeField('ownerStreet', data.rechnungs_details.strasse);
+                mergeField('ownerZip', data.rechnungs_details.plz);
+                mergeField('ownerCity', data.rechnungs_details.ort);
                 mergeField('ownerEmail', data.rechnungs_details.email_rechnung);
                 mergeField('invoiceReference', data.rechnungs_details.vermerk);
+            }
+            // Fallback: KI hat Eigentümer als Kontakt erkannt, aber nicht in rechnungs_details geschrieben
+            if (!nextData.ownerName) {
+                const eigKontakt = (data.kontakte || []).find(c => c.rolle === 'Eig.' || c.rolle === 'Eigentümer' || c.rolle === 'Eig');
+                if (eigKontakt?.name) nextData.ownerName = eigKontakt.name;
             }
 
             // --- KONTAKTE aufbauen ---
@@ -3933,6 +3941,7 @@ END:VCARD`;
                                             type="file"
                                             multiple
                                             accept="image/*"
+                                            capture="environment"
                                             style={{ display: 'none' }}
                                             onChange={(e) => handleCategorySelect(e, 'Schadenfotos')}
                                         />
@@ -4569,37 +4578,42 @@ END:VCARD`;
                                                                             </button>
                                                                         )}
 
-                                                                        {mode !== 'technician' && (
-                                                                            <button
-                                                                                type="button"
-                                                                                className="btn btn-ghost"
-                                                                                title="Bild löschen"
-                                                                                style={{
-                                                                                    color: '#EF4444',
-                                                                                    padding: '0',
-                                                                                    backgroundColor: '#1E293B',
-                                                                                    border: '1px solid var(--border)',
-                                                                                    borderRadius: '50%',
-                                                                                    width: '36px',
-                                                                                    height: '36px',
-                                                                                    display: 'flex',
-                                                                                    alignItems: 'center',
-                                                                                    justifyContent: 'center',
-                                                                                    boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
-                                                                                    cursor: 'pointer'
-                                                                                }}
-                                                                                onClick={() => {
-                                                                                    if (window.confirm('Bild wirklich löschen?')) {
-                                                                                        setFormData(prev => ({
-                                                                                            ...prev,
-                                                                                            images: prev.images.filter(i => i !== img && (!thermalImg || i !== thermalImg))
-                                                                                        }));
-                                                                                    }
-                                                                                }}
-                                                                            >
-                                                                                <Trash size={16} />
-                                                                            </button>
-                                                                        )}
+                                                                        <button
+                                                                            type="button"
+                                                                            className="btn btn-ghost"
+                                                                            title="Bild löschen"
+                                                                            style={{
+                                                                                color: '#EF4444',
+                                                                                padding: mode === 'technician' ? '0 0.5rem' : '0',
+                                                                                backgroundColor: '#1E293B',
+                                                                                border: '1px solid rgba(239,68,68,0.3)',
+                                                                                borderRadius: mode === 'technician' ? '8px' : '50%',
+                                                                                width: mode === 'technician' ? 'auto' : '36px',
+                                                                                height: '36px',
+                                                                                minWidth: '36px',
+                                                                                display: 'flex',
+                                                                                alignItems: 'center',
+                                                                                justifyContent: 'center',
+                                                                                gap: '6px',
+                                                                                boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
+                                                                                cursor: 'pointer',
+                                                                                fontWeight: 700,
+                                                                                fontSize: '0.8rem',
+                                                                                whiteSpace: 'nowrap'
+                                                                            }}
+                                                                            onClick={() => {
+                                                                                if (window.confirm('Bild wirklich löschen?')) {
+                                                                                    setFormData(prev => ({
+                                                                                        ...prev,
+                                                                                        images: prev.images.filter(i => i !== img && (!thermalImg || i !== thermalImg))
+                                                                                    }));
+                                                                                }
+                                                                            }}
+                                                                        >
+                                                                            <Trash size={16} />
+                                                                            {mode === 'technician' && 'Löschen'}
+                                                                        </button>
+
                                                                     </div>
 
                                                                 </div>

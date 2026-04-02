@@ -203,17 +203,17 @@ function ProjectRow({ report, reminders, onSaveReminder, onSelect }) {
       {/* Project name + number + Schadenort */}
       <td style={{ padding: '0.6rem 0.75rem', minWidth: '170px', verticalAlign: 'middle' }}>
         <div style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '165px' }}>
-          {report.projectTitle || report.client || '—'}
+          {report.street
+            ? `${report.street}, ${report.zip ? report.zip + ' ' : ''}${report.city || ''}`
+            : report.address
+              ? report.address.split(',')[0]
+              : report.locationDetails || report.projectTitle || '—'}
         </div>
         <div style={{ fontSize: '0.7rem', color: '#3B82F6', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
           {report.projectNumber || report.id || '—'}
         </div>
         <div style={{ fontSize: '0.68rem', color: '#94A3B8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '165px', marginTop: '1px' }}>
-          {report.street
-            ? `${report.street}, ${report.zip ? report.zip + ' ' : ''}${report.city || ''}`
-            : report.address
-              ? report.address.split(',')[0]
-              : report.locationDetails || '—'}
+          {report.client || report.projectTitle || '—'}
         </div>
       </td>
 

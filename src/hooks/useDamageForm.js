@@ -289,9 +289,19 @@ export const useDamageForm = (initialData, onSave, mode = 'desktop') => {
             }
             if (data.rechnungs_details) {
                 mergeField('ownerName', data.rechnungs_details.eigentuemer);
+                mergeField('ownerStreet', data.rechnungs_details.strasse);
+                mergeField('ownerZip', data.rechnungs_details.plz);
+                mergeField('ownerCity', data.rechnungs_details.ort);
                 mergeField('ownerEmail', data.rechnungs_details.email_rechnung);
                 mergeField('invoiceReference', data.rechnungs_details.vermerk);
             }
+            // Fallback: KI hat Eigentümer als Kontakt erkannt, aber nicht in rechnungs_details geschrieben
+            if (!nextData.ownerName) {
+                const eigKontakt = (data.kontakte || []).find(c => c.rolle === 'Eig.' || c.rolle === 'Eigentümer' || c.rolle === 'Eig');
+                if (eigKontakt?.name) nextData.ownerName = eigKontakt.name;
+            }
+
+
             if (data.schaden) {
                 mergeField('damageCategory', data.schaden.art);
                 mergeField('description', data.schaden.beschreibung);

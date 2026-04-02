@@ -82,7 +82,7 @@ define(['./workbox-e67eb281'], (function (workbox) { 'use strict';
     "revision": "3ca0b8505b4bec776b69afdba2768812"
   }, {
     "url": "index.html",
-    "revision": "0.rkmo7ddorvk"
+    "revision": "0.4gul57n54ns"
   }], {});
   workbox.cleanupOutdatedCaches();
   workbox.registerRoute(new workbox.NavigationRoute(workbox.createHandlerBoundToURL("index.html"), {
@@ -115,5 +115,7 @@ define(['./workbox-e67eb281'], (function (workbox) { 'use strict';
   }), 'GET');
   workbox.registerRoute(/^https:\/\/api\.openai\.com\/.*/i, new workbox.NetworkOnly(), 'GET');
   workbox.registerRoute(/supabase\.co/i, new workbox.NetworkOnly(), 'GET');
+  workbox.registerRoute(/graph\.microsoft\.com|sharepoint\.com|1drv\.ms/i, new workbox.NetworkOnly(), 'GET');
+  workbox.registerRoute(/maps\.googleapis\.com/i, new workbox.NetworkOnly(), 'GET');
 
 }));

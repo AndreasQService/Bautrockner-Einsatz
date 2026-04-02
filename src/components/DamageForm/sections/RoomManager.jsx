@@ -185,6 +185,7 @@ export default function RoomManager({
                                     type="file"
                                     multiple
                                     accept="image/*"
+                                    capture={mode === 'technician' ? 'environment' : undefined}
                                     style={{ display: 'none' }}
                                     onChange={(e) => handleCategorySelect(e, 'Schadenfotos')}
                                 />
@@ -199,60 +200,59 @@ export default function RoomManager({
                                             <div key={idx} style={{
                                                 position: 'relative',
                                                 width: '100px',
-                                                height: '100px',
-                                                borderRadius: '4px',
-                                                overflow: 'hidden',
                                                 flexShrink: 0,
-                                                border: img.includeInReport !== false ? '2px solid #0F6EA3' : '1px solid var(--border)'
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                gap: '4px'
                                             }}>
-                                                <img
-                                                    src={img.preview}
-                                                    style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: 'zoom-in' }}
-                                                    onClick={() => setLightboxImage(img.preview)}
-                                                    title="Klicken zum Vergrössern"
-                                                />
-
-                                                {/* Include in Report Toggle */}
-                                                <div
-                                                    style={{
-                                                        position: 'absolute',
-                                                        top: '2px',
-                                                        left: '2px',
-                                                        backgroundColor: 'rgba(0,0,0,0.5)',
-                                                        borderRadius: '2px',
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        justifyContent: 'center',
-                                                        padding: '2px',
-                                                        zIndex: 10
-                                                    }}
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        setFormData(prev => ({
-                                                            ...prev,
-                                                            images: prev.images.map(i => i === img ? { ...i, includeInReport: !img.includeInReport } : i)
-                                                        }));
-                                                    }}
-                                                    title="Im Bericht anzeigen"
-                                                >
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={img.includeInReport !== false}
-                                                        onChange={() => { }}
-                                                        style={{ width: '14px', height: '14px', cursor: 'pointer', accentColor: '#0F6EA3' }}
+                                                <div style={{
+                                                    position: 'relative',
+                                                    width: '100px',
+                                                    height: '100px',
+                                                    borderRadius: '4px',
+                                                    overflow: 'hidden',
+                                                    border: img.includeInReport !== false ? '2px solid #0F6EA3' : '1px solid var(--border)'
+                                                }}>
+                                                    <img
+                                                        src={img.preview}
+                                                        style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: 'zoom-in' }}
+                                                        onClick={() => setLightboxImage(img.preview)}
+                                                        title="Klicken zum Vergrössern"
                                                     />
+
+                                                    {/* Include in Report Toggle */}
+                                                    <div
+                                                        style={{
+                                                            position: 'absolute',
+                                                            top: '2px',
+                                                            left: '2px',
+                                                            backgroundColor: 'rgba(0,0,0,0.5)',
+                                                            borderRadius: '2px',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
+                                                            padding: '2px',
+                                                            zIndex: 10
+                                                        }}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setFormData(prev => ({
+                                                                ...prev,
+                                                                images: prev.images.map(i => i === img ? { ...i, includeInReport: !img.includeInReport } : i)
+                                                            }));
+                                                        }}
+                                                        title="Im Bericht anzeigen"
+                                                    >
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={img.includeInReport !== false}
+                                                            onChange={() => { }}
+                                                            style={{ width: '14px', height: '14px', cursor: 'pointer', accentColor: '#0F6EA3' }}
+                                                        />
+                                                    </div>
                                                 </div>
 
-                                                {/* Edit button */}
-                                                <button
-                                                    type="button"
-                                                    onClick={(e) => { e.stopPropagation(); setEditingImage(img); }}
-                                                    title="Bild bearbeiten"
-                                                    style={{ position: 'absolute', bottom: '2px', right: '20px', backgroundColor: 'rgba(14,165,233,0.85)', color: 'white', border: 'none', borderRadius: '50%', width: '18px', height: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, zIndex: 5, cursor: 'pointer' }}
-                                                >
-                                                    <Edit3 size={10} />
-                                                </button>
-
+                                                {/* Löschen-Button – volle Breite, gut tappbar auf iPad */}
                                                 <button
                                                     type="button"
                                                     onClick={(e) => {
@@ -265,9 +265,17 @@ export default function RoomManager({
                                                             }));
                                                         }
                                                     }}
-                                                    style={{ position: 'absolute', top: '2px', right: '2px', backgroundColor: 'rgba(239, 68, 68, 0.8)', color: 'white', border: 'none', borderRadius: '50%', width: '18px', height: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, zIndex: 5 }}
+                                                    style={{
+                                                        width: '100%', padding: '5px 0',
+                                                        backgroundColor: 'rgba(239,68,68,0.15)',
+                                                        color: '#EF4444',
+                                                        border: '1px solid rgba(239,68,68,0.4)',
+                                                        borderRadius: '4px',
+                                                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
+                                                        cursor: 'pointer', fontSize: '0.72rem', fontWeight: 700
+                                                    }}
                                                 >
-                                                    <X size={12} />
+                                                    <X size={12} /> Löschen
                                                 </button>
                                             </div>
                                         ))}
@@ -870,23 +878,28 @@ export default function RoomManager({
                                                     </div>
 
                                                     {/* Actions: Delete */}
-                                                    <div style={{ display: 'flex', flexDirection: 'column', height: '140px', justifyContent: 'flex-start' }}>
+                                                    <div style={{ display: 'flex', flexDirection: 'column', height: mode === 'technician' ? 'auto' : '140px', justifyContent: 'flex-start' }}>
                                                         <button
                                                             type="button"
                                                             className="btn btn-ghost"
                                                             title="Bild löschen"
                                                             style={{
                                                                 color: '#EF4444',
-                                                                padding: '0',
+                                                                padding: mode === 'technician' ? '0 0.5rem' : '0',
                                                                 backgroundColor: 'rgba(239, 68, 68, 0.1)',
                                                                 border: '1px solid rgba(239, 68, 68, 0.2)',
                                                                 borderRadius: '6px',
-                                                                width: '32px',
-                                                                height: '32px',
+                                                                width: mode === 'technician' ? 'auto' : '32px',
+                                                                minWidth: '32px',
+                                                                height: mode === 'technician' ? '44px' : '32px',
                                                                 display: 'flex',
                                                                 alignItems: 'center',
                                                                 justifyContent: 'center',
-                                                                cursor: 'pointer'
+                                                                gap: '6px',
+                                                                cursor: 'pointer',
+                                                                fontWeight: 700,
+                                                                fontSize: '0.8rem',
+                                                                whiteSpace: 'nowrap'
                                                             }}
                                                             onClick={() => {
                                                                 if (window.confirm('Bild wirklich löschen?')) {
@@ -898,6 +911,7 @@ export default function RoomManager({
                                                             }}
                                                         >
                                                             <Trash size={16} />
+                                                            {mode === 'technician' && 'Löschen'}
                                                         </button>
                                                     </div>
                                                 </div>
@@ -921,6 +935,7 @@ export default function RoomManager({
                                                     type="file"
                                                     multiple
                                                     accept="image/*"
+                                                    capture={mode === 'technician' ? 'environment' : undefined}
                                                     style={{ display: 'none' }}
                                                     onChange={(e) => handleRoomImageSelect(e, room)}
                                                 />

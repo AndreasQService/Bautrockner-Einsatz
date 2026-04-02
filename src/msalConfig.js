@@ -4,11 +4,13 @@ export const msalConfig = {
     auth: {
         clientId: import.meta.env.VITE_MSAL_CLIENT_ID,
         authority: `https://login.microsoftonline.com/${import.meta.env.VITE_MSAL_TENANT_ID}`,
-        redirectUri: window.location.origin, // e.g., http://localhost:5173
+        redirectUri: window.location.origin,
+        navigateToLoginRequestUrl: false, // Verhindert automatischen Redirect beim Start
+        postLogoutRedirectUri: window.location.origin,
     },
     cache: {
         cacheLocation: "localStorage",
-        storeAuthStateInCookie: false, // Set this to "true" if you are having issues on IE11 or Edge
+        storeAuthStateInCookie: true, // Für Safari/iOS ITP Kompatibilität
     },
     system: {
         loggerOptions: {

@@ -92,13 +92,15 @@ export default defineConfig({
         ],
       },
 
-      // Entwicklungsmodus: Service Worker auch beim `npm run dev` aktiv
+      // Entwicklungsmodus: Service Worker deaktiviert (stört Netzwerk-IP-Zugriff)
       devOptions: {
-        enabled: true,
-        type: 'module',
+        enabled: false,
       },
     }),
   ],
+  esbuild: {
+    target: 'safari14',
+  },
   server: {
     proxy: {
       '/openai-api': {

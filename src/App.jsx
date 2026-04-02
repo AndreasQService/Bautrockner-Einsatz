@@ -289,9 +289,15 @@ function App() {
     }
 
     if (supabase) {
-      supabase.from('damage_reports').delete().eq('id', reportId);
+      const { error } = await supabase.from('damage_reports').delete().eq('id', reportId);
+      if (error) {
+        console.error('[Delete] Supabase-Fehler:', error);
+        showToast('Fehler beim Löschen in der Cloud', 'error');
+      } else {
+        showToast('Projekt gelöscht', 'success');
+      }
     } else {
-      showToast('Bericht lokal gelöscht', 'success');
+      showToast('Projekt lokal gelöscht', 'success');
     }
   };
 
@@ -349,8 +355,14 @@ function App() {
       city: city,
       address: `${street}, ${zip} ${city}`.trim(),
       locationDetails: importedData.schadenort?.etage_wohnung || '',
-      ownerName: importedData.rechnungs_details?.eigentuemer || '',
+      ownerName: importedData.rechnungs_details?.eigentuemer ||
+        (importedData.kontakte || []).find(c => c.rolle === 'Eig.' || c.rolle === 'Eigentümer' || c.rolle === 'Eig')?.name || '',
+
+      ownerStreet: importedData.rechnungs_details?.strasse || '',
+      ownerZip: importedData.rechnungs_details?.plz || '',
+      ownerCity: importedData.rechnungs_details?.ort || '',
       ownerEmail: importedData.rechnungs_details?.email_rechnung || '',
+
       description: importedData.description || '',
       assignedTo: importedData.auftrag_verwaltung?.sachbearbeiter || '',
       status: 'Schadenaufnahme',
