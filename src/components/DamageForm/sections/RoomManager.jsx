@@ -41,26 +41,72 @@ export default function RoomManager({
     const [isCauseExpanded, setIsCauseExpanded] = useState(true);
     const [lightboxImage, setLightboxImage] = useState(null);
     const recognitionRef = React.useRef(null);
-
+    const accumulatedTextRef = React.useRef('');
+    const isDictatingRef = React.useRef(false);
 
     const startDictation = (onResult) => {
         const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (!SR) { alert('Diktat wird von diesem Browser nicht unterstützt.'); return; }
-        if (isDictating) { recognitionRef.current?.stop(); return; }
-        const rec = new SR();
-        rec.lang = 'de-CH';
-        rec.continuous = true;
-        rec.interimResults = false;
-        rec.onresult = (e) => {
-            const text = Array.from(e.results).map(r => r[0].transcript).join(' ');
-            onResult(text);
-        };
-        rec.onerror = () => setIsDictating(false);
-        rec.onend = () => setIsDictating(false);
-        recognitionRef.current = rec;
-        rec.start();
+        if (!SR) {
+            alert('Diktat wird von diesem Browser nicht unterstützt.');
+            return;
+        }
+        // Sicherheitskontext prüfen (iOS braucht HTTPS)
+        if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+            alert('Diktat benötigt eine HTTPS-Verbindung. Bitte die App über die Vercel-URL öffnen.');
+            return;
+        }
+        // Diktat stoppen wenn aktiv
+        if (isDictatingRef.current) {
+            isDictatingRef.current = false;
+            recognitionRef.current?.stop();
+            accumulatedTextRef.current = '';
+            setIsDictating(false);
+            return;
+        }
+
+        isDictatingRef.current = true;
+        accumulatedTextRef.current = '';
         setIsDictating(true);
+
+        const startSession = () => {
+            if (!isDictatingRef.current) return;
+            const rec = new SR();
+            rec.lang = 'de-CH';
+            rec.continuous = false; // iOS Safari unterstützt continuous nicht zuverlässig
+            rec.interimResults = false;
+            rec.maxAlternatives = 1;
+
+            rec.onresult = (e) => {
+                const newText = Array.from(e.results).map(r => r[0].transcript).join(' ');
+                accumulatedTextRef.current = (accumulatedTextRef.current + ' ' + newText).trim();
+                onResult(accumulatedTextRef.current);
+            };
+            rec.onerror = (e) => {
+                if (e.error === 'not-allowed') {
+                    alert('Mikrofon-Zugriff verweigert. Bitte in den iPad-Einstellungen erlauben.');
+                    isDictatingRef.current = false;
+                    setIsDictating(false);
+                } else if (e.error !== 'aborted') {
+                    // Bei anderen Fehlern kurz warten und neu starten
+                    setTimeout(startSession, 300);
+                }
+            };
+            rec.onend = () => {
+                // iOS stoppt automatisch nach Pause → sofort neu starten
+                if (isDictatingRef.current) {
+                    setTimeout(startSession, 150);
+                } else {
+                    setIsDictating(false);
+                }
+            };
+
+            recognitionRef.current = rec;
+            try { rec.start(); } catch (e) { /* bereits gestartet */ }
+        };
+
+        startSession();
     };
+
 
     const toggleRoomImages = (roomId) => {
         setVisibleRoomImages(prev => ({
