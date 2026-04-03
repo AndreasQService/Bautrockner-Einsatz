@@ -50,9 +50,13 @@ const EmailImportModalV2 = ({ onClose, onImport, audioDevices, selectedDeviceId,
         } else {
             setShowSettings(true); // Prompts user to enter key first time
         }
+
+        const storedOpenAiKey = localStorage.getItem('openai_api_key') || import.meta.env.VITE_OPENAI_API_KEY || '';
+        setOpenAiKey(storedOpenAiKey);
     }, []);
 
     const [previewData, setPreviewData] = useState(null);
+    const [openAiKey, setOpenAiKey] = useState('');
 
     const saveApiKey = (key) => {
         setApiKey(key);
@@ -480,6 +484,29 @@ ${text}`;
                                 Speichern
                             </button>
                         </div>
+                        <div style={{ marginTop: '1rem', borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>
+                            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--text-main)' }}>OpenAI API Key (Diktat / Whisper)</label>
+                            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                <input
+                                    type="password"
+                                    placeholder="sk-..."
+                                    value={openAiKey}
+                                    onChange={(e) => setOpenAiKey(e.target.value)}
+                                    className="form-input"
+                                    style={{ flex: 1 }}
+                                />
+                                <button onClick={() => {
+                                    localStorage.setItem('openai_api_key', openAiKey.trim());
+                                    setShowSettings(false);
+                                }} className="btn btn-primary" style={{ padding: '0.5rem 1rem' }}>
+                                    Speichern
+                                </button>
+                            </div>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
+                                Für Sprachdiktat (Whisper). Separat vom Gemini-Key.
+                            </div>
+                        </div>
+
                         <div style={{ marginTop: '1rem', borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>
                             <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--text-main)' }}>Mikrofon auswählen</label>
                             <div style={{ display: 'flex', gap: '0.5rem' }}>
