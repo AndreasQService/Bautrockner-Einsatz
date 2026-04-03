@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     Image, Plus, X, FileText, MapPin, Map, Camera,
     Folder, ChevronDown, Phone, Trash, Edit3,
@@ -41,6 +41,7 @@ export default function RoomManager({
     const [isCauseExpanded, setIsCauseExpanded] = useState(true);
     const [lightboxImage, setLightboxImage] = useState(null);
     const recognitionRef = React.useRef(null);
+
 
     const startDictation = (onResult) => {
         const SR = window.SpeechRecognition || window.webkitSpeechRecognition;

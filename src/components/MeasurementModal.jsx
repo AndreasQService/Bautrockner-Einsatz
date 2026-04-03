@@ -549,7 +549,7 @@ const MeasurementModal = ({ isOpen, onClose, onSave, rooms, projectTitle, initia
                     </div>
                 </div>
 
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
 
                     {/* Toolbar & Canvas - Sticky */}
                     {/* Toolbar & Canvas - Sticky - Hidden in History View */}

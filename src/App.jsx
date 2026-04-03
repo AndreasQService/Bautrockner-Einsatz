@@ -46,6 +46,52 @@ function App() {
   // OneDrive: MSAL-Instanz sofort registrieren sobald verfügbar
   useEffect(() => { setMsalInstance(instance); }, [instance]);
 
+  // iOS-Tastatur: Eingabefeld automatisch sichtbar halten (Techniker-Modus)
+  useEffect(() => {
+    if (!isTechnicianMode) return;
+
+    // Nächsten scrollbaren Vorfahren finden (Modal-Body oder window)
+    const getScrollParent = (el) => {
+      let node = el.parentElement;
+      while (node) {
+        const style = window.getComputedStyle(node);
+        const overflow = style.overflowY;
+        if ((overflow === 'auto' || overflow === 'scroll') && node.scrollHeight > node.clientHeight) {
+          return node;
+        }
+        node = node.parentElement;
+      }
+      return null;
+    };
+
+    const handleFocus = (e) => {
+      const el = e.target;
+      if (el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA' && el.tagName !== 'SELECT') return;
+
+      setTimeout(() => {
+        const viewportHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+        const rect = el.getBoundingClientRect();
+
+        if (rect.bottom > viewportHeight - 20) {
+          // Scrollbaren Container suchen
+          const scrollParent = getScrollParent(el);
+          if (scrollParent) {
+            // Im Modal-Container scrollen
+            const parentRect = scrollParent.getBoundingClientRect();
+            const offset = rect.bottom - parentRect.top - scrollParent.clientHeight + 80;
+            scrollParent.scrollBy({ top: offset, behavior: 'smooth' });
+          } else {
+            // Fallback: window scrollen
+            window.scrollBy({ top: rect.bottom - viewportHeight + 80, behavior: 'smooth' });
+          }
+        }
+      }, 400);
+    };
+
+    document.addEventListener('focusin', handleFocus);
+    return () => document.removeEventListener('focusin', handleFocus);
+  }, [isTechnicianMode]);
+
   const handleLoginOneDrive = () => {
     instance.loginRedirect(loginRequest).catch(e => {
       console.error("MSAL Login Error:", e);
