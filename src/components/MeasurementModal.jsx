@@ -51,14 +51,14 @@ const MeasurementModal = ({ isOpen, onClose, onSave, rooms, projectTitle, initia
     const [saveAsPdf, setSaveAsPdf] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [isSuccess, setIsSuccess] = useState(false);
-    const [stylusOnlyMode, setStylusOnlyMode] = useState(false); // New state for Palm Rejection
+    const [stylusOnlyMode, setStylusOnlyMode] = useState(true); // Palm Rejection standardmäßig AN
     const [showCamera, setShowCamera] = useState(false);
 
     // Always lock the sketch by default when the modal opens
     useEffect(() => {
         if (isOpen) {
             setIsSketchLocked(true);
-            setStylusOnlyMode(false); // Reset stylus mode too for fresh start
+            setStylusOnlyMode(true); // Palm Rejection beim Reset aktiv lassen
         }
     }, [isOpen]);
 

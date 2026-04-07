@@ -50,6 +50,8 @@ function App() {
   useEffect(() => {
     if (!isTechnicianMode) return;
 
+    let focusedEl = null;
+
     // Nächsten scrollbaren Vorfahren finden (Modal-Body oder window)
     const getScrollParent = (el) => {
       let node = el.parentElement;
@@ -64,32 +66,57 @@ function App() {
       return null;
     };
 
+    const scrollElIntoView = (el) => {
+      if (!el) return;
+      const viewportHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+      const rect = el.getBoundingClientRect();
+      if (rect.bottom > viewportHeight - 20) {
+        const scrollParent = getScrollParent(el);
+        if (scrollParent) {
+          const parentRect = scrollParent.getBoundingClientRect();
+          const offset = rect.bottom - parentRect.top - scrollParent.clientHeight + 80;
+          scrollParent.scrollBy({ top: offset, behavior: 'smooth' });
+        } else {
+          window.scrollBy({ top: rect.bottom - viewportHeight + 80, behavior: 'smooth' });
+        }
+      }
+    };
+
     const handleFocus = (e) => {
       const el = e.target;
       if (el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA' && el.tagName !== 'SELECT') return;
+      focusedEl = el;
+      // Sofort + nach Tastatur-Animation scrollen
+      setTimeout(() => scrollElIntoView(el), 100);
+      setTimeout(() => scrollElIntoView(el), 500);
+    };
 
-      setTimeout(() => {
-        const viewportHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-        const rect = el.getBoundingClientRect();
+    const handleBlur = (e) => {
+      const el = e.target;
+      if (el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA' && el.tagName !== 'SELECT') return;
+      focusedEl = null;
+    };
 
-        if (rect.bottom > viewportHeight - 20) {
-          // Scrollbaren Container suchen
-          const scrollParent = getScrollParent(el);
-          if (scrollParent) {
-            // Im Modal-Container scrollen
-            const parentRect = scrollParent.getBoundingClientRect();
-            const offset = rect.bottom - parentRect.top - scrollParent.clientHeight + 80;
-            scrollParent.scrollBy({ top: offset, behavior: 'smooth' });
-          } else {
-            // Fallback: window scrollen
-            window.scrollBy({ top: rect.bottom - viewportHeight + 80, behavior: 'smooth' });
-          }
-        }
-      }, 400);
+    // Feuert wenn iOS-Tastatur fertig erschienen ist (zuverlässiger als Timeout)
+    const handleViewportResize = () => {
+      if (focusedEl) {
+        setTimeout(() => scrollElIntoView(focusedEl), 50);
+      }
     };
 
     document.addEventListener('focusin', handleFocus);
-    return () => document.removeEventListener('focusin', handleFocus);
+    document.addEventListener('focusout', handleBlur);
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', handleViewportResize);
+    }
+
+    return () => {
+      document.removeEventListener('focusin', handleFocus);
+      document.removeEventListener('focusout', handleBlur);
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', handleViewportResize);
+      }
+    };
   }, [isTechnicianMode]);
 
   const handleLoginOneDrive = () => {
@@ -338,7 +365,7 @@ function App() {
       const { error } = await supabase.from('damage_reports').delete().eq('id', reportId);
       if (error) {
         console.error('[Delete] Supabase-Fehler:', error);
-        showToast('Fehler beim Löschen in der Cloud', 'error');
+        showToast(`Fehler: ${error.message || error.code || 'Unbekannt'}`, 'error');
       } else {
         showToast('Projekt gelöscht', 'success');
       }

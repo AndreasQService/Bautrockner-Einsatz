@@ -630,11 +630,25 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         }
 
         try {
-            const constraints = {
-                audio: selectedDeviceId ? { deviceId: { exact: selectedDeviceId } } : true
+            const audioConstraints = {
+                echoCancellation: true,   // Browser-Verarbeitung für sauberes Signal
+                noiseSuppression: true,   // Hilft bei schwachem BT/AirPods-Signal
+                autoGainControl: true,    // Boost für leise Mikrofone
             };
-            const stream = await navigator.mediaDevices.getUserMedia(constraints);
-            mediaRecorderRef.current = new MediaRecorder(stream);
+            if (selectedDeviceId) audioConstraints.deviceId = { exact: selectedDeviceId };
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints });
+
+            // Beste MIME-Type für Browser-Kompatibilität (Whisper unterstützt webm, mp4, ogg)
+            const preferredMimes = [
+                'audio/webm;codecs=opus',
+                'audio/webm',
+                'audio/ogg;codecs=opus',
+                'audio/mp4'
+            ];
+            const supportedMime = preferredMimes.find(m => MediaRecorder.isTypeSupported(m)) || '';
+            console.log("Using MIME type:", supportedMime || 'browser default');
+
+            mediaRecorderRef.current = new MediaRecorder(stream, supportedMime ? { mimeType: supportedMime } : {});
             const audioChunks = [];
 
             mediaRecorderRef.current.ondataavailable = (event) => {
@@ -644,8 +658,9 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
             };
 
             mediaRecorderRef.current.onstop = async () => {
-                const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-                console.log("Recording finished. Size:", audioBlob.size, "Type:", audioBlob.type);
+                const actualMime = mediaRecorderRef.current?.mimeType || supportedMime || 'audio/webm';
+                const audioBlob = new Blob(audioChunks, { type: actualMime });
+                console.log("Recording finished. Size:", audioBlob.size, "Type:", actualMime);
 
                 try {
                     if (audioBlob.size > 0) {
@@ -762,6 +777,9 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
             const data = await response.json();
 
             if (data.text) {
+                // Log raw Whisper response for debugging
+                console.log("Whisper raw response:", JSON.stringify(data.text));
+
                 // Clean up the new text: removing leading dots/whitespace
                 let newText = data.text.trim();
 
@@ -784,8 +802,9 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
 
                 // If nothing remains (or just a dot), it was effectively silence
                 if (cleanText === '' || cleanText === '.') {
-                    console.warn("Whisper hallucination detected (likely silence):", newText);
-                    alert("Keine Sprache erkannt (Stille). Bitte lauter sprechen.");
+                    console.warn("Whisper hallucination detected (likely silence):", newText, "Blob size:", audioBlob?.size);
+                    const sizeHint = audioBlob?.size < 5000 ? "\n\nMikrofon-Signal zu leise – bitte Lautstärke erhöhen." : "";
+                    alert("Keine Sprache erkannt. Bitte lauter und deutlicher sprechen." + sizeHint);
                     return;
                 }
 
@@ -3068,21 +3087,38 @@ END:VCARD`;
                 {/* Desktop-Only: Schadenbeschreibung (AI Extracted) */}
                 {mode === 'desktop' && (
                     <div className="card" style={{ marginBottom: '1.5rem', padding: '1.5rem' }}>
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: '1.5rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.75rem' }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: '1rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.75rem' }}>
                             <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.6rem', margin: 0 }}>
                                 <FileText size={18} /> Schadenbeschreibung (KI / Meldung)
                             </h3>
-                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: 'var(--text-muted)', cursor: 'pointer' }}>
-                                <input
-                                    type="checkbox"
-                                    checked={formData.includeDescriptionInReport}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, includeDescriptionInReport: e.target.checked }))}
-                                    style={{ width: '18px', height: '18px', accentColor: '#0F6EA3' }}
-                                />
-                                In Bericht aufnehmen
-                            </label>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                <button
+                                    type="button"
+                                    onClick={() => isRecording === 'desc-desktop' ? stopRecording() : startRecording('desc-desktop')}
+                                    style={{
+                                        width: '32px', height: '32px', borderRadius: '50%',
+                                        border: `1px solid ${isRecording === 'desc-desktop' ? '#ef4444' : 'var(--border)'}`,
+                                        backgroundColor: isRecording === 'desc-desktop' ? 'rgba(239,68,68,0.12)' : 'rgba(14,165,233,0.08)',
+                                        color: isRecording === 'desc-desktop' ? '#ef4444' : '#38bdf8',
+                                        cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+                                    }}
+                                    title={isRecording === 'desc-desktop' ? 'Aufnahme stoppen' : 'Diktieren starten'}
+                                >
+                                    {isRecording === 'desc-desktop' ? <MicOff size={16} /> : <Mic size={16} />}
+                                </button>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: 'var(--text-muted)', cursor: 'pointer' }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={formData.includeDescriptionInReport}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, includeDescriptionInReport: e.target.checked }))}
+                                        style={{ width: '18px', height: '18px', accentColor: '#0F6EA3' }}
+                                    />
+                                    In Bericht aufnehmen
+                                </label>
+                            </div>
                         </div>
                         <textarea
+                            id="desc-desktop"
                             value={formData.description || ''}
                             onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
                             placeholder="Beschrieb aus der Meldung..."
@@ -3393,7 +3429,8 @@ END:VCARD`;
 
                 {/* Container for Map & Exterior Photo (Side-by-Side) */}
                 <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap', alignItems: 'stretch', marginBottom: '1.5rem' }}>
-                    {/* Map Card */}
+                    {/* Map Card – nur im Techniker-Modus */}
+                    {mode !== 'desktop' && (
                     <div className="card" style={{ flex: '1 1 350px', padding: '1.5rem', display: 'flex', flexDirection: 'column' }}>
                         <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.6rem', color: 'var(--primary)', borderBottom: '1px solid var(--border)', paddingBottom: '0.75rem' }}>
                             <MapPin size={18} /> Standort Karte
@@ -3452,6 +3489,7 @@ END:VCARD`;
                             </div>
                         )}
                     </div>
+                    )}
 
                     {/* 1b. Exterior Photo (Aussenaufnahme) - Show only if exists */}
                     {formData.exteriorPhoto && (
@@ -4859,128 +4897,148 @@ END:VCARD`;
 
                         {isCauseExpanded && (<>
 
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem', marginBottom: '2rem' }}>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                    <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>Schadenursache</span>
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-                                            if (!SR) { alert('Diktat wird von diesem Browser nicht unterst\u00fctzt.'); return; }
-                                            if (window.__dictRec) { window.__dictRec.stop(); window.__dictRec = null; return; }
-                                            const rec = new SR();
-                                            rec.lang = 'de-DE';
-                                            rec.continuous = true;
-                                            rec.interimResults = false;
-                                            rec.onresult = (e) => {
-                                                const text = Array.from(e.results).map(r => r[0].transcript).join(' ');
-                                                setFormData(prev => ({ ...prev, cause: (prev.cause ? prev.cause + ' ' : '') + text }));
-                                            };
-                                            rec.onerror = (e) => { console.error('Diktat Fehler:', e); window.__dictRec = null; };
-                                            rec.onend = () => { window.__dictRec = null; };
-                                            window.__dictRec = rec;
-                                            rec.start();
-                                        }}
-                                        style={{
-                                            display: 'flex', alignItems: 'center', gap: '0.4rem',
-                                            padding: '0.35rem 0.8rem', borderRadius: '6px', border: 'none',
-                                            backgroundColor: 'rgba(14,165,233,0.15)',
-                                            color: '#38bdf8', cursor: 'pointer',
-                                            fontSize: '0.8rem', fontWeight: 700
-                                        }}
-                                        title="Diktieren starten / stoppen"
-                                    >
-                                        <Mic size={15} /> Diktieren
-                                    </button>
-                                </div>
-                                <textarea
-                                    className="form-input"
-                                    rows={3}
-                                    value={formData.cause || ''}
-                                    onChange={e => setFormData({ ...formData, cause: e.target.value })}
-                                    placeholder="Beschreibung der Ursache..."
-                                />
-                            </div>
-                        </div>
-
-                        <div>
-                            <h4 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--text-main)' }}>Fotos zur Ursache</h4>
-                            <div
-                                style={{
-                                    border: '2px dashed var(--border)', borderRadius: 'var(--radius)',
-                                    padding: '2rem 1rem', textAlign: 'center', cursor: 'pointer',
-                                    backgroundColor: 'rgba(255,255,255,0.02)', transition: 'all 0.2s',
-                                    marginBottom: '1rem', display: 'flex', flexDirection: 'column',
-                                    alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)'
-                                }}
-                                onClick={() => document.getElementById('file-upload-Schadenfotos-desktop').click()}
-                                onDragOver={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.backgroundColor = 'rgba(56, 189, 248, 0.1)'; e.currentTarget.style.color = 'var(--primary)'; }}
-                                onDragLeave={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.02)'; e.currentTarget.style.color = 'var(--text-muted)'; }}
-                                onDrop={(e) => handleCategoryDrop(e, 'Schadenfotos')}
-                            >
-                                <Plus size={24} style={{ marginBottom: '0.5rem', opacity: 0.5 }} />
-                                <span style={{ fontSize: '0.85rem' }}>Schadenfoto hochladen / Drop</span>
-                                <input id="file-upload-Schadenfotos-desktop" type="file" multiple accept="image/*" style={{ display: 'none' }} onChange={(e) => handleCategorySelect(e, 'Schadenfotos')} />
-                            </div>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                                {formData.images.filter(img => img.assignedTo === 'Schadenfotos').map((item, idx) => (
-                                    <div key={idx} style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start', border: '1px solid var(--border)', padding: '0.5rem', borderRadius: '6px', backgroundColor: 'var(--background)' }}>
-                                        {/* Thumbnail + Controls */}
-                                        <div style={{ flex: '0 0 140px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
-                                            <div style={{ width: '140px', height: '140px', borderRadius: '6px', overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-                                                <img src={item.preview} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: 'pointer' }} onClick={() => setEditingImage(item)} />
-                                            </div>
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', padding: '0 2px', alignItems: 'center' }}>
-                                                <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', fontSize: '0.75rem', cursor: 'pointer', color: 'var(--text-main)' }}>
-                                                    <input
-                                                        type="checkbox"
-                                                        style={{ width: '16px', height: '16px', accentColor: 'var(--primary)', cursor: 'pointer' }}
-                                                        checked={item.includeInReport !== false}
-                                                        onChange={(e) => setFormData(prev => ({
-                                                            ...prev,
-                                                            images: prev.images.map(i => i === item ? { ...i, includeInReport: e.target.checked } : i)
-                                                        }))}
-                                                    />
-                                                    <span style={{ fontWeight: 600 }}>Bericht</span>
-                                                </label>
-                                                <button
-                                                    type="button"
-                                                    title="Bearbeiten"
-                                                    style={{ border: '1px solid var(--border)', backgroundColor: 'var(--surface)', color: 'var(--text-main)', cursor: 'pointer', padding: '6px', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                                                    onClick={() => setEditingImage(item)}
-                                                >
-                                                    <Edit3 size={16} />
-                                                </button>
-                                            </div>
-                                        </div>
-                                        {/* Description */}
-                                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '140px' }}>
-                                            <textarea
-                                                placeholder="Beschreibung..."
-                                                className="form-input"
-                                                style={{ fontSize: '0.9rem', padding: '0.5rem', flex: 1, width: '100%', resize: 'none', backgroundColor: 'var(--surface)', color: 'var(--text-main)' }}
-                                                value={item.description || ''}
-                                                onChange={(e) => {
-                                                    const newDesc = e.target.value;
-                                                    setFormData(prev => ({
-                                                        ...prev,
-                                                        images: prev.images.map(i => i.preview === item.preview ? { ...i, description: newDesc } : i)
-                                                    }));
-                                                }}
-                                            />
-                                        </div>
-                                        {/* Delete */}
-                                        <div style={{ display: 'flex', flexDirection: 'column', height: '100px', justifyContent: 'flex-start' }}>
-                                            <button type="button" onClick={() => setFormData(prev => ({ ...prev, images: prev.images.filter(i => i !== item) }))} style={{ color: '#EF4444', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '6px', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}><Trash size={16} /></button>
-                                        </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem', marginBottom: '2rem' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                        <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>Schadenursache</span>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+                                                if (!SR) { alert('Diktat wird von diesem Browser nicht unterst\u00fctzt.'); return; }
+                                                if (window.__dictRec) { window.__dictRec.stop(); window.__dictRec = null; return; }
+                                                const rec = new SR();
+                                                rec.lang = 'de-DE';
+                                                rec.continuous = true;
+                                                rec.interimResults = false;
+                                                rec.onresult = (e) => {
+                                                    const text = Array.from(e.results).map(r => r[0].transcript).join(' ');
+                                                    setFormData(prev => ({ ...prev, cause: (prev.cause ? prev.cause + ' ' : '') + text }));
+                                                };
+                                                rec.onerror = (e) => { console.error('Diktat Fehler:', e); window.__dictRec = null; };
+                                                rec.onend = () => { window.__dictRec = null; };
+                                                window.__dictRec = rec;
+                                                rec.start();
+                                            }}
+                                            style={{
+                                                display: 'flex', alignItems: 'center', gap: '0.4rem',
+                                                padding: '0.35rem 0.8rem', borderRadius: '6px', border: 'none',
+                                                backgroundColor: 'rgba(14,165,233,0.15)',
+                                                color: '#38bdf8', cursor: 'pointer',
+                                                fontSize: '0.8rem', fontWeight: 700
+                                            }}
+                                            title="Diktieren starten / stoppen"
+                                        >
+                                            <Mic size={15} /> Diktieren
+                                        </button>
                                     </div>
-                                ))}
-                                {formData.images.filter(img => img.assignedTo === 'Schadenfotos').length === 0 && (
-                                    <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.9rem', fontStyle: 'italic' }}>Keine Schadenfotos vorhanden.</div>
-                                )}
+                                    <textarea
+                                        className="form-input"
+                                        rows={3}
+                                        value={formData.cause || ''}
+                                        onChange={e => setFormData({ ...formData, cause: e.target.value })}
+                                        placeholder="Beschreibung der Ursache..."
+                                    />
+                                </div>
                             </div>
-                        </div>
+
+                            <div>
+                                <h4 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--text-main)' }}>Fotos zur Ursache</h4>
+                                <div
+                                    style={{
+                                        border: '2px dashed var(--border)', borderRadius: 'var(--radius)',
+                                        padding: '2rem 1rem', textAlign: 'center', cursor: 'pointer',
+                                        backgroundColor: 'rgba(255,255,255,0.02)', transition: 'all 0.2s',
+                                        marginBottom: '1rem', display: 'flex', flexDirection: 'column',
+                                        alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)'
+                                    }}
+                                    onClick={() => document.getElementById('file-upload-Schadenfotos-desktop').click()}
+                                    onDragOver={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.backgroundColor = 'rgba(56, 189, 248, 0.1)'; e.currentTarget.style.color = 'var(--primary)'; }}
+                                    onDragLeave={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.02)'; e.currentTarget.style.color = 'var(--text-muted)'; }}
+                                    onDrop={(e) => handleCategoryDrop(e, 'Schadenfotos')}
+                                >
+                                    <Plus size={24} style={{ marginBottom: '0.5rem', opacity: 0.5 }} />
+                                    <span style={{ fontSize: '0.85rem' }}>Schadenfoto hochladen / Drop</span>
+                                    <input id="file-upload-Schadenfotos-desktop" type="file" multiple accept="image/*" style={{ display: 'none' }} onChange={(e) => handleCategorySelect(e, 'Schadenfotos')} />
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                    {formData.images.filter(img => img.assignedTo === 'Schadenfotos').map((item, idx) => (
+                                        <div key={idx} style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start', border: '1px solid var(--border)', padding: '0.5rem', borderRadius: '6px', backgroundColor: 'var(--background)' }}>
+                                            {/* Thumbnail + Controls */}
+                                            <div style={{ flex: '0 0 140px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
+                                                <div style={{ width: '140px', height: '140px', borderRadius: '6px', overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+                                                    <img src={item.preview} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: 'pointer' }} onClick={() => setEditingImage(item)} />
+                                                </div>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', padding: '0 2px', alignItems: 'center' }}>
+                                                    <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', fontSize: '0.75rem', cursor: 'pointer', color: 'var(--text-main)' }}>
+                                                        <input
+                                                            type="checkbox"
+                                                            style={{ width: '16px', height: '16px', accentColor: 'var(--primary)', cursor: 'pointer' }}
+                                                            checked={item.includeInReport !== false}
+                                                            onChange={(e) => setFormData(prev => ({
+                                                                ...prev,
+                                                                images: prev.images.map(i => i === item ? { ...i, includeInReport: e.target.checked } : i)
+                                                            }))}
+                                                        />
+                                                        <span style={{ fontWeight: 600 }}>Bericht</span>
+                                                    </label>
+                                                    <button
+                                                        type="button"
+                                                        title="Bearbeiten"
+                                                        style={{ border: '1px solid var(--border)', backgroundColor: 'var(--surface)', color: 'var(--text-main)', cursor: 'pointer', padding: '6px', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                                        onClick={() => setEditingImage(item)}
+                                                    >
+                                                        <Edit3 size={16} />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            {/* Description */}
+                                            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '140px', gap: '4px' }}>
+                                                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            const tid = `imgdesc-${idx}`;
+                                                            isRecording === tid ? stopRecording() : startRecording(tid);
+                                                        }}
+                                                        style={{
+                                                            width: '32px', height: '32px', borderRadius: '50%',
+                                                            border: `1px solid ${isRecording === `imgdesc-${idx}` ? '#ef4444' : 'var(--border)'}`,
+                                                            backgroundColor: isRecording === `imgdesc-${idx}` ? 'rgba(239,68,68,0.1)' : 'rgba(14,165,233,0.08)',
+                                                            color: isRecording === `imgdesc-${idx}` ? '#ef4444' : '#38bdf8',
+                                                            cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+                                                        }}
+                                                        title={isRecording === `imgdesc-${idx}` ? 'Aufnahme stoppen' : 'Diktieren starten'}
+                                                    >
+                                                        {isRecording === `imgdesc-${idx}` ? <MicOff size={16} /> : <Mic size={16} />}
+                                                    </button>
+                                                </div>
+                                                <textarea
+                                                    id={`imgdesc-${idx}`}
+                                                    placeholder="Beschreibung..."
+                                                    className="form-input"
+                                                    style={{ fontSize: '0.9rem', padding: '0.5rem', flex: 1, width: '100%', resize: 'none', backgroundColor: 'var(--surface)', color: 'var(--text-main)' }}
+                                                    value={item.description || ''}
+                                                    onChange={(e) => {
+                                                        const newDesc = e.target.value;
+                                                        setFormData(prev => ({
+                                                            ...prev,
+                                                            images: prev.images.map(i => i.preview === item.preview ? { ...i, description: newDesc } : i)
+                                                        }));
+                                                    }}
+                                                />
+                                            </div>
+                                            {/* Delete */}
+                                            <div style={{ display: 'flex', flexDirection: 'column', height: '100px', justifyContent: 'flex-start' }}>
+                                                <button type="button" onClick={() => setFormData(prev => ({ ...prev, images: prev.images.filter(i => i !== item) }))} style={{ color: '#EF4444', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '6px', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}><Trash size={16} /></button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {formData.images.filter(img => img.assignedTo === 'Schadenfotos').length === 0 && (
+                                        <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.9rem', fontStyle: 'italic' }}>Keine Schadenfotos vorhanden.</div>
+                                    )}
+                                </div>
+                            </div>
                         </>)}
                     </div>
                 )}
@@ -4999,16 +5057,17 @@ END:VCARD`;
                                     type="button"
                                     className={`btn btn-ghost ${isListeningFindings ? 'listening' : ''}`}
                                     style={{
+                                        width: '32px', height: '32px', borderRadius: '50%',
                                         color: isListeningFindings ? '#ef4444' : 'var(--text-muted)',
-                                        padding: '2px 8px', fontSize: '0.8rem',
-                                        display: 'flex', alignItems: 'center', gap: '4px',
-                                        border: '1px solid var(--border)', borderRadius: '4px'
+                                        border: `1px solid ${isListeningFindings ? '#ef4444' : 'var(--border)'}`,
+                                        backgroundColor: isListeningFindings ? 'rgba(239,68,68,0.1)' : 'transparent',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        padding: 0, cursor: 'pointer'
                                     }}
                                     onClick={toggleFindingsListening}
                                     title="Diktieren"
                                 >
-                                    {isListeningFindings ? <MicOff size={14} /> : <Mic size={14} />}
-                                    <span>Diktieren</span>
+                                    {isListeningFindings ? <MicOff size={16} /> : <Mic size={16} />}
                                 </button>
                             </div>
                             <textarea
@@ -5086,20 +5145,17 @@ END:VCARD`;
                                 type="button"
                                 className={`btn btn-ghost ${isListeningMeasures ? 'listening' : ''}`}
                                 style={{
+                                    width: '32px', height: '32px', borderRadius: '50%',
                                     color: isListeningMeasures ? '#ef4444' : 'var(--text-muted)',
-                                    padding: '2px 8px',
-                                    fontSize: '0.8rem',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '4px',
-                                    border: '1px solid var(--border)',
-                                    borderRadius: '4px'
+                                    border: `1px solid ${isListeningMeasures ? '#ef4444' : 'var(--border)'}`,
+                                    backgroundColor: isListeningMeasures ? 'rgba(239,68,68,0.1)' : 'transparent',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    padding: 0, cursor: 'pointer'
                                 }}
                                 onClick={toggleMeasuresListening}
                                 title="Diktieren"
                             >
-                                {isListeningMeasures ? <MicOff size={14} /> : <Mic size={14} />}
-                                <span>Diktieren</span>
+                                {isListeningMeasures ? <MicOff size={16} /> : <Mic size={16} />}
                             </button>
                         </div>
 
@@ -5326,18 +5382,20 @@ END:VCARD`;
                                     className="btn-glass"
                                     onClick={toggleMeasuresListening}
                                     style={{
-                                        padding: '0.4rem 0.75rem',
+                                        width: '32px', height: '32px', borderRadius: '50%',
+                                        padding: '0',
                                         fontSize: '0.75rem',
                                         display: 'flex',
                                         alignItems: 'center',
-                                        gap: '0.5rem',
+                                        justifyContent: 'center',
                                         color: isListeningMeasures ? '#EF4444' : 'var(--primary)',
-                                        borderRadius: '10px',
+                                        border: `1px solid ${isListeningMeasures ? '#EF4444' : 'var(--border)'}`,
+                                        backgroundColor: isListeningMeasures ? 'rgba(239,68,68,0.1)' : 'transparent',
+                                        borderRadius: '50%',
                                         fontWeight: 700
                                     }}
                                 >
                                     {isListeningMeasures ? <MicOff size={16} /> : <Mic size={16} />}
-                                    {isListeningMeasures ? 'Stop' : 'Diktieren'}
                                 </button>
                             </div>
                             <textarea
