@@ -667,7 +667,7 @@ export default function RoomManager({
                                                         fontSize: mode === 'technician' ? '0.9rem' : '0.75rem',
                                                         cursor: 'pointer',
                                                         flex: 1,
-                                                        minHeight: mode === 'technician' ? '44px' : 'auto',
+                                                        minHeight: mode === 'technician' ? '44px' : '44px',
                                                         fontWeight: 800
                                                     }}
                                                 >
@@ -695,7 +695,7 @@ export default function RoomManager({
                                                         fontSize: mode === 'technician' ? '0.9rem' : '0.75rem',
                                                         cursor: 'pointer',
                                                         flex: 1,
-                                                        minHeight: mode === 'technician' ? '44px' : 'auto',
+                                                        minHeight: mode === 'technician' ? '44px' : '44px',
                                                         fontWeight: 800,
                                                         whiteSpace: 'nowrap'
                                                     }}
@@ -726,7 +726,7 @@ export default function RoomManager({
                                                     fontSize: mode === 'technician' ? '1rem' : '0.75rem',
                                                     cursor: 'pointer',
                                                     flex: 1,
-                                                    minHeight: mode === 'technician' ? '50px' : 'auto',
+                                                    minHeight: mode === 'technician' ? '50px' : '44px',
                                                     fontWeight: 700,
                                                     gridColumn: mode === 'technician' ? 'span 2' : 'auto'
                                                 }}
@@ -787,7 +787,7 @@ export default function RoomManager({
                                                 alignItems: 'center',
                                                 justifyContent: 'center',
                                                 cursor: 'pointer',
-                                                minHeight: mode === 'technician' ? '44px' : 'auto',
+                                                minHeight: mode === 'technician' ? '44px' : '44px',
                                                 gridColumn: mode === 'technician' && !(room.measurementHistory && room.measurementHistory.length > 0) ? 'span 1' : 'auto'
                                             }}
                                         >

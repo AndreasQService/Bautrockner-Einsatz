@@ -4270,7 +4270,8 @@ END:VCARD`;
                                                 <Edit3 size={16} /> Bearbeiten
                                             </button>
                                         </>
-                                    ) : mode !== 'desktop' ? (
+                                    ) : (
+                                        // Noch keine Messung — Button für alle Modi anzeigen
                                         <button
                                             type="button"
                                             onClick={(e) => {
@@ -4281,7 +4282,7 @@ END:VCARD`;
                                                 setShowMeasurementModal(true);
                                             }}
                                             style={{
-                                                padding: '0.8rem 0.5rem',
+                                                padding: mode === 'technician' ? '0.8rem 0.5rem' : '0.4rem 0.6rem',
                                                 borderRadius: '6px',
                                                 border: '1px solid #059669',
                                                 backgroundColor: 'rgba(16, 185, 129, 0.2)',
@@ -4290,17 +4291,17 @@ END:VCARD`;
                                                 alignItems: 'center',
                                                 justifyContent: 'center',
                                                 gap: '0.4rem',
-                                                fontSize: '1rem',
+                                                fontSize: mode === 'technician' ? '1rem' : '0.75rem',
                                                 cursor: 'pointer',
                                                 flex: 1,
-                                                minHeight: '50px',
+                                                minHeight: mode === 'technician' ? '50px' : '44px',
                                                 fontWeight: 700,
                                                 gridColumn: 'span 2'
                                             }}
                                         >
                                             <Plus size={18} /> Messung starten
                                         </button>
-                                    ) : null}
+                                    )}
 
                                     {/* History Button */}
                                     {room.measurementHistory && room.measurementHistory.length > 0 && (
@@ -5705,11 +5706,11 @@ END:VCARD`;
                                             <div style={{ display: 'flex', gap: '0.5rem' }}>
                                                 {room.measurementData ? (
                                                     <>
-                                                        <button type="button" className="btn-glass" style={{ padding: '0.4rem 0.8rem', fontSize: '0.75rem', borderRadius: '8px' }} onClick={() => { setActiveRoomForMeasurement(room); setIsNewMeasurement(true); setShowMeasurementModal(true); }}>Neue Messung</button>
-                                                        <button type="button" className="btn-glass" style={{ padding: '0.4rem 0.8rem', fontSize: '0.75rem', borderRadius: '8px', color: 'var(--primary)' }} onClick={() => { setActiveRoomForMeasurement(room); setIsNewMeasurement(false); setShowMeasurementModal(true); }}>Bearbeiten</button>
+                                                        <button type="button" className="btn-glass" style={{ padding: '0.4rem 0.8rem', minHeight: '44px', fontSize: '0.75rem', borderRadius: '8px' }} onClick={() => { setActiveRoomForMeasurement(room); setIsNewMeasurement(true); setShowMeasurementModal(true); }}>Neue Messung</button>
+                                                        <button type="button" className="btn-glass" style={{ padding: '0.4rem 0.8rem', minHeight: '44px', fontSize: '0.75rem', borderRadius: '8px', color: 'var(--primary)' }} onClick={() => { setActiveRoomForMeasurement(room); setIsNewMeasurement(false); setShowMeasurementModal(true); }}>Bearbeiten</button>
                                                     </>
                                                 ) : (
-                                                    <button type="button" className="btn-glass" style={{ padding: '0.4rem 0.8rem', fontSize: '0.75rem', borderRadius: '8px', color: 'var(--success)' }} onClick={() => { setActiveRoomForMeasurement(room); setIsNewMeasurement(false); setShowMeasurementModal(true); }}>Messung starten</button>
+                                                    <button type="button" className="btn-glass" style={{ padding: '0.4rem 0.8rem', minHeight: '44px', fontSize: '0.75rem', borderRadius: '8px', color: 'var(--success)' }} onClick={() => { setActiveRoomForMeasurement(room); setIsNewMeasurement(false); setShowMeasurementModal(true); }}>Messung starten</button>
                                                 )}
                                             </div>
                                         </div>

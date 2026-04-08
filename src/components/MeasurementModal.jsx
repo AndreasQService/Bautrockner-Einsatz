@@ -18,7 +18,7 @@ const MeasurementModal = ({ isOpen, onClose, onSave, rooms, projectTitle, initia
     const [history, setHistory] = useState([]); // Array of ImageData
     const [historyStep, setHistoryStep] = useState(-1);
     const [isScrollMode, setIsScrollMode] = useState(false); // New state for Scroll Mode
-    const [isCanvasExpanded, setIsCanvasExpanded] = useState(true); // New state for sticky toggle
+    const [isCanvasExpanded, setIsCanvasExpanded] = useState(true); // Skizze standardmässig sichtbar
     const [isSketchLocked, setIsSketchLocked] = useState(true); // Default to Locked for safety
     const [globalSettings, setGlobalSettings] = useState({
         date: new Date().toISOString().split('T')[0],
@@ -781,18 +781,20 @@ const MeasurementModal = ({ isOpen, onClose, onSave, rooms, projectTitle, initia
                                 border: '1px solid var(--border)',
                                 borderRadius: '4px',
                                 overflow: 'hidden',
-                                touchAction: 'none'
+                                // Wenn Skizze gesperrt: Touch-Events durchleiten (damit darunter liegende Inputs erreichbar sind)
+                                touchAction: isSketchLocked ? 'auto' : 'none',
+                                pointerEvents: isSketchLocked ? 'none' : 'auto',
                             }}>
                                 <canvas
                                     ref={canvasRef}
                                     width={960}
-                                    height={400}
+                                    height={280}
                                     style={{
                                         width: '100%',
-                                        height: '400px',
+                                        height: '280px',
                                         cursor: isScrollMode ? 'grab' : 'crosshair',
                                         display: 'block',
-                                        backgroundColor: 'white', // Base white
+                                        backgroundColor: 'white',
                                         backgroundImage: `
                                             linear-gradient(to right, #e0e0e0 1px, transparent 1px),
                                             linear-gradient(to bottom, #e0e0e0 1px, transparent 1px)
@@ -965,6 +967,7 @@ const MeasurementModal = ({ isOpen, onClose, onSave, rooms, projectTitle, initia
                                         alignItems: 'center',
                                         gap: '0.5rem',
                                         padding: '0.5rem 1rem',
+                                        minHeight: '44px',
                                         background: 'transparent',
                                         border: '1px dashed var(--border)',
                                         borderRadius: '4px',
