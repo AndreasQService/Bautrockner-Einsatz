@@ -29,6 +29,7 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import CameraCaptureModal from './CameraCaptureModal';
 import MeasurementModal from './MeasurementModal';
+import { applyDryingCheck } from '../features/projects/dryingCheckService';
 import { generateMeasurementExcel } from '../utils/MeasurementExcelExporter';
 
 /* Custom PDF Icon */
@@ -5177,7 +5178,34 @@ END:VCARD`;
 
                 {/* PDF Button - Desktop Mode (immer sichtbar) */}
                 {mode === 'desktop' && (
-                    <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1rem', marginBottom: '2rem' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem', marginTop: '1rem', marginBottom: '2rem' }}>
+
+                        {/* Checkbox: Bericht erstellt */}
+                        <label
+                            onClick={e => e.stopPropagation()}
+                            style={{
+                                display: 'inline-flex', alignItems: 'center', gap: '0.55rem',
+                                cursor: 'pointer', userSelect: 'none',
+                                padding: '0.38rem 0.9rem', borderRadius: 999,
+                                backgroundColor: formData.reportCreated ? 'rgba(16,185,129,0.1)' : 'rgba(255,255,255,0.04)',
+                                border: `1px solid ${formData.reportCreated ? 'rgba(16,185,129,0.35)' : 'rgba(255,255,255,0.1)'}`,
+                                transition: 'all 0.18s',
+                            }}
+                        >
+                            <input
+                                type="checkbox"
+                                checked={!!formData.reportCreated}
+                                onChange={e => setFormData(prev => ({ ...prev, reportCreated: e.target.checked }))}
+                                style={{ width: 15, height: 15, accentColor: '#10B981', cursor: 'pointer' }}
+                            />
+                            <span style={{
+                                fontSize: '0.82rem', fontWeight: 600,
+                                color: formData.reportCreated ? '#6EE7B7' : '#94A3B8',
+                            }}>
+                                {formData.reportCreated ? '✅ Bericht erstellt' : 'Bericht erstellt'}
+                            </span>
+                        </label>
+
                         <button
                             type="button"
                             onClick={handleGeneratePDF}
@@ -6397,23 +6425,21 @@ END:VCARD`;
                             }
                         }
 
-                        // 2. Update room data (Latest & History)
+                        // Update room data (Latest & History)
                         if (activeRoomForMeasurement) {
-                            setFormData(prev => ({
-                                ...prev,
-                                rooms: prev.rooms.map(r => {
+                            setFormData(prev => {
+                                // ── Räume aktualisieren (bestehende Logik unverändert) ──
+                                const updatedRooms = prev.rooms.map(r => {
                                     if (r.id === activeRoomForMeasurement.id) {
-                                        // History Entry
                                         const newHistoryEntry = {
                                             id: `hist_${Date.now()}`,
                                             date: globalSettings.date || new Date().toISOString(),
-                                            measurements: measurements.map(m => ({ ...m })), // Deep clone
+                                            measurements: measurements.map(m => ({ ...m })),
                                             globalSettings: { ...globalSettings },
                                             canvasImage: canvasImage,
-                                            protocolUrl: protocolUrl // Store the uploaded file link
+                                            protocolUrl: protocolUrl
                                         };
                                         const history = r.measurementHistory ? [...r.measurementHistory] : [];
-
                                         return {
                                             ...r,
                                             measurementData: { measurements, globalSettings, canvasImage, protocolUrl },
@@ -6421,8 +6447,26 @@ END:VCARD`;
                                         };
                                     }
                                     return r;
-                                })
-                            }));
+                                });
+
+                                // ── Büro-Projektkontrolle aktualisieren wenn Trocknungskontrolle ──
+                                // Bedingung: Status Trocknung + Messung hat Datum (= documentationComplete)
+                                const measuredAt = globalSettings.date
+                                    ? new Date(globalSettings.date).toISOString()
+                                    : new Date().toISOString();
+                                const documentationComplete = !!(measurements && measurements.length > 0 && globalSettings.date);
+
+                                const dryingUpdate = applyDryingCheck(
+                                    { ...prev, rooms: updatedRooms },  // aktueller State mit neuen Räumen
+                                    { measuredAt, documentationComplete }
+                                );
+
+                                // applyDryingCheck gibt null zurück wenn Bedingungen nicht erfüllt
+                                // (z.B. kein Trocknung-Status) — dann nur Räume updaten
+                                return dryingUpdate
+                                    ? { ...dryingUpdate, rooms: updatedRooms }
+                                    : { ...prev, rooms: updatedRooms };
+                            });
                         }
                     }}
                 />

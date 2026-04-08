@@ -306,3 +306,22 @@ export async function uploadProjectJson(folderName, projectData) {
   await uploadFile(`${ROOT_FOLDER}/${folderName}`, 'Projektdaten.json', blob);
   console.log(`[OneDrive] ✅ Projektdaten.json gesichert`);
 }
+
+/**
+ * Web-URL des QTool-Hauptordners auf OneDrive zurückgeben
+ * → Wird für den "Zu OneDrive" Button im Dashboard genutzt
+ */
+export async function getQToolFolderWebUrl() {
+  const token = await getAccessToken();
+  if (!token) return null;
+  try {
+    const res = await fetch(`${GRAPH_BASE}/me/drive/root:/${ROOT_FOLDER}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.webUrl || null;
+  } catch {
+    return null;
+  }
+}

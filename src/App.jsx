@@ -11,7 +11,7 @@ import EmailImportModalV2 from './components/EmailImportModalV2'
 import i18n from './i18n'
 import { useIsAuthenticated, useMsal } from "@azure/msal-react";
 import { loginRequest } from "./msalConfig";
-import { setMsalInstance, buildProjectFolderName, uploadProjectJson } from "./services/OneDriveService";
+import { setMsalInstance, buildProjectFolderName, uploadProjectJson, getQToolFolderWebUrl } from "./services/OneDriveService";
 
 function App() {
   const [view, setView] = useState(() => localStorage.getItem('qservice_current_view') || 'dashboard') // 'dashboard', 'new-report', 'details'
@@ -610,10 +610,24 @@ function App() {
                         <span className="hide-mobile">OneDrive Login</span>
                       </button>
                     ) : (
-                      <button className="btn btn-outline" onClick={handleLogoutOneDrive} style={{ color: '#10B981', borderColor: '#10B981', gap: '0.4rem' }}>
-                        <Database size={18} />
-                        <span className="hide-mobile">OneDrive OK ({accounts[0]?.name?.split(' ')[0]})</span>
-                      </button>
+                      <>
+                        <button className="btn btn-outline" onClick={handleLogoutOneDrive} style={{ color: '#10B981', borderColor: '#10B981', gap: '0.4rem' }}>
+                          <Database size={18} />
+                          <span className="hide-mobile">OneDrive OK ({accounts[0]?.name?.split(' ')[0]})</span>
+                        </button>
+                        <button
+                          className="btn btn-outline"
+                          title="QTool-Ordner in OneDrive öffnen"
+                          onClick={async () => {
+                            const url = await getQToolFolderWebUrl();
+                            if (url) window.open(url, '_blank');
+                            else window.open('https://onedrive.live.com/', '_blank');
+                          }}
+                          style={{ color: '#0078D4', borderColor: '#0078D4', padding: '0 0.6rem' }}
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                        </button>
+                      </>
                     )}
                   </>
                 )}
@@ -701,7 +715,19 @@ function App() {
       </header>
 
       <main className="container" style={{ marginTop: isTechnicianMode ? '1rem' : '2rem', padding: isTechnicianMode ? '0.5rem' : '1rem', maxWidth: isTechnicianMode ? undefined : 'none' }}>
-        {view === 'dashboard' && <Dashboard reports={reports} onSelectReport={handleSelectReport} onDeleteReport={handleDeleteReport} mode={isTechnicianMode ? 'technician' : 'desktop'} />}
+        {view === 'dashboard' && <Dashboard
+          reports={reports}
+          onSelectReport={handleSelectReport}
+          onDeleteReport={handleDeleteReport}
+          mode={isTechnicianMode ? 'technician' : 'desktop'}
+          supabase={supabase}
+          currentUser={currentUser}
+          onReportsChanged={async () => {
+            // Reload from Supabase after a status change
+            const { data } = await supabase.from('damage_reports').select('report_data').order('created_at', { ascending: false });
+            if (data) setReports(data.map(r => r.report_data));
+          }}
+        />}
         {view === 'devices' && <DeviceManager reports={reports} onBack={() => setView('dashboard')} onNavigateToReport={handleNavigateToReport} />}
         {(view === 'new-report' || view === 'details') && (
           <DamageForm

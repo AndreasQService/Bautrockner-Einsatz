@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { Filter, MapPin, Calendar, ArrowRight, Search, Trash2, FileText } from 'lucide-react'
 import InboxTodo from './InboxTodo'
 import WorkflowStatusOverview from './WorkflowStatusOverview'
+import OfficeProjectsPage from '../features/projects/OfficeProjectsPage'
 
 // Helper to calculate days difference
 const getDaysDiff = (startDate) => {
@@ -321,7 +322,7 @@ const MeasurementControlOverview = ({ reports, onSelectReport }) => {
     );
 };
 
-export default function Dashboard({ reports, onSelectReport, onDeleteReport, mode }) {
+export default function Dashboard({ reports, onSelectReport, onDeleteReport, mode, supabase, currentUser, onReportsChanged }) {
     const [searchTerm, setSearchTerm] = useState('')
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 20;
@@ -453,8 +454,16 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
             {/* Pass Filtered Reports to Monitors (only when not in Archive OR Technician Mode) */}
             {!showArchive && mode !== 'technician' && (
                 <>
+                    {/* ── Büro-Projektkontrolle (ausgeblendet) ── */}
+                    {/* <OfficeProjectsPage
+                        reports={reports}
+                        supabase={supabase}
+                        currentUser={currentUser}
+                        onSelectReport={onSelectReport}
+                        onReportsChanged={onReportsChanged}
+                    /> */}
                     <WorkflowStatusOverview reports={filteredReports} onSelectReport={onSelectReport} />
-                    <InboxTodo />
+                    {/* <InboxTodo /> */}
                     <MeasurementControlOverview reports={filteredReports} onSelectReport={onSelectReport} />
                     <DryingMonitor reports={filteredReports} onSelectReport={onSelectReport} />
                 </>
