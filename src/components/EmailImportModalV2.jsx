@@ -64,6 +64,24 @@ const EmailImportModalV2 = ({ onClose, onImport, audioDevices, selectedDeviceId,
         setShowSettings(false);
     };
 
+    // --- RETRY HELPER: 503 / high demand ---
+    const callWithRetry = async (fn, retries = 3) => {
+        for (let i = 0; i < retries; i++) {
+            try {
+                return await fn();
+            } catch (err) {
+                const is503 = err.message?.includes('503') || err.message?.includes('high demand') || err.message?.includes('overloaded');
+                if (is503 && i < retries - 1) {
+                    const wait = 1000 * (i + 1);
+                    console.warn(`503 überlastet — Retry ${i + 1}/${retries - 1} in ${wait}ms...`);
+                    await new Promise(r => setTimeout(r, wait));
+                } else {
+                    throw err;
+                }
+            }
+        }
+    };
+
     const parseWithAI = async () => {
         if (!apiKey) {
             alert("Bitte geben Sie zuerst einen Google Gemini API Key in den Einstellungen ein.");
@@ -214,11 +232,20 @@ ${text}`;
                 }
             } catch (e) { }
 
-            const baseModels = discoveryModels.length > 0 ? discoveryModels : ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-1.5-flash-8b"];
+            // Preferred models: 2.5-flash first, 2.0-flash as fallback, then legacy
+            const PREFERRED = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.0-flash-lite"];
+            const legacyModels = discoveryModels.length > 0
+                ? discoveryModels.filter(m => !PREFERRED.includes(m))
+                : ["gemini-1.5-flash", "gemini-1.5-pro"];
+
+            // Build ordered attempts: preferred first, then discovered/legacy
+            const orderedModels = [
+                ...PREFERRED,
+                ...legacyModels.slice(0, 3),
+            ];
             const attempts = [];
-            baseModels.slice(0, 6).forEach(m => {
+            orderedModels.forEach(m => {
                 attempts.push({ model: m, version: "v1beta" });
-                attempts.push({ model: m, version: "v1" });
             });
 
             let lastError;
@@ -228,7 +255,7 @@ ${text}`;
                 try {
                     console.log(`Versuch: ${attempt.model} (${attempt.version})...`);
                     const model = genAI.getGenerativeModel({ model: attempt.model }, { apiVersion: attempt.version });
-                    result = await model.generateContent(prompt);
+                    result = await callWithRetry(() => model.generateContent(prompt));
                     if (result) {
                         console.log(`ERFOLG! Antwort von ${attempt.model} (${attempt.version})`);
                         break;
@@ -239,6 +266,9 @@ ${text}`;
                     console.warn(`Fehlgeschlagen: ${attempt.model} (${attempt.version})`, msg);
                     if (msg.includes('429') || msg.includes('Quota') || msg.includes('limit')) {
                         hasQuotaError = true;
+                        continue;
+                    } else if (msg.includes('503') || msg.includes('high demand') || msg.includes('overloaded')) {
+                        console.warn(`${attempt.model} dauerhaft überlastet — nächstes Modell...`);
                         continue;
                     } else if (msg.includes('404') || msg.includes('not found') || msg.includes('supported') || msg.includes('available')) {
                         continue;
