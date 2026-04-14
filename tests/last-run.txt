@@ -1,0 +1,318 @@
+﻿
+Running 22 tests using 1 worker
+
+[1A[2K[1/22] [ipad-a1934-portrait] ÔÇ║ tests\messen-ipad-a1934.spec.js:189:3 ÔÇ║ iPad A1934 (768├ù1024 Portrait) ÔÇö Messprotokoll ÔÇ║ 1.1 App l├ñdt korrekt auf iPad A1934 Portrait
+[1A[2K[ipad-a1934-portrait] ÔÇ║ tests\messen-ipad-a1934.spec.js:189:3 ÔÇ║ iPad A1934 (768├ù1024 Portrait) ÔÇö Messprotokoll ÔÇ║ 1.1 App l├ñdt korrekt auf iPad A1934 Portrait
+Ô£à App geladen ÔÇö 768├ù1024
+
+[1A[2K[2/22] [ipad-a1934-portrait] ÔÇ║ tests\messen-ipad-a1934.spec.js:196:3 ÔÇ║ iPad A1934 (768├ù1024 Portrait) ÔÇö Messprotokoll ÔÇ║ 1.2 Kein horizontales Scrollen auf Dashboard
+[1A[2K[ipad-a1934-portrait] ÔÇ║ tests\messen-ipad-a1934.spec.js:196:3 ÔÇ║ iPad A1934 (768├ù1024 Portrait) ÔÇö Messprotokoll ÔÇ║ 1.2 Kein horizontales Scrollen auf Dashboard
+Ô£à Kein horizontales Scrollen (970px = 970px)
+
+[1A[2K[3/22] [ipad-a1934-portrait] ÔÇ║ tests\messen-ipad-a1934.spec.js:209:3 ÔÇ║ iPad A1934 (768├ù1024 Portrait) ÔÇö Messprotokoll ÔÇ║ 2.1 Projekt ├Âffnen ÔÇö DamageForm l├ñdt
+[1A[2K[ipad-a1934-portrait] ÔÇ║ tests\messen-ipad-a1934.spec.js:209:3 ÔÇ║ iPad A1934 (768├ù1024 Portrait) ÔÇö Messprotokoll ÔÇ║ 2.1 Projekt ├Âffnen ÔÇö DamageForm l├ñdt
+Ô£à DamageForm geladen via direkter localStorage-Navigation
+
+[1A[2KÔ£à DamageForm geladen: "Test Wasserschaden"
+
+[1A[2K[4/22] [ipad-a1934-portrait] ÔÇ║ tests\messen-ipad-a1934.spec.js:221:3 ÔÇ║ iPad A1934 (768├ù1024 Portrait) ÔÇö Messprotokoll ÔÇ║ 2.2 DamageForm nutzt volle Breite (>85% des Viewports)
+[1A[2K[ipad-a1934-portrait] ÔÇ║ tests\messen-ipad-a1934.spec.js:221:3 ÔÇ║ iPad A1934 (768├ù1024 Portrait) ÔÇö Messprotokoll ÔÇ║ 2.2 DamageForm nutzt volle Breite (>85% des Viewports)
+Ô£à DamageForm geladen via direkter localStorage-Navigation
+
+[1A[2KFormbreite: 768px / 768px = 100.0%
+
+[1A[2K[5/22] [ipad-a1934-portrait] ÔÇ║ tests\messen-ipad-a1934.spec.js:236:3 ÔÇ║ iPad A1934 (768├ù1024 Portrait) ÔÇö Messprotokoll ÔÇ║ 3.1 "Messung starten" Button ist sichtbar und gross genug
+[1A[2K[ipad-a1934-portrait] ÔÇ║ tests\messen-ipad-a1934.spec.js:236:3 ÔÇ║ iPad A1934 (768├ù1024 Portrait) ÔÇö Messprotokoll ÔÇ║ 3.1 "Messung starten" Button ist sichtbar und gross genug
+Ô£à DamageForm geladen via direkter localStorage-Navigation
+
+[1A[2KGefundene Mess-Buttons: 6
+
+[1A[2K"Messung starten": 140├ù33px
+
+node.exe : [1A[2KÔÜá´©Å  
+TOUCH-BUG: "Messung 
+starten" zu klein ÔÇö 33px 
+< 44px
+In Zeile:1 Zeichen:1
++ & "C:\Program 
+Files\nodejs/node.exe" 
+"C:\Program 
+Files\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~
+    + CategoryInfo         
+     : NotSpecified: ([1  
+  A[2KÔÜá´©Å ...ÔÇö 33p   
+ x < 44px:String) [], R    
+emoteException
+    + FullyQualifiedErrorI 
+   d : NativeCommandError
+ 
+
+[1A[2K"Messung starten": 140├ù33px
+
+
+[1A[2KÔÜá´©Å  TOUCH-BUG: 
+"Messung starten" zu klein 
+ÔÇö 33px < 44px
+[1A[2K"Messung starten": 140├ù33px
+
+
+[1A[2KÔÜá´©Å  TOUCH-BUG: 
+"Messung starten" zu klein 
+ÔÇö 33px < 44px
+[1A[2K[6/22] [ipad-a1934-portrait] ÔÇ║ tests\messen-ipad-a1934.spec.js:262:3 ÔÇ║ iPad A1934 (768├ù1024 Portrait) ÔÇö Messprotokoll ÔÇ║ 3.2 Messprotokoll-Modal ├Âffnet sich
+[1A[2K[ipad-a1934-portrait] ÔÇ║ tests\messen-ipad-a1934.spec.js:262:3 ÔÇ║ iPad A1934 (768├ù1024 Portrait) ÔÇö Messprotokoll ÔÇ║ 3.2 Messprotokoll-Modal ├Âffnet sich
+Ô£à DamageForm geladen via direkter localStorage-Navigation
+
+[1A[2KÔ£à MeasurementModal ge├Âffnet
+
+[1A[2K[7/22] [ipad-a1934-portrait] ÔÇ║ tests\messen-ipad-a1934.spec.js:278:3 ÔÇ║ iPad A1934 (768├ù1024 Portrait) ÔÇö Messprotokoll ÔÇ║ 4.1 Kein horizontales Scrollen im Modal
+[1A[2K[ipad-a1934-portrait] ÔÇ║ tests\messen-ipad-a1934.spec.js:278:3 ÔÇ║ iPad A1934 (768├ù1024 Portrait) ÔÇö Messprotokoll ÔÇ║ 4.1 Kein horizontales Scrollen im Modal
+Ô£à DamageForm geladen via direkter localStorage-Navigation
+
+[1A[2K[8/22] [ipad-a1934-portrait] ÔÇ║ tests\messen-ipad-a1934.spec.js:290:3 ÔÇ║ iPad A1934 (768├ù1024 Portrait) ÔÇö Messprotokoll ÔÇ║ 4.2 Inputs: Mindesth├Âhe 40px (Touch-freundlich)
+[1A[2K[ipad-a1934-portrait] ÔÇ║ tests\messen-ipad-a1934.spec.js:290:3 ÔÇ║ iPad A1934 (768├ù1024 Portrait) ÔÇö Messprotokoll ÔÇ║ 4.2 Inputs: Mindesth├Âhe 40px (Touch-freundlich)
+Ô£à DamageForm geladen via direkter localStorage-Navigation
+
+[1A[2K
+Inputs im Modal: 19
+
+[1A[2K  "20.5": 156├ù45px, inViewport=true
+
+[1A[2K  "55": 156├ù45px, inViewport=true
+
+[1A[2K  "z.B. Trotec": 156├ù45px, inViewport=true
+
+[1A[2K  "Input 4": 193├ù51px, inViewport=true
+
+[1A[2K  "Wert...": 126├ù51px, inViewport=true
+
+[1A[2K  "Wert...": 126├ù51px, inViewport=true
+
+[1A[2K  "...": 153├ù51px, inViewport=true
+
+[1A[2K  "Input 8": 193├ù51px, inViewport=true
+
+[1A[2K  "Wert...": 126├ù51px, inViewport=true
+
+[1A[2K  "Wert...": 126├ù51px, inViewport=true
+
+[1A[2K  "...": 153├ù51px, inViewport=true
+
+[1A[2K  "Input 12": 193├ù51px, inViewport=true
+
+[1A[2K  "Wert...": 126├ù51px, inViewport=true
+
+[1A[2K  "Wert...": 126├ù51px, inViewport=true
+
+[1A[2K  "...": 153├ù51px, inViewport=true
+
+[1A[2K  "Input 16": 193├ù51px, inViewport=false
+
+[1A[2K  "Wert...": 126├ù51px, inViewport=false
+
+[1A[2K  "Wert...": 126├ù51px, inViewport=false
+
+[1A[2K  "...": 153├ù51px, inViewport=false
+
+[1A[2K[9/22] [ipad-a1934-portrait] ÔÇ║ tests\messen-ipad-a1934.spec.js:310:3 ÔÇ║ iPad A1934 (768├ù1024 Portrait) ÔÇö Messprotokoll ÔÇ║ 4.3 Input fokussierbar + keine Seitw├ñrts-Verschiebung
+[1A[2K[ipad-a1934-portrait] ÔÇ║ tests\messen-ipad-a1934.spec.js:310:3 ÔÇ║ iPad A1934 (768├ù1024 Portrait) ÔÇö Messprotokoll ÔÇ║ 4.3 Input fokussierbar + keine Seitw├ñrts-Verschiebung
+Ô£à DamageForm geladen via direkter localStorage-Navigation
+
+[1A[2K  1) [ipad-a1934-portrait] ÔÇ║ tests\messen-ipad-a1934.spec.js:310:3 ÔÇ║ iPad A1934 (768├ù1024 Portrait) ÔÇö Messprotokoll ÔÇ║ 4.3 Input fokussierbar + keine Seitw├ñrts-Verschiebung 
+
+    [31mTest timeout of 30000ms exceeded.[39m
+
+    Error: locator.click: Test timeout of 30000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('input[type="number"], input[type="text"]').first()[22m
+    [2m    - locator resolved to <input type="text" value="W-25-TEST" class="form-input" placeholder="W-25..."/>[22m
+    [2m  - attempting click action[22m
+    [2m    2 ├ù waiting for element to be visible, enabled and stable[22m
+    [2m      - element is visible, enabled and stable[22m
+    [2m      - scrolling into view if needed[22m
+    [2m      - done scrolling[22m
+    [2m      - <canvas width="960" height="400"></canvas> from <div>ÔÇª</div> subtree intercepts pointer events[22m
+    [2m    - retrying click action[22m
+    [2m    - waiting 20ms[22m
+    [2m    - waiting for element to be visible, enabled and stable[22m
+    [2m    - element is visible, enabled and stable[22m
+    [2m    - scrolling into view if needed[22m
+    [2m    - done scrolling[22m
+    [2m    - <canvas width="960" height="400"></canvas> from <div>ÔÇª</div> subtree intercepts pointer events[22m
+    [2m  2 ├ù retrying click action[22m
+    [2m      - waiting 100ms[22m
+    [2m      - waiting for element to be visible, enabled and stable[22m
+    [2m      - element is visible, enabled and stable[22m
+    [2m      - scrolling into view if needed[22m
+    [2m      - done scrolling[22m
+    [2m      - <div>ÔÇª</div> intercepts pointer events[22m
+    [2m  12 ├ù retrying click action[22m
+    [2m       - waiting 500ms[22m
+    [2m       - waiting for element to be visible, enabled and stable[22m
+    [2m       - element is visible, enabled and stable[22m
+    [2m       - scrolling into view if needed[22m
+    [2m       - done scrolling[22m
+    [2m       - <canvas width="960" height="400"></canvas> from <div>ÔÇª</div> subtree intercepts pointer events[22m
+    [2m     - retrying click action[22m
+    [2m       - waiting 500ms[22m
+    [2m       - waiting for element to be visible, enabled and stable[22m
+    [2m       - element is visible, enabled and stable[22m
+    [2m       - scrolling into view if needed[22m
+    [2m       - done scrolling[22m
+    [2m       - <canvas width="960" height="400"></canvas> from <div>ÔÇª</div> subtree intercepts pointer events[22m
+    [2m     - retrying click action[22m
+    [2m       - waiting 500ms[22m
+    [2m       - waiting for element to be visible, enabled and stable[22m
+    [2m       - element is visible, enabled and stable[22m
+    [2m       - scrolling into view if needed[22m
+    [2m       - done scrolling[22m
+    [2m       - <div>ÔÇª</div> intercepts pointer events[22m
+    [2m     - retrying click action[22m
+    [2m       - waiting 500ms[22m
+    [2m       - waiting for element to be visible, enabled and stable[22m
+    [2m       - element is visible, enabled and stable[22m
+    [2m       - scrolling into view if needed[22m
+    [2m       - done scrolling[22m
+    [2m       - <div>ÔÇª</div> intercepts pointer events[22m
+    [2m  - retrying click action[22m
+    [2m    - waiting 500ms[22m
+
+
+      317 |
+      318 |     const before = await page.evaluate(() => ({ x: window.scrollX, y: window.scrollY }));
+    > 319 |     await inp.click();
+          |               ^
+      320 |     await page.waitForTimeout(400);
+      321 |     const after = await page.evaluate(() => ({ x: window.scrollX, y: window.scrollY }));
+      322 |
+        at C:\QTool\tests\messen-ipad-a1934.spec.js:319:15
+
+    attachment #1: screenshot (image/png) ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+    test-results\messen-ipad-a1934-iPad-A19-b713c-eine-Seitw├ñrts-Verschiebung-ipad-a1934-portrait\test-failed-1.png
+    ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+
+    attachment #2: video (video/webm) ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+    test-results\messen-ipad-a1934-iPad-A19-b713c-eine-Seitw├ñrts-Verschiebung-ipad-a1934-portrait\video.webm
+    ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+
+    Error Context: test-results\messen-ipad-a1934-iPad-A19-b713c-eine-Seitw├ñrts-Verschiebung-ipad-a1934-portrait\error-context.md
+
+
+[1A[2K[10/22] [ipad-a1934-portrait] ÔÇ║ tests\messen-ipad-a1934.spec.js:333:3 ÔÇ║ iPad A1934 (768├ù1024 Portrait) ÔÇö Messprotokoll ÔÇ║ 5.1 Mindestens 4 sichtbare Messpunkte
+[1A[2K[ipad-a1934-portrait] ÔÇ║ tests\messen-ipad-a1934.spec.js:333:3 ÔÇ║ iPad A1934 (768├ù1024 Portrait) ÔÇö Messprotokoll ÔÇ║ 5.1 Mindestens 4 sichtbare Messpunkte
+Ô£à DamageForm geladen via direkter localStorage-Navigation
+
+[1A[2KMesspunkt-Labels sichtbar: 2
+
+
+[1A[2KÔÜá´©Å  Nur 2 
+Labels ÔÇö evtl. 
+Scrollproblem!
+[1A[2K[11/22] [ipad-a1934-portrait] ÔÇ║ tests\messen-ipad-a1934.spec.js:347:3 ÔÇ║ iPad A1934 (768├ù1024 Portrait) ÔÇö Messprotokoll ÔÇ║ 5.2 Mehrere Inputs gleichzeitig im Viewport (iPad-Nutzung)
+[1A[2K[ipad-a1934-portrait] ÔÇ║ tests\messen-ipad-a1934.spec.js:347:3 ÔÇ║ iPad A1934 (768├ù1024 Portrait) ÔÇö Messprotokoll ÔÇ║ 5.2 Mehrere Inputs gleichzeitig im Viewport (iPad-Nutzung)
+Ô£à DamageForm geladen via direkter localStorage-Navigation
+
+[1A[2KInputs total: 19, im Viewport: 15
+
+[1A[2K[12/22] [ipad-a1934-portrait] ÔÇ║ tests\messen-ipad-a1934.spec.js:366:3 ÔÇ║ iPad A1934 (768├ù1024 Portrait) ÔÇö Messprotokoll ÔÇ║ 5.3 Globale Felder (Datum, Temp, Feuchtigkeit) vorhanden
+[1A[2K[ipad-a1934-portrait] ÔÇ║ tests\messen-ipad-a1934.spec.js:366:3 ÔÇ║ iPad A1934 (768├ù1024 Portrait) ÔÇö Messprotokoll ÔÇ║ 5.3 Globale Felder (Datum, Temp, Feuchtigkeit) vorhanden
+Ô£à DamageForm geladen via direkter localStorage-Navigation
+
+[1A[2KDatum-Input: true, Temp-Input: false
+
+[1A[2K[13/22] [ipad-a1934-portrait] ÔÇ║ tests\messen-ipad-a1934.spec.js:380:3 ÔÇ║ iPad A1934 (768├ù1024 Portrait) ÔÇö Messprotokoll ÔÇ║ 6.1 "+ Messpunkt" Button: vorhanden und Touch-freundlich
+[1A[2K[ipad-a1934-portrait] ÔÇ║ tests\messen-ipad-a1934.spec.js:380:3 ÔÇ║ iPad A1934 (768├ù1024 Portrait) ÔÇö Messprotokoll ÔÇ║ 6.1 "+ Messpunkt" Button: vorhanden und Touch-freundlich
+Ô£à DamageForm geladen via direkter localStorage-Navigation
+
+[1A[2K"weiteren Messpunkt hinzuf├╝gen": 671├ù43px
+
+[1A[2KÔÜá´©Å  TOUCH-BUG: 
+Button 43px < 44px
+
+[1A[2K[14/22] [ipad-a1934-portrait] ÔÇ║ tests\messen-ipad-a1934.spec.js:407:3 ÔÇ║ iPad A1934 (768├ù1024 Portrait) ÔÇö Messprotokoll ÔÇ║ 6.2 BONUS: Neuer Messpunkt ÔÇö Layout stabil
+[1A[2K[ipad-a1934-portrait] ÔÇ║ tests\messen-ipad-a1934.spec.js:407:3 ÔÇ║ iPad A1934 (768├ù1024 Portrait) ÔÇö Messprotokoll ÔÇ║ 6.2 BONUS: Neuer Messpunkt ÔÇö Layout stabil
+Ô£à DamageForm geladen via direkter localStorage-Navigation
+
+[1A[2KInputs: 2 ÔåÆ 2 (+0)
+
+[1A[2KÔÜá´©Å  Kein neuer 
+Input nach Klick!
+
+[1A[2K[15/22] [ipad-a1934-portrait] ÔÇ║ tests\messen-ipad-a1934.spec.js:440:3 ÔÇ║ iPad A1934 (768├ù1024 Portrait) ÔÇö Messprotokoll ÔÇ║ 7.1 data-testid Vollst├ñndigkeits-Audit
+[1A[2K[ipad-a1934-portrait] ÔÇ║ tests\messen-ipad-a1934.spec.js:440:3 ÔÇ║ iPad A1934 (768├ù1024 Portrait) ÔÇö Messprotokoll ÔÇ║ 7.1 data-testid Vollst├ñndigkeits-Audit
+Ô£à DamageForm geladen via direkter localStorage-Navigation
+
+[1A[2KÔÜá´©Å  FEHLEND: data-testid="room-block" (0x)
+
+[1A[2KÔÜá´©Å  FEHLEND: data-testid="room-title" (0x)
+
+[1A[2KÔÜá´©Å  FEHLEND: data-testid="measurement-point" (0x)
+
+[1A[2KÔÜá´©Å  FEHLEND: data-testid="measurement-input" (0x)
+
+[1A[2KÔÜá´©Å  FEHLEND: data-testid="add-measurement-button" (0x)
+
+[1A[2K
+ÔÜá´©Å  AUDIT: 5/5 testids 
+fehlen!
+
+   ÔåÆ 
+data-testid="room-block"
+   ÔåÆ 
+data-testid="room-title"
+   ÔåÆ data-testid="measure
+ment-point"
+   ÔåÆ data-testid="measure
+ment-input"
+   ÔåÆ data-testid="add-mea
+surement-button"
+   ÔåÆ In 
+MeasurementModal.jsx und 
+DamageForm.jsx erg├ñnzen!
+[1A[2K
+Audit-Ergebnis: 0/5 vorhanden
+
+[1A[2K[16/22] [ipad-a1934-portrait] ÔÇ║ tests\messen-ipad-a1934.spec.js:465:3 ÔÇ║ iPad A1934 (768├ù1024 Portrait) ÔÇö Messprotokoll ÔÇ║ 8.1 PFLICHT: Screenshot Portrait fullPage
+[1A[2K[ipad-a1934-portrait] ÔÇ║ tests\messen-ipad-a1934.spec.js:465:3 ÔÇ║ iPad A1934 (768├ù1024 Portrait) ÔÇö Messprotokoll ÔÇ║ 8.1 PFLICHT: Screenshot Portrait fullPage
+Ô£à DamageForm geladen via direkter localStorage-Navigation
+
+[1A[2K­ƒô© Portrait-Screenshot gespeichert ÔÇö Modal offen: true
+
+[1A[2K[17/22] [ipad-a1934-portrait] ÔÇ║ tests\messen-ipad-a1934.spec.js:478:3 ÔÇ║ iPad A1934 (1024├ù768 Landscape) ÔÇö Messprotokoll ÔÇ║ L1. App l├ñdt im Landscape
+[1A[2K[ipad-a1934-portrait] ÔÇ║ tests\messen-ipad-a1934.spec.js:478:3 ÔÇ║ iPad A1934 (1024├ù768 Landscape) ÔÇö Messprotokoll ÔÇ║ L1. App l├ñdt im Landscape
+Ô£à Landscape geladen ÔÇö 1024├ù768
+
+[1A[2K[18/22] [ipad-a1934-portrait] ÔÇ║ tests\messen-ipad-a1934.spec.js:485:3 ÔÇ║ iPad A1934 (1024├ù768 Landscape) ÔÇö Messprotokoll ÔÇ║ L2. Kein horizontales Scrollen im Landscape
+[1A[2K[ipad-a1934-portrait] ÔÇ║ tests\messen-ipad-a1934.spec.js:485:3 ÔÇ║ iPad A1934 (1024├ù768 Landscape) ÔÇö Messprotokoll ÔÇ║ L2. Kein horizontales Scrollen im Landscape
+scrollWidth=1024, innerWidth=1024
+
+[1A[2K[19/22] [ipad-a1934-portrait] ÔÇ║ tests\messen-ipad-a1934.spec.js:492:3 ÔÇ║ iPad A1934 (1024├ù768 Landscape) ÔÇö Messprotokoll ÔÇ║ L3. DamageForm nutzt Landscape-Breite
+[1A[2K[ipad-a1934-portrait] ÔÇ║ tests\messen-ipad-a1934.spec.js:492:3 ÔÇ║ iPad A1934 (1024├ù768 Landscape) ÔÇö Messprotokoll ÔÇ║ L3. DamageForm nutzt Landscape-Breite
+Ô£à DamageForm geladen via direkter localStorage-Navigation
+
+[1A[2KLandscape-Breite: 100.0% (1024/1024px)
+
+[1A[2K[20/22] [ipad-a1934-portrait] ÔÇ║ tests\messen-ipad-a1934.spec.js:507:3 ÔÇ║ iPad A1934 (1024├ù768 Landscape) ÔÇö Messprotokoll ÔÇ║ L4. Modal ├Âffnet sich im Landscape
+[1A[2K[ipad-a1934-portrait] ÔÇ║ tests\messen-ipad-a1934.spec.js:507:3 ÔÇ║ iPad A1934 (1024├ù768 Landscape) ÔÇö Messprotokoll ÔÇ║ L4. Modal ├Âffnet sich im Landscape
+Ô£à DamageForm geladen via direkter localStorage-Navigation
+
+[1A[2KButton: true, Modal: true
+
+[1A[2K[21/22] [ipad-a1934-portrait] ÔÇ║ tests\messen-ipad-a1934.spec.js:514:3 ÔÇ║ iPad A1934 (1024├ù768 Landscape) ÔÇö Messprotokoll ÔÇ║ L5. Mehr Inputs im Viewport (Landscape-Vorteil)
+[1A[2K[ipad-a1934-portrait] ÔÇ║ tests\messen-ipad-a1934.spec.js:514:3 ÔÇ║ iPad A1934 (1024├ù768 Landscape) ÔÇö Messprotokoll ÔÇ║ L5. Mehr Inputs im Viewport (Landscape-Vorteil)
+Ô£à DamageForm geladen via direkter localStorage-Navigation
+
+[1A[2KLandscape: 19 Inputs total, 3 im Viewport (1024├ù768)
+
+[1A[2K[22/22] [ipad-a1934-portrait] ÔÇ║ tests\messen-ipad-a1934.spec.js:529:3 ÔÇ║ iPad A1934 (1024├ù768 Landscape) ÔÇö Messprotokoll ÔÇ║ L6. PFLICHT: Screenshot Landscape fullPage
+[1A[2K[ipad-a1934-portrait] ÔÇ║ tests\messen-ipad-a1934.spec.js:529:3 ÔÇ║ iPad A1934 (1024├ù768 Landscape) ÔÇö Messprotokoll ÔÇ║ L6. PFLICHT: Screenshot Landscape fullPage
+Ô£à DamageForm geladen via direkter localStorage-Navigation
+
+[1A[2K­ƒô© Landscape-Screenshot gespeichert ÔÇö Modal offen: true
+
+[1A[2K  1 failed
+    [ipad-a1934-portrait] ÔÇ║ tests\messen-ipad-a1934.spec.js:310:3 ÔÇ║ iPad A1934 (768├ù1024 Portrait) ÔÇö Messprotokoll ÔÇ║ 4.3 Input fokussierbar + keine Seitw├ñrts-Verschiebung 
+  21 passed (2.0m)

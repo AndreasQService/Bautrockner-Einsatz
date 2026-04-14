@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Upload, X, Trash, Phone, FileText } from 'lucide-react';
+import { Upload, Trash, FileText, Check } from 'lucide-react';
 import { convertPdfToImages } from '../utils/pdfToImages';
 
 const DataLoggerUploader = ({ images = [], onChange }) => {
@@ -28,7 +28,9 @@ const DataLoggerUploader = ({ images = [], onChange }) => {
     };
 
     const handleDelete = (id) => {
-        onChange(images.filter(img => img.id !== id));
+        if (window.confirm('Dieses Messprotokoll-Bild wirklich löschen?')) {
+            onChange(images.filter(img => img.id !== id));
+        }
     };
 
     const handleToggleInclude = (id) => {
@@ -46,90 +48,163 @@ const DataLoggerUploader = ({ images = [], onChange }) => {
                     <FileText size={18} /> Datenlogger / Messprotokolle
                 </h3>
                 <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                    Alle Seiten der hochgeladenen PDFs werden als Bilder eingefügt und im Bericht als Anhang aufgeführt.
+                    PDF wird automatisch in Bilder umgewandelt
                 </span>
             </div>
 
-            <div style={{ display: 'flex', gap: '1rem', flexDirection: 'column' }}>
-                {images.length > 0 && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                        {images.map((img, idx) => (
-                            <div key={img.id} style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start', border: '1px solid var(--border)', padding: '0.75rem', borderRadius: '8px', backgroundColor: 'var(--background)' }}>
-                                <div style={{ flex: '0 0 120px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
-                                    <div style={{ width: '120px', height: '160px', borderRadius: '6px', overflow: 'hidden', backgroundColor: '#E5E7EB', border: '1px solid var(--border)' }}>
-                                        <img src={img.preview} alt={`Seite ${idx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: 'pointer' }} onClick={() => window.open(img.preview, '_blank')} />
-                                    </div>
-                                    <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', cursor: 'pointer', color: 'var(--text-main)' }}>
-                                        <input
-                                            type="checkbox"
-                                            checked={img.includeInReport !== false}
-                                            onChange={() => handleToggleInclude(img.id)}
-                                            style={{ accentColor: '#10B981', transform: 'scale(1.1)' }}
-                                        />
-                                        Im Bericht
-                                    </label>
-                                </div>
-                                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                                    <textarea
-                                        className="form-input"
-                                        style={{ width: '100%', minHeight: '80px', fontSize: '0.9rem', resize: 'vertical' }}
-                                        placeholder="Bemerkung zum Messprotokoll..."
-                                        value={img.description || ''}
-                                        onChange={(e) => handleDescriptionChange(img.id, e.target.value)}
+            {images.length > 0 && (
+                <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(2, 1fr)',
+                    gap: '0.75rem',
+                    marginBottom: '1rem',
+                }}>
+                    {images.map((img, idx) => {
+                        const included = img.includeInReport !== false;
+                        return (
+                            <div
+                                key={img.id}
+                                style={{
+                                    border: `1px solid ${included ? 'var(--primary)' : 'var(--border)'}`,
+                                    borderRadius: '10px',
+                                    overflow: 'hidden',
+                                    backgroundColor: 'var(--background)',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                }}
+                            >
+                                {/* Image with delete overlay */}
+                                <div style={{ position: 'relative', flex: '0 0 auto' }}>
+                                    <img
+                                        src={img.preview}
+                                        alt={`Seite ${idx + 1}`}
+                                        style={{
+                                            width: '100%',
+                                            height: '200px',
+                                            objectFit: 'contain',
+                                            backgroundColor: '#fff',
+                                            display: 'block',
+                                            cursor: 'pointer',
+                                        }}
+                                        onClick={() => window.open(img.preview, '_blank')}
                                     />
-                                </div>
-                                <div>
+
+                                    {/* Delete button – top right overlay */}
                                     <button
-                                        onClick={() => { if (window.confirm("Bist du sicher?")) handleDelete(img.id) }}
-                                        style={{ background: 'none', border: 'none', color: '#EF4444', cursor: 'pointer', padding: '0.5rem', borderRadius: '4px', backgroundColor: 'rgba(239, 68, 68, 0.1)' }}
+                                        type="button"
+                                        onClick={() => handleDelete(img.id)}
                                         title="Löschen"
+                                        style={{
+                                            position: 'absolute',
+                                            top: '6px',
+                                            right: '6px',
+                                            background: 'rgba(239,68,68,0.9)',
+                                            color: 'white',
+                                            border: 'none',
+                                            borderRadius: '50%',
+                                            width: '32px',
+                                            height: '32px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            cursor: 'pointer',
+                                            boxShadow: '0 2px 6px rgba(0,0,0,0.4)',
+                                        }}
                                     >
-                                        <Trash size={18} />
+                                        <Trash size={14} />
+                                    </button>
+
+                                    {/* Include-in-report toggle – top left overlay */}
+                                    <button
+                                        type="button"
+                                        onClick={() => handleToggleInclude(img.id)}
+                                        title={included ? 'Aus Bericht entfernen' : 'In Bericht aufnehmen'}
+                                        style={{
+                                            position: 'absolute',
+                                            top: '6px',
+                                            left: '6px',
+                                            background: included ? 'rgba(16,185,129,0.9)' : 'rgba(0,0,0,0.5)',
+                                            color: 'white',
+                                            border: 'none',
+                                            borderRadius: '6px',
+                                            padding: '3px 7px',
+                                            fontSize: '0.65rem',
+                                            fontWeight: 700,
+                                            cursor: 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '3px',
+                                            boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
+                                        }}
+                                    >
+                                        {included && <Check size={10} />}
+                                        Bericht
                                     </button>
                                 </div>
-                            </div>
-                        ))}
-                    </div>
-                )}
 
-                <div>
-                    <input
-                        type="file"
-                        accept="application/pdf"
-                        style={{ display: 'none' }}
-                        ref={fileInputRef}
-                        onChange={handleFileChange}
-                    />
-                    <button
-                        onClick={() => fileInputRef.current?.click()}
-                        disabled={isConverting}
-                        className="btn-glass"
-                        style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '0.5rem',
-                            padding: '0.75rem',
-                            borderRadius: '8px',
-                            border: '2px dashed var(--border)',
-                            color: 'var(--primary)',
-                            cursor: 'pointer',
-                            width: '100%',
-                            fontSize: '0.9rem',
-                            fontWeight: 600,
-                            backgroundColor: 'rgba(255,255,255,0.02)'
-                        }}
-                    >
-                        {isConverting ? (
-                            <span>Konvertiere PDF in Bilder... (Bitte warten)</span>
-                        ) : (
-                            <>
-                                <Upload size={18} /> Datenlogger PDF hochladen
-                            </>
-                        )}
-                    </button>
+                                {/* Description */}
+                                <textarea
+                                    className="form-input"
+                                    style={{
+                                        width: '100%',
+                                        minHeight: '60px',
+                                        fontSize: '0.8rem',
+                                        resize: 'none',
+                                        border: 'none',
+                                        borderTop: '1px solid var(--border)',
+                                        borderRadius: 0,
+                                        padding: '0.5rem',
+                                        boxSizing: 'border-box',
+                                        backgroundColor: 'transparent',
+                                    }}
+                                    placeholder="Bemerkung..."
+                                    value={img.description || ''}
+                                    onChange={(e) => handleDescriptionChange(img.id, e.target.value)}
+                                />
+                            </div>
+                        );
+                    })}
                 </div>
-            </div>
+            )}
+
+            {/* Upload Button */}
+            <input
+                type="file"
+                accept="application/pdf"
+                style={{ display: 'none' }}
+                ref={fileInputRef}
+                onChange={handleFileChange}
+            />
+            <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isConverting}
+                className="btn-glass"
+                style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.5rem',
+                    padding: '0.75rem',
+                    borderRadius: '8px',
+                    border: '2px dashed var(--border)',
+                    color: 'var(--primary)',
+                    cursor: 'pointer',
+                    width: '100%',
+                    fontSize: '0.9rem',
+                    fontWeight: 600,
+                    backgroundColor: 'rgba(255,255,255,0.02)',
+                    opacity: isConverting ? 0.7 : 1,
+                }}
+            >
+                {isConverting ? (
+                    <span>Konvertiere PDF in Bilder… (Bitte warten)</span>
+                ) : (
+                    <>
+                        <Upload size={18} /> Datenlogger PDF hochladen
+                    </>
+                )}
+            </button>
         </div>
     );
 };

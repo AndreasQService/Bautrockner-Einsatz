@@ -241,34 +241,27 @@ INPUT DATEN:
 ${textContext}`;
 
       let result;
-      // Modell-Erkennung: einmal pro Session gecacht → kein wiederholter Discovery-Call
-      let attempts;
-      const cachedModel = sessionStorage.getItem('gemini_working_model');
-      if (cachedModel) {
-        attempts = [JSON.parse(cachedModel)];
-        console.log("Verwende gecachtes Modell:", cachedModel);
-      } else {
-        // Einmalige Discovery um das richtige Modell zu finden
-        let discoveredModels = [];
-        try {
-          const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
-          const data = await res.json();
-          if (data?.models) {
-            discoveredModels = data.models
-              .map(m => m.name.replace('models/', ''))
-              .filter(n => n.includes('flash') && !n.includes('vision') && !n.includes('exp'));
-            console.log("Verfügbare Flash-Modelle:", discoveredModels);
-          }
-        } catch (e) { console.warn("Discovery fehlgeschlagen:", e); }
+      // Fallback-Reihenfolge — gecachtes Modell wird vorgezogen, aber Fallbacks bleiben immer erhalten
+      const FALLBACK_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash-latest", "gemini-1.5-flash"];
 
-        // Fallback-Reihenfolge wenn Discovery nichts liefert
-        const fallback = ["gemini-2.0-flash-lite", "gemini-2.0-flash", "gemini-1.5-flash-latest", "gemini-1.5-flash"];
-        const modelList = discoveredModels.length > 0 ? discoveredModels : fallback;
-        attempts = modelList.slice(0, 4).flatMap(m => [
-          { model: m, version: "v1beta" },
-          { model: m, version: "v1" }
-        ]);
+      // Versuche gecachtes Modell als erstes, behalte aber immer alle anderen als Fallback
+      let priorityModel = null;
+      const cachedRaw = sessionStorage.getItem('gemini_working_model');
+      if (cachedRaw) {
+        try {
+          priorityModel = JSON.parse(cachedRaw);
+          console.log("Gecachtes Modell vorgezogen:", priorityModel.model);
+        } catch(e) { sessionStorage.removeItem('gemini_working_model'); }
       }
+
+      const orderedModels = priorityModel
+        ? [priorityModel.model, ...FALLBACK_MODELS.filter(m => m !== priorityModel.model)]
+        : FALLBACK_MODELS;
+
+      const attempts = orderedModels.flatMap(m => [
+        { model: m, version: "v1beta" },
+        { model: m, version: "v1" }
+      ]);
 
       let lastError;
       let hasQuotaError = false;

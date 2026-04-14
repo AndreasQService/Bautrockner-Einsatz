@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { X, ArrowRight, Mail, Settings, Check, RotateCw, FileUp } from 'lucide-react';
 import { swissPLZ } from '../data/swiss_plz';
+import PlzOrtInput from './PlzOrtInput';
 
 const EmailImportModalV2 = ({ onClose, onImport, audioDevices, selectedDeviceId, onSelectDeviceId, initialShowSettings = false, onRefreshDevices, deviceError }) => {
     console.log("EmailImportModalV2 Loaded - VERSION 2026.1.1 (Gemini-1.5-Flash)");
@@ -93,120 +94,138 @@ const EmailImportModalV2 = ({ onClose, onImport, audioDevices, selectedDeviceId,
         try {
             const genAI = new GoogleGenerativeAI(apiKey);
 
-            const prompt = `Du bist ein technischer Daten-Parser. Deine einzige Aufgabe ist es, unstrukturierte Texte in ein JSON-Format zu überführen, das exakt auf die Felder der AG-App passt.
+            const prompt = `Du bist ein technischer Daten-Parser für Wasserschaden-, Leckortungs- und Handwerkeraufträge.
 
-1. REGEL FÜR EIGENTÜMER-FELD (PFLICHT):
-   - FELD 'rechnungs_details.eigentuemer': Enthält NUR den Firmennamen / Organisationsnamen des Eigentümers.
-   - 'c/o'-Zeilen (z.B. 'c/o Avadis Vorsorge AG') gehören zum Organisationsnamen und müssen MITGENOMMEN werden (z.B. 'Avadis Anlagestiftung c/o Avadis Vorsorge AG').
-   - CUT-OFF: Sobald ein Wort erscheint, das eine Strassen-Adresse einleitet (Strasse, Str., Weg, Hausnummer), MUSS dieses und alles danach aus dem Feld entfernt werden.
-   - ADRESSE: Die Strassen-Adresse des Eigentümers kommt in 'rechnungs_details.strasse', die PLZ in 'rechnungs_details.plz', der Ort in 'rechnungs_details.ort'. Sie geht NICHT in 'schadenort'!
-   - KONTROLLE: Wenn ein Block explizit mit 'Eigentümer:' beschriftet ist, MUSS der Organisationsname in 'rechnungs_details.eigentuemer' erscheinen.
+Deine einzige Aufgabe ist es, unstrukturierte Texte in ein JSON-Format zu überführen, das EXAKT auf die Felder der AG-App passt.
 
-2. AUFTRAGGEBER-LOGIK (PFLICHT):
-   Der Auftraggeber ist die Person/Firma, die das Email AN Q-Service geschrieben hat.
+WICHTIGE GRUNDREGELN
+- Antworte ausschliesslich als gültiges JSON.
+- Keine Erklärungen ausser innerhalb von "gap_analysis".
+- Keine erfundenen Daten.
+- Keine Platzhalter wie "string", null, "-", "unbekannt".
+- Fehlende Werte immer als "" oder [] ausgeben.
+- Telefonnummern möglichst im Format +41 XX XXX XX XX.
+- E-Mail-Adressen exakt übernehmen.
+- PLZ und Ort immer trennen.
+- Strasse nie mit PLZ/Ort mischen.
+- Rollen immer auf die erlaubten Zielrollen normalisieren.
 
-   SCHRITT 1 – TRENNLINIE FINDEN:
-   Suche nach der Trennlinie zum weitergeleiteten Teil: "Von:", "Gesendet:", "-----Ursprüngliche Nachricht-----", "From:".
-   ALLES VOR dieser Trennlinie = das äussere/eigene Email des Absenders.
-   ALLES NACH dieser Trennlinie = weitergeleitete Inhalte anderer Personen → IGNORIEREN für Auftraggeber-Erkennung.
+QUELLEN-PRIORITÄT
+Verwende Quellen in dieser Reihenfolge:
+1. Explizit beschriftete Blöcke (z.B. "Bewirtschafter/in", "Bewohner", "Abrechnungsname", "Eigentümer", "Dienstleister")
+2. Betreff
+3. Fliesstext / Beschreibung
+4. Mail-Header / Absender
+5. Signaturen
+Wenn eine höher priorisierte Quelle einer tiefer priorisierten widerspricht, gilt die höher priorisierte Quelle.
 
-   SCHRITT 2 – ABSENDER LESEN:
-   Die E-Mail-Adresse und Kontaktdaten des Absenders bestimmen den Auftraggeber.
-   Suche die Absender-Adresse in dieser Reihenfolge:
-   a) Header-Zeile am Textanfang: "Von: name@firma.ch", "From: Vorname Name <name@firma.ch>"
-   b) In der Signatur: jede Zeichenfolge mit @domain (z.B. sonja.streuli@matma.ch)
-   c) Nach "E-Mail:", "Email:", "Mail:" gefolgt von einer Adresse
-   AUSNAHME: datenschutz@, info@, noreply@ sind keine persönlichen Adressen → überspringen.
-   → 'auftrag_verwaltung.firma' = Firmenname aus der Signatur (auch aus @domain ableitbar falls im Text erwähnt).
-   → 'auftrag_verwaltung.sachbearbeiter' = Person aus der Signatur.
-   → 'auftrag_verwaltung.telefon' = Telefon aus der Signatur.
-   → 'auftrag_verwaltung.email' = E-Mail-Adresse wie oben gefunden.
+1) REGEL FÜR rechnungs_details.eigentuemer
+- Dieses Feld enthält NUR den Firmennamen / Organisationsnamen des Eigentümers bzw. Rechnungsempfängers.
+- Wenn ein Block mit "Eigentümer:", "Abrechnungsname:", "Rechnungsadressat:", "Rechnungsempfänger:" oder "Fakturierung:" beschriftet ist, MUSS dessen Organisationsname in rechnungs_details.eigentuemer übernommen werden.
+- c/o-Zeilen gehören zum Organisationsnamen und werden MIT übernommen.
+- CUT-OFF: Sobald die eigentliche Strassenadresse beginnt, darf ab dort nichts mehr in rechnungs_details.eigentuemer stehen.
+- Strasse kommt in rechnungs_details.strasse.
+- PLZ in rechnungs_details.plz.
+- Ort in rechnungs_details.ort.
 
-   KONKRETES BEISPIEL:
-   Text: "...Nikola Komani / Serviceleiter / Neukom Marzolo AG / Gewerbestrasse 13 / 8197 Rafz / nikola.komani@neukom-marzolo.ch
-   Von: Susanne Waeckerlin ... Verwaltung/Auftraggeber: STUMP + PARTNER AG ..."
-   → firma = "Neukom Marzolo AG" (aus der EIGENEN Signatur VOR "Von:")
-   → NICHT "STUMP + PARTNER AG" (das ist im weitergeleiteten Teil)
+SONDERFALL p.a.
+- Wenn ein Rechnungsblock die Form "Organisation A, p.a. Organisation B, Strasse, PLZ Ort" hat:
+  - Teil VOR "p.a." = rechnungs_details.eigentuemer
+  - Teil NACH "p.a." bis zur Strasse = rechnungs_details.verwaltung_p_a
+  - Strasse / PLZ / Ort = Rechnungsadresse
+- Die p.a.-Organisation NICHT zusätzlich in rechnungs_details.eigentuemer aufnehmen.
 
-   AUFTRAGGEBER-ADRESSE: Adresse der Auftraggeber-Firma gehört in 'auftrag_verwaltung.adresse', 'auftrag_verwaltung.plz' und 'auftrag_verwaltung.ort'. NICHT in 'schadenort'!
+2) AUFTRAGGEBER-LOGIK
+- Auftraggeber ist die fachlich beauftragende Stelle, nicht zwingend der technische Mail-Absender.
+- Wenn ein expliziter Block wie "Bewirtschafter/in", "Verwaltung", "Auftraggeber", "Property Manager" oder "Kontakt Verwaltung" vorhanden ist, dann hat dieser Vorrang als Auftraggeber.
+- Nur wenn kein fachlicher Auftraggeber im Text genannt ist, darf der Mail-Absender als Auftraggeber verwendet werden.
+- Portal-/System-Absender wie MyHIG, Allthings usw. sind NICHT automatisch Auftraggeber.
 
-2b. SCHADENORT-EXTRAKTION (PFLICHT):
-   - BETREFF als Quelle: Wenn der Email-Betreff eine Strasse enthält (Muster: "Wasserschaden Strassename Nr"), IST DAS DER SCHADENORT. Extrahiere Strasse + Hausnummer daraus. Wenn nach der Hausnummer noch ein Ortsname folgt (z.B. "Bühlwiesenstrasse 6, Dübendorf"), extrahiere diesen als schadenort.ort.
-   - Beispiel: "Betreff: Wasserschaden Leutschenbachstrasse 30 B1804" → schadenort.strasse_nr = "Leutschenbachstrasse 30", schadenort.etage_wohnung = "B1804"
-   - Beispiel: "Betreff: Wasser tropft Bühlwiesenstrasse 6, Dübendorf" → schadenort.strasse_nr = "Bühlwiesenstrasse 6", schadenort.ort = "Dübendorf"
-   - WOHNUNGSNUMMERN erkennen: Codes wie "B1804", "EG", "3OG", "DG", "W12", "OG3", "C204" gehören in schadenort.etage_wohnung, NICHT in strasse_nr.
-   - ETAGE_WOHNUNG – NUR EINE ANGABE: Dieses Feld darf NUR DIE PRIMÄRE/ERSTE Schadenlokalität enthalten. Wenn mehrere Wohnungen oder Etagen erwähnt werden (z.B. "3. OG rechts" UND "EG links"), nimm NUR die erstgenannte oder spezifischste. KEINE Komma-Listen! KEIN "3. OG rechts Wohnung Strehler, EG links" – nur "3. OG rechts Wohnung Strehler".
-   - AUFLISTUNG MÖGLICHER WOHNUNGEN: Wenn eine Liste von "möglichen" oder "betroffenen" Wohnungen vorhanden ist (z.B. "EG rechts, Banz", "1 OG rechts, Gantner"), nimm immer die ERSTE in der Liste (z.B. "EG rechts"). Lass das Feld NIEMALS leer, wenn Wohnungsangaben im Text vorhanden sind.
-   - PLZ/ORT: PLZ separat in schadenort.plz, Ort separat in schadenort.ort. Wenn die PLZ NICHT im Text steht, aber der Ort eindeutig identifizierbar ist, ergänze die Schweizer PLZ aus deinem Wissen (z.B. Dübendorf=8600, Zürich=8001, Winterthur=8400, Bern=3000, Basel=4051). NIEMALS kombiniert als plz_ort!
-   - MEHRFACH-QUELLEN: Die Adresse kann auch in einer Signatur, Cc-Liste oder Weiterleitungszeile vorkommen ("Betreff:", "Subject:", "Objekt:").
+3) SCHADENORT-LOGIK
+- Betreff ist primäre Quelle für Objekt- und Wohnungsangaben.
+- Wohnungscodes, Etagen oder Einheiten in schadenort.etage_wohnung speichern.
+- Strasse und Hausnummer separat speichern.
+- Werte wie "2.OG", "DG", "UG", "Whg. 12" nicht in das Strassenfeld schreiben.
 
-3. KONTAKT-EXTRAKTION (VOLLSTÄNDIG – PFLICHT):
-   Extrahiere ALLE im Text erwähnten Personen als separate Kontakteinträge. Jede Person mit Name UND/ODER Telefon muss als eigener Eintrag erscheinen.
-   
-   AUFLISTUNGEN: Wenn Personen nummeriert aufgelistet sind (1. Name Tel..., 2. Name Tel...), extrahiere JEDEN Eintrag separat.
-   MEHRERE TELEFONNUMMERN: Wenn eine Person 2 Nummern hat (z.B. "076 390 96 05, 043 399 57 39"), nimm die Mobilnummer (076/079) als primäre Telefonnummer.
+4) KONTAKT-EXTRAKTION
+- Extrahiere ALLE realen Personen und Firmenkontakte in kontakte[].
+- Jeder Kontakt erhält genau eine normalisierte Hauptrolle.
+- Erlaubte Rollen: "verwaltung", "mieter", "eigentuemer", "rechnungsempfaenger", "dienstleister", "handwerker", "sanitaer", "dachdecker", "hauswart", "sonstiges"
 
-   ROLLEN-LOGIK (STRIKTE REGELN):
-   Jede Person bekommt GENAU EINE Rolle. KEINE Doppelzuweisung erlaubt.
-   Prioritätsreihenfolge bei Unklarheit: Handw. > Verw. > Eig. > HW > Mieter
+ROLLEN-MAPPING
+- "Bewohner", "Mieter", "Nutzer" → mieter
+- "Bewirtschafter/in", "Verwaltung", "Immobilienfirma", "Property Manager" → verwaltung
+- "Abrechnungsname", "Rechnungsempfänger", "Eigentümer" → eigentuemer oder rechnungsempfaenger je nach Kontext
+- "Dienstleister" → dienstleister
+- Sanitärfirma / Sanitär → sanitaer
+- Dachdecker / Dachfirma → dachdecker
+- Andere ausführende Firmen → handwerker
+- Hauswart → hauswart
 
-   - 'Handw.': Techniker, Sanitär, Heizung, Monteure, Handwerker-Firmen – NUR wenn sie am Schaden gearbeitet haben UND NICHT der Auftraggeber sind.
-   - 'Verw.': Firmen mit Bezeichnung Verwaltung, Bewirtschaftung, Immobilien AG, Partner.
-   - 'Mieter': NUR Personen die EXPLIZIT als "Mieter" bezeichnet werden, oder die in der beschädigten Wohnung wohnen (erkenntlich an: "wohnt in", "Mieter:", "bewohnt").
-   - 'Eig.': Personen/Firmen die explizit als "Eigentümer", "Eig.", "Stockwerkeigentümer", "Wohnungseigentümer" bezeichnet werden, ODER deren Wohnung/OG im Zusammenhang mit dem Schaden genannt wird (z.B. "1. OG: Bujar Morina", "2. OG: Peter Schmidlin").
-   - 'HW': Hauswart.
-   - FEHLER-KONTROLLE: Ein Sanitärtechniker ist KEIN Mieter. Eine Verwaltungsfirma ist kein Handwerker.
-   
-   ETAGE-FELD: Wenn die Etage/Wohnung der Person bekannt ist (z.B. "1. OG", "2. OG"), trage sie im Feld 'etage' ein.
+WICHTIG:
+- Firmen dürfen ebenfalls als Kontakte in kontakte[] erscheinen.
+- Bewohner ist nie automatisch Auftraggeber.
+- Dienstleister Q-Service ist nie Eigentümer und nie Verwaltung.
+- Eine Person darf nicht gleichzeitig mehrere Hauptrollen bekommen.
 
-4. VERBOT VON PLATZHALTERN:
-   - Die Ausgabe des Wortes "string" ist strengstens untersagt. 
-   - Falls eine Information im Text nicht existiert, gib einen leeren String ("") aus. 
-   - Fülle JEDES Feld mit den Realdaten aus dem Text, niemals mit Platzhaltern.
-   - Rechnungsvermerk: NUR echte Referenznummern (z.B. RIM-23, Ref: 2026xxx). KEINE Schadensbeschreibung.
+5) BESCHREIBUNG
+- projekt_daten.beschreibung kurz und sachlich zusammenfassen (max. 3 Sätze).
+- Nur gesicherte Informationen übernehmen.
 
-5. FORMATIERUNG:
-   - Telefon: +41 XX XXX XX XX.
-   - Namen: Trenne Vorname und Nachname (falls möglich).
+6) TAGS / TYP / FRISTEN
+- Tags als Array. Typ separat übernehmen.
+- Fristen in Originalformat übernehmen, sofern eindeutig.
+- "Offerte erforderlich ab CHF ..." als separaten Wert speichern, falls vorhanden.
 
-AUSGABE-FORMAT (JSON):
+7) GAP_ANALYSIS
+Füge in gap_analysis[] alle Unsicherheiten, Ableitungen oder Konfliktlösungen ein.
+Beispiele:
+- "Auftraggeber aus Bewirtschafter/in-Block statt Portal-Absender abgeleitet"
+- "Eigentümer aus Abrechnungsname erkannt"
+- "p.a.-Block in Eigentümer und Verwaltung getrennt"
+
+AUSGABEFORMAT
+Gib ausschliesslich JSON in genau dieser Struktur zurück:
+
 {
   "projekt_daten": {
-    "interne_id": "2026xxxx",
-    "externe_ref": "",
-    "auftrags_nr": ""
+    "titel": "",
+    "referenz_nummer": "",
+    "erp_id": "",
+    "beschreibung": "",
+    "typ": "",
+    "tags": [],
+    "frist": "",
+    "offerte_ab_chf": ""
   },
   "auftrag_verwaltung": {
     "firma": "",
-    "sachbearbeiter": "",
-    "telefon": "",
+    "ansprechperson": "",
     "email": "",
-    "leistungsart": "Wasserschaden",
-    "adresse": "",
-    "plz": "",
-    "ort": ""
+    "telefon": ""
   },
   "rechnungs_details": {
     "eigentuemer": "",
+    "verwaltung_p_a": "",
     "strasse": "",
     "plz": "",
-    "ort": "",
-    "email_rechnung": "",
-    "vermerk": ""
+    "ort": ""
   },
   "schadenort": {
-    "strasse_nr": "",
+    "strasse": "",
+    "hausnummer": "",
     "plz": "",
     "ort": "",
-    "etage_wohnung": ""
+    "etage_wohnung": "",
+    "bereich": []
   },
   "kontakte": [
     {
       "name": "",
-      "rolle": "Handw. | Verw. | Mieter | Eig. | HW",
-      "telefon": "+41 XX XXX XX XX",
-      "etage": "",
-      "email": ""
+      "firma": "",
+      "rolle": "",
+      "email": "",
+      "telefon": ""
     }
   ],
   "gap_analysis": []
@@ -218,6 +237,8 @@ INPUT DATEN:
 ${text}`;
 
             let result;
+
+
             // 1. DIAGNOSE: Frag Google, was dieser Key überhaupt darf
             let discoveryModels = [];
             try {
@@ -233,7 +254,7 @@ ${text}`;
             } catch (e) { }
 
             // Preferred models: 2.5-flash first, 2.0-flash as fallback, then legacy
-            const PREFERRED = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.0-flash-lite"];
+            const PREFERRED = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash-latest"];
             const legacyModels = discoveryModels.length > 0
                 ? discoveryModels.filter(m => !PREFERRED.includes(m))
                 : ["gemini-1.5-flash", "gemini-1.5-pro"];
@@ -346,74 +367,93 @@ ${text}`;
                         <button onClick={() => setPreviewData(null)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}><X size={24} /></button>
                     </div>
 
+                    {/* Projekt */}
+                    {previewData.projekt_daten?.beschreibung && (
+                        <div style={{ backgroundColor: 'rgba(59,130,246,0.08)', padding: '0.75rem 1rem', borderRadius: '10px', borderLeft: '3px solid #3b82f6', marginBottom: '1rem', fontSize: '0.85rem', color: '#93c5fd' }}>
+                            <strong style={{ color: '#3b82f6', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Beschreibung: </strong>
+                            {previewData.projekt_daten.beschreibung}
+                        </div>
+                    )}
+
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1.5rem', marginBottom: '2rem' }}>
-                        {/* Projekt & Auftrag */}
+                        {/* Auftraggeber / Verwaltung */}
                         <div style={{ backgroundColor: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: '12px' }}>
-                            <h4 style={{ marginTop: 0, color: '#3b82f6', fontSize: '0.9rem', textTransform: 'uppercase' }}>Projekt & Auftrag</h4>
+                            <h4 style={{ marginTop: 0, color: '#3b82f6', fontSize: '0.9rem', textTransform: 'uppercase' }}>Auftraggeber / Verwaltung</h4>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                                 <div>
-                                    <label style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8' }}>Projekt-Nr (2026xxxx)</label>
-                                    <input className="form-input" style={{ width: '100%' }} value={previewData.projekt_daten?.interne_id || ''} onChange={e => setPreviewData({ ...previewData, projekt_daten: { ...previewData.projekt_daten, interne_id: e.target.value } })} />
-                                </div>
-                                <div>
-                                    <label style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8' }}>Auftraggeber (Firma)</label>
+                                    <label style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8' }}>Firma</label>
                                     <input className="form-input" style={{ width: '100%' }} value={previewData.auftrag_verwaltung?.firma || ''} onChange={e => setPreviewData({ ...previewData, auftrag_verwaltung: { ...previewData.auftrag_verwaltung, firma: e.target.value } })} />
                                 </div>
                                 <div>
-                                    <label style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8' }}>Sachbearbeiter</label>
-                                    <input className="form-input" style={{ width: '100%' }} value={previewData.auftrag_verwaltung?.sachbearbeiter || ''} onChange={e => setPreviewData({ ...previewData, auftrag_verwaltung: { ...previewData.auftrag_verwaltung, sachbearbeiter: e.target.value } })} />
+                                    <label style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8' }}>Ansprechperson</label>
+                                    <input className="form-input" style={{ width: '100%' }} value={previewData.auftrag_verwaltung?.ansprechperson || ''} onChange={e => setPreviewData({ ...previewData, auftrag_verwaltung: { ...previewData.auftrag_verwaltung, ansprechperson: e.target.value } })} />
                                 </div>
                                 <div style={{ display: 'flex', gap: '0.5rem' }}>
                                     <div style={{ flex: 1 }}>
-                                        <label style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8' }}>Telefon (AG)</label>
+                                        <label style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8' }}>Telefon</label>
                                         <input className="form-input" style={{ width: '100%' }} placeholder="+41 XX XXX XX XX" value={previewData.auftrag_verwaltung?.telefon || ''} onChange={e => setPreviewData({ ...previewData, auftrag_verwaltung: { ...previewData.auftrag_verwaltung, telefon: e.target.value } })} />
                                     </div>
                                     <div style={{ flex: 1 }}>
-                                        <label style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8' }}>E-Mail (AG)</label>
+                                        <label style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8' }}>E-Mail</label>
                                         <input className="form-input" style={{ width: '100%' }} placeholder="email@firma.ch" value={previewData.auftrag_verwaltung?.email || ''} onChange={e => setPreviewData({ ...previewData, auftrag_verwaltung: { ...previewData.auftrag_verwaltung, email: e.target.value } })} />
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        {/* Rechnung */}
+                        {/* Rechnungsdetails */}
                         <div style={{ backgroundColor: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: '12px' }}>
-                            <h4 style={{ marginTop: 0, color: '#f59e0b', fontSize: '0.9rem', textTransform: 'uppercase' }}>Rechnungs-Details</h4>
+                            <h4 style={{ marginTop: 0, color: '#f59e0b', fontSize: '0.9rem', textTransform: 'uppercase' }}>Rechnungsdetails</h4>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                                 <div>
-                                    <label style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8' }}>Eigentümer / c/o</label>
+                                    <label style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8' }}>Eigentümer / Rechnungsempfänger</label>
                                     <input className="form-input" style={{ width: '100%' }} value={previewData.rechnungs_details?.eigentuemer || ''} onChange={e => setPreviewData({ ...previewData, rechnungs_details: { ...previewData.rechnungs_details, eigentuemer: e.target.value } })} />
                                 </div>
                                 <div>
-                                    <label style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8' }}>E-Mail Rechnung</label>
-                                    <input className="form-input" style={{ width: '100%' }} value={previewData.rechnungs_details?.email_rechnung || ''} onChange={e => setPreviewData({ ...previewData, rechnungs_details: { ...previewData.rechnungs_details, email_rechnung: e.target.value } })} />
+                                    <label style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8' }}>p.a. (Zustellorganisation)</label>
+                                    <input className="form-input" style={{ width: '100%' }} value={previewData.rechnungs_details?.verwaltung_p_a || ''} onChange={e => setPreviewData({ ...previewData, rechnungs_details: { ...previewData.rechnungs_details, verwaltung_p_a: e.target.value } })} />
                                 </div>
                                 <div>
-                                    <label style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8' }}>Rechnungsvermerk (Ref)</label>
-                                    <input className="form-input" style={{ width: '100%' }} value={previewData.rechnungs_details?.vermerk || ''} onChange={e => setPreviewData({ ...previewData, rechnungs_details: { ...previewData.rechnungs_details, vermerk: e.target.value } })} />
+                                    <label style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8' }}>Strasse</label>
+                                    <input className="form-input" style={{ width: '100%' }} value={previewData.rechnungs_details?.strasse || ''} onChange={e => setPreviewData({ ...previewData, rechnungs_details: { ...previewData.rechnungs_details, strasse: e.target.value } })} />
                                 </div>
+                                <PlzOrtInput
+                                    plz={previewData.rechnungs_details?.plz || ''}
+                                    ort={previewData.rechnungs_details?.ort || ''}
+                                    onAutofill={(p, o) => setPreviewData({ ...previewData, rechnungs_details: { ...previewData.rechnungs_details, plz: p, ort: o } })}
+                                    onChangePlz={v => setPreviewData({ ...previewData, rechnungs_details: { ...previewData.rechnungs_details, plz: v } })}
+                                    onChangeOrt={v => setPreviewData({ ...previewData, rechnungs_details: { ...previewData.rechnungs_details, ort: v } })}
+                                    labelPlz="PLZ" labelOrt="Ort"
+                                />
                             </div>
                         </div>
 
                         {/* Schadenort */}
                         <div style={{ gridColumn: 'span 2', backgroundColor: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: '12px' }}>
                             <h4 style={{ marginTop: 0, color: '#ef4444', fontSize: '0.9rem', textTransform: 'uppercase' }}>Schadenort</h4>
-                            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 2fr', gap: '1rem' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '1rem' }}>
                                 <div>
-                                    <label style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8' }}>Strasse & Nr.</label>
-                                    <input className="form-input" style={{ width: '100%' }} value={previewData.schadenort?.strasse_nr || ''} onChange={e => setPreviewData({ ...previewData, schadenort: { ...previewData.schadenort, strasse_nr: e.target.value } })} />
+                                    <label style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8' }}>Strasse</label>
+                                    <input className="form-input" style={{ width: '100%' }} value={previewData.schadenort?.strasse || ''} onChange={e => setPreviewData({ ...previewData, schadenort: { ...previewData.schadenort, strasse: e.target.value } })} />
                                 </div>
                                 <div>
-                                    <label style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8' }}>Etage / Details</label>
+                                    <label style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8' }}>Nr.</label>
+                                    <input className="form-input" style={{ width: '100%' }} value={previewData.schadenort?.hausnummer || ''} onChange={e => setPreviewData({ ...previewData, schadenort: { ...previewData.schadenort, hausnummer: e.target.value } })} />
+                                </div>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8' }}>Etage / Wohnung</label>
                                     <input className="form-input" style={{ width: '100%' }} value={previewData.schadenort?.etage_wohnung || ''} onChange={e => setPreviewData({ ...previewData, schadenort: { ...previewData.schadenort, etage_wohnung: e.target.value } })} />
                                 </div>
-                                <div>
-                                    <label style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8' }}>PLZ</label>
-                                    <input className="form-input" style={{ width: '100%' }} value={previewData.schadenort?.plz || ''} onChange={e => setPreviewData({ ...previewData, schadenort: { ...previewData.schadenort, plz: e.target.value } })} />
-                                </div>
-                                <div>
-                                    <label style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8' }}>Ort</label>
-                                    <input className="form-input" style={{ width: '100%' }} value={previewData.schadenort?.ort || ''} onChange={e => setPreviewData({ ...previewData, schadenort: { ...previewData.schadenort, ort: e.target.value } })} />
+                                <div style={{ gridColumn: 'span 3' }}>
+                                    <PlzOrtInput
+                                        plz={previewData.schadenort?.plz || ''}
+                                        ort={previewData.schadenort?.ort || ''}
+                                        onAutofill={(p, o) => setPreviewData({ ...previewData, schadenort: { ...previewData.schadenort, plz: p, ort: o } })}
+                                        onChangePlz={v => setPreviewData({ ...previewData, schadenort: { ...previewData.schadenort, plz: v } })}
+                                        onChangeOrt={v => setPreviewData({ ...previewData, schadenort: { ...previewData.schadenort, ort: v } })}
+                                        labelPlz="PLZ" labelOrt="Ort"
+                                        plzWidth="100px"
+                                    />
                                 </div>
                             </div>
                         </div>
@@ -422,12 +462,15 @@ ${text}`;
                     <h4 style={{ color: '#10b981', fontSize: '0.9rem', textTransform: 'uppercase', marginBottom: '1rem' }}>Identifizierte Kontakte</h4>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '2rem' }}>
                         {previewData.kontakte && previewData.kontakte.map((c, idx) => (
-                            <div key={idx} style={{ display: 'grid', gridTemplateColumns: '150px 1fr 180px 40px', gap: '0.75rem', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.2)', padding: '0.75rem', borderRadius: '8px' }}>
+                            <div key={idx} style={{ display: 'grid', gridTemplateColumns: '130px 1fr 1fr 160px 40px', gap: '0.5rem', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.2)', padding: '0.75rem', borderRadius: '8px' }}>
                                 <input className="form-input" placeholder="Rolle" value={c.rolle || ''} onChange={e => {
                                     const newC = [...previewData.kontakte]; newC[idx].rolle = e.target.value; setPreviewData({ ...previewData, kontakte: newC });
                                 }} />
                                 <input className="form-input" placeholder="Name" value={c.name || ''} onChange={e => {
                                     const newC = [...previewData.kontakte]; newC[idx].name = e.target.value; setPreviewData({ ...previewData, kontakte: newC });
+                                }} />
+                                <input className="form-input" placeholder="Firma" value={c.firma || ''} onChange={e => {
+                                    const newC = [...previewData.kontakte]; newC[idx].firma = e.target.value; setPreviewData({ ...previewData, kontakte: newC });
                                 }} />
                                 <input className="form-input" placeholder="Telefon" value={c.telefon || ''} onChange={e => {
                                     const newC = [...previewData.kontakte]; newC[idx].telefon = e.target.value; setPreviewData({ ...previewData, kontakte: newC });
@@ -438,7 +481,7 @@ ${text}`;
                                 }} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '38px', width: '38px', borderRadius: '8px', border: '1px solid #ef4444', color: '#ef4444', backgroundColor: 'transparent', cursor: 'pointer' }}><X size={16} /></button>
                             </div>
                         ))}
-                        <button onClick={() => setPreviewData({ ...previewData, kontakte: [...(previewData.kontakte || []), { rolle: '', name: '', telefon: '' }] })} className="btn btn-ghost" style={{ alignSelf: 'start', fontSize: '0.8rem' }}>+ Weiteren Kontakt hinzufügen</button>
+                        <button onClick={() => setPreviewData({ ...previewData, kontakte: [...(previewData.kontakte || []), { rolle: '', name: '', firma: '', telefon: '' }] })} className="btn btn-ghost" style={{ alignSelf: 'start', fontSize: '0.8rem' }}>+ Weiteren Kontakt hinzufügen</button>
                     </div>
 
                     {/* Gap Analysis */}

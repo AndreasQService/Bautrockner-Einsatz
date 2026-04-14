@@ -379,93 +379,96 @@ function App() {
 
     const newId = `P-${Date.now()}`;
 
-    // Mapping Gemini structure to Flat Report Structure
-    const projectNum = importedData.projekt_daten?.interne_id || '';
-    const client = importedData.auftrag_verwaltung?.firma || importedData.client || '';
-    const street = importedData.schadenort?.strasse_nr || importedData.street || '';
+    // ── Neue JSON-Struktur (EmailImportModalV2 v2) ──
+    const av = importedData.auftrag_verwaltung || {};
+    const rd = importedData.rechnungs_details || {};
+    const so = importedData.schadenort || {};
+    const pd = importedData.projekt_daten || {};
 
-    // Schadenort PLZ + Ort
-    let zip = importedData.zip || importedData.schadenort?.plz || '';
-    let city = importedData.city || importedData.schadenort?.ort || '';
-    if (!zip && !city && importedData.schadenort?.plz_ort) {
-      const parts = String(importedData.schadenort.plz_ort).trim().split(/\s+/);
-      if (parts.length >= 2 && /^\d{4,5}$/.test(parts[0])) {
-        zip = parts[0];
-        city = parts.slice(1).join(' ');
-      } else {
-        city = importedData.schadenort.plz_ort;
-      }
-    }
+    const client = av.firma || '';
+    // Schadenort: Strasse + Hausnummer jetzt getrennt
+    const street = so.strasse_nr                       // Compat: altes Format
+      || [so.strasse, so.hausnummer].filter(Boolean).join(' ')  // Neues Format
+      || '';
+    const zip  = so.plz || '';
+    const city = so.ort || '';
 
-    // Verwaltungs-Adresse PLZ + Ort
-    let clientStreet = importedData.auftrag_verwaltung?.adresse || '';
-    let clientZip = importedData.auftrag_verwaltung?.plz || '';
-    let clientCity = importedData.auftrag_verwaltung?.ort || '';
-    if (!clientZip && !clientCity && importedData.auftrag_verwaltung?.plz_ort) {
-      const clientParts = String(importedData.auftrag_verwaltung.plz_ort).trim().split(/\s+/);
-      if (clientParts.length >= 2 && /^\d{4,5}$/.test(clientParts[0])) {
-        clientZip = clientParts[0];
-        clientCity = clientParts.slice(1).join(' ');
-      } else {
-        clientCity = importedData.auftrag_verwaltung.plz_ort;
-      }
-    }
+    // Referenznummer: neues Format hat referenz_nummer statt interne_id
+    const projectNum = pd.referenz_nummer || pd.erp_id || pd.interne_id || '';
+
+    // Rollenumwandlung: neue lowercase-Rollen → App-Dropdown-Werte
+    const rolleMap = {
+      // Neue Rollen (v2)
+      'verwaltung':        'Verwaltung',
+      'mieter':            'Mieter',
+      'eigentuemer':       'Eigentümer',
+      'rechnungsempfaenger': 'Eigentümer',
+      'dienstleister':     'Handwerker',
+      'handwerker':        'Handwerker',
+      'sanitaer':          'Handwerker',
+      'dachdecker':        'Handwerker',
+      'hauswart':          'Hauswart',
+      'sonstiges':         'Mieter',
+      // Alte Rollen (v1 Compat)
+      'Eig.':              'Eigentümer',
+      'Eig':               'Eigentümer',
+      'Eigentümer':        'Eigentümer',
+      'Verw.':             'Verwaltung',
+      'Verw':              'Verwaltung',
+      'Verwaltung':        'Verwaltung',
+      'Handw.':            'Handwerker',
+      'Handw':             'Handwerker',
+      'Handwerker':        'Handwerker',
+      'HW':                'Hauswart',
+      'Hauswart':          'Hauswart',
+      'Mieter':            'Mieter',
+    };
 
     const newReport = {
       id: newId,
-      projectTitle: projectNum || client || 'Importiertes Projekt',
+      projectTitle: pd.titel || projectNum || client || 'Importiertes Projekt',
       projectNumber: projectNum,
-      orderNumber: importedData.projekt_daten?.auftrags_nr || '',
-      invoiceReference: importedData.projekt_daten?.externe_ref || importedData.rechnungs_details?.vermerk || '',
-      client: client,
-      clientStreet: clientStreet,
-      clientZip: clientZip,
-      clientCity: clientCity,
-      clientPhone: importedData.auftrag_verwaltung?.telefon || '',
-      clientEmail: importedData.auftrag_verwaltung?.email || '',
-      street: street,
-      zip: zip,
-      city: city,
-      address: `${street}, ${zip} ${city}`.trim(),
-      locationDetails: importedData.schadenort?.etage_wohnung || '',
-      ownerName: importedData.rechnungs_details?.eigentuemer ||
-        (importedData.kontakte || []).find(c => c.rolle === 'Eig.' || c.rolle === 'Eigentümer' || c.rolle === 'Eig')?.name || '',
+      orderNumber:   pd.auftrags_nr || pd.erp_id || '',
+      invoiceReference: pd.externe_ref || rd.vermerk || '',
 
-      ownerStreet: importedData.rechnungs_details?.strasse || '',
-      ownerZip: importedData.rechnungs_details?.plz || '',
-      ownerCity: importedData.rechnungs_details?.ort || '',
-      ownerEmail: importedData.rechnungs_details?.email_rechnung || '',
+      // Auftraggeber / Verwaltung
+      client:      client,
+      clientStreet: av.adresse || '',
+      clientZip:   av.plz || '',
+      clientCity:  av.ort || '',
+      clientPhone: av.telefon || '',
+      clientEmail: av.email || '',
 
-      description: importedData.description || '',
-      assignedTo: importedData.auftrag_verwaltung?.sachbearbeiter || '',
+      // Schadenort
+      street,
+      zip,
+      city,
+      address: [street, zip && city ? `${zip} ${city}` : (zip || city)].filter(Boolean).join(', '),
+      locationDetails: so.etage_wohnung || '',
+
+      // Eigentümer / Rechnungsdetails
+      ownerName:   rd.eigentuemer || '',
+      ownerStreet: rd.strasse || '',
+      ownerZip:    rd.plz || '',
+      ownerCity:   rd.ort || '',
+      ownerEmail:  rd.email_rechnung || '',
+
+      // Sachbearbeiter: neues Format hat ansprechperson
+      assignedTo: av.ansprechperson || av.sachbearbeiter || '',
+
+      description: pd.beschreibung || importedData.description || '',
       status: 'Schadenaufnahme',
       date: new Date().toISOString(),
-      contacts: (importedData.kontakte || []).map(c => {
-        // KI-Kürzel auf Dropdown-Werte mappen
-        const rolleMap = {
-          'Eig.': 'Eigentümer',
-          'Eig': 'Eigentümer',
-          'Eigentümer': 'Eigentümer',
-          'Verw.': 'Verwaltung',
-          'Verw': 'Verwaltung',
-          'Verwaltung': 'Verwaltung',
-          'Handw.': 'Handwerker',
-          'Handw': 'Handwerker',
-          'Handwerker': 'Handwerker',
-          'HW': 'Hauswart',
-          'Hauswart': 'Hauswart',
-          'Mieter': 'Mieter',
-        };
-        const mappedRole = rolleMap[c.rolle] || rolleMap[(c.rolle || '').trim()] || 'Mieter';
-        return {
-          name: c.name || '',
-          phone: c.telefon || '',
-          email: c.email || '',
-          role: mappedRole,
-          apartment: c.etage || '',
-          floor: c.etage || ''
-        };
-      }),
+
+      contacts: (importedData.kontakte || []).map(c => ({
+        name:      c.name || c.firma || '',
+        phone:     c.telefon || '',
+        email:     c.email || '',
+        role:      rolleMap[c.rolle] || rolleMap[(c.rolle || '').trim()] || 'Sonstiges',
+        apartment: c.etage || '',
+        floor:     c.etage || '',
+      })),
+
       rooms: [],
       images: [],
       equipment: [],

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Briefcase, MapPin } from 'lucide-react';
-import { swissPLZ } from '../../../data/swiss_plz';
+import PlzOrtInput from '../../PlzOrtInput';
 
 const ContactSection = ({ formData, setFormData, mode, renderConflictWarn }) => {
     return (
@@ -35,28 +35,17 @@ const ContactSection = ({ formData, setFormData, mode, renderConflictWarn }) => 
                                 style={{ width: '100%' }}
                             />
                         </div>
-                        <div style={{ width: '90px' }}>
-                            <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 600, marginBottom: '0.5rem', display: 'block' }}>PLZ (AG)</label>
-                            <input
-                                type="text"
-                                className="form-input"
-                                value={formData.clientZip || ''}
-                                onChange={(e) => setFormData(prev => ({ ...prev, clientZip: e.target.value }))}
-                                placeholder="PLZ"
-                                style={{ width: '100%' }}
-                            />
-                        </div>
-                        <div style={{ flex: '1 1 150px' }}>
-                            <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 600, marginBottom: '0.5rem', display: 'block' }}>Ort (AG)</label>
-                            <input
-                                type="text"
-                                className="form-input"
-                                value={formData.clientCity || ''}
-                                onChange={(e) => setFormData(prev => ({ ...prev, clientCity: e.target.value }))}
-                                placeholder="Ort"
-                                style={{ width: '100%' }}
-                            />
-                        </div>
+                        <PlzOrtInput
+                            plz={formData.clientZip || ''}
+                            ort={formData.clientCity || ''}
+                            onAutofill={(p, o) => setFormData(prev => ({ ...prev, clientZip: p, clientCity: o }))}
+                            onChangePlz={v => setFormData(prev => ({ ...prev, clientZip: v }))}
+                            onChangeOrt={v => setFormData(prev => ({ ...prev, clientCity: v }))}
+                            labelPlz="PLZ (AG)" labelOrt="Ort (AG)"
+                            plzWidth="90px"
+                            gap="1.25rem"
+                            labelStyle={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 600, marginBottom: '0.5rem' }}
+                        />
                     </div>
 
                     <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
@@ -129,29 +118,17 @@ const ContactSection = ({ formData, setFormData, mode, renderConflictWarn }) => 
                                 />
                             </div>
 
-                            {/* PLZ / Ort */}
-                            <div style={{ width: '180px', display: 'flex', gap: '0.4rem' }}>
-                                <div style={{ flex: 1 }}>
-                                    <label style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '0.25rem' }}>PLZ</label>
-                                    <input
-                                        className="form-input"
-                                        placeholder="PLZ"
-                                        value={formData.ownerZip || ''}
-                                        onChange={(e) => setFormData(prev => ({ ...prev, ownerZip: e.target.value }))}
-                                        style={{ width: '100%' }}
-                                    />
-                                </div>
-                                <div style={{ flex: 2 }}>
-                                    <label style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '0.25rem' }}>Ort</label>
-                                    <input
-                                        className="form-input"
-                                        placeholder="Ort"
-                                        value={formData.ownerCity || ''}
-                                        onChange={(e) => setFormData(prev => ({ ...prev, ownerCity: e.target.value }))}
-                                        style={{ width: '100%' }}
-                                    />
-                                </div>
-                            </div>
+                            <PlzOrtInput
+                                plz={formData.ownerZip || ''}
+                                ort={formData.ownerCity || ''}
+                                onAutofill={(p, o) => setFormData(prev => ({ ...prev, ownerZip: p, ownerCity: o }))}
+                                onChangePlz={v => setFormData(prev => ({ ...prev, ownerZip: v }))}
+                                onChangeOrt={v => setFormData(prev => ({ ...prev, ownerCity: v }))}
+                                labelPlz="PLZ" labelOrt="Ort"
+                                plzWidth="75px"
+                                gap="0.4rem"
+                                labelStyle={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600, marginBottom: '0.25rem' }}
+                            />
                         </div>
 
                         {/* Zweite Zeile für Rechnungsdetails */}
@@ -223,43 +200,23 @@ const ContactSection = ({ formData, setFormData, mode, renderConflictWarn }) => 
                     </div>
 
                     {/* Zip and City */}
-                    <div style={{ display: 'flex', gap: '0.75rem' }}>
-                        <div style={{ width: '100px', display: 'flex', flexDirection: 'column', gap: '0.4rem', position: 'relative' }}>
-                            <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 600 }}>PLZ</label>
-                            <input
-                                list="plz-list-mobile"
-                                className="form-input"
-                                placeholder="PLZ"
-                                value={formData.zip || ''}
-                                onChange={(e) => {
-                                    const val = e.target.value;
-                                    const match = swissPLZ.find(entry => entry.plz === val.trim());
-                                    if (match) {
-                                        setFormData(prev => ({ ...prev, zip: val, city: match.city }));
-                                    } else {
-                                        setFormData(prev => ({ ...prev, zip: val }));
-                                    }
-                                }}
-                                style={{ width: '100%', fontSize: '0.95rem' }}
-                            />
-                            {renderConflictWarn('zip')}
-                        </div>
-                        <datalist id="plz-list-mobile">
-                            {swissPLZ.map((entry, idx) => (
-                                <option key={idx} value={entry.plz}>{entry.city}</option>
-                            ))}
-                        </datalist>
-
-                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.4rem', position: 'relative' }}>
-                            <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 600 }}>Ort</label>
-                            <input
-                                className="form-input"
-                                placeholder="Ort"
-                                value={formData.city || ''}
-                                onChange={(e) => setFormData(prev => ({ ...prev, city: e.target.value }))}
-                                style={{ width: '100%', fontSize: '0.95rem' }}
-                            />
-                            {renderConflictWarn('city')}
+                    <div>
+                        <PlzOrtInput
+                            plz={formData.zip || ''}
+                            ort={formData.city || ''}
+                            onAutofill={(p, o) => setFormData(prev => ({ ...prev, zip: p, city: o }))}
+                            onChangePlz={v => setFormData(prev => ({ ...prev, zip: v }))}
+                            onChangeOrt={v => setFormData(prev => ({ ...prev, city: v }))}
+                            labelPlz="PLZ" labelOrt="Ort"
+                            plzWidth="100px"
+                            gap="0.75rem"
+                            labelStyle={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 600 }}
+                            inputStyle={{ fontSize: '0.95rem' }}
+                        />
+                        {/* Conflict warnings below */}
+                        <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.25rem' }}>
+                            <div style={{ width: '100px', flexShrink: 0 }}>{renderConflictWarn('zip')}</div>
+                            <div style={{ flex: 1 }}>{renderConflictWarn('city')}</div>
                         </div>
                     </div>
                 </div>

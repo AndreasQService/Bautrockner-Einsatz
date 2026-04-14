@@ -9,7 +9,8 @@ const ImageGrid = ({ images, showName = false, imageStyle = styles.image, contai
     const flatImages = [];
     images.forEach(img => {
         flatImages.push(img);
-        if (img.thermalImage) {
+        // Only show thermal if it exists AND has a different preview (not the same image)
+        if (img.thermalImage && img.thermalImage.preview && img.thermalImage.preview !== img.preview) {
             flatImages.push({
                 ...img.thermalImage,
                 _isThermal: true,

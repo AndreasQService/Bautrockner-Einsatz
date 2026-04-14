@@ -170,13 +170,17 @@ const ImageEditor = ({ image, onSave, onCancel }) => {
             pCtx.arc(startPos.current.x, startPos.current.y, radius, 0, 2 * Math.PI);
             pCtx.stroke();
         } else if (tool === 'eraser') {
+            // Erase directly on the stable canvas
             ctx.globalCompositeOperation = 'destination-out';
-            ctx.lineWidth = lineWidth * 4; // Scaled eraser
+            ctx.lineWidth = lineWidth * 4;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
             ctx.beginPath();
             ctx.moveTo(startPos.current.x, startPos.current.y);
             ctx.lineTo(coords.x, coords.y);
             ctx.stroke();
-            startPos.current = coords;
+            ctx.globalCompositeOperation = 'source-over'; // Reset
+            startPos.current = coords; // Advance for smooth continuous erasing
         }
     };
 
@@ -191,12 +195,14 @@ const ImageEditor = ({ image, onSave, onCancel }) => {
         const pCtx = pCtxRef.current;
 
         if (tool !== 'eraser') {
+            // Merge preview strokes onto stable canvas
             ctx.globalCompositeOperation = 'source-over';
             ctx.drawImage(pCanvas, 0, 0);
             pCtx.clearRect(0, 0, pCanvas.width, pCanvas.height);
         }
+        // Eraser already drew directly on ctx — nothing to merge
 
-        // Extremely limited history to prevent memory hang on tablets
+        // Save history snapshot
         const newState = ctx.getImageData(0, 0, canvasRef.current.width, canvasRef.current.height);
         setHistory(prev => {
             const next = [...prev, newState];
@@ -308,7 +314,33 @@ const ImageEditor = ({ image, onSave, onCancel }) => {
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', backgroundColor: 'rgba(255,255,255,0.05)', padding: '0.4rem 0.6rem', borderRadius: '12px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginRight: '0.5rem' }}>
+                    {/* Preset Colors */}
+                    {[
+                        { hex: '#EF4444', label: 'Rot' },
+                        { hex: '#3B82F6', label: 'Blau' },
+                        { hex: '#22C55E', label: 'Grün' },
+                        { hex: '#EAB308', label: 'Gelb' },
+                    ].map(({ hex, label }) => (
+                        <button
+                            key={hex}
+                            title={label}
+                            onPointerDown={(e) => { e.stopPropagation(); setColor(hex); }}
+                            style={{
+                                width: '26px', height: '26px',
+                                borderRadius: '50%',
+                                backgroundColor: hex,
+                                border: color === hex ? '3px solid white' : '2px solid rgba(255,255,255,0.25)',
+                                cursor: 'pointer',
+                                flexShrink: 0,
+                                boxShadow: color === hex ? `0 0 0 2px ${hex}` : 'none',
+                                transition: 'border 0.1s, box-shadow 0.1s',
+                                padding: 0,
+                            }}
+                        />
+                    ))}
+                    <div style={{ width: '1px', background: 'rgba(255,255,255,0.15)', alignSelf: 'stretch' }} />
+                    {/* Size Slider */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: 'white', opacity: 0.5 }} />
                         <input
                             type="range"
@@ -319,6 +351,7 @@ const ImageEditor = ({ image, onSave, onCancel }) => {
                             style={{ width: '80px', cursor: 'pointer', accentColor: '#3B82F6' }}
                         />
                     </div>
+                    {/* Free Color Picker */}
                     <input type="color" value={color} onChange={(e) => setColor(e.target.value)} style={{ width: '28px', height: '28px', border: '2px solid white', borderRadius: '50%', cursor: 'pointer', padding: 0 }} />
                 </div>
             </div>
