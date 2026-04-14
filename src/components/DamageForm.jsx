@@ -3621,6 +3621,8 @@ END:VCARD`;
                                                             type="text"
                                                             placeholder="Name"
                                                             className="form-input"
+                                                            data-lpignore="true"
+                                                            autoComplete="off"
                                                             value={contact.name}
                                                             onChange={(e) => {
                                                                 const newContacts = [...formData.contacts];
@@ -3748,6 +3750,8 @@ END:VCARD`;
                                                         type="email"
                                                         placeholder="email@firma.ch"
                                                         className="form-input"
+                                                        data-lpignore="true"
+                                                        autoComplete="off"
                                                         value={contact.email || ''}
                                                         onChange={(e) => {
                                                             const newContacts = [...formData.contacts];
