@@ -5693,26 +5693,74 @@ END:VCARD`;
                                 {formData.rooms.map(room => {
                                     const hasMeasurement = !!room.measurementData;
                                     const date = hasMeasurement ? (room.measurementData.globalSettings?.date ? new Date(room.measurementData.globalSettings.date).toLocaleDateString('de-CH') : 'Kein Datum') : '-';
+                                    const allImages = [
+                                        ...(room.measurementData?.canvasImage ? [{ id: 'current', src: room.measurementData.canvasImage, label: `Aktuell · ${date}`, isCurrent: true }] : []),
+                                        ...((room.measurementHistory || []).filter(h => h?.canvasImage).map(h => ({ id: h.id, src: h.canvasImage, label: h.globalSettings?.date ? new Date(h.globalSettings.date).toLocaleDateString('de-CH') : 'Messung', isCurrent: false }))),
+                                    ];
                                     return (
                                         <div key={room.id} style={{
-                                            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                                             padding: '1rem', backgroundColor: 'rgba(255, 255, 255, 0.02)',
-                                            border: '1px solid var(--border)', borderRadius: '12px', gap: '1rem'
+                                            border: '1px solid var(--border)', borderRadius: '12px',
+                                            display: 'flex', flexDirection: 'column', gap: '0.75rem',
                                         }}>
-                                            <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-                                                <div style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--text-main)' }}>{room.name}</div>
-                                                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 500 }}>{hasMeasurement ? `Letzte Messung: ${date}` : 'Keine Messdaten'}</div>
+                                            {/* Header: Raumname + Buttons */}
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
+                                                <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+                                                    <div style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--text-main)' }}>{room.name}</div>
+                                                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 500 }}>{hasMeasurement ? `Letzte Messung: ${date}` : 'Keine Messdaten'}</div>
+                                                </div>
+                                                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                                    {room.measurementData ? (
+                                                        <>
+                                                            <button type="button" className="btn-glass" style={{ padding: '0.4rem 0.8rem', minHeight: '44px', fontSize: '0.75rem', borderRadius: '8px' }} onClick={() => { setActiveRoomForMeasurement(room); setIsNewMeasurement(true); setShowMeasurementModal(true); }}>Neue Messung</button>
+                                                            <button type="button" className="btn-glass" style={{ padding: '0.4rem 0.8rem', minHeight: '44px', fontSize: '0.75rem', borderRadius: '8px', color: 'var(--primary)' }} onClick={() => { setActiveRoomForMeasurement(room); setIsNewMeasurement(false); setShowMeasurementModal(true); }}>Bearbeiten</button>
+                                                        </>
+                                                    ) : (
+                                                        <button type="button" className="btn-glass" style={{ padding: '0.4rem 0.8rem', minHeight: '44px', fontSize: '0.75rem', borderRadius: '8px', color: 'var(--success)' }} onClick={() => { setActiveRoomForMeasurement(room); setIsNewMeasurement(false); setShowMeasurementModal(true); }}>Messung starten</button>
+                                                    )}
+                                                </div>
                                             </div>
-                                            <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                                {room.measurementData ? (
-                                                    <>
-                                                        <button type="button" className="btn-glass" style={{ padding: '0.4rem 0.8rem', minHeight: '44px', fontSize: '0.75rem', borderRadius: '8px' }} onClick={() => { setActiveRoomForMeasurement(room); setIsNewMeasurement(true); setShowMeasurementModal(true); }}>Neue Messung</button>
-                                                        <button type="button" className="btn-glass" style={{ padding: '0.4rem 0.8rem', minHeight: '44px', fontSize: '0.75rem', borderRadius: '8px', color: 'var(--primary)' }} onClick={() => { setActiveRoomForMeasurement(room); setIsNewMeasurement(false); setShowMeasurementModal(true); }}>Bearbeiten</button>
-                                                    </>
-                                                ) : (
-                                                    <button type="button" className="btn-glass" style={{ padding: '0.4rem 0.8rem', minHeight: '44px', fontSize: '0.75rem', borderRadius: '8px', color: 'var(--success)' }} onClick={() => { setActiveRoomForMeasurement(room); setIsNewMeasurement(false); setShowMeasurementModal(true); }}>Messung starten</button>
-                                                )}
-                                            </div>
+                                            {/* Skizzen 2-Spalten Grid (responsive) */}
+                                            {allImages.length > 0 && (
+                                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', borderTop: '1px solid var(--border)', paddingTop: '0.75rem' }}>
+                                                    {allImages.map((entry) => (
+                                                        <div key={entry.id} style={{ position: 'relative', borderRadius: '8px', overflow: 'hidden', border: `1px solid ${entry.isCurrent ? 'var(--primary)' : 'var(--border)'}`, width: 'calc(50% - 0.375rem)', flexShrink: 0 }}>
+                                                            <img
+                                                                src={entry.src}
+                                                                alt={entry.label}
+                                                                style={{ width: '100%', height: '160px', objectFit: 'contain', backgroundColor: '#fff', display: 'block', cursor: 'pointer' }}
+                                                                onClick={() => window.open(entry.src, '_blank')}
+                                                            />
+                                                            <div style={{ padding: '0.3rem 0.6rem', fontSize: '0.7rem', fontWeight: 600, color: entry.isCurrent ? 'var(--primary)' : 'var(--text-muted)', borderTop: '1px solid var(--border)' }}>
+                                                                {entry.isCurrent ? `● ${entry.label}` : entry.label}
+                                                            </div>
+                                                            <button
+                                                                type="button"
+                                                                title="Bild löschen"
+                                                                onClick={() => {
+                                                                    if (!window.confirm('Dieses Messprotokoll-Bild wirklich löschen?')) return;
+                                                                    setFormData(prev => ({
+                                                                        ...prev,
+                                                                        rooms: prev.rooms.map(r => {
+                                                                            if (r.id !== room.id) return r;
+                                                                            if (entry.isCurrent) {
+                                                                                const newHistory = [...(r.measurementHistory || [])];
+                                                                                const lastHist = newHistory.pop();
+                                                                                return { ...r, measurementData: lastHist ? { ...lastHist } : null, measurementHistory: newHistory };
+                                                                            } else {
+                                                                                return { ...r, measurementHistory: (r.measurementHistory || []).filter(h => h.id !== entry.id) };
+                                                                            }
+                                                                        })
+                                                                    }));
+                                                                }}
+                                                                style={{ position: 'absolute', top: '6px', right: '6px', background: 'rgba(239,68,68,0.85)', color: 'white', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 2px 4px rgba(0,0,0,0.3)', zIndex: 10 }}
+                                                            >
+                                                                <X size={14} />
+                                                            </button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
                                         </div>
                                     );
                                 })}

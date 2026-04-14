@@ -53,6 +53,7 @@ const MeasurementModal = ({ isOpen, onClose, onSave, rooms, projectTitle, initia
     const [isSuccess, setIsSuccess] = useState(false);
     const [stylusOnlyMode, setStylusOnlyMode] = useState(true); // Palm Rejection standardmäßig AN
     const [showCamera, setShowCamera] = useState(false);
+    const [galleryPhotos, setGalleryPhotos] = useState([]); // Messprotokoll-Fotos (2-Spalten-Grid)
 
     // Always lock the sketch by default when the modal opens
     useEffect(() => {
@@ -193,6 +194,7 @@ const MeasurementModal = ({ isOpen, onClose, onSave, rooms, projectTitle, initia
                     humidity: '',
                     device: ''
                 });
+                if (roomData.galleryPhotos) setGalleryPhotos(roomData.galleryPhotos);
 
                 if (roomData.canvasImage) {
                     const img = new window.Image();
@@ -256,6 +258,34 @@ const MeasurementModal = ({ isOpen, onClose, onSave, rooms, projectTitle, initia
         setHistory(prev => [...prev.slice(0, historyStep + 1), imageData]);
         setHistoryStep(prev => prev + 1);
     };
+
+    // Fotos im Canvas 2-spaltig zeichnen wenn galleryPhotos sich ändert
+    useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        if (galleryPhotos.length === 0) return;
+        const cols = Math.min(2, galleryPhotos.length);
+        const cellW = canvas.width / cols;
+        const cellH = canvas.height;
+        let loaded = 0;
+        galleryPhotos.forEach((photo, index) => {
+            const img = new window.Image();
+            img.onload = () => {
+                const col = index % 2;
+                const x = col * cellW;
+                const scale = Math.min(cellW / img.width, cellH / img.height);
+                const drawX = x + (cellW - img.width * scale) / 2;
+                const drawY = (cellH - img.height * scale) / 2;
+                ctx.drawImage(img, drawX, drawY, img.width * scale, img.height * scale);
+                loaded++;
+                if (loaded === galleryPhotos.length) saveParamsToHistory(canvas);
+            };
+            img.src = photo.src;
+        });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [galleryPhotos]);
 
     const handleUndo = () => {
         if (historyStep > 0) {
@@ -387,17 +417,7 @@ const MeasurementModal = ({ isOpen, onClose, onSave, rooms, projectTitle, initia
         setShowCamera(false);
         const reader = new FileReader();
         reader.onload = (event) => {
-            const img = new window.Image();
-            img.onload = () => {
-                const canvas = canvasRef.current;
-                const ctx = canvas.getContext('2d');
-                const scale = Math.min(canvas.width / img.width, canvas.height / img.height);
-                const x = (canvas.width / 2) - (img.width / 2) * scale;
-                const y = (canvas.height / 2) - (img.height / 2) * scale;
-                ctx.drawImage(img, x, y, img.width * scale, img.height * scale);
-                saveParamsToHistory(canvas);
-            };
-            img.src = event.target.result;
+            setGalleryPhotos(prev => [...prev, { id: Date.now() + Math.random(), src: event.target.result }]);
         };
         reader.readAsDataURL(file);
     };
@@ -434,7 +454,8 @@ const MeasurementModal = ({ isOpen, onClose, onSave, rooms, projectTitle, initia
                     file,
                     measurements,
                     globalSettings,
-                    canvasImage: canvasDataUrl
+                    canvasImage: canvasDataUrl,
+                    galleryPhotos
                 });
             } else {
                 // Standard Image Save
@@ -686,10 +707,19 @@ const MeasurementModal = ({ isOpen, onClose, onSave, rooms, projectTitle, initia
                                             id="sketch-photo-upload"
                                             type="file"
                                             accept="image/*,.heic,.heif"
+                                            multiple
                                             style={{ display: 'none' }}
                                             onChange={(e) => {
-                                                const file = e.target.files?.[0];
-                                                if (file) handleCameraCapture(file);
+                                                const files = Array.from(e.target.files || []);
+                                                if (files.length === 0) return;
+                                                files.forEach(file => {
+                                                    const reader = new FileReader();
+                                                    reader.onload = (ev) => {
+                                                        setGalleryPhotos(prev => [...prev, { id: Date.now() + Math.random(), src: ev.target.result }]);
+                                                    };
+                                                    reader.readAsDataURL(file);
+                                                });
+                                                e.target.value = '';
                                             }}
                                         />
 
@@ -776,38 +806,34 @@ const MeasurementModal = ({ isOpen, onClose, onSave, rooms, projectTitle, initia
                                 </button>
                             </div>
 
-                            <div style={{
-                                display: isCanvasExpanded ? 'block' : 'none',
-                                border: '1px solid var(--border)',
-                                borderRadius: '4px',
-                                overflow: 'hidden',
-                                // Wenn Skizze gesperrt: Touch-Events durchleiten (damit darunter liegende Inputs erreichbar sind)
-                                touchAction: isSketchLocked ? 'auto' : 'none',
-                                pointerEvents: isSketchLocked ? 'none' : 'auto',
-                            }}>
+                            <div style={{ display: isCanvasExpanded ? 'block' : 'none', position: 'relative', border: '1px solid var(--border)', borderRadius: '4px', overflow: 'hidden', touchAction: isSketchLocked ? 'auto' : 'none', pointerEvents: isSketchLocked ? 'none' : 'auto' }}>
                                 <canvas
                                     ref={canvasRef}
                                     width={960}
                                     height={280}
-                                    style={{
-                                        width: '100%',
-                                        height: '280px',
-                                        cursor: isScrollMode ? 'grab' : 'crosshair',
-                                        display: 'block',
-                                        backgroundColor: 'white',
-                                        backgroundImage: `
-                                            linear-gradient(to right, #e0e0e0 1px, transparent 1px),
-                                            linear-gradient(to bottom, #e0e0e0 1px, transparent 1px)
-                                        `,
-                                        backgroundSize: '40px 40px',
-                                        touchAction: 'none'
-                                    }}
+                                    style={{ width: '100%', height: '280px', cursor: isScrollMode ? 'grab' : 'crosshair', display: 'block', backgroundColor: 'white', backgroundImage: `linear-gradient(to right, #e0e0e0 1px, transparent 1px), linear-gradient(to bottom, #e0e0e0 1px, transparent 1px)`, backgroundSize: '40px 40px', touchAction: 'none' }}
                                     onPointerDown={startDrawing}
                                     onPointerMove={draw}
                                     onPointerUp={stopDrawing}
                                     onPointerLeave={stopDrawing}
                                     onPointerCancel={stopDrawing}
                                 />
+                                {/* Löschen-Overlay pro Foto-Zelle */}
+                                {galleryPhotos.map((photo, index) => {
+                                    const cols = Math.min(2, galleryPhotos.length);
+                                    const rightEdgePct = ((index % 2) + 1) / cols * 100;
+                                    return (
+                                        <button
+                                            key={photo.id}
+                                            type="button"
+                                            title="Foto löschen"
+                                            onClick={() => setGalleryPhotos(prev => prev.filter(p => p.id !== photo.id))}
+                                            style={{ position: 'absolute', top: '8px', left: `calc(${rightEdgePct}% - 44px)`, background: 'rgba(220,38,38,0.92)', color: 'white', border: 'none', borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: 20, pointerEvents: 'auto', boxShadow: '0 2px 8px rgba(0,0,0,0.5)' }}
+                                        >
+                                            <X size={16} />
+                                        </button>
+                                    );
+                                })}
                             </div>
                         </div>
                     )}
