@@ -3627,50 +3627,7 @@ END:VCARD`;
                                                                 newContacts[idx].name = e.target.value;
                                                                 setFormData({ ...formData, contacts: newContacts });
                                                             }}
-                                                            style={{ fontWeight: 700, fontSize: '0.95rem', flex: 1, padding: '0.55rem 0.7rem', minWidth: 0 }}
                                                         />
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => downloadVCard(contact)}
-                                                            className="btn-glass"
-                                                            style={{
-                                                                padding: '0 0.5rem',
-                                                                borderRadius: '8px',
-                                                                cursor: 'pointer',
-                                                                display: 'flex',
-                                                                alignItems: 'center',
-                                                                justifyContent: 'center',
-                                                                backgroundColor: 'rgba(15, 110, 163, 0.15)',
-                                                                border: '1px solid rgba(15, 110, 163, 0.25)',
-                                                                color: '#0F6EA3',
-                                                                flexShrink: 0
-                                                            }}
-                                                            title="vCard downloaden"
-                                                        >
-                                                            <VcfIcon size={20} />
-                                                        </button>
-                                                        {/* QR-Code Button */}
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => handleContactQR(contact)}
-                                                            style={{
-                                                                padding: '0 0.6rem',
-                                                                height: '36px',
-                                                                borderRadius: '8px',
-                                                                cursor: 'pointer',
-                                                                display: 'flex',
-                                                                alignItems: 'center',
-                                                                justifyContent: 'center',
-                                                                backgroundColor: 'rgba(16, 185, 129, 0.12)',
-                                                                border: '1px solid rgba(16, 185, 129, 0.35)',
-                                                                color: '#10b981',
-                                                                flexShrink: 0,
-                                                                fontSize: '15px',
-                                                            }}
-                                                            title="QR-Code zum Scannen"
-                                                        >
-                                                            QR
-                                                        </button>
                                                     </div>
                                                 </div>
 
@@ -3822,6 +3779,29 @@ END:VCARD`;
                                                     >
                                                         <Phone size={16} />
                                                     </a>
+
+                                                    {/* QR-Code Button */}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleContactQR(contact)}
+                                                        className="btn-glass"
+                                                        style={{
+                                                            padding: '0.45rem 0.6rem',
+                                                            borderRadius: '8px',
+                                                            cursor: 'pointer',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
+                                                            backgroundColor: 'rgba(16, 185, 129, 0.08)',
+                                                            border: '1px solid rgba(16, 185, 129, 0.15)',
+                                                            color: '#10B981',
+                                                            fontSize: '0.75rem',
+                                                            fontWeight: 700,
+                                                        }}
+                                                        title="QR-Code zum Scannen"
+                                                    >
+                                                        QR
+                                                    </button>
 
                                                     {/* Delete Button */}
                                                     <button
