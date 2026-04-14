@@ -3627,6 +3627,7 @@ END:VCARD`;
                                                                 newContacts[idx].name = e.target.value;
                                                                 setFormData({ ...formData, contacts: newContacts });
                                                             }}
+                                                            style={{ fontWeight: 700, fontSize: '0.85rem', padding: '0.45rem 0.7rem', width: '100%' }}
                                                         />
                                                     </div>
                                                 </div>
