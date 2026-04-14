@@ -828,7 +828,7 @@ const MeasurementModal = ({ isOpen, onClose, onSave, rooms, projectTitle, initia
                                             type="button"
                                             title="Foto löschen"
                                             onClick={() => setGalleryPhotos(prev => prev.filter(p => p.id !== photo.id))}
-                                            style={{ position: 'absolute', top: '8px', left: `calc(${rightEdgePct}% - 44px)`, background: 'rgba(220,38,38,0.92)', color: 'white', border: 'none', borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: 20, pointerEvents: 'auto', boxShadow: '0 2px 8px rgba(0,0,0,0.5)' }}
+                                            style={{ position: 'absolute', top: '8px', left: `calc(${rightEdgePct}% - 44px)`, background: 'rgba(220,38,38,0.92)', color: 'white', border: 'none', borderRadius: '50%', width: '36px', height: '36px', display: isSketchLocked ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: 20, pointerEvents: isSketchLocked ? 'none' : 'auto', boxShadow: '0 2px 8px rgba(0,0,0,0.5)' }}
                                         >
                                             <X size={16} />
                                         </button>
