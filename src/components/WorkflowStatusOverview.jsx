@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import {
   Bell, Calendar, X, ChevronRight, AlertTriangle, Clock,
   CheckCircle2, Zap, StickyNote, MinusCircle, Check,
@@ -130,14 +131,20 @@ function StepPopover({ reportId, step, stepData, onSave, onClose, anchorRect }) 
 
   // Smart positioning
   if (anchorRect) {
-    const winH = window.innerHeight
-    const popH = 280
-    if (anchorRect.bottom + popH < winH) {
+    const winH   = window.innerHeight
+    const winW   = window.innerWidth
+    const popH   = 360  // enough for all fields incl. date + note + buttons
+    const popW   = 248
+    const leftPos = Math.min(Math.max(4, anchorRect.left), winW - popW - 4)
+    if (anchorRect.bottom + popH + 8 < winH) {
+      // open downward
       style.top  = anchorRect.bottom + 6
-      style.left = Math.min(anchorRect.left, window.innerWidth - 256)
+      style.left = leftPos
     } else {
-      style.bottom = winH - anchorRect.top + 6
-      style.left   = Math.min(anchorRect.left, window.innerWidth - 256)
+      // open upward — clamp so it doesn't go above viewport
+      const upTop = anchorRect.top - popH - 6
+      style.top  = Math.max(8, upTop)
+      style.left = leftPos
     }
   }
 
@@ -162,7 +169,7 @@ function StepPopover({ reportId, step, stepData, onSave, onClose, anchorRect }) 
     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px',
   })
 
-  return (
+  return createPortal(
     <div ref={ref} style={style} onClick={e => e.stopPropagation()}>
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem' }}>
@@ -257,7 +264,8 @@ function StepPopover({ reportId, step, stepData, onSave, onClose, anchorRect }) 
           </button>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 
@@ -279,6 +287,17 @@ function StepCell({ report, step, stepIdx, activeIdx, store, onOpenPopover, open
   const urgency = sd.status === 'date' ? dateUrgency(sd.date) : null
   const hasNote = !!sd.note
 
+  // Auto-Eskalation: Kontakt-Schritt färbt sich nach Tagen seit Projekteingang
+  let kontaktEscStyle = null
+  if (state === 'active' && step.id === 'kontakt' && report.date) {
+    const daysSince = -daysFrom(report.date) // positiv = Tage in der Vergangenheit
+    if (daysSince >= 5) {
+      kontaktEscStyle = { bg: 'rgba(239,68,68,0.15)', fg: '#EF4444', border: 'rgba(239,68,68,0.5)' }
+    } else if (daysSince >= 3) {
+      kontaktEscStyle = { bg: 'rgba(245,158,11,0.15)', fg: '#F59E0B', border: 'rgba(245,158,11,0.5)' }
+    }
+  }
+
   // BG / color logic
   const styles = {
     done:    { bg: 'rgba(16,185,129,0.12)',  fg: '#10B981', border: 'transparent' },
@@ -291,7 +310,7 @@ function StepCell({ report, step, stepIdx, activeIdx, store, onOpenPopover, open
       fg:     urgency?.color || '#3B82F6',
       border: (urgency?.color || '#3B82F6') + '55',
     },
-    active:  { bg: 'rgba(59,130,246,0.15)', fg: '#60A5FA', border: 'rgba(59,130,246,0.45)' },
+    active:  kontaktEscStyle || { bg: 'rgba(59,130,246,0.15)', fg: '#60A5FA', border: 'rgba(59,130,246,0.45)' },
     pending: { bg: 'rgba(255,255,255,0.02)', fg: '#334155', border: 'transparent' },
   }
   const s = styles[state]
@@ -361,8 +380,8 @@ function StepCell({ report, step, stepIdx, activeIdx, store, onOpenPopover, open
           {state === 'active' && (
             <div style={{
               width: 8, height: 8, borderRadius: '50%',
-              backgroundColor: '#3B82F6',
-              boxShadow: '0 0 6px #3B82F6aa',
+              backgroundColor: s.fg,
+              boxShadow: `0 0 6px ${s.fg}aa`,
               animation: 'wfPulse 2s ease-in-out infinite',
             }} />
           )}
