@@ -3615,7 +3615,7 @@ END:VCARD`;
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '1.25rem 1.5rem 1.5rem' }}>
                                                 {/* Row 1: Name & vCard (Blue Button) */}
                                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                                                    <label style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)', fontWeight: 750 }}>Name</label>
+                                                    <label style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)', fontWeight: 750 }}>{['AG', 'HW', 'Handwerker'].includes(contact.role) ? 'Firma' : 'Name'}</label>
                                                     <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'stretch' }}>
                                                         <input
                                                             type="text"
