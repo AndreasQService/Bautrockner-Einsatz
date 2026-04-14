@@ -477,3 +477,14 @@ input[type=number] {
   border-radius: 1rem;
   padding: 1.5rem;
 }
+/* -- LastPass / Browser-Extension Icons unterdr cken ---------------- */
+[data-lastpass-root],
+[data-lastpass-icon-root],
+div[id^='__lpform_'],
+span[data-lastpass-icon],
+div[data-lastpass-root='true'] {
+  display: none !important;
+}
+input[data-lpignore='false'] + div[id^='__lpform_'] {
+  display: none !important;
+}
