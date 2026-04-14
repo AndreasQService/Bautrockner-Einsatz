@@ -6480,19 +6480,21 @@ END:VCARD`;
                                 // ── Räume aktualisieren (bestehende Logik unverändert) ──
                                 const updatedRooms = prev.rooms.map(r => {
                                     if (r.id === activeRoomForMeasurement.id) {
-                                        const newHistoryEntry = {
-                                            id: `hist_${Date.now()}`,
-                                            date: globalSettings.date || new Date().toISOString(),
-                                            measurements: measurements.map(m => ({ ...m })),
-                                            globalSettings: { ...globalSettings },
-                                            canvasImage: canvasImage,
-                                            protocolUrl: protocolUrl
-                                        };
                                         const history = r.measurementHistory ? [...r.measurementHistory] : [];
+                                        const updatedHistory = isNewMeasurement
+                                            ? [...history, {
+                                                id: `hist_${Date.now()}`,
+                                                date: globalSettings.date || new Date().toISOString(),
+                                                measurements: measurements.map(m => ({ ...m })),
+                                                globalSettings: { ...globalSettings },
+                                                canvasImage: canvasImage,
+                                                protocolUrl: protocolUrl
+                                              }]
+                                            : history; // Bearbeiten: Verlauf unverändert lassen
                                         return {
                                             ...r,
                                             measurementData: { measurements, globalSettings, canvasImage, protocolUrl },
-                                            measurementHistory: [...history, newHistoryEntry]
+                                            measurementHistory: updatedHistory
                                         };
                                     }
                                     return r;
