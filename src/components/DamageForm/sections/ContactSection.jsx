@@ -125,7 +125,7 @@ const ContactSection = ({ formData, setFormData, mode, renderConflictWarn }) => 
                                 onChangePlz={v => setFormData(prev => ({ ...prev, ownerZip: v }))}
                                 onChangeOrt={v => setFormData(prev => ({ ...prev, ownerCity: v }))}
                                 labelPlz="PLZ" labelOrt="Ort"
-                                plzWidth="75px"
+                                plzWidth="90px"
                                 gap="0.4rem"
                                 labelStyle={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600, marginBottom: '0.25rem' }}
                             />

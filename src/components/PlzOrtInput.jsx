@@ -52,22 +52,22 @@ const PlzOrtInput = ({
         return () => document.removeEventListener('mousedown', handler);
     }, []);
 
-    // Auto-fill on mount or when values change externally:
-    // If Ort is set but PLZ is empty → find PLZ
-    // If PLZ is set but Ort is empty → find Ort
+    // Auto-fill on mount:
+    // 1. PLZ gesetzt → ORT korrigieren wenn PLZ bekannt ist (auch wenn ORT bereits gesetzt aber falsch)
+    // 2. ORT gesetzt aber PLZ leer → PLZ aus ORT suchen
     useEffect(() => {
-        if (ort && !plz) {
+        if (plz && plz.trim().length === 4) {
+            const match = swissPLZ.find(e => e.plz === plz.trim());
+            if (match && match.city !== ort) {
+                onAutofill ? onAutofill(match.plz, match.city) : onChangeOrt && onChangeOrt(match.city);
+            }
+        } else if (ort && !plz) {
             const match = swissPLZ.find(e => e.city.toLowerCase() === ort.toLowerCase().trim());
             if (match) {
                 onAutofill ? onAutofill(match.plz, match.city) : onChangePlz && onChangePlz(match.plz);
             }
-        } else if (plz && !ort) {
-            const match = swissPLZ.find(e => e.plz === plz.trim());
-            if (match) {
-                onAutofill ? onAutofill(match.plz, match.city) : onChangeOrt && onChangeOrt(match.city);
-            }
         }
-        // Only run on mount or when the values flip from empty↔filled
+        // Only run on mount
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 

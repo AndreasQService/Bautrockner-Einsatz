@@ -18,7 +18,9 @@ import { supabase } from '../supabaseClient';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import { buildProjectFolderName, uploadReport, uploadPhotoFile, uploadPhotoAndGetUrl, getPhotoDownloadUrl } from '../services/OneDriveService';
+import { savePhotoLocally, updatePhotoSyncStatus, deleteOldSyncedPhotos, getPendingCount } from '../services/PhotoStorage';
 import { swissPLZ } from '../data/swiss_plz';
+
 import { DEVICE_INVENTORY } from '../data/device_inventory';
 import { pdf } from '@react-pdf/renderer';
 import DamageReportDocument from './pdf/DamageReportDocument';
@@ -273,8 +275,121 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
     const [conflicts, setConflicts] = useState({}); // Stores { fieldPath: { original: '...', new: '...' } }
     const [isContactsExpanded, setIsContactsExpanded] = useState(mode !== 'technician');
     const [isRoomsExpanded, setIsRoomsExpanded] = useState(true);
+    const [isOnline, setIsOnline] = useState(navigator.onLine);
+    const [pendingSyncCount, setPendingSyncCount] = useState(0);
+    const [isSyncing, setIsSyncing] = useState(false);
+
+    // ── Auto-Sync: Pending Fotos hochladen wenn Netz zurückkommt ─────────────
+    useEffect(() => {
+        const syncPendingPhotos = async () => {
+            if (isSyncing) return;
+            setIsSyncing(true);
+
+            console.log('[Sync] 🔄 Netz verfügbar – starte Sync ausstehender Fotos...');
+
+            try {
+                const { getPendingPhotos } = await import('../services/PhotoStorage');
+                const pending = await getPendingPhotos(formData.id || 'temp');
+
+                if (pending.length === 0) {
+                    console.log('[Sync] ✅ Keine ausstehenden Fotos.');
+                    setPendingSyncCount(0);
+                    return;
+                }
+
+                console.log(`[Sync] ${pending.length} Fotos ausstehend...`);
+                let synced = 0;
+
+                for (const photo of pending) {
+                    try {
+                        const meta = photo.meta || {};
+                        const subFolder = meta.subFolder || 'Sonstiges';
+                        const odFolder = meta.odFolder || buildProjectFolderName(formData.projectNumber || formData.id || 'Unbekannt', formData);
+
+                        // Supabase Upload
+                        let supabasePath = photo.supabasePath;
+                        if (!supabasePath && supabase) {
+                            const ext = photo.name.split('.').pop();
+                            const fileName = `cases/${formData.id || 'temp'}/images/${Date.now()}_${photo.id}.${ext}`;
+                            const { error } = await supabase.storage.from('case-files').upload(fileName, photo.blob);
+                            if (!error) supabasePath = fileName;
+                        }
+
+                        // OneDrive Upload
+                        let oneDriveItemId = photo.oneDriveItemId;
+                        let oneDrivePath = photo.oneDrivePath;
+                        if (!oneDriveItemId) {
+                            const odResult = await uploadPhotoAndGetUrl(odFolder, subFolder, new File([photo.blob], photo.name, { type: photo.type }));
+                            if (odResult) {
+                                oneDriveItemId = odResult.itemId;
+                                oneDrivePath = odResult.odPath;
+                            }
+                        }
+
+                        // IndexedDB Status aktualisieren
+                        await updatePhotoSyncStatus(photo.id, {
+                            supabasePath,
+                            oneDriveItemId,
+                            oneDrivePath,
+                            syncStatus: oneDriveItemId ? 'synced' : (supabasePath ? 'synced' : 'error'),
+                        });
+
+                        // formData image Eintrag aktualisieren
+                        setFormData(prev => ({
+                            ...prev,
+                            images: prev.images.map(img =>
+                                img.localId === photo.id ? {
+                                    ...img,
+                                    storagePath: supabasePath,
+                                    oneDriveItemId,
+                                    oneDrivePath,
+                                } : img
+                            )
+                        }));
+
+                        synced++;
+                    } catch (photoErr) {
+                        console.warn(`[Sync] Foto ${photo.id} fehlgeschlagen:`, photoErr.message);
+                    }
+                }
+
+                console.log(`[Sync] ✅ ${synced}/${pending.length} Fotos synchronisiert`);
+                setPendingSyncCount(pending.length - synced);
+            } catch (e) {
+                console.warn('[Sync] Fehler:', e.message);
+            } finally {
+                setIsSyncing(false);
+            }
+        };
+
+        // Pending-Count beim Mount laden
+        getPendingCount().then(count => setPendingSyncCount(count));
+
+        // Online-Event: automatisch syncen wenn Netz zurückkommt
+        const handleOnline = () => {
+            setIsOnline(true);
+            console.log('[Netz] ✅ Online – starte Auto-Sync...');
+            syncPendingPhotos();
+        };
+        const handleOffline = () => {
+            setIsOnline(false);
+            console.log('[Netz] ⚠️ Offline-Modus aktiv');
+        };
+
+        window.addEventListener('online', handleOnline);
+        window.addEventListener('offline', handleOffline);
+
+        // Beim Mount: wenn bereits online, sofort syncen
+        if (navigator.onLine) syncPendingPhotos();
+
+        return () => {
+            window.removeEventListener('online', handleOnline);
+            window.removeEventListener('offline', handleOffline);
+        };
+    }, [formData.id]); // Nur neu starten wenn Projekt wechselt
 
     // Auto-Save Effect
+
     useEffect(() => {
         // Skip auto-save if it's the very first render/empty (optional check)
         if (!formData.projectTitle && !formData.id) return;
@@ -608,9 +723,18 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
     // UI State for Technician Mode "Add Room" toggle
     const [isAddRoomExpanded, setIsAddRoomExpanded] = useState(false);
 
+
     useEffect(() => {
         // Initial load
         // refreshAudioDevices(); // Potentially blocking if hardware issue
+
+        // Auto-Bereinigung: Supabase-Fotos > 30 Tage mit OneDrive-Backup löschen
+        // Läuft still im Hintergrund, 5s verzögert um den Start nicht zu blockieren
+        const cleanupTimer = setTimeout(() => {
+            cleanupOldSupabasePhotos();
+            deleteOldSyncedPhotos(30); // Alte IndexedDB-Fotos bereinigen
+        }, 5000);
+
 
         // Listen for device changes (plugging in/out)
         /*
@@ -621,8 +745,10 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         */
 
         return () => {
+            clearTimeout(cleanupTimer);
             // navigator.mediaDevices.ondevicechange = null;
         };
+
     }, []);
 
     const startRecording = async (targetId = 'modal') => {
@@ -1209,7 +1335,7 @@ END:VCARD`;
         }));
     };
 
-    // --- Image Upload Handler (Supabase) ---
+    // --- Image Upload Handler: Supabase (Pflicht-Backup) + OneDrive (Primärarchiv) ---
     const handleImageUpload = async (files, contextData = {}) => {
         if (!files || files.length === 0) return;
 
@@ -1241,62 +1367,83 @@ END:VCARD`;
                     formData
                 );
 
-                // ── Primär: OneDrive ──────────────────────────────────────────
+                let supabasePath = null;
+                let supabaseUrl = null;
+                let odResult = null;
+                let localPreviewUrl = previewUrl; // Fallback: blob-URL aus createObjectURL
+
+                // ── SCHRITT 0: IndexedDB (sofort, offline, garantiert) ────────
                 if (!isDoc) {
-                    console.log('[OneDrive] 🖼️ Foto-Upload startet:', file.name, '→', odFolder, '/', subFolder);
-                    let odResult = null;
                     try {
-                        odResult = await uploadPhotoAndGetUrl(odFolder, subFolder, file);
-                    } catch (odErr) {
-                        console.warn('[OneDrive] Foto-Upload fehlgeschlagen, nutze Supabase als Fallback:', odErr.message);
-                    }
-
-                    if (!odResult) {
-                        console.warn('[OneDrive] ⚠️ uploadPhotoAndGetUrl gab null zurück (kein Token?) → Supabase-Fallback');
-                    }
-
-                    if (odResult) {
-                        // OneDrive erfolgreich → URL = temporäre Download-URL (gültig ~1h)
-                        // Lokale blob-URL bleibt als Fallback für aktuelle Session
+                        localPreviewUrl = await savePhotoLocally(tempId, formData.id || 'temp', file, {
+                            subFolder, odFolder, contextData
+                        });
+                        // State sofort mit lokaler URL aktualisieren (kein Netz nötig!)
                         setFormData(prev => ({
                             ...prev,
                             images: prev.images.map(img =>
-                                img.id === tempId ? {
-                                    ...img,
-                                    preview: odResult.downloadUrl || previewUrl,
-                                    previewFallback: previewUrl,
-                                    oneDriveItemId: odResult.itemId,
-                                    oneDrivePath: odResult.odPath,
-                                    uploading: false,
-                                } : img
+                                img.id === tempId ? { ...img, preview: localPreviewUrl, localId: tempId } : img
                             )
                         }));
-                        continue; // Supabase überspringen
+                        console.log('[IndexedDB] ✅ Foto lokal gesichert:', tempId);
+                    } catch (idbErr) {
+                        console.warn('[IndexedDB] Lokaler Speicher fehlgeschlagen:', idbErr.message);
                     }
                 }
 
-                // ── Fallback: Supabase Storage (Dokumente oder kein OneDrive-Login) ──
+                // ── SCHRITT 1: Supabase (immer – garantierter Backup) ─────────
                 if (supabase) {
-                    const ext = file.name.split('.').pop();
-                    const fileName = `cases/${formData.id || 'temp'}/images/${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${ext}`;
-                    const { error } = await supabase.storage.from('case-files').upload(fileName, file);
-                    if (error) throw error;
-                    const { data: { publicUrl } } = supabase.storage.from('case-files').getPublicUrl(fileName);
-                    setFormData(prev => ({
-                        ...prev,
-                        images: prev.images.map(img =>
-                            img.id === tempId ? { ...img, preview: publicUrl, storagePath: fileName, uploading: false } : img
-                        )
-                    }));
-                } else {
-                    // Offline: nur lokale Vorschau
-                    setFormData(prev => ({
-                        ...prev,
-                        images: prev.images.map(img =>
-                            img.id === tempId ? { ...img, uploading: false } : img
-                        )
-                    }));
+                    try {
+                        const ext = file.name.split('.').pop();
+                        const fileName = `cases/${formData.id || 'temp'}/images/${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${ext}`;
+                        const { error: sbErr } = await supabase.storage.from('case-files').upload(fileName, file);
+                        if (!sbErr) {
+                            const { data: { publicUrl } } = supabase.storage.from('case-files').getPublicUrl(fileName);
+                            supabasePath = fileName;
+                            supabaseUrl = publicUrl;
+                            console.log('[Supabase] ✅ Backup gespeichert:', fileName);
+                        } else {
+                            console.warn('[Supabase] Backup-Fehler:', sbErr.message);
+                        }
+                    } catch (sbEx) {
+                        console.warn('[Supabase] Backup fehlgeschlagen:', sbEx.message);
+                    }
                 }
+
+                // ── SCHRITT 2: OneDrive (zusätzlich – permanentes Archiv) ──────
+                if (!isDoc) {
+                    try {
+                        odResult = await uploadPhotoAndGetUrl(odFolder, subFolder, file);
+                        if (odResult) {
+                            console.log('[OneDrive] ✅ Foto hochgeladen:', odResult.odPath);
+                        } else {
+                            console.warn('[OneDrive] ⚠️ Kein Token – nur Supabase-Backup aktiv');
+                        }
+                    } catch (odErr) {
+                        console.warn('[OneDrive] fehlgeschlagen (Supabase-Backup aktiv):', odErr.message);
+                    }
+                }
+
+                // ── SCHRITT 3: State mit beiden Pfaden aktualisieren ──────────
+                setFormData(prev => ({
+                    ...prev,
+                    images: prev.images.map(img =>
+                        img.id === tempId ? {
+                            ...img,
+                            // Vorschau: OneDrive → Supabase → blob (Session)
+                            preview: odResult?.downloadUrl || supabaseUrl || previewUrl,
+                            previewFallback: supabaseUrl || previewUrl,
+                            // OneDrive (permanent)
+                            oneDriveItemId: odResult?.itemId || null,
+                            oneDrivePath: odResult?.odPath || null,
+                            // Supabase (temporärer Backup, periodisch bereinigt)
+                            storagePath: supabasePath,
+                            supabaseBackedUpAt: supabasePath ? new Date().toISOString() : null,
+                            uploading: false,
+                            error: !supabasePath && !odResult,
+                        } : img
+                    )
+                }));
 
             } catch (error) {
                 console.error('Upload failed:', error);
@@ -1307,6 +1454,31 @@ END:VCARD`;
                     )
                 }));
             }
+        }
+    };
+
+    // --- Auto-Bereinigung: Supabase-Fotos > 30 Tage mit OneDrive-Backup löschen ---
+    const cleanupOldSupabasePhotos = async () => {
+        if (!supabase) return;
+        try {
+            const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+            const { data: projects, error } = await supabase
+                .from('reports')
+                .select('id, images')
+                .lt('updated_at', thirtyDaysAgo);
+            if (error || !projects) return;
+            for (const project of projects) {
+                const images = Array.isArray(project.images) ? project.images : [];
+                const toDelete = images
+                    .filter(img => img.storagePath && img.oneDriveItemId)
+                    .map(img => img.storagePath);
+                if (toDelete.length > 0) {
+                    const { error: delErr } = await supabase.storage.from('case-files').remove(toDelete);
+                    if (!delErr) console.log(`[Supabase Cleanup] 🗑️ ${toDelete.length} Fotos bereinigt`);
+                }
+            }
+        } catch (e) {
+            console.warn('[Supabase Cleanup] Fehler:', e.message);
         }
     };
 

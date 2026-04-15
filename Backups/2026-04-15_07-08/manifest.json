@@ -1,0 +1,9 @@
+﻿{
+    "created_at":  "2026-04-15T07:08:04.6095908+02:00",
+    "backup_date":  "2026-04-15_07-08",
+    "supabase_url":  "https://***",
+    "files":  [
+                  "damage_reports.json",
+                  "devices.json"
+              ]
+}

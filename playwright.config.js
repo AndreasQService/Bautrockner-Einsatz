@@ -92,10 +92,12 @@ export default defineConfig({
         },
     ],
 
-    // KEIN automatischer Dev-Server-Start - manuell starten mit: npm run dev
-    // webServer: {
-    //   command: 'npm run dev',
-    //   url: 'http://localhost:5173',
-    //   reuseExistingServer: true,
-    // },
+    // Automatischer Dev-Server-Start (startet nur wenn noch nicht läuft)
+    webServer: {
+        command: 'npm run dev',
+        url: 'http://localhost:5173',
+        reuseExistingServer: true, // Nutzt laufenden Server falls vorhanden
+        timeout: 30 * 1000,
+    },
 });
+

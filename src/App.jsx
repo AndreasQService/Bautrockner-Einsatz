@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Plus, LayoutDashboard, Settings, User, Users, LogOut, Thermometer, Database, RotateCcw } from 'lucide-react'
+import { Plus, LayoutDashboard, Settings, User, Users, LogOut, Thermometer, Database, RotateCcw, Download } from 'lucide-react'
 import { supabase } from './supabaseClient'
 import Dashboard from './components/Dashboard'
 import DamageForm from './components/DamageForm'
@@ -44,7 +44,28 @@ function App() {
   const isAuthenticated = useIsAuthenticated();
 
   // OneDrive: MSAL-Instanz sofort registrieren sobald verfügbar
-  useEffect(() => { setMsalInstance(instance); }, [instance]);
+  useEffect(() => {
+    setMsalInstance(instance);
+
+    // Automatischer Silent-Login beim App-Start
+    // Wenn ein Account gespeichert ist (vorheriger Login), wird der Token
+    // still erneuert → OneDrive ist sofort verbunden ohne Benutzeraktion
+    const accounts = instance.getAllAccounts();
+    if (accounts.length > 0) {
+      instance.acquireTokenSilent({
+        scopes: ['Files.ReadWrite.All'],
+        account: accounts[0],
+      }).then(result => {
+        console.log('[MSAL] ✅ Automatisch angemeldet:', accounts[0].name);
+      }).catch(err => {
+        // Silent fehlgeschlagen (Token abgelaufen, kein Netz)
+        // Kein automatischer Redirect — Benutzer kann manuell einloggen
+        console.warn('[MSAL] Silent-Login fehlgeschlagen:', err.message);
+      });
+    } else {
+      console.log('[MSAL] Kein gespeicherter Account — manueller Login erforderlich');
+    }
+  }, [instance]);
 
   // iOS-Tastatur: Eingabefeld automatisch sichtbar halten (Techniker-Modus)
   useEffect(() => {
@@ -193,6 +214,7 @@ function App() {
       const { data, error } = await supabase
         .from('damage_reports')
         .select('report_data')
+        .is('deleted_at', null)          // ← Soft-Delete: nur nicht-gelöschte laden
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -243,7 +265,10 @@ function App() {
   const handleSaveReport = useCallback(async (updatedReport, silent = false) => {
     let finalReport = { ...updatedReport };
     if (!finalReport.id) {
-      finalReport.id = finalReport.projectNumber || finalReport.projectTitle || `TMP-${Date.now()}`;
+      // Immer UUID verwenden — verhindert ID-Kollisionen die zu Datenverlust führen
+      finalReport.id = (typeof crypto !== 'undefined' && crypto.randomUUID)
+        ? crypto.randomUUID()
+        : `TMP-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     }
     if (!finalReport.date) finalReport.date = new Date().toISOString();
 
@@ -311,6 +336,8 @@ function App() {
       supabase.from('damage_reports').upsert(rowData).then(({ error }) => {
         if (error) {
           console.error('Error saving to Supabase:', error);
+          // Sichtbarer Fehler — Benutzer wird informiert, nicht stilles Versagen
+          showToast(`⚠️ Speicherfehler: ${error.message || error.code || 'Supabase-Fehler'}. Daten nur lokal gesichert!`, 'error');
         } else {
           // OneDrive JSON-Backup (silent)
           try {
@@ -346,6 +373,7 @@ function App() {
     const reportToDelete = reports.find(r => r.id === reportId);
     if (!reportToDelete) return;
 
+    // ── Soft-Delete: Projekt aus lokalem State entfernen, aber in DB nur markieren ──
     setReports(prev => {
       const newReports = prev.filter(r => r.id !== reportId);
       try {
@@ -362,15 +390,53 @@ function App() {
     }
 
     if (supabase) {
-      const { error } = await supabase.from('damage_reports').delete().eq('id', reportId);
+      // SOFT-DELETE: Nur als gelöscht markieren – NIEMALS permanent löschen!
+      // Wiederherstellung möglich über Supabase Dashboard oder SQL:
+      //   UPDATE damage_reports SET deleted_at = NULL WHERE id = '<id>';
+      const { error } = await supabase
+        .from('damage_reports')
+        .update({
+          deleted_at: new Date().toISOString(),
+          deleted_by: currentUser?.name || 'unbekannt'
+        })
+        .eq('id', reportId);
+
       if (error) {
-        console.error('[Delete] Supabase-Fehler:', error);
+        console.error('[Soft-Delete] Supabase-Fehler:', error);
         showToast(`Fehler: ${error.message || error.code || 'Unbekannt'}`, 'error');
       } else {
-        showToast('Projekt gelöscht', 'success');
+        showToast('Projekt gelöscht (wiederherstellbar)', 'success');
       }
     } else {
       showToast('Projekt lokal gelöscht', 'success');
+    }
+  };
+
+  // ── Backup: Alle Projekte als JSON-Datei herunterladen ──────────────────────
+  const handleDownloadBackup = async () => {
+    try {
+      let backupData = reports;
+      if (supabase) {
+        const { data, error } = await supabase
+          .from('damage_reports')
+          .select('*')
+          .is('deleted_at', null)
+          .order('created_at', { ascending: false });
+        if (!error && data) backupData = data;
+      }
+      const blob = new Blob(
+        [JSON.stringify(backupData, null, 2)],
+        { type: 'application/json' }
+      );
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `qtool-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast(`✅ Backup gespeichert (${backupData.length} Projekte)`, 'success');
+    } catch (e) {
+      showToast(`Backup fehlgeschlagen: ${e.message}`, 'error');
     }
   };
 
@@ -379,94 +445,95 @@ function App() {
 
     const newId = `P-${Date.now()}`;
 
-    // ── Neue JSON-Struktur (EmailImportModalV2 v2) ──
-    const av = importedData.auftrag_verwaltung || {};
+    // ── V4 Felder (EmailImportModalV2 Parser V4) ──
+    const ag = importedData.auftraggeber || {};            // V4
+    const av = importedData.auftrag_verwaltung || {};      // V3 Compat
     const rd = importedData.rechnungs_details || {};
     const so = importedData.schadenort || {};
     const pd = importedData.projekt_daten || {};
 
-    const client = av.firma || '';
-    // Schadenort: Strasse + Hausnummer jetzt getrennt
-    const street = so.strasse_nr                       // Compat: altes Format
-      || [so.strasse, so.hausnummer].filter(Boolean).join(' ')  // Neues Format
-      || '';
-    const zip  = so.plz || '';
-    const city = so.ort || '';
+    // Auftraggeber: V4 hat "firma" + "kontaktperson", V3 hatte "firma" + "ansprechperson"
+    const clientFirma = ag.firma || av.firma || '';
+    const kontaktperson = ag.kontaktperson || av.ansprechperson || '';
 
-    // Referenznummer: neues Format hat referenz_nummer statt interne_id
-    const projectNum = pd.referenz_nummer || pd.erp_id || pd.interne_id || '';
+    // Schadenort
+    const street = [so.strasse, so.hausnummer].filter(Boolean).join(' ') || so.strasse_nr || '';
+    const zip    = so.plz || '';
+    const city   = so.ort || '';
 
-    // Rollenumwandlung: neue lowercase-Rollen → App-Dropdown-Werte
+    // Projekttitel: V4 hat projektTitel top-level
+    const projektTitel = importedData.projektTitel || pd.titel || '';
+
+    // Beschreibung: V4 hat beschreibung top-level, V3 in projekt_daten
+    const beschreibung = importedData.beschreibung || pd.beschreibung || '';
+
+    // Referenznummer: in rechnungs_details.referenz (V4) oder projekt_daten (V3)
+    const projectNum = rd.referenz || pd.referenz_nummer || pd.erp_id || '';
+
+    // Rollenumwandlung
     const rolleMap = {
-      // Neue Rollen (v2)
-      'verwaltung':        'Verwaltung',
-      'mieter':            'Mieter',
-      'eigentuemer':       'Eigentümer',
+      'verwaltung':          'Verwaltung',
+      'mieter':              'Mieter',
+      'eigentuemer':         'Eigentümer',
       'rechnungsempfaenger': 'Eigentümer',
-      'dienstleister':     'Handwerker',
-      'handwerker':        'Handwerker',
-      'sanitaer':          'Handwerker',
-      'dachdecker':        'Handwerker',
-      'hauswart':          'Hauswart',
-      'sonstiges':         'Mieter',
-      // Alte Rollen (v1 Compat)
-      'Eig.':              'Eigentümer',
-      'Eig':               'Eigentümer',
-      'Eigentümer':        'Eigentümer',
-      'Verw.':             'Verwaltung',
-      'Verw':              'Verwaltung',
-      'Verwaltung':        'Verwaltung',
-      'Handw.':            'Handwerker',
-      'Handw':             'Handwerker',
-      'Handwerker':        'Handwerker',
-      'HW':                'Hauswart',
-      'Hauswart':          'Hauswart',
-      'Mieter':            'Mieter',
+      'dienstleister':       'Handwerker',
+      'handwerker':          'Handwerker',
+      'sanitaer':            'Handwerker',
+      'dachdecker':          'Handwerker',
+      'hauswart':            'Hauswart',
+      'sonstiges':           'Mieter',
+      'Eigentümer':          'Eigentümer',
+      'Verwaltung':          'Verwaltung',
+      'Handwerker':          'Handwerker',
+      'Hauswart':            'Hauswart',
+      'Mieter':              'Mieter',
     };
 
     const newReport = {
       id: newId,
-      projectTitle: pd.titel || projectNum || client || 'Importiertes Projekt',
+      projectTitle: projektTitel || projectNum || clientFirma || 'Importiertes Projekt',
       projectNumber: projectNum,
-      orderNumber:   pd.auftrags_nr || pd.erp_id || '',
-      invoiceReference: pd.externe_ref || rd.vermerk || '',
+      orderNumber:   pd.auftrags_nr || '',
 
       // Auftraggeber / Verwaltung
-      client:      client,
-      clientStreet: av.adresse || '',
-      clientZip:   av.plz || '',
-      clientCity:  av.ort || '',
-      clientPhone: av.telefon || '',
-      clientEmail: av.email || '',
+      client:      clientFirma,
+      clientStreet: av.adresse || ag.adresse || '',
+      clientZip:   av.plz || ag.plz || '',
+      clientCity:  av.ort || ag.ort || '',
+      clientPhone: ag.telefon || av.telefon || '',
+      clientEmail: ag.email || av.email || '',
+      assignedTo:  kontaktperson,
 
       // Schadenort
       street,
       zip,
       city,
       address: [street, zip && city ? `${zip} ${city}` : (zip || city)].filter(Boolean).join(', '),
-      locationDetails: so.etage_wohnung || '',
+      locationDetails: so.etage_wohnung || so.stockwerk || so.wohnung || '',
 
-      // Eigentümer / Rechnungsdetails
-      ownerName:   rd.eigentuemer || '',
-      ownerStreet: rd.strasse || '',
-      ownerZip:    rd.plz || '',
-      ownerCity:   rd.ort || '',
-      ownerEmail:  rd.email_rechnung || '',
+      // Eigentümer / Rechnungsdetails (V4: alle Felder vorhanden)
+      ownerName:        rd.eigentuemer || '',
+      ownerStreet:      rd.strasse || '',
+      ownerZip:         rd.plz || '',
+      ownerCity:        rd.ort || '',
+      ownerEmail:       rd.email_rechnung || '',
+      invoiceReference: rd.referenz || rd.vermerk || '',
 
-      // Sachbearbeiter: neues Format hat ansprechperson
-      assignedTo: av.ansprechperson || av.sachbearbeiter || '',
-
-      description: pd.beschreibung || importedData.description || '',
+      description: beschreibung,
       status: 'Schadenaufnahme',
       date: new Date().toISOString(),
+
+      // Priorität V4
+      priority: importedData.priority || '',
 
       contacts: (importedData.kontakte || []).map(c => ({
         name:      c.name || c.firma || '',
         phone:     c.telefon || '',
         email:     c.email || '',
-        role:      rolleMap[c.rolle] || rolleMap[(c.rolle || '').trim()] || 'Sonstiges',
-        apartment: c.etage || '',
-        floor:     c.etage || '',
+        role:      rolleMap[c.rolle] || 'Sonstiges',
+        apartment: c.wohnung || c.etage || '',
+        floor:     c.stockwerk || c.etage || '',
+        note:      c.zweck || '',
       })),
 
       rooms: [],
@@ -648,6 +715,14 @@ function App() {
                   }}>
                     <button
                       className="btn btn-ghost"
+                      onClick={handleDownloadBackup}
+                      title="Backup als JSON herunterladen"
+                      style={{ padding: '0.5rem', color: '#10B981' }}
+                    >
+                      <Download size={18} />
+                    </button>
+                    <button
+                      className="btn btn-ghost"
                       onClick={() => {
                         if (confirm('Lokal gespeicherte Berichte (Cache) löschen? Echte Daten in der Cloud bleiben erhalten.')) {
                           localStorage.removeItem('qservice_reports_prod');
@@ -727,7 +802,7 @@ function App() {
           currentUser={currentUser}
           onReportsChanged={async () => {
             // Reload from Supabase after a status change
-            const { data } = await supabase.from('damage_reports').select('report_data').order('created_at', { ascending: false });
+            const { data } = await supabase.from('damage_reports').select('report_data').is('deleted_at', null).order('created_at', { ascending: false });
             if (data) setReports(data.map(r => r.report_data));
           }}
         />}
