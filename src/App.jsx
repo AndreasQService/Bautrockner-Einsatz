@@ -147,7 +147,11 @@ function App() {
         // Desktop: Redirect-Flow
         await instance.loginRedirect(loginRequest);
       } else {
-        // Vercel / iPad (Chrome): Popup-Flow – bleibt in der App
+        // Vercel / iPad (Chrome): Popup-Flow
+        // Zuerst veralteten MSAL-Interaction-Status löschen → verhindert interaction_in_progress
+        Object.keys(sessionStorage)
+          .filter(k => k.includes('interaction.status') || k.includes('request.origin') || k.includes('request.state'))
+          .forEach(k => sessionStorage.removeItem(k));
         await instance.loginPopup(loginRequest);
       }
     } catch (e) {
