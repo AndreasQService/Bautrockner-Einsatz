@@ -959,13 +959,49 @@ function App() {
         />}
         {view === 'devices' && <DeviceManager reports={reports} onBack={() => setView('dashboard')} onNavigateToReport={handleNavigateToReport} />}
         {(view === 'new-report' || view === 'details') && (
-          <DamageForm
-            key={selectedReport ? selectedReport.id : 'new'}
-            onCancel={handleCancelEntry}
-            onSave={handleSaveReport}
-            initialData={selectedReport}
-            mode={isTechnicianMode ? 'technician' : 'desktop'}
-          />
+          <div style={{ position: 'relative' }}>
+            {/* ── Sitzungssperre: Overlay blockiert alle Eingaben wenn inaktiv ── */}
+            {!isSessionActive && (
+              <div style={{
+                position: 'fixed',
+                top: 0, left: 0, right: 0, bottom: 0,
+                zIndex: 9000,
+                backgroundColor: 'rgba(220, 38, 38, 0.08)',
+                cursor: 'not-allowed',
+                pointerEvents: 'all',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}>
+                <div style={{
+                  background: 'rgba(220,38,38,0.92)',
+                  color: 'white',
+                  padding: '1.5rem 2.5rem',
+                  borderRadius: '16px',
+                  fontWeight: 800,
+                  fontSize: '1.1rem',
+                  textAlign: 'center',
+                  boxShadow: '0 8px 40px rgba(220,38,38,0.5)',
+                  maxWidth: '400px',
+                  lineHeight: 1.5,
+                  pointerEvents: 'none'
+                }}>
+                  🔒 Gesperrt<br />
+                  <span style={{ fontWeight: 400, fontSize: '0.9rem' }}>
+                    QTool ist auf einem anderen Gerät aktiv.<br />
+                    Benutze den roten Banner oben um diese Sitzung zu übernehmen.
+                  </span>
+                </div>
+              </div>
+            )}
+            <DamageForm
+              key={selectedReport ? selectedReport.id : 'new'}
+              onCancel={handleCancelEntry}
+              onSave={handleSaveReport}
+              initialData={selectedReport}
+              mode={isTechnicianMode ? 'technician' : 'desktop'}
+            />
+          </div>
         )}
       </main>
 
