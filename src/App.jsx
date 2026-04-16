@@ -37,9 +37,11 @@ function App() {
   const sessionTokenRef = useRef(null);
   const presenceChannelRef = useRef(null);
   const isSessionActiveRef = useRef(true); // Ref für handleSaveReport-Zugriff
+  const selectedReportRef = useRef(null);  // Ref für Session-Check (projektspezifisch)
 
-  // Ref immer synchron halten
+  // Refs synchron halten
   useEffect(() => { isSessionActiveRef.current = isSessionActive; }, [isSessionActive]);
+  useEffect(() => { selectedReportRef.current = selectedReport; }, [selectedReport]);
   const [userRole, setUserRole] = useState('admin'); // 'admin' | 'technician' | 'user'
   const [isTechnicianMode, setIsTechnicianMode] = useState(false); // Mode state
   const [showEmailImport, setShowEmailImport] = useState(false);
@@ -74,12 +76,12 @@ function App() {
     }
   }, [instance]);
 
-  // ── Single-Session: REST-Polling (kein WebSocket nötig) ───────────────────────
-  // Jede Sitzung schreibt ihren Token in Supabase. Andere Geräte prüfen alle 10s ob sie verdrängt wurden.
+  // ── Single-Session: Projektspezifisches Lock via REST-Polling ─────────────────────────
+  // Locked wird nur das Projekt das auf einem anderen Gerät geöffnet ist
   useEffect(() => {
     if (!supabase) return;
 
-    const SESSION_KEY = '_qtool_session_v1'; // Feste ID in damage_reports
+    const SESSION_KEY = '_qtool_session_v1';
 
     let myToken = sessionStorage.getItem('qtool_session_token');
     if (!myToken) {
@@ -89,43 +91,59 @@ function App() {
     sessionTokenRef.current = myToken;
     const myDevice = /iPad|iPhone|Android/i.test(navigator.userAgent) ? 'Mobil' : 'Desktop';
 
-    // Hilfsfunktion: Sitzung in Supabase beanspruchen
-    const claimSession = async (token) => {
+    // Sitzung beanspruchen (optional: mit Projekt-ID)
+    const claimSession = async (token, projectId) => {
       const t = token || sessionTokenRef.current;
       await supabase.from('damage_reports').upsert({
         id: SESSION_KEY,
         project_title: '__session__',
         client: '__system__',
-        report_data: { _isSession: true, token: t, device: myDevice, since: new Date().toISOString() },
+        report_data: {
+          _isSession: true,
+          token: t,
+          device: myDevice,
+          since: new Date().toISOString(),
+          projectId: projectId !== undefined ? projectId : null
+        },
         updated_at: new Date().toISOString()
       });
     };
 
-    // Hilfsfunktion: Prüfen ob unsere Sitzung noch aktiv ist
+    // Projektspezifischer Lock-Check
     const checkSession = async () => {
       const { data } = await supabase
         .from('damage_reports')
         .select('report_data')
         .eq('id', SESSION_KEY)
         .single();
-      if (data?.report_data?.token && data.report_data.token !== sessionTokenRef.current) {
-        console.warn('[Session] ⚠️ Andere Sitzung aktiv:', data.report_data.device);
-        setIsSessionActive(false);
-      } else if (data?.report_data?.token === sessionTokenRef.current) {
+
+      if (!data?.report_data?.token) return;
+      const sessionData = data.report_data;
+
+      if (sessionData.token === sessionTokenRef.current) {
+        // Wir sind die aktive Sitzung
         setIsSessionActive(true);
+        return;
+      }
+
+      // Anderes Gerät ist aktiv – nur sperren wenn DASSELBE Projekt geöffnet ist
+      const currentProjectId = selectedReportRef.current?.id;
+      const lockedProjectId = sessionData.projectId;
+
+      if (lockedProjectId && currentProjectId && lockedProjectId === currentProjectId) {
+        console.warn('[Session] Projekt gesperrt von:', sessionData.device, '- Projekt:', lockedProjectId);
+        setIsSessionActive(false);
+      } else {
+        setIsSessionActive(true); // Anderes Projekt oder kein Projekt → frei
       }
     };
 
-    // Ref für claimSession – für den "Hier weiterarbeiten"-Button
     presenceChannelRef.current = { claimSession, SESSION_KEY };
 
-    // Start: Diese Sitzung sofort beanspruchen
-    claimSession().then(() => console.log('[Session] ✅ Gestartet:', myDevice, myToken.slice(0, 8)));
+    // Start: Sitzung ohne spezifisches Projekt beanspruchen
+    claimSession(undefined, null).then(() => console.log('[Session] ✅ Gestartet:', myDevice));
 
-    // Alle 10 Sekunden prüfen
     const interval = setInterval(checkSession, 10000);
-
-    // Auch prüfen wenn Benutzer zurück zum Tab wechselt
     const onFocus = () => checkSession();
     window.addEventListener('focus', onFocus);
 
@@ -331,13 +349,23 @@ function App() {
   }, []);
 
   const handleSelectReport = (report) => {
-    setSelectedReport(report)
-    setView('details')
+    setSelectedReport(report);
+    setView('details');
+    setIsSessionActive(true); // Reset bei Projektwechsel
+    // Sitzung mit diesem Projekt-ID beanspruchen
+    if (presenceChannelRef.current?.claimSession) {
+      presenceChannelRef.current.claimSession(undefined, report.id);
+    }
   }
 
   const handleCancelEntry = () => {
-    setView('dashboard')
-    setSelectedReport(null)
+    setView('dashboard');
+    setSelectedReport(null);
+    setIsSessionActive(true); // Lock zurücksetzen
+    // Projekt aus Sitzung freigeben
+    if (presenceChannelRef.current?.claimSession) {
+      presenceChannelRef.current.claimSession(undefined, null);
+    }
   }
 
   const handleSaveReport = useCallback(async (updatedReport, silent = false) => {
