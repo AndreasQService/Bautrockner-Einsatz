@@ -141,24 +141,17 @@ function App() {
   }, [isTechnicianMode]);
 
   const handleLoginOneDrive = async () => {
-    const isLocalhost = ['localhost', '127.0.0.1'].includes(window.location.hostname);
     try {
-      if (isLocalhost) {
-        // Desktop: Redirect-Flow
-        await instance.loginRedirect(loginRequest);
-      } else {
-        // Vercel / iPad (Chrome): Popup-Flow
-        // Zuerst veralteten MSAL-Interaction-Status löschen → verhindert interaction_in_progress
-        Object.keys(sessionStorage)
-          .filter(k => k.includes('interaction.status') || k.includes('request.origin') || k.includes('request.state'))
-          .forEach(k => sessionStorage.removeItem(k));
-        await instance.loginPopup(loginRequest);
-      }
+      // Veralteten MSAL-Interaction-Status löschen → verhindert interaction_in_progress
+      Object.keys(sessionStorage)
+        .filter(k => k.includes('interaction.status') || k.includes('request.origin') || k.includes('request.state'))
+        .forEach(k => sessionStorage.removeItem(k));
+      // loginRedirect funktioniert auf allen Plattformen (Desktop + iPad/Chrome)
+      // Voraussetzung: Vercel-URL muss in Azure App Registration als Redirect URI eingetragen sein
+      await instance.loginRedirect(loginRequest);
     } catch (e) {
       console.error("MSAL Login Error:", e);
-      if (!e.message?.includes('user_cancelled') && !e.message?.includes('popup_window_error')) {
-        alert("MSAL Fehler: " + e.message);
-      }
+      alert("MSAL Fehler: " + e.message);
     }
   };
 
