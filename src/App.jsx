@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Plus, LayoutDashboard, Settings, User, Users, LogOut, Thermometer, Database, RotateCcw, Download } from 'lucide-react'
 import { supabase } from './supabaseClient'
 import Dashboard from './components/Dashboard'
@@ -33,6 +33,13 @@ function App() {
   const [showUserModal, setShowUserModal] = useState(false);
   const [showMeasurementManager, setShowMeasurementManager] = useState(false);
   const [currentUser, setCurrentUser] = useState({ id: 1, name: 'Admin User', role: 'admin' }); // Auto-login as admin
+  const [isSessionActive, setIsSessionActive] = useState(true); // Single-Session: nur 1 Gerät aktiv
+  const sessionTokenRef = useRef(null);
+  const presenceChannelRef = useRef(null);
+  const isSessionActiveRef = useRef(true); // Ref für handleSaveReport-Zugriff
+
+  // Ref immer synchron halten
+  useEffect(() => { isSessionActiveRef.current = isSessionActive; }, [isSessionActive]);
   const [userRole, setUserRole] = useState('admin'); // 'admin' | 'technician' | 'user'
   const [isTechnicianMode, setIsTechnicianMode] = useState(false); // Mode state
   const [showEmailImport, setShowEmailImport] = useState(false);
@@ -66,6 +73,60 @@ function App() {
       console.log('[MSAL] Kein gespeicherter Account — manueller Login erforderlich');
     }
   }, [instance]);
+
+  // ── Single-Session: Supabase Realtime Presence ────────────────────────────────
+  // Wenn ein neues Gerät QTool öffnet, wird die alte Sitzung blockiert (kein Autosave)
+  useEffect(() => {
+    if (!supabase) return;
+
+    // Eindeutiges Session-Token für dieses Gerät
+    let token = sessionStorage.getItem('qtool_session_token');
+    if (!token) {
+      token = (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`);
+      sessionStorage.setItem('qtool_session_token', token);
+    }
+    sessionTokenRef.current = token;
+
+    const deviceInfo = /iPad|iPhone|Android/i.test(navigator.userAgent) ? 'Mobil' : 'Desktop';
+    const channel = supabase.channel('qtool_global_session', {
+      config: { presence: { key: token } }
+    });
+
+    channel
+      .on('presence', { event: 'join' }, ({ key, newPresences }) => {
+        // Anderes Gerät hat sich verbunden
+        if (key !== sessionTokenRef.current) {
+          console.log('[Session] Neue Sitzung erkannt auf:', newPresences[0]?.device, '– diese Sitzung wird inaktiv');
+          setIsSessionActive(false);
+        }
+      })
+      .on('presence', { event: 'leave' }, ({ key }) => {
+        // Anderes Gerät hat sich getrennt → diese Sitzung wieder aktiv
+        if (key !== sessionTokenRef.current) {
+          const state = channel.presenceState();
+          const others = Object.keys(state).filter(k => k !== sessionTokenRef.current);
+          if (others.length === 0) {
+            console.log('[Session] Andere Sitzung getrennt – diese Sitzung ist wieder aktiv');
+            setIsSessionActive(true);
+          }
+        }
+      })
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          await channel.track({
+            device: deviceInfo,
+            token,
+            since: new Date().toISOString()
+          });
+        }
+      });
+
+    presenceChannelRef.current = channel;
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [supabase]);
 
   // iOS-Tastatur: Eingabefeld automatisch sichtbar halten (Techniker-Modus)
   useEffect(() => {
@@ -330,6 +391,12 @@ function App() {
     }
 
     if (supabase) {
+      // ── Sitzungsschutz: Kein Supabase-Save wenn anderes Gerät aktiv ist ───────────
+      if (!isSessionActiveRef.current) {
+        console.warn('[Session] Sitzung inaktiv – Supabase-Save blockiert für:', finalReport.id);
+        return finalReport; // Nur lokal im Memory, kein Supabase-Write
+      }
+
       const now = new Date().toISOString();
       // _supabase_updated_at ist ein internes Feld – nicht in die DB speichern
       const { _supabase_updated_at: loadedAt, ...reportForStorage } = finalReport;
@@ -666,6 +733,43 @@ function App() {
 
   return (
     <div className="app">
+      {/* ── Session-Inaktiv-Banner ───────────────────────────────────── */}
+      {!isSessionActive && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, zIndex: 99999,
+          background: 'linear-gradient(90deg, #dc2626, #b91c1c)',
+          color: 'white', padding: '10px 16px',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          boxShadow: '0 2px 12px rgba(220,38,38,0.5)', gap: '1rem'
+        }}>
+          <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>
+            ⚠️ Diese Sitzung ist inaktiv – QTool ist auf einem anderen Geråt geöffnet. Kein automatisches Speichern.
+          </span>
+          <button
+            onClick={async () => {
+              // Sitzung zurückfordern: neues Token → anderes Gerät wird inaktiv
+              const newToken = (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}`);
+              sessionStorage.setItem('qtool_session_token', newToken);
+              sessionTokenRef.current = newToken;
+              if (presenceChannelRef.current) {
+                await presenceChannelRef.current.track({
+                  device: /iPad|iPhone|Android/i.test(navigator.userAgent) ? 'Mobil' : 'Desktop',
+                  token: newToken,
+                  since: new Date().toISOString()
+                });
+              }
+              setIsSessionActive(true);
+            }}
+            style={{
+              background: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.5)',
+              color: 'white', padding: '4px 12px', borderRadius: '6px',
+              cursor: 'pointer', fontWeight: 700, fontSize: '0.8rem', flexShrink: 0
+            }}
+          >
+            Hier weiterarbeiten
+          </button>
+        </div>
+      )}
       {ToastMarkup}
 
       <header className="app-header">
