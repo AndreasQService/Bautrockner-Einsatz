@@ -42,6 +42,19 @@ function App() {
   // Refs synchron halten
   useEffect(() => { isSessionActiveRef.current = isSessionActive; }, [isSessionActive]);
   useEffect(() => { selectedReportRef.current = selectedReport; }, [selectedReport]);
+
+  // Beim Öffnen eines Projekts (auch aus localStorage): sofort beanspruchen + prüfen
+  useEffect(() => {
+    if (!selectedReport?.id || !presenceChannelRef.current) return;
+    const pid = selectedReport.id;
+    // 1. Dieses Gerät beansprucht das Projekt
+    presenceChannelRef.current.claimSession?.(undefined, pid);
+    // 2. Sofortiger Check (nach kurzem Delay damit iPad-Claim zuerst ankommen kann)
+    const t = setTimeout(() => {
+      presenceChannelRef.current?.checkSession?.();
+    }, 1500);
+    return () => clearTimeout(t);
+  }, [selectedReport?.id]);
   const [userRole, setUserRole] = useState('admin'); // 'admin' | 'technician' | 'user'
   const [isTechnicianMode, setIsTechnicianMode] = useState(false); // Mode state
   const [showEmailImport, setShowEmailImport] = useState(false);
@@ -140,7 +153,7 @@ function App() {
 
     presenceChannelRef.current = { claimSession, releaseSession, checkSession };
 
-    const interval = setInterval(checkSession, 10000);
+    const interval = setInterval(checkSession, 5000);
     const onFocus = () => checkSession();
     window.addEventListener('focus', onFocus);
     return () => { clearInterval(interval); window.removeEventListener('focus', onFocus); };
