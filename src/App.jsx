@@ -76,12 +76,10 @@ function App() {
     }
   }, [instance]);
 
-  // ── Single-Session: Projektspezifisches Lock via REST-Polling ─────────────────────────
-  // Locked wird nur das Projekt das auf einem anderen Gerät geöffnet ist
+  // ── Projektspezifisches Lock-System: eigener Session-Key pro Projekt ──────────────────
+  // iPad öffnet Projekt X → Desktop sieht Lock auf X, andere Projekte frei
   useEffect(() => {
     if (!supabase) return;
-
-    const SESSION_KEY = '_qtool_session_v1';
 
     let myToken = sessionStorage.getItem('qtool_session_token');
     if (!myToken) {
@@ -91,66 +89,61 @@ function App() {
     sessionTokenRef.current = myToken;
     const myDevice = /iPad|iPhone|Android/i.test(navigator.userAgent) ? 'Mobil' : 'Desktop';
 
-    // Sitzung beanspruchen (optional: mit Projekt-ID)
+    // Session-Key pro Projekt
+    const getKey = (projectId) => `_session_${projectId}`;
+
+    // Projekt beanspruchen
     const claimSession = async (token, projectId) => {
+      if (!projectId) return;
       const t = token || sessionTokenRef.current;
       await supabase.from('damage_reports').upsert({
-        id: SESSION_KEY,
+        id: getKey(projectId),
         project_title: '__session__',
         client: '__system__',
-        report_data: {
-          _isSession: true,
-          token: t,
-          device: myDevice,
-          since: new Date().toISOString(),
-          projectId: projectId !== undefined ? projectId : null
-        },
+        report_data: { _isSession: true, token: t, device: myDevice, since: new Date().toISOString() },
         updated_at: new Date().toISOString()
       });
     };
 
-    // Projektspezifischer Lock-Check
+    // Projekt freigeben
+    const releaseSession = async (projectId) => {
+      if (!projectId) return;
+      await supabase.from('damage_reports').upsert({
+        id: getKey(projectId),
+        project_title: '__session__',
+        client: '__system__',
+        report_data: { _isSession: true, token: null, device: null, since: null },
+        updated_at: new Date().toISOString()
+      });
+    };
+
+    // Lock-Check für aktuell geöffnetes Projekt
     const checkSession = async () => {
+      const currentProject = selectedReportRef.current;
+      if (!currentProject?.id) { setIsSessionActive(true); return; }
+
       const { data } = await supabase
         .from('damage_reports')
         .select('report_data')
-        .eq('id', SESSION_KEY)
+        .eq('id', getKey(currentProject.id))
         .single();
 
-      if (!data?.report_data?.token) return;
-      const sessionData = data.report_data;
+      if (!data?.report_data?.token) { setIsSessionActive(true); return; }
 
-      if (sessionData.token === sessionTokenRef.current) {
-        // Wir sind die aktive Sitzung
+      if (data.report_data.token === sessionTokenRef.current) {
         setIsSessionActive(true);
-        return;
-      }
-
-      // Anderes Gerät ist aktiv – nur sperren wenn DASSELBE Projekt geöffnet ist
-      const currentProjectId = selectedReportRef.current?.id;
-      const lockedProjectId = sessionData.projectId;
-
-      if (lockedProjectId && currentProjectId && lockedProjectId === currentProjectId) {
-        console.warn('[Session] Projekt gesperrt von:', sessionData.device, '- Projekt:', lockedProjectId);
-        setIsSessionActive(false);
       } else {
-        setIsSessionActive(true); // Anderes Projekt oder kein Projekt → frei
+        console.warn('[Session] Gesperrt von:', data.report_data.device);
+        setIsSessionActive(false);
       }
     };
 
-    presenceChannelRef.current = { claimSession, SESSION_KEY };
-
-    // Start: Sitzung ohne spezifisches Projekt beanspruchen
-    claimSession(undefined, null).then(() => console.log('[Session] ✅ Gestartet:', myDevice));
+    presenceChannelRef.current = { claimSession, releaseSession, checkSession };
 
     const interval = setInterval(checkSession, 10000);
     const onFocus = () => checkSession();
     window.addEventListener('focus', onFocus);
-
-    return () => {
-      clearInterval(interval);
-      window.removeEventListener('focus', onFocus);
-    };
+    return () => { clearInterval(interval); window.removeEventListener('focus', onFocus); };
   }, []);
 
   // iOS-Tastatur: Eingabefeld automatisch sichtbar halten (Techniker-Modus)
@@ -348,23 +341,46 @@ function App() {
     fetchReports();
   }, []);
 
-  const handleSelectReport = (report) => {
+  const handleSelectReport = async (report) => {
     setSelectedReport(report);
     setView('details');
-    setIsSessionActive(true); // Reset bei Projektwechsel
-    // Sitzung mit diesem Projekt-ID beanspruchen
-    if (presenceChannelRef.current?.claimSession) {
-      presenceChannelRef.current.claimSession(undefined, report.id);
+    setIsSessionActive(true);
+
+    // Prüfen ob anderes Gerät dieses Projekt bereits offen hat
+    if (supabase && report.id) {
+      try {
+        const { data } = await supabase
+          .from('damage_reports')
+          .select('report_data')
+          .eq('id', `_session_${report.id}`)
+          .single();
+
+        if (data?.report_data?.token && data.report_data.token !== sessionTokenRef.current) {
+          // Anderes Gerät hat dieses Projekt – Sperre anzeigen, NICHT überschreiben
+          setIsSessionActive(false);
+        } else {
+          // Frei – beanspruchen
+          if (presenceChannelRef.current?.claimSession) {
+            await presenceChannelRef.current.claimSession(undefined, report.id);
+          }
+        }
+      } catch {
+        // Kein Session-Record – frei beanspruchen
+        if (presenceChannelRef.current?.claimSession) {
+          await presenceChannelRef.current.claimSession(undefined, report.id);
+        }
+      }
     }
   }
 
   const handleCancelEntry = () => {
+    const closingProject = selectedReport;
     setView('dashboard');
     setSelectedReport(null);
-    setIsSessionActive(true); // Lock zurücksetzen
-    // Projekt aus Sitzung freigeben
-    if (presenceChannelRef.current?.claimSession) {
-      presenceChannelRef.current.claimSession(undefined, null);
+    setIsSessionActive(true);
+    // Projekt-Session freigeben
+    if (closingProject?.id && presenceChannelRef.current?.releaseSession) {
+      presenceChannelRef.current.releaseSession(closingProject.id);
     }
   }
 
