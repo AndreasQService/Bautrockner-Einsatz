@@ -74,61 +74,66 @@ function App() {
     }
   }, [instance]);
 
-  // ── Single-Session: Supabase Realtime Presence ────────────────────────────────
-  // Das zuletzt geöffnete Gerät "gewinnt" – ältere Sitzungen werden blockiert
+  // ── Single-Session: REST-Polling (kein WebSocket nötig) ───────────────────────
+  // Jede Sitzung schreibt ihren Token in Supabase. Andere Geräte prüfen alle 10s ob sie verdrängt wurden.
   useEffect(() => {
     if (!supabase) return;
 
-    // Session-Token für dieses Gerät (pro Tab eindeutig)
-    let token = sessionStorage.getItem('qtool_session_token');
-    if (!token) {
-      token = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-      sessionStorage.setItem('qtool_session_token', token);
-    }
-    sessionTokenRef.current = token;
+    const SESSION_KEY = '_qtool_session_v1'; // Feste ID in damage_reports
 
-    const joinedAt = new Date().toISOString(); // Zeitpunkt DIESES Gerätestarts
+    let myToken = sessionStorage.getItem('qtool_session_token');
+    if (!myToken) {
+      myToken = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      sessionStorage.setItem('qtool_session_token', myToken);
+    }
+    sessionTokenRef.current = myToken;
     const myDevice = /iPad|iPhone|Android/i.test(navigator.userAgent) ? 'Mobil' : 'Desktop';
 
-    const channel = supabase.channel('qtool_session_v2'); // Neuer Channel-Name
-
-    channel
-      .on('presence', { event: 'sync' }, () => {
-        const state = channel.presenceState();
-        const allPresences = Object.values(state).flat();
-        const myToken = sessionTokenRef.current;
-
-        // Andere Sitzungen (nicht meine)
-        const others = allPresences.filter(p => p.token !== myToken);
-
-        if (others.length === 0) {
-          setIsSessionActive(true); // Allein → aktiv
-          return;
-        }
-
-        // Gibt es eine NEUERE Sitzung als meine?
-        const myJoinTime = allPresences.find(p => p.token === myToken)?.since || joinedAt;
-        const newerExists = others.some(p => new Date(p.since) > new Date(myJoinTime));
-
-        if (newerExists) {
-          setIsSessionActive(false); // Neueres Gerät existiert → inaktiv
-        } else {
-          setIsSessionActive(true);  // Ich bin das neueste → aktiv
-        }
-      })
-      .subscribe(async (status) => {
-        if (status === 'SUBSCRIBED') {
-          await channel.track({ token, device: myDevice, since: joinedAt });
-          console.log('[Session] ✅ Presence aktiv:', myDevice, token.slice(0, 8));
-        } else {
-          console.warn('[Session] Status:', status);
-        }
+    // Hilfsfunktion: Sitzung in Supabase beanspruchen
+    const claimSession = async (token) => {
+      const t = token || sessionTokenRef.current;
+      await supabase.from('damage_reports').upsert({
+        id: SESSION_KEY,
+        project_title: '__session__',
+        client: '__system__',
+        report_data: { _isSession: true, token: t, device: myDevice, since: new Date().toISOString() },
+        updated_at: new Date().toISOString()
       });
+    };
 
-    presenceChannelRef.current = channel;
+    // Hilfsfunktion: Prüfen ob unsere Sitzung noch aktiv ist
+    const checkSession = async () => {
+      const { data } = await supabase
+        .from('damage_reports')
+        .select('report_data')
+        .eq('id', SESSION_KEY)
+        .single();
+      if (data?.report_data?.token && data.report_data.token !== sessionTokenRef.current) {
+        console.warn('[Session] ⚠️ Andere Sitzung aktiv:', data.report_data.device);
+        setIsSessionActive(false);
+      } else if (data?.report_data?.token === sessionTokenRef.current) {
+        setIsSessionActive(true);
+      }
+    };
 
-    return () => { supabase.removeChannel(channel); };
-  }, []); // Nur einmal beim Mount
+    // Ref für claimSession – für den "Hier weiterarbeiten"-Button
+    presenceChannelRef.current = { claimSession, SESSION_KEY };
+
+    // Start: Diese Sitzung sofort beanspruchen
+    claimSession().then(() => console.log('[Session] ✅ Gestartet:', myDevice, myToken.slice(0, 8)));
+
+    // Alle 10 Sekunden prüfen
+    const interval = setInterval(checkSession, 10000);
+
+    // Auch prüfen wenn Benutzer zurück zum Tab wechselt
+    const onFocus = () => checkSession();
+    window.addEventListener('focus', onFocus);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, []);
 
   // iOS-Tastatur: Eingabefeld automatisch sichtbar halten (Techniker-Modus)
   useEffect(() => {
@@ -299,7 +304,7 @@ function App() {
             ...img,
             includeInReport: img.includeInReport !== false
           }))
-        }));
+        })).filter(r => !r._isSession); // Session-Record ausblenden
         if (loadedReports.length > 0) {
           setReports(loadedReports);
 
@@ -749,16 +754,12 @@ function App() {
           </span>
           <button
             onClick={async () => {
-              // Sitzung zurückfordern: neues Token → anderes Gerät wird inaktiv
+              // Sitzung zurückfordern: neues Token setzen und in Supabase schreiben
               const newToken = (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}`);
               sessionStorage.setItem('qtool_session_token', newToken);
               sessionTokenRef.current = newToken;
-              if (presenceChannelRef.current) {
-                await presenceChannelRef.current.track({
-                  device: /iPad|iPhone|Android/i.test(navigator.userAgent) ? 'Mobil' : 'Desktop',
-                  token: newToken,
-                  since: new Date().toISOString()
-                });
+              if (presenceChannelRef.current?.claimSession) {
+                await presenceChannelRef.current.claimSession(newToken);
               }
               setIsSessionActive(true);
             }}
