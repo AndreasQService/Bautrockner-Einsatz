@@ -345,31 +345,9 @@ function App() {
     setSelectedReport(report);
     setView('details');
     setIsSessionActive(true);
-
-    // Prüfen ob anderes Gerät dieses Projekt bereits offen hat
-    if (supabase && report.id) {
-      try {
-        const { data } = await supabase
-          .from('damage_reports')
-          .select('report_data')
-          .eq('id', `_session_${report.id}`)
-          .single();
-
-        if (data?.report_data?.token && data.report_data.token !== sessionTokenRef.current) {
-          // Anderes Gerät hat dieses Projekt – Sperre anzeigen, NICHT überschreiben
-          setIsSessionActive(false);
-        } else {
-          // Frei – beanspruchen
-          if (presenceChannelRef.current?.claimSession) {
-            await presenceChannelRef.current.claimSession(undefined, report.id);
-          }
-        }
-      } catch {
-        // Kein Session-Record – frei beanspruchen
-        if (presenceChannelRef.current?.claimSession) {
-          await presenceChannelRef.current.claimSession(undefined, report.id);
-        }
-      }
+    // Projekt sofort beanspruchen – neuestes Gerät gewinnt (wie Login-System)
+    if (presenceChannelRef.current?.claimSession) {
+      await presenceChannelRef.current.claimSession(undefined, report.id);
     }
   }
 
