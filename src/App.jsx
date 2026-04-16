@@ -222,16 +222,17 @@ function App() {
     const fetchReports = async () => {
       const { data, error } = await supabase
         .from('damage_reports')
-        .select('report_data')
+        .select('report_data, updated_at')
         .is('deleted_at', null)          // ← Soft-Delete: nur nicht-gelöschte laden
         .order('created_at', { ascending: false });
 
       if (error) {
         console.error('Error fetching reports from Supabase:', error);
       } else if (data) {
-        const loadedReports = data.map(row => row.report_data).map(report => ({
-          ...report,
-          images: (report.images || []).map(img => ({
+        const loadedReports = data.map(row => ({
+          ...row.report_data,
+          _supabase_updated_at: row.updated_at,  // ← Konfliktschutz: Zeitstempel merken
+          images: (row.report_data.images || []).map(img => ({
             ...img,
             includeInReport: img.includeInReport !== false
           }))
@@ -329,6 +330,10 @@ function App() {
     }
 
     if (supabase) {
+      const now = new Date().toISOString();
+      // _supabase_updated_at ist ein internes Feld – nicht in die DB speichern
+      const { _supabase_updated_at: loadedAt, ...reportForStorage } = finalReport;
+
       const rowData = {
         id: finalReport.id,
         project_title: finalReport.projectTitle,
@@ -338,30 +343,57 @@ function App() {
         assigned_to: finalReport.assignedTo,
         date: finalReport.date,
         drying_started: finalReport.dryingStarted,
-        report_data: finalReport,
-        updated_at: new Date().toISOString()
+        report_data: reportForStorage,  // ohne _supabase_updated_at
+        updated_at: now
       };
 
-      supabase.from('damage_reports').upsert(rowData).then(({ error }) => {
+      const oneDriveBackup = () => {
+        try {
+          const odFolder = buildProjectFolderName(
+            finalReport.projectNumber || finalReport.id || 'Unbekannt',
+            finalReport
+          );
+          uploadProjectJson(odFolder, finalReport).catch(e =>
+            console.warn('[OneDrive] JSON-Backup fehlgeschlagen:', e.message)
+          );
+        } catch (e) {
+          console.warn('[OneDrive] JSON-Backup fehlgeschlagen:', e.message);
+        }
+      };
+
+      // ─── Konfliktschutz: Nur speichern wenn kein neueres Update existiert ───────
+      if (loadedAt && finalReport.id && !finalReport.id.startsWith('TMP-')) {
+        const { data: updateResult, error } = await supabase
+          .from('damage_reports')
+          .update(rowData)
+          .eq('id', finalReport.id)
+          .lte('updated_at', loadedAt)  // Nur wenn DB-Version ≤ geladene Version
+          .select('id');
+
         if (error) {
           console.error('Error saving to Supabase:', error);
-          // Sichtbarer Fehler — Benutzer wird informiert, nicht stilles Versagen
           showToast(`⚠️ Speicherfehler: ${error.message || error.code || 'Supabase-Fehler'}. Daten nur lokal gesichert!`, 'error');
+        } else if (!updateResult || updateResult.length === 0) {
+          // Konflikt: Ein anderes Gerät hat neuere Daten → NICHT überschreiben
+          console.warn('[Sync-Konflikt] Neuere Version in Supabase – abgebrochen:', finalReport.id);
+          showToast('⚠️ Neuere Version auf anderem Gerät! Seite neu laden.', 'warning');
         } else {
-          // OneDrive JSON-Backup (silent)
-          try {
-            const odFolder = buildProjectFolderName(
-              finalReport.projectNumber || finalReport.id || 'Unbekannt',
-              finalReport
-            );
-            uploadProjectJson(odFolder, finalReport).catch(e =>
-              console.warn('[OneDrive] JSON-Backup fehlgeschlagen:', e.message)
-            );
-          } catch (e) {
-            console.warn('[OneDrive] JSON-Backup fehlgeschlagen:', e.message);
-          }
+          // Erfolgreich: _supabase_updated_at aktualisieren damit nächster Save erlaubt ist
+          setReports(prev => prev.map(r => r.id === finalReport.id ? { ...r, _supabase_updated_at: now } : r));
+          oneDriveBackup();
         }
-      });
+      } else {
+        // Neues Projekt oder kein bekannter Zeitstempel → einfaches Upsert
+        supabase.from('damage_reports').upsert(rowData).then(({ error }) => {
+          if (error) {
+            console.error('Error saving to Supabase:', error);
+            showToast(`⚠️ Speicherfehler: ${error.message || error.code || 'Supabase-Fehler'}. Daten nur lokal gesichert!`, 'error');
+          } else {
+            setReports(prev => prev.map(r => r.id === finalReport.id ? { ...r, _supabase_updated_at: now } : r));
+            oneDriveBackup();
+          }
+        });
+      }
     }
 
     return finalReport;
@@ -817,8 +849,8 @@ function App() {
           currentUser={currentUser}
           onReportsChanged={async () => {
             // Reload from Supabase after a status change
-            const { data } = await supabase.from('damage_reports').select('report_data').is('deleted_at', null).order('created_at', { ascending: false });
-            if (data) setReports(data.map(r => r.report_data));
+            const { data } = await supabase.from('damage_reports').select('report_data, updated_at').is('deleted_at', null).order('created_at', { ascending: false });
+            if (data) setReports(data.map(r => ({ ...r.report_data, _supabase_updated_at: r.updated_at })));
           }}
         />}
         {view === 'devices' && <DeviceManager reports={reports} onBack={() => setView('dashboard')} onNavigateToReport={handleNavigateToReport} />}
