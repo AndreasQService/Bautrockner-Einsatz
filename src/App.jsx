@@ -40,7 +40,7 @@ function App() {
   const [selectedDeviceId, setSelectedDeviceId] = useState(localStorage.getItem('qtool_selected_mic') || '');
 
   // MSAL hooks for OneDrive
-  const { instance, accounts } = useMsal();
+  const { instance, accounts, inProgress } = useMsal();
   const isAuthenticated = useIsAuthenticated();
 
   // OneDrive: MSAL-Instanz sofort registrieren sobald verfügbar
@@ -151,7 +151,8 @@ function App() {
       await instance.loginRedirect(loginRequest);
     } catch (e) {
       console.error("MSAL Login Error:", e);
-      alert("MSAL Fehler: " + e.message);
+      // alert() wird von Safari in async Kontext geblockt → Toast verwenden
+      showToast("OneDrive Fehler: " + (e.message || 'Unbekannt'), 'error');
     }
   };
 
@@ -683,9 +684,15 @@ function App() {
                     </button>
 
                     {!isAuthenticated ? (
-                      <button className="btn btn-outline" onClick={handleLoginOneDrive} style={{ color: '#0078D4', borderColor: '#0078D4', gap: '0.4rem' }}>
+                      <button
+                        className="btn btn-outline"
+                        onClick={handleLoginOneDrive}
+                        disabled={inProgress !== 'none'}
+                        style={{ color: inProgress !== 'none' ? 'var(--text-muted)' : '#0078D4', borderColor: inProgress !== 'none' ? 'var(--border)' : '#0078D4', gap: '0.4rem', opacity: inProgress !== 'none' ? 0.5 : 1 }}
+                        title={inProgress !== 'none' ? 'MSAL wird initialisiert...' : 'Mit OneDrive verbinden'}
+                      >
                         <Database size={18} />
-                        <span className="hide-mobile">OneDrive Login</span>
+                        <span className="hide-mobile">{inProgress !== 'none' ? 'Verbinde...' : 'OneDrive Login'}</span>
                       </button>
                     ) : (
                       <>
