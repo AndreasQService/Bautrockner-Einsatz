@@ -768,39 +768,7 @@ function App() {
 
   return (
     <div className="app">
-      {/* ── Session-Inaktiv-Banner ───────────────────────────────────── */}
-      {!isSessionActive && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, zIndex: 99999,
-          background: 'linear-gradient(90deg, #dc2626, #b91c1c)',
-          color: 'white', padding: '10px 16px',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          boxShadow: '0 2px 12px rgba(220,38,38,0.5)', gap: '1rem'
-        }}>
-          <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>
-            ⚠️ Diese Sitzung ist inaktiv – QTool ist auf einem anderen Geråt geöffnet. Kein automatisches Speichern.
-          </span>
-          <button
-            onClick={async () => {
-              // Sitzung zurückfordern: neues Token setzen und in Supabase schreiben
-              const newToken = (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}`);
-              sessionStorage.setItem('qtool_session_token', newToken);
-              sessionTokenRef.current = newToken;
-              if (presenceChannelRef.current?.claimSession) {
-                await presenceChannelRef.current.claimSession(newToken);
-              }
-              setIsSessionActive(true);
-            }}
-            style={{
-              background: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.5)',
-              color: 'white', padding: '4px 12px', borderRadius: '6px',
-              cursor: 'pointer', fontWeight: 700, fontSize: '0.8rem', flexShrink: 0
-            }}
-          >
-            Hier weiterarbeiten
-          </button>
-        </div>
-      )}
+
       {ToastMarkup}
 
       <header className="app-header">
@@ -994,7 +962,7 @@ function App() {
             {/* ── Sitzungssperre: Overlay blockiert alle Eingaben wenn inaktiv ── */}
             {!isSessionActive && (
               <div style={{
-                position: 'fixed',
+                position: 'absolute',
                 top: 0, left: 0, right: 0, bottom: 0,
                 zIndex: 9000,
                 backgroundColor: 'rgba(220, 38, 38, 0.08)',
@@ -1003,6 +971,7 @@ function App() {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
+                minHeight: '60vh',
               }}>
                 <div style={{
                   background: 'rgba(220,38,38,0.92)',
@@ -1014,14 +983,38 @@ function App() {
                   textAlign: 'center',
                   boxShadow: '0 8px 40px rgba(220,38,38,0.5)',
                   maxWidth: '400px',
-                  lineHeight: 1.5,
-                  pointerEvents: 'none'
+                  lineHeight: 1.8,
+                  pointerEvents: 'all',
+                  cursor: 'default',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '1rem',
                 }}>
-                  🔒 Gesperrt<br />
-                  <span style={{ fontWeight: 400, fontSize: '0.9rem' }}>
-                    QTool ist auf einem anderen Gerät aktiv.<br />
-                    Benutze den roten Banner oben um diese Sitzung zu übernehmen.
-                  </span>
+                  <div>
+                    🔒 Projekt gesperrt<br />
+                    <span style={{ fontWeight: 400, fontSize: '0.9rem' }}>
+                      Dieses Projekt ist auf einem anderen Gerät geöffnet.
+                    </span>
+                  </div>
+                  <button
+                    onClick={async () => {
+                      const newToken = (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}`);
+                      sessionStorage.setItem('qtool_session_token', newToken);
+                      sessionTokenRef.current = newToken;
+                      if (presenceChannelRef.current?.claimSession) {
+                        await presenceChannelRef.current.claimSession(newToken, selectedReport?.id);
+                      }
+                      setIsSessionActive(true);
+                    }}
+                    style={{
+                      background: 'white', color: '#dc2626',
+                      border: 'none', padding: '0.6rem 1.2rem',
+                      borderRadius: '8px', fontWeight: 800,
+                      fontSize: '0.95rem', cursor: 'pointer',
+                    }}
+                  >
+                    → Hier weiterarbeiten
+                  </button>
                 </div>
               </div>
             )}
