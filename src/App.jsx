@@ -33,28 +33,57 @@ function App() {
   const [showUserModal, setShowUserModal] = useState(false);
   const [showMeasurementManager, setShowMeasurementManager] = useState(false);
   const [currentUser, setCurrentUser] = useState({ id: 1, name: 'Admin User', role: 'admin' }); // Auto-login as admin
-  const [isSessionActive, setIsSessionActive] = useState(true); // Single-Session: nur 1 Gerät aktiv
+  const [isSessionActive, setIsSessionActive] = useState(true);
   const sessionTokenRef = useRef(null);
   const presenceChannelRef = useRef(null);
-  const isSessionActiveRef = useRef(true); // Ref für handleSaveReport-Zugriff
-  const selectedReportRef = useRef(null);  // Ref für Session-Check (projektspezifisch)
+  const isSessionActiveRef = useRef(true);
+  const selectedReportRef = useRef(null);
+
+  // Session-Token synchron initialisieren (vor allen useEffects verfügbar)
+  const [mySessionToken] = useState(() => {
+    let t = sessionStorage.getItem('qtool_session_token');
+    if (!t) {
+      t = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      sessionStorage.setItem('qtool_session_token', t);
+    }
+    sessionTokenRef.current = t;
+    return t;
+  });
+  const myDevice = /iPad|iPhone|Android/i.test(navigator.userAgent) ? 'Mobil' : 'Desktop';
 
   // Refs synchron halten
   useEffect(() => { isSessionActiveRef.current = isSessionActive; }, [isSessionActive]);
   useEffect(() => { selectedReportRef.current = selectedReport; }, [selectedReport]);
 
-  // Beim Öffnen eines Projekts (auch aus localStorage): sofort beanspruchen + prüfen
+  // Beim Öffnen eines Projekts: sofort beanspruchen + nach 2s prüfen ob anderes Gerät übernommen hat
   useEffect(() => {
-    if (!selectedReport?.id || !presenceChannelRef.current) return;
+    if (!selectedReport?.id || !supabase) return;
     const pid = selectedReport.id;
-    // 1. Dieses Gerät beansprucht das Projekt
-    presenceChannelRef.current.claimSession?.(undefined, pid);
-    // 2. Sofortiger Check (nach kurzem Delay damit iPad-Claim zuerst ankommen kann)
-    const t = setTimeout(() => {
-      presenceChannelRef.current?.checkSession?.();
-    }, 1500);
+    const sessionKey = `_session_${pid}`;
+    const token = sessionTokenRef.current;
+
+    // Sofort beanspruchen (direkter Supabase-Aufruf, kein presenceChannelRef nötig)
+    supabase.from('damage_reports').upsert({
+      id: sessionKey,
+      project_title: '__session__',
+      client: '__system__',
+      report_data: { _isSession: true, token, device: myDevice, since: new Date().toISOString() },
+      updated_at: new Date().toISOString()
+    });
+
+    // Nach 2s prüfen ob ein anderes Gerät DANACH beansprucht hat
+    const t = setTimeout(async () => {
+      const { data } = await supabase.from('damage_reports')
+        .select('report_data').eq('id', sessionKey).single();
+      if (data?.report_data?.token && data.report_data.token !== sessionTokenRef.current) {
+        setIsSessionActive(false);
+      } else {
+        setIsSessionActive(true);
+      }
+    }, 2000);
+
     return () => clearTimeout(t);
-  }, [selectedReport?.id]);
+  }, [selectedReport?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const [userRole, setUserRole] = useState('admin'); // 'admin' | 'technician' | 'user'
   const [isTechnicianMode, setIsTechnicianMode] = useState(false); // Mode state
   const [showEmailImport, setShowEmailImport] = useState(false);
