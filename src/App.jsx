@@ -75,58 +75,60 @@ function App() {
   }, [instance]);
 
   // ── Single-Session: Supabase Realtime Presence ────────────────────────────────
-  // Wenn ein neues Gerät QTool öffnet, wird die alte Sitzung blockiert (kein Autosave)
+  // Das zuletzt geöffnete Gerät "gewinnt" – ältere Sitzungen werden blockiert
   useEffect(() => {
     if (!supabase) return;
 
-    // Eindeutiges Session-Token für dieses Gerät
+    // Session-Token für dieses Gerät (pro Tab eindeutig)
     let token = sessionStorage.getItem('qtool_session_token');
     if (!token) {
-      token = (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`);
+      token = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
       sessionStorage.setItem('qtool_session_token', token);
     }
     sessionTokenRef.current = token;
 
-    const deviceInfo = /iPad|iPhone|Android/i.test(navigator.userAgent) ? 'Mobil' : 'Desktop';
-    const channel = supabase.channel('qtool_global_session', {
-      config: { presence: { key: token } }
-    });
+    const joinedAt = new Date().toISOString(); // Zeitpunkt DIESES Gerätestarts
+    const myDevice = /iPad|iPhone|Android/i.test(navigator.userAgent) ? 'Mobil' : 'Desktop';
+
+    const channel = supabase.channel('qtool_session_v2'); // Neuer Channel-Name
 
     channel
-      .on('presence', { event: 'join' }, ({ key, newPresences }) => {
-        // Anderes Gerät hat sich verbunden
-        if (key !== sessionTokenRef.current) {
-          console.log('[Session] Neue Sitzung erkannt auf:', newPresences[0]?.device, '– diese Sitzung wird inaktiv');
-          setIsSessionActive(false);
+      .on('presence', { event: 'sync' }, () => {
+        const state = channel.presenceState();
+        const allPresences = Object.values(state).flat();
+        const myToken = sessionTokenRef.current;
+
+        // Andere Sitzungen (nicht meine)
+        const others = allPresences.filter(p => p.token !== myToken);
+
+        if (others.length === 0) {
+          setIsSessionActive(true); // Allein → aktiv
+          return;
         }
-      })
-      .on('presence', { event: 'leave' }, ({ key }) => {
-        // Anderes Gerät hat sich getrennt → diese Sitzung wieder aktiv
-        if (key !== sessionTokenRef.current) {
-          const state = channel.presenceState();
-          const others = Object.keys(state).filter(k => k !== sessionTokenRef.current);
-          if (others.length === 0) {
-            console.log('[Session] Andere Sitzung getrennt – diese Sitzung ist wieder aktiv');
-            setIsSessionActive(true);
-          }
+
+        // Gibt es eine NEUERE Sitzung als meine?
+        const myJoinTime = allPresences.find(p => p.token === myToken)?.since || joinedAt;
+        const newerExists = others.some(p => new Date(p.since) > new Date(myJoinTime));
+
+        if (newerExists) {
+          setIsSessionActive(false); // Neueres Gerät existiert → inaktiv
+        } else {
+          setIsSessionActive(true);  // Ich bin das neueste → aktiv
         }
       })
       .subscribe(async (status) => {
         if (status === 'SUBSCRIBED') {
-          await channel.track({
-            device: deviceInfo,
-            token,
-            since: new Date().toISOString()
-          });
+          await channel.track({ token, device: myDevice, since: joinedAt });
+          console.log('[Session] ✅ Presence aktiv:', myDevice, token.slice(0, 8));
+        } else {
+          console.warn('[Session] Status:', status);
         }
       });
 
     presenceChannelRef.current = channel;
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [supabase]);
+    return () => { supabase.removeChannel(channel); };
+  }, []); // Nur einmal beim Mount
 
   // iOS-Tastatur: Eingabefeld automatisch sichtbar halten (Techniker-Modus)
   useEffect(() => {
