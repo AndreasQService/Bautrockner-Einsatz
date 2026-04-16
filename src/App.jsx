@@ -140,11 +140,22 @@ function App() {
     };
   }, [isTechnicianMode]);
 
-  const handleLoginOneDrive = () => {
-    instance.loginRedirect(loginRequest).catch(e => {
+  const handleLoginOneDrive = async () => {
+    const isLocalhost = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+    try {
+      if (isLocalhost) {
+        // Desktop: Redirect-Flow
+        await instance.loginRedirect(loginRequest);
+      } else {
+        // Vercel / iPad (Chrome): Popup-Flow – bleibt in der App
+        await instance.loginPopup(loginRequest);
+      }
+    } catch (e) {
       console.error("MSAL Login Error:", e);
-      alert("MSAL Fehler: " + e.message);
-    });
+      if (!e.message?.includes('user_cancelled') && !e.message?.includes('popup_window_error')) {
+        alert("MSAL Fehler: " + e.message);
+      }
+    }
   };
 
   const handleLogoutOneDrive = () => {
