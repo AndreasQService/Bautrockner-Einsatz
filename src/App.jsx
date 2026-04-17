@@ -38,6 +38,7 @@ function App() {
   const presenceChannelRef = useRef(null);
   const isSessionActiveRef = useRef(true);
   const selectedReportRef = useRef(null);
+  const sessionStartedAtRef = useRef(Date.now());
 
   // Session-Token synchron initialisieren (vor allen useEffects verfügbar)
   const [mySessionToken] = useState(() => {
@@ -95,18 +96,32 @@ function App() {
     }
   }, [instance]);
 
-  // ── Ref für aktuellen Modus des geöffneten Projekts (für Presence-Entscheidung) ──────────
-  const activePresenceChannelRef = useRef(null);
-  const presenceModeRef = useRef('desktop'); // wird synchron gehalten
+  // ======================================================
+  // QTOOL – SESSION / MODUS-SPERRE PRO PROJEKT
+  // Regeln:
+  // - Verschiedener Modus (Desktop↔Technician) = Konflikt
+  // - Gleicher Modus = kein Konflikt
+  // - First Wins = älteste Session bleibt Owner
+  // - Presence nur via sync auswerten
+  // ======================================================
 
-  // Sperrentscheidung (nur aus sync aufzurufen, nie aus join/leave direkt)
+  const activePresenceChannelRef = useRef(null);
+  const presenceModeRef = useRef('desktop');
+
+  // Konflikt prüfen
   const evaluateLock = useCallback((presenceState, myToken, mode) => {
-    // Alle Einträge flach machen: { [key]: [{ token, mode, since, device }] }
     const allEntries = Object.values(presenceState).flat();
 
-    // Nur Einträge mit GLEICHEM Modus führen zum Konflikt
+    const myEntry = allEntries.find(e => e.token === myToken);
+
+    if (!myEntry) {
+      setIsSessionActive(false);
+      return;
+    }
+
+    // Nur anderer Modus = Konflikt
     const conflicting = allEntries.filter(
-      e => e.mode === mode && e.token !== myToken
+      e => e.token !== myToken && e.mode !== mode
     );
 
     if (conflicting.length === 0) {
@@ -114,18 +129,17 @@ function App() {
       return;
     }
 
-    // Deterministisch: latest-wins – neuester since-Timestamp ist Owner
-    const myEntry = allEntries.find(e => e.token === myToken);
-    const mySince = Number(myEntry?.since ?? 0);
-    const latestConflictSince = Math.max(...conflicting.map(e => Number(e.since ?? 0)));
+    // First Wins = älteste Session gewinnt
+    const allRelevant = [myEntry, ...conflicting];
+    const owner = allRelevant.sort((a, b) => {
+      const diff = Number(a.since) - Number(b.since);
+      if (diff !== 0) return diff;
+      return String(a.token).localeCompare(String(b.token));
+    })[0];
 
-    if (mySince >= latestConflictSince) {
-      // Ich bin der neueste → ich bin aktiv
-      console.log(`[Session] ✅ Owner (${mode}): since=${mySince}`);
+    if (owner.token === myToken) {
       setIsSessionActive(true);
     } else {
-      // Ein anderes Gerät mit gleichem Modus ist neuer → gesperrt
-      console.warn(`[Session] 🔒 Gesperrt – Modus "${mode}" bereits auf anderem Gerät aktiver`);
       setIsSessionActive(false);
     }
   }, []);
@@ -136,97 +150,58 @@ function App() {
     if (!ch || !supabase) return;
     activePresenceChannelRef.current = null;
     try { await ch.untrack(); } catch (_) {}
-    supabase.removeChannel(ch);
-    console.log('[Session] 🔓 Kanal geschlossen');
-  }, []);
+    await supabase.removeChannel(ch);
+  }, [supabase]);
 
-  // Presence-Kanal für ein Projekt starten
-  // mode: 'desktop' | 'technician' – bestimmt ob ein Konflikt vorliegt
-  const setupPresenceForProject = useCallback((projectId, mode) => {
+  // Presence starten
+  const setupPresenceForProject = useCallback(async (projectId, mode) => {
     if (!supabase || !projectId) return;
-    presenceModeRef.current = mode;
 
-    // Alten Kanal zuerst sauber schließen
-    closePresenceChannel();
+    await closePresenceChannel();
+
+    presenceModeRef.current = mode;
 
     const myToken = sessionTokenRef.current;
     const myDevice = /iPad|iPhone|Android/i.test(navigator.userAgent) ? 'Mobil' : 'Desktop';
-    const since = Date.now();
-    const channelName = `project-lock-${projectId}`;
+    const since = sessionStartedAtRef.current;
 
-    const channel = supabase.channel(channelName, {
+    const channel = supabase.channel(`project-lock-${projectId}`, {
       config: { presence: { key: myToken } }
     });
 
     channel
-      // sync = einzige Entscheidungsgrundlage für die Sperre
       .on('presence', { event: 'sync' }, () => {
         evaluateLock(channel.presenceState(), myToken, presenceModeRef.current);
       })
-      // join/leave: nur für Logging, kein direktes setIsSessionActive
-      .on('presence', { event: 'join' }, ({ key, newPresences }) => {
-        if (key !== myToken) {
-          console.log('[Session] 👤 Beigetreten:', key, newPresences?.[0]?.mode);
-        }
-      })
-      .on('presence', { event: 'leave' }, ({ key }) => {
-        if (key !== myToken) {
-          console.log('[Session] 👤 Verlassen:', key);
-        }
-      })
-      .subscribe(async (status) => {
+      .subscribe(async status => {
         if (status === 'SUBSCRIBED') {
           await channel.track({ token: myToken, mode, device: myDevice, since });
-          console.log(`[Session] ✅ Presence aktiv: ${myDevice} | Modus: ${mode} | Token: ${myToken.slice(0, 8)}`);
-        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          // Fallback: bei Verbindungsfehler nicht sperren
-          console.warn('[Session] ⚠️ Presence-Fehler:', status, '– nicht sperren');
-          setIsSessionActive(true);
+        }
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          setIsSessionActive(false);
         }
       });
 
     activePresenceChannelRef.current = channel;
+    presenceChannelRef.current = { releaseSession: closePresenceChannel };
+  }, [supabase, evaluateLock, closePresenceChannel]);
 
-    // API nach außen für handleCancelEntry
-    presenceChannelRef.current = {
-      releaseSession: closePresenceChannel
-    };
-  }, [evaluateLock, closePresenceChannel]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Wenn Modus während geöffnetem Projekt geändert wird → Presence neu tracken
+  // Modus-Wechsel im offenen Projekt
   useEffect(() => {
-    if ((view !== 'details' && view !== 'new-report') || !selectedReport?.id) return;
-    if (!activePresenceChannelRef.current) return;
+    const ch = activePresenceChannelRef.current;
+    if (!ch) return;
     presenceModeRef.current = projectMode;
-    const myToken = sessionTokenRef.current;
-    const myDevice = /iPad|iPhone|Android/i.test(navigator.userAgent) ? 'Mobil' : 'Desktop';
-    activePresenceChannelRef.current
-      .track({ token: myToken, mode: projectMode, device: myDevice, since: Date.now() })
-      .then(() => console.log('[Session] 🔄 Modus-Wechsel getrackt:', projectMode))
-      .catch(() => {});
+    ch.track({
+      token: sessionTokenRef.current,
+      mode: projectMode,
+      device: /iPad|iPhone|Android/i.test(navigator.userAgent) ? 'Mobil' : 'Desktop',
+      since: sessionStartedAtRef.current
+    }).catch(() => {});
   }, [projectMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Presence-Kanal schließen wenn Tab/App unsichtbar
+  // Cleanup beim Verlassen
   useEffect(() => {
-    const handleVisibilityChange = () => {
-      const ch = activePresenceChannelRef.current;
-      if (!ch) return;
-      if (document.hidden) {
-        ch.untrack().catch(() => {});
-      } else if (selectedReportRef.current?.id) {
-        ch.track({
-          token: sessionTokenRef.current,
-          mode: presenceModeRef.current,
-          device: /iPad|iPhone|Android/i.test(navigator.userAgent) ? 'Mobil' : 'Desktop',
-          since: Date.now()
-        }).catch(() => {});
-      }
-    };
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      closePresenceChannel();
-    };
+    return () => { closePresenceChannel(); };
   }, [closePresenceChannel]);
 
   // iOS-Tastatur: Eingabefeld automatisch sichtbar halten (Techniker-Modus)
