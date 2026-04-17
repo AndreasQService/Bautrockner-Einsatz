@@ -93,7 +93,20 @@ function App() {
     return () => clearTimeout(t);
   }, [selectedReport?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const [userRole, setUserRole] = useState('admin'); // 'admin' | 'technician' | 'user'
-  const [isTechnicianMode, setIsTechnicianMode] = useState(false); // Mode state
+  const [isTechnicianMode, setIsTechnicianMode] = useState(false); // Globaler Fallback-Modus (Dashboard)
+
+  // ── Projektspezifischer Modus: 'desktop' | 'technician' (Mutex – nie beides gleichzeitig)
+  const [projectMode, setProjectMode] = useState('desktop'); // Modus des aktuell geöffneten Projekts
+
+  // Setzt den Modus für das aktuelle Projekt – immer Mutex (Desktop XOR Techniker)
+  const setProjectModeExclusive = (mode) => {
+    // Nur gültige Werte: 'desktop' oder 'technician'
+    if (mode !== 'desktop' && mode !== 'technician') return;
+    setProjectMode(mode);
+  };
+
+  // Effektiver Modus: Im Projekt-View gilt projectMode, im Dashboard isTechnicianMode
+  const effectiveMode = (view === 'details' || view === 'new-report') ? projectMode : (isTechnicianMode ? 'technician' : 'desktop');
   const [showEmailImport, setShowEmailImport] = useState(false);
   const [audioDevices, setAudioDevices] = useState([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState(localStorage.getItem('qtool_selected_mic') || '');
@@ -318,6 +331,8 @@ function App() {
     setUserRole(user.role);
     // Automatically set mode based on role
     setIsTechnicianMode(user.role === 'technician');
+    // Projektmodus beim Login zurücksetzen
+    setProjectMode(user.role === 'technician' ? 'technician' : 'desktop');
     showToast(`Angemeldet als ${user.name}`, 'success');
   };
 
@@ -325,6 +340,7 @@ function App() {
     setCurrentUser(null);
     setUserRole('admin');
     setIsTechnicianMode(false);
+    setProjectMode('desktop');
     setView('dashboard');
     setSelectedReport(null);
   };
@@ -365,6 +381,8 @@ function App() {
 
       if (error) {
         console.error('Error fetching reports from Supabase:', error);
+        // iPad-Debug: Supabase-Fehler im Klartext
+        console.warn('[Supabase] Fehler beim Laden. Fallback auf LocalStorage-Cache.');
       } else if (data) {
         const loadedReports = data.map(row => ({
           ...row.report_data,
@@ -374,6 +392,10 @@ function App() {
             includeInReport: img.includeInReport !== false
           }))
         })).filter(r => !r._isSession); // Session-Record ausblenden
+
+        console.log(`[Supabase] ${loadedReports.length} Projekte geladen (von ${data.length} Gesamt-Einträgen).`);
+
+        // IMMER setzen – auch bei leerem Array (verhindert hängenbleiben am LocalStorage-Cache)
         if (loadedReports.length > 0) {
           setReports(loadedReports);
 
@@ -403,6 +425,14 @@ function App() {
     setSelectedReport(report);
     setView('details');
     setIsSessionActive(true);
+    // Projektspezifischen Modus laden – gespeicherter Modus hat Vorrang, sonst globaler Modus
+    const savedMode = report?._projectMode;
+    if (savedMode === 'technician' || savedMode === 'desktop') {
+      setProjectMode(savedMode);
+    } else {
+      // Kein gespeicherter Modus → globalen isTechnicianMode übernehmen
+      setProjectMode(isTechnicianMode ? 'technician' : 'desktop');
+    }
     // Projekt sofort beanspruchen – neuestes Gerät gewinnt (wie Login-System)
     if (presenceChannelRef.current?.claimSession) {
       await presenceChannelRef.current.claimSession(undefined, report.id);
@@ -846,12 +876,24 @@ function App() {
               </button>
             )}
 
+            {/* Projektspezifischer Mode-Toggle: nur im Projekt-View (details/new-report) */}
+            {(view === 'details' || view === 'new-report') && userRole === 'admin' && (
+              <button
+                className={`btn ${projectMode === 'technician' ? 'btn-primary' : 'btn-outline'}`}
+                onClick={() => setProjectModeExclusive(projectMode === 'technician' ? 'desktop' : 'technician')}
+                style={{ padding: '0.5rem 1rem' }}
+                title={projectMode === 'technician' ? 'Auf Desktop-Modus wechseln' : 'Auf Techniker-Modus wechseln'}
+              >
+                {projectMode === 'technician' ? 'Techniker' : 'Desktop'}
+              </button>
+            )}
+
             {view === 'dashboard' && (
               <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                 {userRole === 'admin' && (
                   <button
                     className={`btn ${isTechnicianMode ? 'btn-primary' : 'btn-outline'}`}
-                    onClick={() => setIsTechnicianMode(!isTechnicianMode)}
+                    onClick={() => setIsTechnicianMode(prev => !prev)}
                     style={{ padding: '0.5rem 1rem' }}
                   >
                     {isTechnicianMode ? 'Techniker' : 'Desktop'}
@@ -994,7 +1036,7 @@ function App() {
         </div>
       </header>
 
-      <main className="container" style={{ marginTop: isTechnicianMode ? '1rem' : '2rem', padding: isTechnicianMode ? '0.5rem' : '1rem', maxWidth: isTechnicianMode ? undefined : 'none' }}>
+      <main className="container" style={{ marginTop: effectiveMode === 'technician' ? '1rem' : '2rem', padding: effectiveMode === 'technician' ? '0.5rem' : '1rem', maxWidth: effectiveMode === 'technician' ? undefined : 'none' }}>
         {view === 'dashboard' && <Dashboard
           reports={reports}
           onSelectReport={handleSelectReport}
@@ -1075,7 +1117,11 @@ function App() {
               onCancel={handleCancelEntry}
               onSave={handleSaveReport}
               initialData={selectedReport}
-              mode={isTechnicianMode ? 'technician' : 'desktop'}
+              mode={projectMode}
+              onModeChange={(newMode) => {
+                // Mutex: Nur 'desktop' oder 'technician' – nie beides gleichzeitig
+                setProjectModeExclusive(newMode);
+              }}
             />
           </div>
         )}
