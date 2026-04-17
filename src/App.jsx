@@ -61,21 +61,29 @@ function App() {
     const pid = selectedReport.id;
     const sessionKey = `_session_${pid}`;
     const token = sessionTokenRef.current;
+    const now = new Date().toISOString();
 
-    // Sofort beanspruchen (direkter Supabase-Aufruf, kein presenceChannelRef nötig)
+    // Sofort beanspruchen mit created_at und onConflict
     supabase.from('damage_reports').upsert({
       id: sessionKey,
       project_title: '__session__',
       client: '__system__',
-      report_data: { _isSession: true, token, device: myDevice, since: new Date().toISOString() },
-      updated_at: new Date().toISOString()
+      report_data: { _isSession: true, token, device: myDevice, since: now },
+      updated_at: now,
+      created_at: now
+    }, { onConflict: 'id' }).then(({ error }) => {
+      if (error) console.error('[Session] Direkt-Claim Fehler:', error.message, error);
+      else console.log('[Session] ✅ Direkt-Claim OK:', token.slice(0, 8), 'key:', sessionKey.slice(0, 20));
     });
 
     // Nach 2s prüfen ob ein anderes Gerät DANACH beansprucht hat
     const t = setTimeout(async () => {
-      const { data } = await supabase.from('damage_reports')
+      const { data, error } = await supabase.from('damage_reports')
         .select('report_data').eq('id', sessionKey).single();
+      if (error) { console.warn('[Session] Check-Fehler:', error.message); return; }
+      console.log('[Session] Check:', data?.report_data?.token?.slice(0, 8), 'vs mein Token:', sessionTokenRef.current?.slice(0, 8));
       if (data?.report_data?.token && data.report_data.token !== sessionTokenRef.current) {
+        console.warn('[Session] 🔒 GESPERRT von:', data.report_data.device);
         setIsSessionActive(false);
       } else {
         setIsSessionActive(true);
@@ -138,25 +146,33 @@ function App() {
     const claimSession = async (token, projectId) => {
       if (!projectId) return;
       const t = token || sessionTokenRef.current;
-      await supabase.from('damage_reports').upsert({
+      const now = new Date().toISOString();
+      const { error } = await supabase.from('damage_reports').upsert({
         id: getKey(projectId),
         project_title: '__session__',
         client: '__system__',
-        report_data: { _isSession: true, token: t, device: myDevice, since: new Date().toISOString() },
-        updated_at: new Date().toISOString()
-      });
+        report_data: { _isSession: true, token: t, device: myDevice, since: now },
+        updated_at: now,
+        created_at: now
+      }, { onConflict: 'id' });
+      if (error) console.error('[Session] claimSession Fehler:', error.message, error);
+      else console.log('[Session] ✅ Beansprucht:', myDevice, t.slice(0, 8), 'Projekt:', projectId.slice(0, 8));
     };
 
     // Projekt freigeben
     const releaseSession = async (projectId) => {
       if (!projectId) return;
-      await supabase.from('damage_reports').upsert({
+      const now = new Date().toISOString();
+      const { error } = await supabase.from('damage_reports').upsert({
         id: getKey(projectId),
         project_title: '__session__',
         client: '__system__',
         report_data: { _isSession: true, token: null, device: null, since: null },
-        updated_at: new Date().toISOString()
-      });
+        updated_at: now,
+        created_at: now
+      }, { onConflict: 'id' });
+      if (error) console.error('[Session] releaseSession Fehler:', error.message);
+      else console.log('[Session] 🔓 Freigegeben:', projectId.slice(0, 8));
     };
 
     // Lock-Check für aktuell geöffnetes Projekt
