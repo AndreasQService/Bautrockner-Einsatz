@@ -55,168 +55,107 @@ function App() {
   useEffect(() => { isSessionActiveRef.current = isSessionActive; }, [isSessionActive]);
   useEffect(() => { selectedReportRef.current = selectedReport; }, [selectedReport]);
 
-  // Beim Öffnen eines Projekts: sofort beanspruchen + nach 2s prüfen ob anderes Gerät übernommen hat
-  useEffect(() => {
-    if (!selectedReport?.id || !supabase) return;
-    const pid = selectedReport.id;
-    const sessionKey = `_session_${pid}`;
-    const token = sessionTokenRef.current;
-    const now = new Date().toISOString();
+  // ── Session-Locking via Supabase Realtime Presence ────────────────────────
+  // Kein DB-Write nötig – funktioniert über WebSocket-Kanal pro Projekt
+  // Gerät A öffnet Projekt → sendet Token via Presence
+  // Gerät B sieht Token sofort → zeigt Sperre wenn Token != eigener Token
+  const activePresenceChannelRef = useRef(null); // aktueller Presence-Kanal
 
-    // Sofort beanspruchen mit created_at und onConflict
-    supabase.from('damage_reports').upsert({
-      id: sessionKey,
-      project_title: '__session__',
-      client: '__system__',
-      report_data: { _isSession: true, token, device: myDevice, since: now },
-      updated_at: now,
-      created_at: now
-    }, { onConflict: 'id' }).then(({ error }) => {
-      if (error) console.error('[Session] Direkt-Claim Fehler:', error.message, error);
-      else console.log('[Session] ✅ Direkt-Claim OK:', token.slice(0, 8), 'key:', sessionKey.slice(0, 20));
+  const setupPresenceForProject = useCallback((projectId) => {
+    if (!supabase || !projectId) return;
+
+    // Alten Kanal schließen
+    if (activePresenceChannelRef.current) {
+      supabase.removeChannel(activePresenceChannelRef.current);
+      activePresenceChannelRef.current = null;
+    }
+
+    const myToken = sessionTokenRef.current;
+    const myDevice = /iPad|iPhone|Android/i.test(navigator.userAgent) ? 'Mobil' : 'Desktop';
+    const channelName = `project-lock-${projectId}`;
+
+    const channel = supabase.channel(channelName, {
+      config: { presence: { key: myToken } }
     });
 
-    // Nach 2s prüfen ob ein anderes Gerät DANACH beansprucht hat
-    const t = setTimeout(async () => {
-      const { data, error } = await supabase.from('damage_reports')
-        .select('report_data').eq('id', sessionKey).single();
-      if (error) { console.warn('[Session] Check-Fehler:', error.message); return; }
-      console.log('[Session] Check:', data?.report_data?.token?.slice(0, 8), 'vs mein Token:', sessionTokenRef.current?.slice(0, 8));
-      if (data?.report_data?.token && data.report_data.token !== sessionTokenRef.current) {
-        console.warn('[Session] 🔒 GESPERRT von:', data.report_data.device);
-        setIsSessionActive(false);
-      } else {
-        setIsSessionActive(true);
-      }
-    }, 2000);
-
-    return () => clearTimeout(t);
-  }, [selectedReport?.id]); // eslint-disable-line react-hooks/exhaustive-deps
-  const [userRole, setUserRole] = useState('admin'); // 'admin' | 'technician' | 'user'
-  const [isTechnicianMode, setIsTechnicianMode] = useState(false); // Globaler Fallback-Modus (Dashboard)
-  const [supabaseStatus, setSupabaseStatus] = useState(null); // null | { ok: bool, count: number, error: string }
-
-  // ── Projektspezifischer Modus: 'desktop' | 'technician' (Mutex – nie beides gleichzeitig)
-  const [projectMode, setProjectMode] = useState('desktop'); // Modus des aktuell geöffneten Projekts
-
-  // Setzt den Modus für das aktuelle Projekt – immer Mutex (Desktop XOR Techniker)
-  const setProjectModeExclusive = (mode) => {
-    // Nur gültige Werte: 'desktop' oder 'technician'
-    if (mode !== 'desktop' && mode !== 'technician') return;
-    setProjectMode(mode);
-  };
-
-  // Effektiver Modus: Im Projekt-View gilt projectMode, im Dashboard isTechnicianMode
-  const effectiveMode = (view === 'details' || view === 'new-report') ? projectMode : (isTechnicianMode ? 'technician' : 'desktop');
-  const [showEmailImport, setShowEmailImport] = useState(false);
-  const [audioDevices, setAudioDevices] = useState([]);
-  const [selectedDeviceId, setSelectedDeviceId] = useState(localStorage.getItem('qtool_selected_mic') || '');
-
-  // MSAL hooks for OneDrive
-  const { instance, accounts, inProgress } = useMsal();
-  const isAuthenticated = useIsAuthenticated();
-
-  // OneDrive: MSAL-Instanz sofort registrieren sobald verfügbar
-  useEffect(() => {
-    setMsalInstance(instance);
-
-    // Automatischer Silent-Login beim App-Start
-    // Wenn ein Account gespeichert ist (vorheriger Login), wird der Token
-    // still erneuert → OneDrive ist sofort verbunden ohne Benutzeraktion
-    const accounts = instance.getAllAccounts();
-    if (accounts.length > 0) {
-      instance.acquireTokenSilent({
-        scopes: ['Files.ReadWrite.All'],
-        account: accounts[0],
-      }).then(result => {
-        console.log('[MSAL] ✅ Automatisch angemeldet:', accounts[0].name);
-      }).catch(err => {
-        // Silent fehlgeschlagen (Token abgelaufen, kein Netz)
-        // Kein automatischer Redirect — Benutzer kann manuell einloggen
-        console.warn('[MSAL] Silent-Login fehlgeschlagen:', err.message);
+    channel
+      .on('presence', { event: 'sync' }, () => {
+        const state = channel.presenceState();
+        const others = Object.keys(state).filter(k => k !== myToken);
+        if (others.length > 0) {
+          // Ein anderes Gerät ist im selben Projekt aktiv
+          console.warn('[Session] 🔒 Gesperrt von anderem Gerät:', others);
+          setIsSessionActive(false);
+        } else {
+          setIsSessionActive(true);
+        }
+      })
+      .on('presence', { event: 'join' }, ({ key }) => {
+        if (key !== myToken) {
+          console.warn('[Session] 🔒 Anderes Gerät hat beigetreten:', key);
+          setIsSessionActive(false);
+        }
+      })
+      .on('presence', { event: 'leave' }, () => {
+        // Prüfen ob noch andere vorhanden
+        const state = channel.presenceState();
+        const others = Object.keys(state).filter(k => k !== myToken);
+        if (others.length === 0) {
+          console.log('[Session] ✅ Anderes Gerät hat verlassen – Sperre aufgehoben');
+          setIsSessionActive(true);
+        }
+      })
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          await channel.track({ token: myToken, device: myDevice, since: Date.now() });
+          console.log('[Session] ✅ Presence aktiv:', myDevice, myToken.slice(0, 8));
+        }
       });
-    } else {
-      console.log('[MSAL] Kein gespeicherter Account — manueller Login erforderlich');
-    }
-  }, [instance]);
 
-  // ── Projektspezifisches Lock-System: eigener Session-Key pro Projekt ──────────────────
-  // iPad öffnet Projekt X → Desktop sieht Lock auf X, andere Projekte frei
+    activePresenceChannelRef.current = channel;
+
+    // claimSession / releaseSession als Kompatibilitäts-Stubs
+    presenceChannelRef.current = {
+      claimSession: async (token, pid) => {
+        // Neuer Token: neuen Kanal aufbauen
+        if (token && token !== sessionTokenRef.current) {
+          sessionTokenRef.current = token;
+        }
+        setupPresenceForProject(pid || projectId);
+      },
+      releaseSession: async (pid) => {
+        if (activePresenceChannelRef.current) {
+          await activePresenceChannelRef.current.untrack();
+          supabase.removeChannel(activePresenceChannelRef.current);
+          activePresenceChannelRef.current = null;
+          console.log('[Session] 🔓 Presence verlassen:', pid?.slice(0, 8));
+        }
+      },
+      checkSession: () => {} // Presence ist event-getrieben, kein polling nötig
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Presence-Kanal schließen wenn App unsichtbar / Tab geschlossen
   useEffect(() => {
-    if (!supabase) return;
-
-    let myToken = sessionStorage.getItem('qtool_session_token');
-    if (!myToken) {
-      myToken = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-      sessionStorage.setItem('qtool_session_token', myToken);
-    }
-    sessionTokenRef.current = myToken;
-    const myDevice = /iPad|iPhone|Android/i.test(navigator.userAgent) ? 'Mobil' : 'Desktop';
-
-    // Session-Key pro Projekt
-    const getKey = (projectId) => `_session_${projectId}`;
-
-    // Projekt beanspruchen
-    const claimSession = async (token, projectId) => {
-      if (!projectId) return;
-      const t = token || sessionTokenRef.current;
-      const now = new Date().toISOString();
-      const { error } = await supabase.from('damage_reports').upsert({
-        id: getKey(projectId),
-        project_title: '__session__',
-        client: '__system__',
-        report_data: { _isSession: true, token: t, device: myDevice, since: now },
-        updated_at: now,
-        created_at: now
-      }, { onConflict: 'id' });
-      if (error) console.error('[Session] claimSession Fehler:', error.message, error);
-      else console.log('[Session] ✅ Beansprucht:', myDevice, t.slice(0, 8), 'Projekt:', projectId.slice(0, 8));
-    };
-
-    // Projekt freigeben
-    const releaseSession = async (projectId) => {
-      if (!projectId) return;
-      const now = new Date().toISOString();
-      const { error } = await supabase.from('damage_reports').upsert({
-        id: getKey(projectId),
-        project_title: '__session__',
-        client: '__system__',
-        report_data: { _isSession: true, token: null, device: null, since: null },
-        updated_at: now,
-        created_at: now
-      }, { onConflict: 'id' });
-      if (error) console.error('[Session] releaseSession Fehler:', error.message);
-      else console.log('[Session] 🔓 Freigegeben:', projectId.slice(0, 8));
-    };
-
-    // Lock-Check für aktuell geöffnetes Projekt
-    const checkSession = async () => {
-      const currentProject = selectedReportRef.current;
-      if (!currentProject?.id) { setIsSessionActive(true); return; }
-
-      const { data } = await supabase
-        .from('damage_reports')
-        .select('report_data')
-        .eq('id', getKey(currentProject.id))
-        .single();
-
-      if (!data?.report_data?.token) { setIsSessionActive(true); return; }
-
-      if (data.report_data.token === sessionTokenRef.current) {
-        setIsSessionActive(true);
-      } else {
-        console.warn('[Session] Gesperrt von:', data.report_data.device);
-        setIsSessionActive(false);
+    const handleVisibilityChange = () => {
+      if (document.hidden && activePresenceChannelRef.current) {
+        activePresenceChannelRef.current.untrack();
+      } else if (!document.hidden && activePresenceChannelRef.current && selectedReportRef.current?.id) {
+        activePresenceChannelRef.current.track({
+          token: sessionTokenRef.current,
+          device: /iPad|iPhone|Android/i.test(navigator.userAgent) ? 'Mobil' : 'Desktop',
+          since: Date.now()
+        });
       }
     };
-
-    presenceChannelRef.current = { claimSession, releaseSession, checkSession };
-
-    const interval = setInterval(checkSession, 5000);
-    const onFocus = () => checkSession();
-    window.addEventListener('focus', onFocus);
-    return () => { clearInterval(interval); window.removeEventListener('focus', onFocus); };
-  }, []);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      if (activePresenceChannelRef.current) {
+        supabase?.removeChannel(activePresenceChannelRef.current);
+      }
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // iOS-Tastatur: Eingabefeld automatisch sichtbar halten (Techniker-Modus)
   useEffect(() => {
@@ -438,13 +377,10 @@ function App() {
     if (savedMode === 'technician' || savedMode === 'desktop') {
       setProjectMode(savedMode);
     } else {
-      // Kein gespeicherter Modus → globalen isTechnicianMode übernehmen
       setProjectMode(isTechnicianMode ? 'technician' : 'desktop');
     }
-    // Projekt sofort beanspruchen – neuestes Gerät gewinnt (wie Login-System)
-    if (presenceChannelRef.current?.claimSession) {
-      await presenceChannelRef.current.claimSession(undefined, report.id);
-    }
+    // Session-Locking via Realtime Presence starten
+    setupPresenceForProject(report.id);
   }
 
   const handleCancelEntry = () => {
