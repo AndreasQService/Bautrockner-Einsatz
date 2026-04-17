@@ -110,25 +110,29 @@ function App() {
 
   // Konflikt prüfen
   const evaluateLock = useCallback((presenceState, myToken, mode) => {
-    const allEntries = Object.values(presenceState).flat();
+    // Robustes Flachmachen inkl. Presence-Key für Debugging
+    const allEntries = Object.entries(presenceState).flatMap(([key, metas]) =>
+      (metas || []).map(meta => ({ key, ...meta }))
+    );
 
     console.log('[Session] evaluateLock', { myToken, mode, allEntries });
 
     const myEntry = allEntries.find(e => e.token === myToken);
     if (!myEntry) {
-      console.warn('[Session] Kein eigener Presence-Eintrag gefunden');
+      console.warn('[Session] ⚠️ Kein eigener Presence-Eintrag – Track noch nicht angekommen oder Token falsch');
       setIsSessionActive(false);
       return;
     }
 
+    // Nur ANDERER Modus = Konflikt
     const conflicting = allEntries.filter(
       e => e.token !== myToken && e.mode !== mode
     );
 
-    console.log('[Session] conflicting', conflicting);
+    console.log('[Session] conflicting (anderer Modus)', conflicting);
 
     if (conflicting.length === 0) {
-      console.log('[Session] ✅ Kein Konflikt');
+      console.log('[Session] ✅ Kein Konflikt – gleicher Modus oder alleine');
       setIsSessionActive(true);
       return;
     }
@@ -140,13 +144,15 @@ function App() {
       return String(a.token).localeCompare(String(b.token));
     })[0];
 
-    console.log('[Session] owner', owner);
+    console.log('[Session] owner (first-wins)', owner);
 
     if (owner.token === myToken) {
       console.log('[Session] ✅ Ich bin Owner');
       setIsSessionActive(true);
     } else {
-      console.warn('[Session] 🔒 Anderer Modus hat Vorrang');
+      console.warn('[Session] 🔒 Gesperrt – anderer Modus hat Vorrang', {
+        owner: owner.device, ownerMode: owner.mode
+      });
       setIsSessionActive(false);
     }
   }, []);
@@ -165,8 +171,14 @@ function App() {
   const setupPresenceForProject = useCallback(async (projectId, mode) => {
     if (!supabase || !projectId) return;
 
-    console.log('[Session] setupPresenceForProject', {
-      projectId, mode, token: sessionTokenRef.current
+    // ── Diagnose-Log 1: Einstieg ─────────────────────────────────────────────
+    const channelName = `project-lock-${projectId}`;
+    console.log('[Session] ═══ setupPresenceForProject ═══', {
+      projectId,
+      projectMode,
+      resolvedProjectMode: mode,
+      channelName,
+      token: sessionTokenRef.current?.slice(0, 8)
     });
 
     await closePresenceChannel();
@@ -176,7 +188,6 @@ function App() {
     const myToken = sessionTokenRef.current;
     const myDevice = /iPad|iPhone|Android/i.test(navigator.userAgent) ? 'Mobil' : 'Desktop';
     const since = sessionStartedAtRef.current;
-    const channelName = `project-lock-${projectId}`;
 
     const channel = supabase.channel(channelName, {
       config: { presence: { key: myToken } }
@@ -185,7 +196,14 @@ function App() {
     channel
       .on('presence', { event: 'sync' }, () => {
         const state = channel.presenceState();
-        console.log('[Session] sync', { channelName, myToken, mode: presenceModeRef.current, state });
+        // ── Diagnose-Log 2: Raw Presence State ──────────────────────────────
+        console.log('[Session] SYNC RAW STATE', state);
+        console.log('[Session] sync details', {
+          channelName,
+          myToken: myToken?.slice(0, 8),
+          mode: presenceModeRef.current,
+          entries: Object.keys(state).length
+        });
         evaluateLock(state, myToken, presenceModeRef.current);
       })
       .on('presence', { event: 'join' }, payload => {
@@ -199,7 +217,9 @@ function App() {
         if (status === 'SUBSCRIBED') {
           try {
             await channel.track({ token: myToken, mode, device: myDevice, since });
-            console.log('[Session] ✅ track gesendet', { token: myToken, mode, device: myDevice, since });
+            console.log('[Session] ✅ track gesendet', {
+              token: myToken?.slice(0, 8), mode, device: myDevice, since
+            });
           } catch (err) {
             console.warn('[Session] track fehlgeschlagen', err);
             setIsSessionActive(false);
@@ -213,7 +233,7 @@ function App() {
 
     activePresenceChannelRef.current = channel;
     presenceChannelRef.current = { releaseSession: closePresenceChannel };
-  }, [supabase, evaluateLock, closePresenceChannel]);
+  }, [supabase, evaluateLock, closePresenceChannel]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Presence starten sobald Projekt geöffnet
   useEffect(() => {
