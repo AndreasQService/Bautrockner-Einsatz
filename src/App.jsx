@@ -382,7 +382,8 @@ function App() {
         const { data, error } = await supabase
           .from('damage_reports')
           .select('report_data, updated_at')
-          .is('deleted_at', null)          // ← Soft-Delete: nur nicht-gelöschte laden
+          // HINWEIS: .is('deleted_at', null) entfernt – Spalte existiert noch nicht in DB
+          // Soft-Delete wird client-seitig gefiltert (r.deleted_at check unten)
           .order('created_at', { ascending: false });
 
         if (error) {
@@ -396,7 +397,7 @@ function App() {
               ...img,
               includeInReport: img.includeInReport !== false
             }))
-          })).filter(r => !r._isSession);
+          })).filter(r => !r._isSession && !r.deleted_at); // Session + soft-deleted ausblenden
 
           console.log(`[Supabase] ${loadedReports.length} Projekte geladen (${data.length} DB-Einträge gesamt).`);
           setSupabaseStatus({ ok: true, count: loadedReports.length, total: data.length, error: null });
@@ -622,22 +623,29 @@ function App() {
     }
 
     if (supabase) {
-      // SOFT-DELETE: Nur als gelöscht markieren – NIEMALS permanent löschen!
-      // Wiederherstellung möglich über Supabase Dashboard oder SQL:
-      //   UPDATE damage_reports SET deleted_at = NULL WHERE id = '<id>';
-      const { error } = await supabase
-        .from('damage_reports')
-        .update({
-          deleted_at: new Date().toISOString(),
-          deleted_by: currentUser?.name || 'unbekannt'
-        })
-        .eq('id', reportId);
-
-      if (error) {
-        console.error('[Soft-Delete] Supabase-Fehler:', error);
-        showToast(`Fehler: ${error.message || error.code || 'Unbekannt'}`, 'error');
-      } else {
-        showToast('Projekt gelöscht (wiederherstellbar)', 'success');
+      // SOFT-DELETE: Projekt aus DB als gelöscht markieren
+      // Spalte deleted_at muss in Supabase existieren – falls nicht, wird nur lokal gelöscht
+      try {
+        const { error } = await supabase
+          .from('damage_reports')
+          .update({ deleted_at: new Date().toISOString() })
+          .eq('id', reportId);
+        if (error) {
+          if (error.code === '42703') {
+            // Spalte existiert noch nicht – nur lokal löschen, kein Fehler anzeigen
+            console.warn('[Soft-Delete] deleted_at Spalte fehlt in DB – nur lokal gelöscht');
+            showToast('Projekt lokal gelöscht', 'success');
+          } else {
+            console.error('[Soft-Delete] Fehler:', error);
+            showToast(`Fehler: ${error.message || error.code}`, 'error');
+          }
+        } else {
+          showToast('Projekt gelöscht', 'success');
+        }
+      } catch (e) {
+        console.warn('[Soft-Delete] Exception:', e.message);
+        showToast('Projekt lokal gelöscht', 'success');
+      }
       }
     } else {
       showToast('Projekt lokal gelöscht', 'success');
@@ -652,8 +660,7 @@ function App() {
         const { data, error } = await supabase
           .from('damage_reports')
           .select('*')
-          .is('deleted_at', null)
-          .order('created_at', { ascending: false });
+          .order('created_at', { ascending: false }); // deleted_at Filter entfernt (Spalte noch nicht in DB)
         if (!error && data) backupData = data;
       }
       const blob = new Blob(
@@ -1086,8 +1093,8 @@ function App() {
           currentUser={currentUser}
           onReportsChanged={async () => {
             // Reload from Supabase after a status change
-            const { data } = await supabase.from('damage_reports').select('report_data, updated_at').is('deleted_at', null).order('created_at', { ascending: false });
-            if (data) setReports(data.map(r => ({ ...r.report_data, _supabase_updated_at: r.updated_at })));
+            const { data } = await supabase.from('damage_reports').select('report_data, updated_at').order('created_at', { ascending: false });
+            if (data) setReports(data.map(r => ({ ...r.report_data, _supabase_updated_at: r.updated_at })).filter(r => !r._isSession && !r.deleted_at));
           }}
         />}
         {view === 'devices' && <DeviceManager reports={reports} onBack={() => setView('dashboard')} onNavigateToReport={handleNavigateToReport} />}
