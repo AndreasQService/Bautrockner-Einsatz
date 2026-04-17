@@ -322,11 +322,12 @@ const MeasurementControlOverview = ({ reports, onSelectReport }) => {
     );
 };
 
-export default function Dashboard({ reports, onSelectReport, onDeleteReport, mode, supabase, currentUser, onReportsChanged }) {
+export default function Dashboard({ reports, onSelectReport, onDeleteReport, mode, supabase, currentUser, onReportsChanged, lockedProjectIds }) {
     const [searchTerm, setSearchTerm] = useState('')
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 20;
     const [showArchive, setShowArchive] = useState(false);
+    const lockedIds = lockedProjectIds instanceof Set ? lockedProjectIds : new Set();
 
     // Filter Logic
     const filteredReports = useMemo(() => reports.filter(r => {
@@ -480,6 +481,7 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
                                 key={report.id}
                                 onClick={() => onSelectReport(report)}
                                 className="tech-project-card"
+                                style={lockedIds.has(report.id) ? { opacity: 0.7, cursor: 'not-allowed' } : {}}
                             >
                                 <div style={{ flex: 1, minWidth: 0 }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.15rem' }}>
@@ -489,9 +491,20 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
                                                 {report.street ? `${report.street}, ${report.city}` : (report.address ? report.address.split(',')[0] : 'Keine Adresse')}
                                             </span>
                                         </div>
-                                        <span className={`status-badge ${statusColors[report.status] || 'bg-gray-100'}`} style={{ fontSize: '0.65rem', padding: '0.15rem 0.5rem', whiteSpace: 'nowrap', marginLeft: '0.5rem', flexShrink: 0 }}>
-                                            {report.status}
-                                        </span>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexShrink: 0, marginLeft: '0.5rem' }}>
+                                            {lockedIds.has(report.id) && (
+                                                <span title="In anderem Tab geöffnet" style={{
+                                                    fontSize: '0.65rem', padding: '0.1rem 0.4rem',
+                                                    backgroundColor: 'rgba(239,68,68,0.15)',
+                                                    color: '#EF4444', borderRadius: '6px',
+                                                    fontWeight: 700, border: '1px solid rgba(239,68,68,0.3)',
+                                                    whiteSpace: 'nowrap'
+                                                }}>🔒 In Bearbeitung</span>
+                                            )}
+                                            <span className={`status-badge ${statusColors[report.status] || 'bg-gray-100'}`} style={{ fontSize: '0.65rem', padding: '0.15rem 0.5rem', whiteSpace: 'nowrap' }}>
+                                                {report.status}
+                                            </span>
+                                        </div>
                                     </div>
 
                                     <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginLeft: '1.25rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -515,7 +528,7 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
                                     >
                                         <Trash2 size={16} />
                                     </button>
-                                    <ArrowRight size={18} style={{ color: 'var(--primary)' }} />
+                                    <ArrowRight size={18} style={{ color: lockedIds.has(report.id) ? '#EF4444' : 'var(--primary)' }} />
                                 </div>
                             </div>
                         ))}
@@ -577,8 +590,9 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
                                 {paginatedReports.map((report) => {
                                     const activeDevices = report.equipment ? report.equipment.length : 0;
                                     const hasLieferantenrechnung = report.images?.some(img => img.assignedTo === 'Sonstiges');
+                                    const isLocked = lockedIds.has(report.id);
                                     return (
-                                        <tr key={report.id} onClick={() => onSelectReport(report)} style={{ cursor: 'pointer' }}>
+                                        <tr key={report.id} onClick={() => onSelectReport(report)} style={{ cursor: isLocked ? 'not-allowed' : 'pointer', opacity: isLocked ? 0.75 : 1 }}>
                                             <td style={{ padding: '0.25rem 0.4rem', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
                                                 <button
                                                     onClick={(e) => {
@@ -591,7 +605,20 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
                                                     onMouseLeave={e => e.currentTarget.style.opacity = 0.6}
                                                 ><Trash2 size={14} /></button>
                                             </td>
-                                            <td style={{ fontWeight: 600, fontSize: '0.9rem' }}>{report.projectNumber || report.projectTitle || report.id}</td>
+                                            <td style={{ fontWeight: 600, fontSize: '0.9rem' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                                    {isLocked && (
+                                                        <span title="In anderem Tab geöffnet" style={{
+                                                            fontSize: '0.6rem', padding: '0.1rem 0.35rem',
+                                                            backgroundColor: 'rgba(239,68,68,0.15)',
+                                                            color: '#EF4444', borderRadius: '5px',
+                                                            fontWeight: 700, border: '1px solid rgba(239,68,68,0.3)',
+                                                            whiteSpace: 'nowrap', flexShrink: 0
+                                                        }}>🔒</span>
+                                                    )}
+                                                    {report.projectNumber || report.projectTitle || report.id}
+                                                </div>
+                                            </td>
                                             <td style={{ fontSize: '0.875rem', whiteSpace: 'nowrap' }}>{formatDate(report.date)}</td>
                                             <td style={{ fontWeight: 500 }}>{report.locationDetails || '-'}</td>
                                             <td>

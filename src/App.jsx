@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { useSessionLock } from './hooks/useSessionLock'
 import { Plus, LayoutDashboard, Settings, User, Users, LogOut, Thermometer, Database, RotateCcw, Download } from 'lucide-react'
 import { supabase } from './supabaseClient'
 import Dashboard from './components/Dashboard'
@@ -14,8 +15,18 @@ import { loginRequest } from "./msalConfig";
 import { setMsalInstance, buildProjectFolderName, uploadProjectJson, getQToolFolderWebUrl } from "./services/OneDriveService";
 
 function App() {
-  const [view, setView] = useState(() => localStorage.getItem('qservice_current_view') || 'dashboard') // 'dashboard', 'new-report', 'details'
+  // Neuer Tab = neue sessionStorage → startet immer auf Dashboard
+  // damit nicht alle Tabs dasselbe Projekt aus localStorage öffnen
+  const _isNewTab = !sessionStorage.getItem('qtool_tab_init');
+  if (_isNewTab) sessionStorage.setItem('qtool_tab_init', '1');
+
+  const [view, setView] = useState(() => {
+    if (_isNewTab) return 'dashboard';
+    return localStorage.getItem('qservice_current_view') || 'dashboard';
+  });
+
   const [selectedReport, setSelectedReport] = useState(() => {
+    if (_isNewTab) return null; // Neuer Tab startet ohne offenes Projekt
     const savedId = localStorage.getItem('qservice_selected_report_id');
     const savedReports = localStorage.getItem('qservice_reports_prod');
     if (savedId && savedReports) {
@@ -27,20 +38,18 @@ function App() {
       }
     }
     return null;
-  })
+  });
 
   // Authentication / User Management State
   const [showUserModal, setShowUserModal] = useState(false);
   const [showMeasurementManager, setShowMeasurementManager] = useState(false);
   const [currentUser, setCurrentUser] = useState({ id: 1, name: 'Admin User', role: 'admin' }); // Auto-login as admin
-  const [isSessionActive, setIsSessionActive] = useState(true);
   const sessionTokenRef = useRef(null);
-  const presenceChannelRef = useRef(null);
   const isSessionActiveRef = useRef(true);
   const selectedReportRef = useRef(null);
   const sessionStartedAtRef = useRef(Date.now());
 
-  // Session-Token synchron initialisieren (vor allen useEffects verfügbar)
+  // Session-Token: einmalig pro Tab (sessionStorage)
   const [mySessionToken] = useState(() => {
     let t = sessionStorage.getItem('qtool_session_token');
     if (!t) {
@@ -53,7 +62,6 @@ function App() {
   const myDevice = /iPad|iPhone|Android/i.test(navigator.userAgent) ? 'Mobil' : 'Desktop';
 
   // Refs synchron halten
-  useEffect(() => { isSessionActiveRef.current = isSessionActive; }, [isSessionActive]);
   useEffect(() => { selectedReportRef.current = selectedReport; }, [selectedReport]);
 
   // ── State-Deklarationen ───────────────────────────────────────────────────
@@ -97,182 +105,24 @@ function App() {
   }, [instance]);
 
   // ======================================================
-  // QTOOL – KOMPLETTER BLOCK FÜR PROJEKT-SPERRE
-  // - Konflikt nur bei verschiedenem Modus
-  // - First Wins = älteste Session bleibt aktiv
+  // ======================================================
+  // QTOOL – REST-basiertes Session-Locking (kein WebSocket)
+  // Polling über Supabase REST – funktioniert überall
   // ======================================================
 
-  const activePresenceChannelRef = useRef(null);
-  const presenceModeRef = useRef('desktop');
-
-  // Modus sauber ableiten
   const resolvedProjectMode = projectMode === 'technician' ? 'technician' : 'desktop';
 
-  // Konflikt prüfen
-  const evaluateLock = useCallback((presenceState, myToken, mode) => {
-    // Robustes Flachmachen inkl. Presence-Key für Debugging
-    const allEntries = Object.entries(presenceState).flatMap(([key, metas]) =>
-      (metas || []).map(meta => ({ key, ...meta }))
-    );
+  const { lockedProjectIds, isSessionActive, setIsSessionActive } = useSessionLock(
+    supabase,
+    mySessionToken,
+    selectedReport?.id ?? null,
+    view,
+    resolvedProjectMode,
+    sessionStartedAtRef.current
+  );
 
-    console.log('[Session] evaluateLock', { myToken, mode, allEntries });
-
-    const myEntry = allEntries.find(e => e.token === myToken);
-    if (!myEntry) {
-      console.warn('[Session] ⚠️ Kein eigener Presence-Eintrag – Track noch nicht angekommen oder Token falsch');
-      setIsSessionActive(false);
-      return;
-    }
-
-    // Nur ANDERER Modus = Konflikt
-    const conflicting = allEntries.filter(
-      e => e.token !== myToken && e.mode !== mode
-    );
-
-    console.log('[Session] conflicting (anderer Modus)', conflicting);
-
-    if (conflicting.length === 0) {
-      console.log('[Session] ✅ Kein Konflikt – gleicher Modus oder alleine');
-      setIsSessionActive(true);
-      return;
-    }
-
-    const allRelevant = [myEntry, ...conflicting];
-    const owner = allRelevant.sort((a, b) => {
-      const diff = Number(a.since ?? 0) - Number(b.since ?? 0);
-      if (diff !== 0) return diff;
-      return String(a.token).localeCompare(String(b.token));
-    })[0];
-
-    console.log('[Session] owner (first-wins)', owner);
-
-    if (owner.token === myToken) {
-      console.log('[Session] ✅ Ich bin Owner');
-      setIsSessionActive(true);
-    } else {
-      console.warn('[Session] 🔒 Gesperrt – anderer Modus hat Vorrang', {
-        owner: owner.device, ownerMode: owner.mode
-      });
-      setIsSessionActive(false);
-    }
-  }, []);
-
-  // Kanal sauber schließen
-  const closePresenceChannel = useCallback(async () => {
-    const ch = activePresenceChannelRef.current;
-    if (!ch || !supabase) return;
-    activePresenceChannelRef.current = null;
-    try { await ch.untrack(); } catch (_) {}
-    try { await supabase.removeChannel(ch); } catch (_) {}
-    console.log('[Session] 🔓 Kanal geschlossen');
-  }, [supabase]);
-
-  // Presence für Projekt starten
-  const setupPresenceForProject = useCallback(async (projectId, mode) => {
-    if (!supabase || !projectId) return;
-
-    // ── Diagnose-Log 1: Einstieg ─────────────────────────────────────────────
-    const channelName = `project-lock-${projectId}`;
-    console.log('[Session] ═══ setupPresenceForProject ═══', {
-      projectId,
-      projectMode,
-      resolvedProjectMode: mode,
-      channelName,
-      token: sessionTokenRef.current?.slice(0, 8)
-    });
-
-    await closePresenceChannel();
-
-    presenceModeRef.current = mode;
-
-    const myToken = sessionTokenRef.current;
-    const myDevice = /iPad|iPhone|Android/i.test(navigator.userAgent) ? 'Mobil' : 'Desktop';
-    const since = sessionStartedAtRef.current;
-
-    const channel = supabase.channel(channelName, {
-      config: { presence: { key: myToken } }
-    });
-
-    channel
-      .on('presence', { event: 'sync' }, () => {
-        const state = channel.presenceState();
-        // ── Diagnose-Log 2: Raw Presence State ──────────────────────────────
-        console.log('[Session] SYNC RAW STATE', state);
-        console.log('[Session] sync details', {
-          channelName,
-          myToken: myToken?.slice(0, 8),
-          mode: presenceModeRef.current,
-          entries: Object.keys(state).length
-        });
-        evaluateLock(state, myToken, presenceModeRef.current);
-      })
-      .on('presence', { event: 'join' }, payload => {
-        console.log('[Session] join', payload);
-      })
-      .on('presence', { event: 'leave' }, payload => {
-        console.log('[Session] leave', payload);
-      })
-      .subscribe(async status => {
-        console.log('[Session] subscribe status', status);
-        if (status === 'SUBSCRIBED') {
-          try {
-            await channel.track({ token: myToken, mode, device: myDevice, since });
-            console.log('[Session] ✅ track gesendet', {
-              token: myToken?.slice(0, 8), mode, device: myDevice, since
-            });
-          } catch (err) {
-            console.warn('[Session] track fehlgeschlagen', err);
-            setIsSessionActive(false);
-          }
-        }
-        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          console.warn('[Session] ⚠️ Presence Fehler', status);
-          setIsSessionActive(false);
-        }
-      });
-
-    activePresenceChannelRef.current = channel;
-    presenceChannelRef.current = { releaseSession: closePresenceChannel };
-  }, [supabase, evaluateLock, closePresenceChannel]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Presence starten sobald Projekt geöffnet
-  useEffect(() => {
-    if (!selectedReport?.id) return;
-    if (view !== 'details' && view !== 'new-report') return;
-    console.log('[Session] starte Presence', { projectId: selectedReport.id, mode: resolvedProjectMode });
-    setupPresenceForProject(selectedReport.id, resolvedProjectMode);
-  }, [selectedReport?.id, view]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Kanal schließen wenn Projekt verlassen
-  useEffect(() => {
-    if (view === 'details' || view === 'new-report') return;
-    closePresenceChannel();
-  }, [view, closePresenceChannel]);
-
-  // Modus-Wechsel innerhalb Projekt re-tracken
-  useEffect(() => {
-    const ch = activePresenceChannelRef.current;
-    if (!ch) return;
-    if (!selectedReport?.id) return;
-    if (view !== 'details' && view !== 'new-report') return;
-    presenceModeRef.current = resolvedProjectMode;
-    ch.track({
-      token: sessionTokenRef.current,
-      mode: resolvedProjectMode,
-      device: /iPad|iPhone|Android/i.test(navigator.userAgent) ? 'Mobil' : 'Desktop',
-      since: sessionStartedAtRef.current
-    })
-      .then(() => console.log('[Session] 🔄 Modus-Wechsel getrackt', resolvedProjectMode))
-      .catch(err => {
-        console.warn('[Session] track bei Modus-Wechsel fehlgeschlagen', err);
-        setIsSessionActive(false);
-      });
-  }, [resolvedProjectMode]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Cleanup beim Unmount
-  useEffect(() => {
-    return () => { closePresenceChannel(); };
-  }, [closePresenceChannel]);
+  // isSessionActive-Ref synchron halten (für handleSaveReport)
+  useEffect(() => { isSessionActiveRef.current = isSessionActive; }, [isSessionActive]);
 
   // UI-Sperr-Variablen
   const isLockedByOtherMode = !isSessionActive;
@@ -280,6 +130,8 @@ function App() {
   const sessionLockMessage = isLockedByOtherMode
     ? 'Dieses Projekt ist aktuell im anderen Modus geöffnet und kann hier momentan nicht bearbeitet werden.'
     : '';
+
+
 
   // iOS-Tastatur: Eingabefeld automatisch sichtbar halten (Techniker-Modus)
   useEffect(() => {
@@ -1147,6 +999,7 @@ function App() {
           mode={isTechnicianMode ? 'technician' : 'desktop'}
           supabase={supabase}
           currentUser={currentUser}
+          lockedProjectIds={lockedProjectIds}
           onReportsChanged={async () => {
             // Reload from Supabase after a status change
             const { data } = await supabase.from('damage_reports').select('report_data, updated_at').order('created_at', { ascending: false });
