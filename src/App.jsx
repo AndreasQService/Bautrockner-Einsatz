@@ -632,7 +632,6 @@ function App() {
           .eq('id', reportId);
         if (error) {
           if (error.code === '42703') {
-            // Spalte existiert noch nicht – nur lokal löschen, kein Fehler anzeigen
             console.warn('[Soft-Delete] deleted_at Spalte fehlt in DB – nur lokal gelöscht');
             showToast('Projekt lokal gelöscht', 'success');
           } else {
@@ -645,7 +644,6 @@ function App() {
       } catch (e) {
         console.warn('[Soft-Delete] Exception:', e.message);
         showToast('Projekt lokal gelöscht', 'success');
-      }
       }
     } else {
       showToast('Projekt lokal gelöscht', 'success');
