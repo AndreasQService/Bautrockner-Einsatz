@@ -55,7 +55,47 @@ function App() {
   useEffect(() => { isSessionActiveRef.current = isSessionActive; }, [isSessionActive]);
   useEffect(() => { selectedReportRef.current = selectedReport; }, [selectedReport]);
 
-  // ── Session-Locking via Supabase Realtime Presence ────────────────────────
+  // ── State-Deklarationen ───────────────────────────────────────────────────
+  const [userRole, setUserRole] = useState('admin'); // 'admin' | 'technician' | 'user'
+  const [isTechnicianMode, setIsTechnicianMode] = useState(false); // Globaler Fallback-Modus (Dashboard)
+  const [supabaseStatus, setSupabaseStatus] = useState(null); // null | { ok: bool, count: number, error: string }
+
+  // Projektspezifischer Modus: 'desktop' | 'technician' (Mutex – nie beides gleichzeitig)
+  const [projectMode, setProjectMode] = useState('desktop');
+  const setProjectModeExclusive = (mode) => {
+    if (mode !== 'desktop' && mode !== 'technician') return;
+    setProjectMode(mode);
+  };
+  // Effektiver Modus: Im Projekt-View gilt projectMode, im Dashboard isTechnicianMode
+  const effectiveMode = (view === 'details' || view === 'new-report') ? projectMode : (isTechnicianMode ? 'technician' : 'desktop');
+
+  const [showEmailImport, setShowEmailImport] = useState(false);
+  const [audioDevices, setAudioDevices] = useState([]);
+  const [selectedDeviceId, setSelectedDeviceId] = useState(localStorage.getItem('qtool_selected_mic') || '');
+
+  // MSAL hooks for OneDrive
+  const { instance, accounts, inProgress } = useMsal();
+  const isAuthenticated = useIsAuthenticated();
+
+  // OneDrive: MSAL-Instanz sofort registrieren sobald verfügbar
+  useEffect(() => {
+    setMsalInstance(instance);
+    const accounts = instance.getAllAccounts();
+    if (accounts.length > 0) {
+      instance.acquireTokenSilent({
+        scopes: ['Files.ReadWrite.All'],
+        account: accounts[0],
+      }).then(() => {
+        console.log('[MSAL] ✅ Automatisch angemeldet:', accounts[0].name);
+      }).catch(err => {
+        console.warn('[MSAL] Silent-Login fehlgeschlagen:', err.message);
+      });
+    } else {
+      console.log('[MSAL] Kein gespeicherter Account — manueller Login erforderlich');
+    }
+  }, [instance]);
+
+
   // Kein DB-Write nötig – funktioniert über WebSocket-Kanal pro Projekt
   // Gerät A öffnet Projekt → sendet Token via Presence
   // Gerät B sieht Token sofort → zeigt Sperre wenn Token != eigener Token
