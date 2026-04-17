@@ -94,6 +94,7 @@ function App() {
   }, [selectedReport?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const [userRole, setUserRole] = useState('admin'); // 'admin' | 'technician' | 'user'
   const [isTechnicianMode, setIsTechnicianMode] = useState(false); // Globaler Fallback-Modus (Dashboard)
+  const [supabaseStatus, setSupabaseStatus] = useState(null); // null | { ok: bool, count: number, error: string }
 
   // ── Projektspezifischer Modus: 'desktop' | 'technician' (Mutex – nie beides gleichzeitig)
   const [projectMode, setProjectMode] = useState('desktop'); // Modus des aktuell geöffneten Projekts
@@ -370,51 +371,57 @@ function App() {
 
   // Fetch reports from Supabase on mount
   useEffect(() => {
-    if (!supabase) return;
+    if (!supabase) {
+      setSupabaseStatus({ ok: false, count: 0, error: 'Supabase nicht konfiguriert (kein Client)' });
+      return;
+    }
 
     const fetchReports = async () => {
-      const { data, error } = await supabase
-        .from('damage_reports')
-        .select('report_data, updated_at')
-        .is('deleted_at', null)          // ← Soft-Delete: nur nicht-gelöschte laden
-        .order('created_at', { ascending: false });
+      setSupabaseStatus({ ok: null, count: null, error: null }); // Laden...
+      try {
+        const { data, error } = await supabase
+          .from('damage_reports')
+          .select('report_data, updated_at')
+          .is('deleted_at', null)          // ← Soft-Delete: nur nicht-gelöschte laden
+          .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error('Error fetching reports from Supabase:', error);
-        // iPad-Debug: Supabase-Fehler im Klartext
-        console.warn('[Supabase] Fehler beim Laden. Fallback auf LocalStorage-Cache.');
-      } else if (data) {
-        const loadedReports = data.map(row => ({
-          ...row.report_data,
-          _supabase_updated_at: row.updated_at,  // ← Konfliktschutz: Zeitstempel merken
-          images: (row.report_data.images || []).map(img => ({
-            ...img,
-            includeInReport: img.includeInReport !== false
-          }))
-        })).filter(r => !r._isSession); // Session-Record ausblenden
+        if (error) {
+          console.error('[Supabase] Fehler beim Laden:', error);
+          setSupabaseStatus({ ok: false, count: 0, error: `${error.code}: ${error.message}` });
+        } else if (data) {
+          const loadedReports = data.map(row => ({
+            ...row.report_data,
+            _supabase_updated_at: row.updated_at,
+            images: (row.report_data.images || []).map(img => ({
+              ...img,
+              includeInReport: img.includeInReport !== false
+            }))
+          })).filter(r => !r._isSession);
 
-        console.log(`[Supabase] ${loadedReports.length} Projekte geladen (von ${data.length} Gesamt-Einträgen).`);
+          console.log(`[Supabase] ${loadedReports.length} Projekte geladen (${data.length} DB-Einträge gesamt).`);
+          setSupabaseStatus({ ok: true, count: loadedReports.length, total: data.length, error: null });
 
-        // IMMER setzen – auch bei leerem Array (verhindert hängenbleiben am LocalStorage-Cache)
-        if (loadedReports.length > 0) {
-          setReports(loadedReports);
-
-          // Save a cached version to LocalStorage (only latest 10, and no base64)
-          try {
-            const cachedReports = loadedReports.slice(0, 10).map(r => ({
-              ...r,
-              damageTypeImage: (r.damageTypeImage && r.damageTypeImage.startsWith('data:')) ? null : r.damageTypeImage,
-              exteriorPhoto: (r.exteriorPhoto && r.exteriorPhoto.startsWith('data:')) ? null : r.exteriorPhoto,
-              images: r.images ? r.images.map(img => ({
-                ...img,
-                preview: (img.preview && (img.preview.startsWith('blob:') || img.preview.startsWith('data:'))) ? null : img.preview
-              })) : []
-            }));
-            localStorage.setItem('qservice_reports_prod', JSON.stringify(cachedReports));
-          } catch (e) {
-            console.warn("Initial LocalStorage cache failed:", e.message);
+          if (loadedReports.length > 0) {
+            setReports(loadedReports);
+            try {
+              const cachedReports = loadedReports.slice(0, 10).map(r => ({
+                ...r,
+                damageTypeImage: (r.damageTypeImage && r.damageTypeImage.startsWith('data:')) ? null : r.damageTypeImage,
+                exteriorPhoto: (r.exteriorPhoto && r.exteriorPhoto.startsWith('data:')) ? null : r.exteriorPhoto,
+                images: r.images ? r.images.map(img => ({
+                  ...img,
+                  preview: (img.preview && (img.preview.startsWith('blob:') || img.preview.startsWith('data:'))) ? null : img.preview
+                })) : []
+              }));
+              localStorage.setItem('qservice_reports_prod', JSON.stringify(cachedReports));
+            } catch (e) {
+              console.warn('LocalStorage cache fehlgeschlagen:', e.message);
+            }
           }
         }
+      } catch (e) {
+        console.error('[Supabase] Unerwarteter Fehler:', e);
+        setSupabaseStatus({ ok: false, count: 0, error: `Unerwarteter Fehler: ${e.message}` });
       }
     };
 
@@ -1037,6 +1044,39 @@ function App() {
       </header>
 
       <main className="container" style={{ marginTop: effectiveMode === 'technician' ? '1rem' : '2rem', padding: effectiveMode === 'technician' ? '0.5rem' : '1rem', maxWidth: effectiveMode === 'technician' ? undefined : 'none' }}>
+
+        {/* ── Supabase Debug-Banner: zeigt Verbindungsstatus für iPad-Diagnose ── */}
+        {view === 'dashboard' && supabaseStatus && (
+          <div style={{
+            marginBottom: '1rem',
+            padding: '0.6rem 1rem',
+            borderRadius: '8px',
+            fontSize: '0.8rem',
+            fontWeight: 600,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '1rem',
+            backgroundColor: supabaseStatus.ok === null
+              ? 'rgba(99,102,241,0.1)'
+              : supabaseStatus.ok
+                ? 'rgba(16,185,129,0.1)'
+                : 'rgba(239,68,68,0.1)',
+            border: `1px solid ${supabaseStatus.ok === null ? '#6366f1' : supabaseStatus.ok ? '#10B981' : '#EF4444'}44`,
+            color: supabaseStatus.ok === null ? '#6366f1' : supabaseStatus.ok ? '#10B981' : '#EF4444',
+          }}>
+            <span>
+              {supabaseStatus.ok === null && '⏳ Verbinde mit Supabase...'}
+              {supabaseStatus.ok === true && `✅ ${supabaseStatus.count} Projekte geladen (${supabaseStatus.total} DB-Einträge)`}
+              {supabaseStatus.ok === false && `❌ Supabase Fehler: ${supabaseStatus.error}`}
+            </span>
+            <button
+              onClick={() => setSupabaseStatus(null)}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', opacity: 0.6, fontSize: '1rem', color: 'inherit' }}
+            >✕</button>
+          </div>
+        )}
+
         {view === 'dashboard' && <Dashboard
           reports={reports}
           onSelectReport={handleSelectReport}
