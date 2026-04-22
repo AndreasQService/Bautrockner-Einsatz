@@ -306,15 +306,15 @@ function StepCell({ report, step, stepIdx, activeIdx, store, onOpenPopover, open
   // IN ARBEIT:   bg #FFF6E2 / border #D6B56B
   // Text immer:  #1F2937
   const styles = {
-    done:    { bg: '#D1FAE5', fg: '#065F46', border: '#059669' },
-    skip:    { bg: '#F3F4F6', fg: '#6B7280', border: '#9CA3AF' },
+    done:    { bg: '#EAF4EC', fg: '#1F2937', border: '#7FB38A' },
+    skip:    { bg: '#F2F3F5', fg: '#9CA3AF', border: '#B8C0CC' },
     date:    {
-      bg:     urgency?.bg || '#DBEAFE',
-      fg:     urgency ? '#1F2937' : '#1E40AF',
-      border: urgency?.border || '#3B82F6',
+      bg:     urgency?.bg || '#EAF1FB',
+      fg:     '#1F2937',
+      border: urgency?.border || '#7EA5D8',
     },
-    active:  kontaktEscStyle || { bg: '#DBEAFE', fg: '#1E40AF', border: '#3B82F6' },
-    pending: { bg: 'transparent', fg: '#9CA3AF', border: '#D1D5DB' },
+    active:  kontaktEscStyle || { bg: '#EAF1FB', fg: '#1F2937', border: '#7EA5D8' },
+    pending: { bg: 'transparent', fg: '#9CA3AF', border: 'transparent' },
   }
   const s = styles[state]
   const isOpen = openPopoverId === `${report.id}__${step.id}`
@@ -335,12 +335,12 @@ function StepCell({ report, step, stepIdx, activeIdx, store, onOpenPopover, open
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           width: '100%', minHeight: 36,
           borderRadius: 4,
-          backgroundColor: '#D1FAE5',
-          border: '2px solid #059669',
+          backgroundColor: '#EAF4EC',
+          border: '1px solid #7FB38A',
           boxSizing: 'border-box',
         }}>
           <span style={{
-            fontSize: '11px', fontWeight: 700, color: '#065F46',
+            fontSize: '11px', fontWeight: 700, color: '#1F2937',
             lineHeight: 1, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.01em',
           }}>
             {entryDate || '—'}
@@ -361,11 +361,11 @@ function StepCell({ report, step, stepIdx, activeIdx, store, onOpenPopover, open
             position: 'relative',
             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
             width: '100%', minHeight: 36,
-            borderRadius: 4, border: `2px solid ${isOpen ? '#2E6DB7' : s.border || '#D1D5DB'}`,
+            borderRadius: 4, border: `1.5px solid ${isOpen ? '#2E6DB7' : s.border || 'transparent'}`,
             cursor: 'pointer', gap: 1, transition: 'all 0.12s',
             backgroundColor: s.bg,
             color: s.fg,
-            fontWeight: 700,
+            fontWeight: 600,
             fontSize: '11px',
             opacity: state === 'skip' ? 0.65 : 1,
             outline: isOpen ? '2px solid rgba(46,109,183,0.25)' : 'none',
