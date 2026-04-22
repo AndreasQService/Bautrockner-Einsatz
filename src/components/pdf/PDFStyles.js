@@ -30,17 +30,20 @@ export const styles = StyleSheet.create({
     },
     titleSection: {
         marginBottom: 20,
+        width: '100%',
     },
     mainTitle: {
         fontSize: 22,
         color: '#0F6EA3',
         fontWeight: 'bold',
         marginBottom: 12,
+        lineHeight: 1.3,
     },
     subTitle: {
         fontSize: 14,
         color: '#000000',
         marginBottom: 2,
+        lineHeight: 1.4,
     },
     projectTitle: {
         fontSize: 10,
@@ -49,21 +52,28 @@ export const styles = StyleSheet.create({
     metaSection: {
         marginBottom: 15,
         paddingBottom: 10,
+        width: '100%',
     },
     metaRow: {
         flexDirection: 'row',
         marginBottom: 4,
+        width: '100%',
+        alignItems: 'flex-start',
     },
     metaLabel: {
         width: 110,
-        fontWeight: 'bold', // Helvetica-Bold
+        flexShrink: 0,   // niemals kleiner als 110pt — verhindert Overlap auf anderen Renderern
+        fontWeight: 'bold',
         color: '#475569',
         fontSize: 10,
+        lineHeight: 1.4,
     },
     metaValue: {
         flex: 1,
+        minWidth: 0,     // erlaubt Text-Wrap innerhalb flex:1
         color: '#000000',
         fontSize: 10,
+        lineHeight: 1.4,
     },
     divider: {
         height: 0.5,
