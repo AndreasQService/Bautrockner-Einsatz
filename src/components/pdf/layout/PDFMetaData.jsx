@@ -80,14 +80,11 @@ const PDFMetaData = ({ data }) => {
                 {data.client && (
                     <View style={styles.metaRow}>
                         <Text style={styles.metaLabel}>Auftraggeber:</Text>
-                        <View style={{ flex: 1, flexDirection: 'column' }}>
-                            <Text style={{ color: '#000000', fontSize: 10, lineHeight: 1.2 }}>{data.client}</Text>
-                            {(data.clientStreet || data.clientZip || data.clientCity) && (
-                                <Text style={{ color: '#000000', fontSize: 10, lineHeight: 1.2 }}>
-                                    {`${data.clientStreet || ''}, ${data.clientZip || ''} ${data.clientCity || ''}`.trim().replace(/^,/, '').trim()}
-                                </Text>
-                            )}
-                        </View>
+                        <Text style={styles.metaValue}>
+                            {data.client}{(data.clientStreet || data.clientZip || data.clientCity)
+                                ? `\n${`${data.clientStreet || ''}, ${data.clientZip || ''} ${data.clientCity || ''}`.trim().replace(/^,\s*/, '').trim()}`
+                                : ''}
+                        </Text>
                     </View>
                 )}
                 {data.insurance && (
