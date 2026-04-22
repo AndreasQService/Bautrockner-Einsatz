@@ -306,15 +306,15 @@ function StepCell({ report, step, stepIdx, activeIdx, store, onOpenPopover, open
   // IN ARBEIT:   bg #FFF6E2 / border #D6B56B
   // Text immer:  #1F2937
   const styles = {
-    done:    { bg: '#D1FAE5', fg: '#065F46', border: '#059669' },
-    skip:    { bg: '#F3F4F6', fg: '#6B7280', border: '#9CA3AF' },
+    done:    { bg: '#EAF4EC', fg: '#1F2937', border: '#7FB38A' },
+    skip:    { bg: '#F2F3F5', fg: '#9CA3AF', border: '#B8C0CC' },
     date:    {
-      bg:     urgency?.bg || '#DBEAFE',
-      fg:     urgency ? '#1F2937' : '#1E40AF',
-      border: urgency?.border || '#3B82F6',
+      bg:     urgency?.bg || '#EAF1FB',
+      fg:     '#1F2937',
+      border: urgency?.border || '#7EA5D8',
     },
-    active:  kontaktEscStyle || { bg: '#DBEAFE', fg: '#1E40AF', border: '#3B82F6' },
-    pending: { bg: 'transparent', fg: '#9CA3AF', border: '#D1D5DB' },
+    active:  kontaktEscStyle || { bg: '#EAF1FB', fg: '#1F2937', border: '#7EA5D8' },
+    pending: { bg: 'transparent', fg: '#9CA3AF', border: 'transparent' },
   }
   const s = styles[state]
   const isOpen = openPopoverId === `${report.id}__${step.id}`
