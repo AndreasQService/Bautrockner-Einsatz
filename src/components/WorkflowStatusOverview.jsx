@@ -54,16 +54,16 @@ const daysFrom = (ds) => {
   return Math.ceil((d - today0()) / 86400000)
 }
 
-// Get urgency color for a date
+// Get urgency info for a date (returns bg/border colors per spec, text always dark)
 const dateUrgency = (ds) => {
   const days = daysFrom(ds)
   if (days === null) return null
-  if (days < -7) return { color: '#DC2626', label: `${Math.abs(days)}T über`, badge: '#DC2626' }
-  if (days < 0)  return { color: '#EF4444', label: `${Math.abs(days)}T über`, badge: '#EF4444' }
-  if (days === 0) return { color: '#F59E0B', label: 'Heute',    badge: '#F59E0B' }
-  if (days <= 2)  return { color: '#F59E0B', label: `${days}T`,  badge: '#F59E0B' }
-  if (days <= 5)  return { color: '#3B82F6', label: `${days}T`,  badge: '#3B82F6' }
-  return { color: '#3B82F6', label: `${days}T`, badge: '#3B82F6' }
+  if (days < -7) return { label: `${Math.abs(days)}T über`, bg: '#FCEBEC', border: '#D97C84' }
+  if (days < 0)  return { label: `${Math.abs(days)}T über`, bg: '#FCEBEC', border: '#D97C84' }
+  if (days === 0) return { label: 'Heute',    bg: '#FFF6E2', border: '#D6B56B' }
+  if (days <= 2)  return { label: `${days}T`,  bg: '#FFF6E2', border: '#D6B56B' }
+  if (days <= 5)  return { label: `${days}T`,  bg: '#EAF1FB', border: '#7EA5D8' }
+  return            { label: `${days}T`,  bg: '#EAF1FB', border: '#7EA5D8' }
 }
 
 // ─── Step data accessor ───────────────────────────────────────────────────────
@@ -298,20 +298,23 @@ function StepCell({ report, step, stepIdx, activeIdx, store, onOpenPopover, open
     }
   }
 
-  // BG / color logic
+  // Spec-konforme Statusfarben:
+  // ERLEDIGT:    bg #EAF4EC / border #7FB38A
+  // DATUM/OFFEN: bg #EAF1FB / border #7EA5D8
+  // NICHT NÖTIG: bg #F2F3F5 / border #B8C0CC
+  // KRITISCH:    bg #FCEBEC / border #D97C84
+  // IN ARBEIT:   bg #FFF6E2 / border #D6B56B
+  // Text immer:  #1F2937
   const styles = {
-    done:    { bg: 'rgba(16,185,129,0.12)',  fg: '#10B981', border: 'transparent' },
-    skip:    { bg: 'rgba(100,116,139,0.08)', fg: '#475569', border: 'transparent' },
+    done:    { bg: '#D1FAE5', fg: '#065F46', border: '#059669' },
+    skip:    { bg: '#F3F4F6', fg: '#6B7280', border: '#9CA3AF' },
     date:    {
-      bg:     urgency?.color === '#DC2626' ? 'rgba(220,38,38,0.13)'
-            : urgency?.color === '#EF4444' ? 'rgba(239,68,68,0.12)'
-            : urgency?.color === '#F59E0B' ? 'rgba(245,158,11,0.12)'
-            : 'rgba(59,130,246,0.12)',
-      fg:     urgency?.color || '#3B82F6',
-      border: (urgency?.color || '#3B82F6') + '55',
+      bg:     urgency?.bg || '#DBEAFE',
+      fg:     urgency ? '#1F2937' : '#1E40AF',
+      border: urgency?.border || '#3B82F6',
     },
-    active:  kontaktEscStyle || { bg: 'rgba(59,130,246,0.15)', fg: '#60A5FA', border: 'rgba(59,130,246,0.45)' },
-    pending: { bg: 'rgba(255,255,255,0.02)', fg: '#334155', border: 'transparent' },
+    active:  kontaktEscStyle || { bg: '#DBEAFE', fg: '#1E40AF', border: '#3B82F6' },
+    pending: { bg: 'transparent', fg: '#9CA3AF', border: '#D1D5DB' },
   }
   const s = styles[state]
   const isOpen = openPopoverId === `${report.id}__${step.id}`
@@ -323,7 +326,7 @@ function StepCell({ report, step, stepIdx, activeIdx, store, onOpenPopover, open
     onOpenPopover(report.id, step.id, rect)
   }
 
-  // Fixed "Eingang" cell
+  // Fixed "Eingang" cell – DONE-Statusfarben aus Spec
   if (isFixed) {
     const entryDate = fmtShort(report.date)
     return (
@@ -331,13 +334,13 @@ function StepCell({ report, step, stepIdx, activeIdx, store, onOpenPopover, open
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           width: '100%', minHeight: 36,
-          borderRadius: 6,
-          backgroundColor: 'rgba(16,185,129,0.12)',
-          border: '1px solid rgba(16,185,129,0.2)',
+          borderRadius: 4,
+          backgroundColor: '#D1FAE5',
+          border: '2px solid #059669',
           boxSizing: 'border-box',
         }}>
           <span style={{
-            fontSize: '0.72rem', fontWeight: 800, color: '#10B981',
+            fontSize: '11px', fontWeight: 700, color: '#065F46',
             lineHeight: 1, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.01em',
           }}>
             {entryDate || '—'}
@@ -358,14 +361,14 @@ function StepCell({ report, step, stepIdx, activeIdx, store, onOpenPopover, open
             position: 'relative',
             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
             width: '100%', minHeight: 36,
-            borderRadius: 6, border: `1.5px solid ${isOpen ? '#3B82F6' : s.border || 'transparent'}`,
+            borderRadius: 4, border: `2px solid ${isOpen ? '#2E6DB7' : s.border || '#D1D5DB'}`,
             cursor: 'pointer', gap: 1, transition: 'all 0.12s',
             backgroundColor: s.bg,
             color: s.fg,
-            fontWeight: state === 'active' ? 700 : 500,
-            fontSize: '0.58rem',
-            opacity: state === 'skip' ? 0.5 : 1,
-            outline: isOpen ? '2px solid rgba(59,130,246,0.35)' : 'none',
+            fontWeight: 700,
+            fontSize: '11px',
+            opacity: state === 'skip' ? 0.65 : 1,
+            outline: isOpen ? '2px solid rgba(46,109,183,0.25)' : 'none',
             outlineOffset: 1,
           }}
         >
@@ -391,10 +394,9 @@ function StepCell({ report, step, stepIdx, activeIdx, store, onOpenPopover, open
           {hasNote && (
             <div style={{
               position: 'absolute', top: -4, right: -4,
-              width: 14, height: 14, borderRadius: '50%',
-              backgroundColor: '#8B5CF6',
+              width: 13, height: 13, borderRadius: '50%',
+              backgroundColor: '#6B7280',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: '0 0 6px rgba(139,92,246,0.6)',
               pointerEvents: 'none',
             }}>
               <MessageSquare size={7} color="white" />
@@ -436,10 +438,10 @@ function ProjectRow({ report, store, onUpdate, onSelect, openPopover, onOpenPopo
       onClick={() => onSelect(report)}
       style={{
         cursor: 'pointer',
-        borderBottom: '1px solid rgba(255,255,255,0.04)',
-        transition: 'background-color 0.1s',
+        borderBottom: '1px solid var(--color-border)',
+        transition: 'background-color 0.08s',
       }}
-      onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.025)'}
+      onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--color-row-hover)'}
       onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
     >
       {/* Project info */}
@@ -560,9 +562,9 @@ export default function WorkflowStatusOverview({ reports, onSelectReport }) {
         {overdueCount > 0 && (
           <span style={{
             display: 'inline-flex', alignItems: 'center', gap: 4,
-            backgroundColor: 'rgba(239,68,68,0.15)', color: '#EF4444',
-            borderRadius: '999px', padding: '0.18rem 0.6rem',
-            fontSize: '0.7rem', fontWeight: 700, border: '1px solid rgba(239,68,68,0.3)',
+            backgroundColor: 'var(--color-danger-bg)', color: 'var(--color-text-primary)',
+            borderRadius: 'var(--radius-sm)', padding: '0.15rem 0.5rem',
+            fontSize: '0.7rem', fontWeight: 600, border: '1px solid rgba(239,68,68,0.2)',
           }}>
             <AlertTriangle size={10} /> {overdueCount} überfällig
           </span>
@@ -570,9 +572,9 @@ export default function WorkflowStatusOverview({ reports, onSelectReport }) {
         {soonCount > 0 && (
           <span style={{
             display: 'inline-flex', alignItems: 'center', gap: 4,
-            backgroundColor: 'rgba(245,158,11,0.15)', color: '#F59E0B',
-            borderRadius: '999px', padding: '0.18rem 0.6rem',
-            fontSize: '0.7rem', fontWeight: 700, border: '1px solid rgba(245,158,11,0.3)',
+            backgroundColor: 'var(--color-warning-bg)', color: 'var(--color-text-primary)',
+            borderRadius: 'var(--radius-sm)', padding: '0.15rem 0.5rem',
+            fontSize: '0.7rem', fontWeight: 600, border: '1px solid rgba(245,158,11,0.2)',
           }}>
             <Bell size={10} /> {soonCount} bald fällig
           </span>
@@ -602,16 +604,16 @@ export default function WorkflowStatusOverview({ reports, onSelectReport }) {
             <thead>
               <tr style={{
                 position: 'sticky', top: 0, zIndex: 20,
-                backgroundColor: '#141E2E',
-                borderBottom: '2px solid rgba(255,255,255,0.09)',
+                backgroundColor: 'var(--color-surface-alt)',
+                borderBottom: '1px solid var(--color-border-strong)',
               }}>
                 {/* Project column header */}
                 <th style={{
-                  padding: '0.65rem 0.75rem',
+                  padding: '0.5rem 0.75rem',
                   textAlign: 'left',
-                  fontSize: '0.7rem', fontWeight: 700,
-                  color: '#94A3B8',
-                  letterSpacing: '0.04em',
+                  fontSize: '11px', fontWeight: 700,
+                  color: 'var(--color-text-secondary)',
+                  letterSpacing: '0.02em',
                   whiteSpace: 'nowrap',
                   textTransform: 'uppercase',
                 }}>
@@ -621,15 +623,15 @@ export default function WorkflowStatusOverview({ reports, onSelectReport }) {
                 {/* Step column headers */}
                 {WORKFLOW_STEPS.map(step => (
                   <th key={step.id} style={{
-                    padding: '0.6rem 1px',
+                    padding: '0.5rem 1px',
                     textAlign: 'center',
                     fontSize: '0.62rem', fontWeight: 600,
-                    color: '#94A3B8',
+                    color: 'var(--color-text-secondary)',
                     whiteSpace: 'nowrap',
                   }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
-                      <span style={{ fontSize: '0.85rem', lineHeight: 1 }}>{step.icon}</span>
-                      <span style={{ fontSize: '0.59rem', fontWeight: 700, color: '#94A3B8' }}>{step.label}</span>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                      <span style={{ fontSize: '14px', lineHeight: 1 }}>{step.icon}</span>
+                      <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--color-text-secondary)' }}>{step.label}</span>
                     </div>
                   </th>
                 ))}
@@ -653,9 +655,9 @@ export default function WorkflowStatusOverview({ reports, onSelectReport }) {
 
           {/* Legend bar */}
           <div style={{
-            padding: '0.5rem 1rem',
-            borderTop: '1px solid rgba(255,255,255,0.05)',
-            display: 'flex', gap: '1.1rem', alignItems: 'center', flexWrap: 'wrap',
+            padding: '0.4rem 0.75rem',
+            borderTop: '1px solid var(--color-border)',
+            display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap',
           }}>
             <span style={{ fontSize: '0.6rem', color: '#334155', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               Legende:
