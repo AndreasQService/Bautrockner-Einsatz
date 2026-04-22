@@ -38,11 +38,16 @@ const CauseSection = ({ data }) => {
                         {cause && <Text style={styles.textBlock}>{cause}</Text>}
                     </View>
 
-                    {/* Schadenfotos Grid (The "Selected Pics") */}
+                    {/* Schadenfotos Grid — Titel + erste 2 Fotos zusammen (kein Orphan) */}
                     {causeImages.length > 0 && (
                         <View style={{ marginTop: 10 }}>
-                            <Text style={[styles.imageDescription, { fontWeight: 'bold', marginBottom: 8, color: '#0F6EA3' }]}>FOTOS ZUR URSACHE</Text>
-                            <ImageGrid images={causeImages} showName={false} />
+                            <View wrap={false}>
+                                <Text style={styles.sectionTitle}>FOTOS ZUR URSACHE</Text>
+                                <ImageGrid images={causeImages.slice(0, 2)} showName={false} />
+                            </View>
+                            {causeImages.length > 2 && (
+                                <ImageGrid images={causeImages.slice(2)} showName={false} />
+                            )}
                         </View>
                     )}
                 </View>
