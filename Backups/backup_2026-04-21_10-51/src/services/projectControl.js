@@ -1,0 +1,419 @@
+/**
+ * projectControl.js  v2
+ * ─────────────────────────────────────────────────────────────────
+ * Büro-Steuerungslogik für Wasserschaden-Projekte
+ *
+ * TECHNIKER-MODUS: Diese Datei wird NUR in der Büroansicht verwendet.
+ * ─────────────────────────────────────────────────────────────────
+ */
+
+// ─── Hilfsfunktionen ────────────────────────────────────────────────────────
+
+export const daysSince = (dateStr) => {
+  if (!dateStr) return null;
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return null;
+  d.setHours(0, 0, 0, 0);
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  return Math.floor((now - d) / 86_400_000);
+};
+
+export const formatDays = (days) => {
+  if (days === null || days === undefined) return '—';
+  if (days === 0) return 'Heute';
+  if (days === 1) return '1 Tag';
+  return `${days} Tage`;
+};
+
+// ─── Workflow-Konfiguration ──────────────────────────────────────────────────
+
+export const WORKFLOW_STEPS = [
+  { id: 'meldung',         label: 'Eingang',        status: null },
+  { id: 'kontakt',         label: 'Kontakt',         status: null },
+  { id: 'schadenaufnahme', label: 'Aufnahme',        status: 'Schadenaufnahme' },
+  { id: 'leckortung',      label: 'Leckortung',      status: 'Leckortung' },
+  { id: 'bericht',         label: 'Bericht',         status: null },
+  { id: 'trocknung',       label: 'Trocknung',       status: 'Trocknung' },
+  { id: 'instandstellung', label: 'Instandstellung', status: 'Instandsetzung' },
+  { id: 'rechnung',        label: 'Rechnung',        status: 'Abgeschlossen' },
+];
+
+export const STATUS_TO_STEP_ID = {
+  'Schadenaufnahme': 'schadenaufnahme',
+  'Leckortung':      'leckortung',
+  'Trocknung':       'trocknung',
+  'Instandsetzung':  'instandstellung',
+  'Instandstellung': 'instandstellung',
+  'Abgeschlossen':   'rechnung',
+};
+
+export const getCurrentStepId = (report) =>
+  STATUS_TO_STEP_ID[report.status] || 'meldung';
+
+// ─── Hilfsfunktion: Trocknungsstartdatum ────────────────────────────────────
+
+const getDryingStartDate = (report) =>
+  report.dryingStarted ||
+  (report.equipment?.length > 0
+    ? report.equipment.map(e => e.startDate).filter(Boolean).sort()[0]
+    : null) ||
+  report.statusStartedAt ||
+  report.date;
+
+// ─── Hilfsfunktion: Letzte Messung ──────────────────────────────────────────
+
+const getDaysSinceLastMeasurement = (report) => {
+  if (!report.rooms) return null;
+  let latest = null;
+  report.rooms.forEach(room => {
+    if (room.measurementData?.globalSettings?.date) {
+      const d = new Date(room.measurementData.globalSettings.date);
+      if (!latest || d > latest) latest = d;
+    }
+    (room.measurementHistory || []).forEach(h => {
+      if (h.date) { const d = new Date(h.date); if (!latest || d > latest) latest = d; }
+    });
+  });
+  return latest ? daysSince(latest) : null;
+};
+
+// ─── Ampel-Regeln ────────────────────────────────────────────────────────────
+// Jede Regel: (report) => { color, reason, urgency (Tage, für Sortierung) } | null
+
+const AMPEL_RULES = [
+  // ROT: Keine Kontakte > 1 Tag
+  (r) => {
+    const d = daysSince(r.date);
+    if (d < 1) return null;
+    if (!r.contacts || r.contacts.length === 0)
+      return { color: 'red', reason: 'Keine Kontakte erfasst', urgency: d };
+    return null;
+  },
+
+  // ROT: Schadenaufnahme ≥ 3 Tage
+  (r) => {
+    if (r.status !== 'Schadenaufnahme') return null;
+    const d = daysSince(r.statusStartedAt || r.date);
+    if (d >= 3) return { color: 'red', reason: `Aufnahme seit ${d} Tagen offen`, urgency: d };
+    return null;
+  },
+
+  // ROT: Leckortung ≥ 5 Tage (Bericht fehlt)
+  (r) => {
+    if (r.status !== 'Leckortung') return null;
+    const d = daysSince(r.statusStartedAt || r.date);
+    if (d >= 5) return { color: 'red', reason: `Bericht fehlt seit ${d} Tagen`, urgency: d };
+    return null;
+  },
+
+  // ROT: Leckortung Termin ≥ 6 Tage
+  (r) => {
+    if (r.status !== 'Leckortung') return null;
+    const d = daysSince(r.statusStartedAt || r.date);
+    if (d >= 6) return { color: 'red', reason: `Leckortung seit ${d} Tagen offen`, urgency: d };
+    return null;
+  },
+
+  // ROT: Trocknung ≥ 30 Tage
+  (r) => {
+    if (r.status !== 'Trocknung') return null;
+    const d = daysSince(getDryingStartDate(r));
+    if (d >= 30) return { color: 'red', reason: `Trocknung seit ${d} Tagen aktiv`, urgency: d };
+    return null;
+  },
+
+  // ROT: Messung fehlt > 10 Tage während Trocknung
+  (r) => {
+    if (r.status !== 'Trocknung') return null;
+    const mDays = getDaysSinceLastMeasurement(r);
+    if (mDays !== null && mDays > 10)
+      return { color: 'red', reason: `Feuchtekontrolle überfällig (${mDays} Tage)`, urgency: mDays };
+    return null;
+  },
+
+  // ROT: Instandstellung ≥ 14 Tage
+  (r) => {
+    if (r.status !== 'Instandsetzung' && r.status !== 'Instandstellung') return null;
+    const d = daysSince(r.statusStartedAt || r.date);
+    if (d >= 14) return { color: 'red', reason: `Instandstellung seit ${d} Tagen offen`, urgency: d };
+    return null;
+  },
+
+  // GELB: Schadenaufnahme 1–2 Tage
+  (r) => {
+    if (r.status !== 'Schadenaufnahme') return null;
+    const d = daysSince(r.statusStartedAt || r.date);
+    if (d >= 1 && d < 3) return { color: 'yellow', reason: `Aufnahme seit ${d} ${d === 1 ? 'Tag' : 'Tagen'} offen`, urgency: d };
+    return null;
+  },
+
+  // GELB: Leckortung 2–4 Tage
+  (r) => {
+    if (r.status !== 'Leckortung') return null;
+    const d = daysSince(r.statusStartedAt || r.date);
+    if (d >= 2 && d < 5) return { color: 'yellow', reason: `Leckortung seit ${d} Tagen – Termin prüfen`, urgency: d };
+    return null;
+  },
+
+  // GELB: Bericht fehlt 3–4 Tage
+  (r) => {
+    if (r.status !== 'Leckortung') return null;
+    const d = daysSince(r.statusStartedAt || r.date);
+    if (d >= 3 && d < 5) return { color: 'yellow', reason: 'Bericht noch nicht erstellt', urgency: d };
+    return null;
+  },
+
+  // GELB: Trocknung 15–29 Tage
+  (r) => {
+    if (r.status !== 'Trocknung') return null;
+    const d = daysSince(getDryingStartDate(r));
+    if (d >= 15 && d < 30) return { color: 'yellow', reason: `Trocknung seit ${d} Tagen – Abschluss prüfen`, urgency: d };
+    return null;
+  },
+
+  // GELB: Messung fehlt 7–10 Tage
+  (r) => {
+    if (r.status !== 'Trocknung') return null;
+    const mDays = getDaysSinceLastMeasurement(r);
+    if (mDays !== null && mDays >= 7 && mDays <= 10)
+      return { color: 'yellow', reason: `Feuchtekontrolle fällig (${mDays} Tage)`, urgency: mDays };
+    return null;
+  },
+
+  // GELB: Instandstellung 5–13 Tage
+  (r) => {
+    if (r.status !== 'Instandsetzung' && r.status !== 'Instandstellung') return null;
+    const d = daysSince(r.statusStartedAt || r.date);
+    if (d >= 5 && d < 14) return { color: 'yellow', reason: `Instandstellung seit ${d} Tagen offen`, urgency: d };
+    return null;
+  },
+];
+
+// ─── Ampelberechnung ─────────────────────────────────────────────────────────
+
+export const calcPriority = (report) => {
+  if (report.status === 'Abgeschlossen')
+    return { color: 'green', reason: 'Projekt abgeschlossen', priority: 3, urgency: 0 };
+
+  let worstRed = null;
+  let worstYellow = null;
+
+  for (const rule of AMPEL_RULES) {
+    const result = rule(report);
+    if (!result) continue;
+    if (result.color === 'red') {
+      // Sammle schwersten roten Grund (höchste urgency)
+      if (!worstRed || result.urgency > worstRed.urgency) worstRed = result;
+    }
+    if (result.color === 'yellow') {
+      if (!worstYellow || result.urgency > worstYellow.urgency) worstYellow = result;
+    }
+  }
+
+  if (worstRed)    return { ...worstRed,    priority: 1 };
+  if (worstYellow) return { ...worstYellow, priority: 2 };
+  return { color: 'green', reason: 'Alles im Zeitplan', priority: 3, urgency: 0 };
+};
+
+// ─── Konkrete nächste Aktionen ────────────────────────────────────────────────
+
+/**
+ * Gibt eine KONKRETE Handlungsanweisung zurück (actionable verb form).
+ * @returns {{ action: string, icon: string }}
+ */
+export const getNextAction = (report) => {
+  const status = report.status;
+  const hasContacts = report.contacts && report.contacts.length > 0;
+  const hasRooms = report.rooms && report.rooms.length > 0;
+  const hasEquipment = report.equipment && report.equipment.length > 0;
+  const daysInStatus = daysSince(report.statusStartedAt || report.date) || 0;
+  const mDays = getDaysSinceLastMeasurement(report);
+
+  if (!hasContacts)
+    return { action: 'Kontakte erfassen (Mieter, Eigentümer, Hauswart)', icon: '📋' };
+
+  switch (status) {
+    case 'Schadenaufnahme':
+      if (!hasRooms) return { action: 'Räume und betroffene Bereiche im System erfassen', icon: '🏠' };
+      if (daysInStatus >= 2) return { action: 'Termin für Schadenaufnahme vereinbaren und bestätigen', icon: '📅' };
+      return { action: 'Schadenaufnahme vorbereiten – Begehung vereinbaren', icon: '📅' };
+
+    case 'Leckortung':
+      if (daysInStatus < 3) return { action: 'Termin für Leckortung vereinbaren', icon: '🔍' };
+      if (daysInStatus < 6) return { action: 'Leckortungs-Termin bestätigen und Resultat erfassen', icon: '🔍' };
+      return { action: 'Schadensbericht erstellen und an Auftraggeber senden', icon: '📄' };
+
+    case 'Trocknung':
+      if (!hasEquipment) return { action: 'Trocknungsgeräte im System erfassen', icon: '💨' };
+      if (mDays !== null && mDays > 7) return { action: 'Feuchtekontrolle durchführen und Messung eintragen', icon: '📊' };
+      const dryDays = daysSince(getDryingStartDate(report)) || 0;
+      if (dryDays >= 25) return { action: 'Trocknungsabschluss prüfen → Geräte abziehen und Status setzen', icon: '✅' };
+      return { action: 'Nächste Feuchtekontrolle planen und durchführen', icon: '📊' };
+
+    case 'Instandsetzung':
+    case 'Instandstellung':
+      if (daysInStatus >= 10) return { action: 'Rechnung vorbereiten und ausstellen', icon: '💰' };
+      return { action: 'Instandstellungs-Termin koordinieren und abschliessen', icon: '🔧' };
+
+    case 'Abgeschlossen':
+      const hasInvoice = report.images?.some(img => img.assignedTo === 'Sonstiges');
+      if (!hasInvoice) return { action: 'Rechnung ausstellen (Projekt abgeschlossen)', icon: '💰' };
+      return { action: 'Projekt vollständig abgeschlossen', icon: '✅' };
+
+    default:
+      return { action: 'Projekt prüfen – Status unklar', icon: '⚠️' };
+  }
+};
+
+// ─── Offene Aufgaben ─────────────────────────────────────────────────────────
+
+export const deriveAutoTasks = (report) => {
+  const tasks = [];
+  const status = report.status;
+  const hasContacts = report.contacts && report.contacts.length > 0;
+  const hasEquipment = report.equipment && report.equipment.length > 0;
+  const hasRooms = report.rooms && report.rooms.length > 0;
+  const hasImages = report.images && report.images.length > 0;
+  const daysInStatus = daysSince(report.statusStartedAt || report.date) || 0;
+  const mDays = getDaysSinceLastMeasurement(report);
+
+  if (!hasContacts)
+    tasks.push({ id: 'contact_missing', text: 'Kontakte erfassen (Mieter, Eigentümer, Hauswart)', auto: true, urgent: daysInStatus >= 1 });
+
+  if (status === 'Schadenaufnahme') {
+    if (!hasRooms) tasks.push({ id: 'rooms_missing', text: 'Räume und betroffene Bereiche erfassen', auto: true, urgent: daysInStatus >= 2 });
+    if (!hasImages) tasks.push({ id: 'images_missing', text: 'Fotos vom Schadenbild aufnehmen', auto: true, urgent: daysInStatus >= 3 });
+    tasks.push({ id: 'assessment_appt', text: 'Termin für Schadenaufnahme vereinbaren', auto: true, urgent: daysInStatus >= 1 });
+    if (daysInStatus >= 2) tasks.push({ id: 'leckortung_next', text: 'Leckortung einleiten / Termin koordinieren', auto: true, urgent: daysInStatus >= 3 });
+  }
+
+  if (status === 'Leckortung') {
+    tasks.push({ id: 'leak_appt', text: 'Termin für Leckortung koordinieren', auto: true, urgent: daysInStatus >= 3 });
+    tasks.push({ id: 'leak_result', text: 'Resultat der Leckortung dokumentieren', auto: true, urgent: daysInStatus >= 4 });
+    tasks.push({ id: 'report_create', text: 'Schadensbericht erstellen und senden', auto: true, urgent: daysInStatus >= 5 });
+    tasks.push({ id: 'next_decision', text: 'Weiteres Vorgehen entscheiden (Trocknung / Instandstellung)', auto: true, urgent: daysInStatus >= 5 });
+  }
+
+  if (status === 'Trocknung') {
+    if (!hasEquipment) tasks.push({ id: 'equipment_missing', text: 'Trocknungsgeräte im System erfassen', auto: true, urgent: true });
+    const dryDays = daysSince(getDryingStartDate(report)) || 0;
+    if (mDays === null && dryDays > 3)
+      tasks.push({ id: 'measurement_missing', text: 'Erste Feuchtekontrolle durchführen', auto: true, urgent: true });
+    else if (mDays !== null && mDays > 7)
+      tasks.push({ id: 'measurement_due', text: `Feuchtekontrolle durchführen (letzte Messung vor ${mDays} Tagen)`, auto: true, urgent: mDays > 10 });
+    if (dryDays >= 25) tasks.push({ id: 'drying_end', text: 'Trocknungsabschluss prüfen → Geräte zurückziehen', auto: true, urgent: true });
+  }
+
+  if (status === 'Instandsetzung' || status === 'Instandstellung') {
+    tasks.push({ id: 'restoration_done', text: 'Instandstellung abschliessen und protokollieren', auto: true, urgent: daysInStatus >= 7 });
+    tasks.push({ id: 'invoice_prepare', text: 'Rechnung vorbereiten', auto: true, urgent: daysInStatus >= 10 });
+    tasks.push({ id: 'invoice_send', text: 'Rechnung ausstellen und versenden', auto: true, urgent: daysInStatus >= 12 });
+  }
+
+  const hasInvoice = report.images?.some(img => img.assignedTo === 'Sonstiges');
+  if (!hasInvoice && (status === 'Abgeschlossen' || status === 'Instandsetzung' || status === 'Instandstellung'))
+    tasks.push({ id: 'invoice_missing', text: 'Rechnung ausstellen (noch nicht vorhanden)', auto: true, urgent: true });
+
+  return tasks;
+};
+
+// ─── Zeittracking ─────────────────────────────────────────────────────────────
+
+export const getStatusDuration = (report) => {
+  const startDate = report.statusStartedAt || report.date;
+  const days = daysSince(startDate);
+  return {
+    days,
+    label: days !== null
+      ? `${report.status} seit ${formatDays(days)}`
+      : `${report.status} – Datum unbekannt`,
+  };
+};
+
+// ─── Vollständige Projekt-Analyse ─────────────────────────────────────────────
+
+export const analyzeProject = (report) => {
+  const priority = calcPriority(report);
+  const autoTasks = deriveAutoTasks(report);
+  const manualTasks = (report.officeTasks || []).filter(t => !t.done);
+  const allTasks = [...autoTasks, ...manualTasks];
+  const nextActionObj = getNextAction(report);
+  const statusDuration = getStatusDuration(report);
+
+  return {
+    ...report,
+    _priority:        priority,
+    _autoTasks:       autoTasks,
+    _allOpenTasks:    allTasks,
+    _openTasksCount:  allTasks.length,
+    _urgentTasksCount: allTasks.filter(t => t.urgent).length,
+    _nextAction:      nextActionObj.action,
+    _nextActionIcon:  nextActionObj.icon,
+    _statusDays:      statusDuration.days,
+    _statusLabel:     statusDuration.label,
+    _isUnassigned:    !report.assignedTo || report.assignedTo.trim() === '',
+  };
+};
+
+// ─── Priorisierte Sortierung ─────────────────────────────────────────────────
+// Rot + längste Dauer zuerst → Rot + kürzere → Gelb → Grün → neueste
+
+export const sortByPriority = (analyzedReports) => {
+  return [...analyzedReports].sort((a, b) => {
+    const pa = a._priority?.priority ?? 3;
+    const pb = b._priority?.priority ?? 3;
+    if (pa !== pb) return pa - pb;
+
+    // Gleiche Farbe: längste Dauer zuerst (urgency aus Ampelregel)
+    const ua = a._priority?.urgency ?? 0;
+    const ub = b._priority?.urgency ?? 0;
+    if (ua !== ub) return ub - ua;
+
+    // Gleiche urgency: neueste zuerst
+    return new Date(b.date || 0) - new Date(a.date || 0);
+  });
+};
+
+// ─── Dashboard KPIs ──────────────────────────────────────────────────────────
+
+export const calcDashboardKPIs = (analyzedReports) => {
+  const active = analyzedReports.filter(r => r.status !== 'Abgeschlossen');
+
+  // Durchschnittliche Leckortungsdauer
+  const leckortungReports = active.filter(r => r.status === 'Leckortung' && r._statusDays !== null);
+  const avgLeckortung = leckortungReports.length > 0
+    ? Math.round(leckortungReports.reduce((s, r) => s + r._statusDays, 0) / leckortungReports.length)
+    : null;
+
+  // Durchschnittliche Trocknungsdauer
+  const dryingReports = active.filter(r => r.status === 'Trocknung');
+  const dryingDays = dryingReports.map(r => daysSince(getDryingStartDate(r))).filter(d => d !== null);
+  const avgDrying = dryingDays.length > 0
+    ? Math.round(dryingDays.reduce((s, d) => s + d, 0) / dryingDays.length)
+    : null;
+
+  return {
+    red:           active.filter(r => r._priority?.color === 'red').length,
+    yellow:        active.filter(r => r._priority?.color === 'yellow').length,
+    green:         active.filter(r => r._priority?.color === 'green').length,
+    total:         active.length,
+    unassigned:    active.filter(r => r._isUnassigned).length,
+    noActivity:    active.filter(r => (r._statusDays || 0) >= 3 && r._openTasksCount > 0).length,
+    openReports:   active.filter(r => ['Leckortung', 'Schadenaufnahme'].includes(r.status)).length,
+    openInvoices:  active.filter(r => {
+      const hasInvoice = r.images?.some(img => img.assignedTo === 'Sonstiges');
+      return !hasInvoice && (r.status === 'Instandsetzung' || r.status === 'Instandstellung');
+    }).length,
+    avgLeckortung,
+    avgDrying,
+  };
+};
+
+// ─── Ampel-Farben ─────────────────────────────────────────────────────────────
+
+export const PRIORITY_COLORS = {
+  red:    { bg: 'rgba(239,68,68,0.10)',  rowBg: 'rgba(239,68,68,0.05)', border: '#EF4444', text: '#EF4444', dot: '#EF4444', label: 'Kritisch' },
+  yellow: { bg: 'rgba(245,158,11,0.12)', rowBg: 'rgba(245,158,11,0.04)', border: '#F59E0B', text: '#F59E0B', dot: '#F59E0B', label: 'Verzögert' },
+  green:  { bg: 'rgba(16,185,129,0.10)', rowBg: 'transparent',           border: '#10B981', text: '#10B981', dot: '#10B981', label: 'OK' },
+};

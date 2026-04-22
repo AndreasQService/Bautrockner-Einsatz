@@ -96,18 +96,11 @@ const DryingMonitor = ({ reports, onSelectReport }) => {
                     dryingReports.map(report => {
                         const startDate = getStartDate(report);
                         const days = getDaysDiff(startDate);
-                        let color = 'var(--success)';
-                        let colorClass = '#10B981';
-
+                        let urgencyBg = '#E8F4EA'; // grün
                         if (days > 30) {
-                            color = 'var(--danger)';
-                            colorClass = '#EF4444';
+                            urgencyBg = '#FCE8E8';
                         } else if (days > 15) {
-                            color = 'var(--accent)';
-                            colorClass = '#F59E0B';
-                        } else {
-                            color = 'var(--success)';
-                            colorClass = '#10B981';
+                            urgencyBg = '#FFF4DD';
                         }
 
                         // Calculate equipment summary
@@ -123,16 +116,20 @@ const DryingMonitor = ({ reports, onSelectReport }) => {
                                 key={report.id}
                                 style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '1rem', cursor: 'pointer', transition: 'transform 0.2s', backgroundColor: 'var(--surface)' }}
                                 onClick={() => onSelectReport(report)}
-                                onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
-                                onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--hover-bg)'}
+                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--surface)'}
                             >
                                 <div style={{ marginBottom: '0.6rem' }}>
                                     <div style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-main)', marginBottom: '0.15rem', letterSpacing: '0.01em' }}>
                                         {report.projectNumber || report.projectTitle || '---'}
                                     </div>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                                        <span style={{ fontWeight: 600, fontSize: '0.875rem', color: 'var(--text-main)', opacity: 0.9 }}>{report.locationDetails || report.client}</span>
-                                        <span style={{ fontWeight: 700, color: colorClass }}>{days} Tage</span>
+                                        <span style={{ fontWeight: 600, fontSize: '0.8rem', color: 'var(--text-main)' }}>{report.locationDetails || report.client}</span>
+                                        <span style={{
+                                            fontSize: '0.72rem', fontWeight: 600,
+                                            padding: '0.1rem 0.5rem', borderRadius: '3px',
+                                            backgroundColor: urgencyBg, color: 'var(--color-text-primary, #2C3540)'
+                                        }}>{days}d</span>
                                     </div>
                                 </div>
 
@@ -145,7 +142,7 @@ const DryingMonitor = ({ reports, onSelectReport }) => {
                                     {report.type}
                                 </div>
                                 {report.clientSource && (
-                                    <div style={{ fontSize: '0.7rem', color: 'var(--primary)', marginTop: '2px', marginBottom: '0.75rem' }}>
+                                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px', marginBottom: '0.5rem' }}>
                                         von: {report.clientSource}
                                     </div>
                                 )}
@@ -210,24 +207,30 @@ const DryingMonitor = ({ reports, onSelectReport }) => {
                                     const mDays = getLatestMeasurementDays(report);
                                     if (mDays === null) return null;
 
-                                    let controlColor = '#10B981'; // Green (bis 7 Tage)
-                                    if (mDays > 10) controlColor = '#EF4444'; // Red (mehr als 10 Tage)
-                                    else if (mDays > 7) controlColor = '#F59E0B'; // Orange (7-10 Tage)
+                                    let ctrlBg = '#E8F4EA';
+                                    if (mDays > 10) ctrlBg = '#FCE8E8';
+                                    else if (mDays > 7) ctrlBg = '#FFF4DD';
 
                                     return (
                                         <div style={{
                                             display: 'flex',
                                             justifyContent: 'space-between',
                                             alignItems: 'center',
-                                            padding: '0.5rem 0.75rem',
+                                            padding: '0.3rem 0.6rem',
                                             marginTop: '0.25rem',
-                                            borderRadius: '8px',
+                                            borderRadius: '3px',
                                             backgroundColor: 'rgba(255,255,255,0.03)',
-                                            border: `1px solid ${controlColor}33`,
-                                            fontSize: '0.75rem'
+                                            border: '1px solid var(--border)',
+                                            fontSize: '0.72rem'
                                         }}>
-                                            <span style={{ fontWeight: 600, color: 'var(--text-muted)' }}>Kontrolle Trocknung</span>
-                                            <span style={{ fontWeight: 800, color: controlColor }}>vor {mDays} {mDays === 1 ? 'Tag' : 'Tagen'}</span>
+                                            <span style={{ fontWeight: 500, color: 'var(--text-muted)' }}>Kontrolle Trocknung</span>
+                                            <span style={{
+                                                fontWeight: 600,
+                                                padding: '0.1rem 0.4rem',
+                                                borderRadius: '3px',
+                                                backgroundColor: ctrlBg,
+                                                color: 'var(--color-text-primary, #2C3540)'
+                                            }}>vor {mDays} {mDays === 1 ? 'Tag' : 'Tagen'}</span>
                                         </div>
                                     );
                                 })()}
@@ -275,9 +278,9 @@ const MeasurementControlOverview = ({ reports, onSelectReport }) => {
                     </thead>
                     <tbody>
                         {sortedReports.map(report => {
-                            let controlColor = '#10B981';
-                            if (report.mDays > 10) controlColor = '#EF4444';
-                            else if (report.mDays > 7) controlColor = '#F59E0B';
+                            let ctrlBg = '#E8F4EA';
+                            if (report.mDays > 10) ctrlBg = '#FCE8E8';
+                            else if (report.mDays > 7) ctrlBg = '#FFF4DD';
 
                             return (
                                 <tr
@@ -298,16 +301,17 @@ const MeasurementControlOverview = ({ reports, onSelectReport }) => {
                                     <td style={{ padding: '0.75rem', color: 'var(--text-main)' }}>
                                         {report.locationDetails || report.client}
                                     </td>
-                                    <td style={{ padding: '0.75rem', textAlign: 'right' }}>
+                                    <td style={{ padding: '0.45rem 0.75rem', textAlign: 'right' }}>
                                         <span style={{
-                                            fontWeight: 800,
-                                            color: controlColor,
-                                            padding: '0.25rem 0.6rem',
-                                            borderRadius: '6px',
-                                            backgroundColor: `${controlColor}15`,
+                                            fontWeight: 600,
+                                            padding: '0.15rem 0.5rem',
+                                            borderRadius: '3px',
+                                            backgroundColor: ctrlBg,
+                                            color: 'var(--color-text-primary, #2C3540)',
                                             display: 'inline-block',
-                                            minWidth: '85px',
-                                            textAlign: 'center'
+                                            minWidth: '80px',
+                                            textAlign: 'center',
+                                            fontSize: '0.75rem'
                                         }}>
                                             vor {report.mDays} {report.mDays === 1 ? 'Tag' : 'Tagen'}
                                         </span>
@@ -384,25 +388,24 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
 
     return (
         <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
-                    <h2 style={{ fontSize: '1.5rem', fontWeight: 700, margin: 0, color: 'var(--primary)' }}>Dashboard</h2>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.875rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.875rem' }}>
+                    <h2 style={{ fontSize: '1rem', fontWeight: 600, margin: 0, color: 'var(--text-main)' }}>Dashboard</h2>
 
                     {/* Archive Toggle */}
-                    <div style={{ display: 'flex', backgroundColor: 'var(--surface)', borderRadius: '9999px', padding: '0.25rem', border: '1px solid var(--border)' }}>
+                    <div style={{ display: 'flex', backgroundColor: 'var(--surface)', borderRadius: 'var(--radius)', padding: '2px', border: '1px solid var(--border)' }}>
                         <button
                             onClick={() => setShowArchive(false)}
                             style={{
-                                padding: '0.5rem 1rem',
-                                minHeight: '44px',
-                                borderRadius: '9999px',
+                                padding: '0.25rem 0.75rem',
+                                minHeight: '28px',
+                                borderRadius: '3px',
                                 border: 'none',
-                                fontSize: '0.875rem',
+                                fontSize: '0.78rem',
                                 fontWeight: 500,
                                 backgroundColor: !showArchive ? 'var(--primary)' : 'transparent',
                                 color: !showArchive ? 'white' : 'var(--text-muted)',
-                                boxShadow: !showArchive ? '0 1px 2px rgba(0,0,0,0.1)' : 'none',
-                                transition: 'all 0.2s'
+                                transition: 'all 0.15s'
                             }}
                         >
                             Aktuell
@@ -410,16 +413,15 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
                         <button
                             onClick={() => setShowArchive(true)}
                             style={{
-                                padding: '0.5rem 1rem',
-                                minHeight: '44px',
-                                borderRadius: '9999px',
+                                padding: '0.25rem 0.75rem',
+                                minHeight: '28px',
+                                borderRadius: '3px',
                                 border: 'none',
-                                fontSize: '0.875rem',
+                                fontSize: '0.78rem',
                                 fontWeight: 500,
                                 backgroundColor: showArchive ? 'var(--primary)' : 'transparent',
                                 color: showArchive ? 'white' : 'var(--text-muted)',
-                                boxShadow: showArchive ? '0 1px 2px rgba(0,0,0,0.1)' : 'none',
-                                transition: 'all 0.2s'
+                                transition: 'all 0.15s'
                             }}
                         >
                             Archiv
@@ -428,7 +430,7 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
                 </div>
 
                 {/* Search Input */}
-                <div style={{ position: 'relative', width: '100%', maxWidth: mode === 'technician' ? '100%' : '300px' }} className={mode === 'technician' ? 'tech-search-bar' : ''}>
+                <div style={{ position: 'relative', width: '100%', maxWidth: mode === 'technician' ? '100%' : '280px' }} className={mode === 'technician' ? 'tech-search-bar' : ''}>
                     <input
                         type="text"
                         placeholder="Suche (Name, Adresse, Gerät...)"
@@ -436,18 +438,19 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
                         onChange={(e) => setSearchTerm(e.target.value)}
                         style={{
                             width: '100%',
-                            padding: '0.75rem 1rem 0.75rem 2.5rem',
-                            minHeight: '44px',
+                            padding: '0.35rem 0.75rem 0.35rem 2rem',
+                            minHeight: '30px',
                             border: '1px solid var(--border)',
-                            borderRadius: '9999px',
-                            fontSize: '0.9rem',
+                            borderRadius: 'var(--radius-sm)',
+                            fontSize: '0.8rem',
                             outline: 'none',
-                            boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                            background: 'var(--surface)',
+                            color: 'var(--text-main)'
                         }}
                     />
                     <Search
-                        size={16}
-                        style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94A3B8' }}
+                        size={13}
+                        style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }}
                     />
                 </div>
             </div>
@@ -558,15 +561,15 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
                     )}
                 </div>
             ) : (
-                <div className="card">
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                        <h3 style={{ fontSize: '1rem', fontWeight: 600 }}>Alle Fälle ({filteredReports.length})</h3>
-                        <button className="btn btn-sm btn-outline" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <Filter size={16} /> Filter
+                <div className="card" style={{ padding: '0' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.625rem 0.875rem', borderBottom: '1px solid var(--border)' }}>
+                        <h3 style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-main)' }}>Alle Fälle ({filteredReports.length})</h3>
+                        <button className="btn btn-sm btn-outline" style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.75rem', padding: '0.2rem 0.5rem' }}>
+                            <Filter size={13} /> Filter
                         </button>
                     </div>
 
-                    <div className="table-container" style={{ maxHeight: 'calc(100vh - 220px)', overflowY: 'auto' }}>
+                    <div className="table-container" style={{ maxHeight: 'calc(100vh - 200px)', overflowY: 'auto' }}>
                         <table className="data-table">
                             <thead>
                                 <tr>

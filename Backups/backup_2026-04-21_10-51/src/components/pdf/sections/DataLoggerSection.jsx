@@ -1,0 +1,36 @@
+import React from 'react';
+import { View, Text, Image } from '@react-pdf/renderer';
+import { styles } from '../PDFStyles';
+
+const DataLoggerSection = ({ data }) => {
+    const dataLoggerImages = data.dataLoggerImages || [];
+    const imagesToInclude = dataLoggerImages.filter(img => img.includeInReport !== false);
+
+    if (!imagesToInclude || imagesToInclude.length === 0) return null;
+
+    return (
+        <View style={{ marginTop: 20 }}>
+            <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Anlagen: Messprotokolle / Datenlogger</Text>
+            </View>
+
+            {imagesToInclude.map((img, index) => (
+                <View key={img.id || index} style={{ marginBottom: 20 }} wrap={false}>
+                    {img.description && (
+                        <Text style={{ ...styles.bodyText, marginBottom: 8, fontWeight: 'bold' }}>
+                            {img.description}
+                        </Text>
+                    )}
+                    <View style={{ width: '100%', alignItems: 'center', backgroundColor: '#F8FAFC', padding: 10, borderRadius: 4, border: '1pt solid #E2E8F0' }}>
+                        <Image
+                            src={img.preview}
+                            style={{ width: '100%', height: 'auto', objectFit: 'contain' }}
+                        />
+                    </View>
+                </View>
+            ))}
+        </View>
+    );
+};
+
+export default DataLoggerSection;

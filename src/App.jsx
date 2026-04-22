@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSessionLock } from './hooks/useSessionLock'
-import { Plus, LayoutDashboard, Settings, User, Users, LogOut, Thermometer, Database, RotateCcw, Download } from 'lucide-react'
+import { Plus, LayoutDashboard, Settings, User, Users, LogOut, Thermometer, Database, RotateCcw, Download, Sun, Moon } from 'lucide-react'
 import { supabase } from './supabaseClient'
 import Dashboard from './components/Dashboard'
 import DamageForm from './components/DamageForm'
@@ -10,9 +10,7 @@ import MeasurementDeviceManager from './components/MeasurementDeviceManager'
 import LoginScreen from './components/LoginScreen'
 import EmailImportModalV2 from './components/EmailImportModalV2'
 import i18n from './i18n'
-import { useIsAuthenticated, useMsal } from "@azure/msal-react";
-import { loginRequest } from "./msalConfig";
-import { setMsalInstance, buildProjectFolderName, uploadProjectJson, getQToolFolderWebUrl } from "./services/OneDriveService";
+import { buildProjectFolderName, uploadProjectJson } from "./services/OneDriveService";
 
 function App() {
   // Neuer Tab = neue sessionStorage → startet immer auf Dashboard
@@ -69,6 +67,17 @@ function App() {
   const [isTechnicianMode, setIsTechnicianMode] = useState(false); // Globaler Fallback-Modus (Dashboard)
   const [supabaseStatus, setSupabaseStatus] = useState(null); // null | { ok: bool, count: number, error: string }
 
+  // ── Dark / Light Mode ────────────────────────────────────────────────────
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    const saved = localStorage.getItem('qtool_dark_mode');
+    return saved !== null ? saved === 'true' : true; // Default: Dark
+  });
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', isDarkMode ? 'dark' : 'light');
+    localStorage.setItem('qtool_dark_mode', String(isDarkMode));
+  }, [isDarkMode]);
+
   // Projektspezifischer Modus: 'desktop' | 'technician' (Mutex – nie beides gleichzeitig)
   const [projectMode, setProjectMode] = useState('desktop');
   const setProjectModeExclusive = (mode) => {
@@ -82,27 +91,38 @@ function App() {
   const [audioDevices, setAudioDevices] = useState([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState(localStorage.getItem('qtool_selected_mic') || '');
 
-  // MSAL hooks for OneDrive
-  const { instance, accounts, inProgress } = useMsal();
-  const isAuthenticated = useIsAuthenticated();
+  // ── Sync-Status (Variante C: kein MSAL, kein direkter OneDrive-Login) ──────
+  // Zählt ausstehende lokale Fotos direkt aus IndexedDB (qtool-photos)
+  const [syncStatus, setSyncStatus] = useState('idle'); // 'idle' | 'syncing' | 'error'
+  const [syncPending, setSyncPending] = useState(0);
 
-  // OneDrive: MSAL-Instanz sofort registrieren sobald verfügbar
+  // Ausstehende lokale Bilder zählen – alle 10s aktualisieren
+  // Fällt automatisch auf 0 nach erfolgreichem Supabase-Upload
   useEffect(() => {
-    setMsalInstance(instance);
-    const accounts = instance.getAllAccounts();
-    if (accounts.length > 0) {
-      instance.acquireTokenSilent({
-        scopes: ['Files.ReadWrite.All'],
-        account: accounts[0],
-      }).then(() => {
-        console.log('[MSAL] ✅ Automatisch angemeldet:', accounts[0].name);
-      }).catch(err => {
-        console.warn('[MSAL] Silent-Login fehlgeschlagen:', err.message);
-      });
-    } else {
-      console.log('[MSAL] Kein gespeicherter Account — manueller Login erforderlich');
-    }
-  }, [instance]);
+    const countPending = () => new Promise((resolve) => {
+      const req = indexedDB.open('qtool-photos');
+      req.onsuccess = () => {
+        const db = req.result;
+        if (!db.objectStoreNames.contains('photos')) { resolve(0); return; }
+        const tx  = db.transaction('photos', 'readonly');
+        const all = tx.objectStore('photos').getAll();
+        all.onsuccess = () => resolve(
+          (all.result || []).filter(p =>
+            p.syncStatus !== 'synced' && !p.oneDriveItemId
+          ).length
+        );
+        all.onerror = () => resolve(0);
+      };
+      req.onerror = () => resolve(0);
+      req.onupgradeneeded = () => resolve(0);
+    });
+
+    countPending().then(setSyncPending).catch(() => {});
+    const interval = setInterval(() => {
+      countPending().then(setSyncPending).catch(() => {});
+    }, 10_000);
+    return () => clearInterval(interval);
+  }, []);
 
   // ======================================================
   // ======================================================
@@ -206,27 +226,6 @@ function App() {
     };
   }, [isTechnicianMode]);
 
-  const handleLoginOneDrive = async () => {
-    try {
-      // Veralteten MSAL-Interaction-Status löschen → verhindert interaction_in_progress
-      Object.keys(sessionStorage)
-        .filter(k => k.includes('interaction.status') || k.includes('request.origin') || k.includes('request.state'))
-        .forEach(k => sessionStorage.removeItem(k));
-      // loginRedirect funktioniert auf allen Plattformen (Desktop + iPad/Chrome)
-      // Voraussetzung: Vercel-URL muss in Azure App Registration als Redirect URI eingetragen sein
-      await instance.loginRedirect(loginRequest);
-    } catch (e) {
-      console.error("MSAL Login Error:", e);
-      // alert() wird von Safari in async Kontext geblockt → Toast verwenden
-      showToast("OneDrive Fehler: " + (e.message || 'Unbekannt'), 'error');
-    }
-  };
-
-  const handleLogoutOneDrive = () => {
-    instance.logoutRedirect().catch(e => {
-      console.error("MSAL Logout Error:", e);
-    });
-  };
 
   // Users List (Managed here to share with LoginScreen)
   const [users, setUsers] = useState(() => {
@@ -834,50 +833,47 @@ function App() {
                       <span className="hide-mobile">Import</span>
                     </button>
 
-                    {!isAuthenticated ? (
-                      <button
-                        className="btn btn-outline"
-                        onClick={handleLoginOneDrive}
-                        disabled={inProgress !== 'none'}
-                        style={{ color: inProgress !== 'none' ? 'var(--text-muted)' : '#0078D4', borderColor: inProgress !== 'none' ? 'var(--border)' : '#0078D4', gap: '0.4rem', opacity: inProgress !== 'none' ? 0.5 : 1 }}
-                        title={inProgress !== 'none' ? 'MSAL wird initialisiert...' : 'Mit OneDrive verbinden'}
-                      >
-                        <Database size={18} />
-                        <span className="hide-mobile">{inProgress !== 'none' ? 'Verbinde...' : 'OneDrive Login'}</span>
-                      </button>
-                    ) : (
-                      <>
-                        <button className="btn btn-outline" onClick={handleLogoutOneDrive} style={{ color: '#10B981', borderColor: '#10B981', gap: '0.4rem' }}>
-                          <Database size={18} />
-                          <span className="hide-mobile">OneDrive OK ({accounts[0]?.name?.split(' ')[0]})</span>
-                        </button>
-                        <button
-                          className="btn btn-outline"
-                          title="QTool-Ordner in OneDrive öffnen"
-                          onClick={async () => {
-                            const url = await getQToolFolderWebUrl();
-                            if (url) window.open(url, '_blank');
-                            else window.open('https://onedrive.live.com/', '_blank');
-                          }}
-                          style={{ color: '#0078D4', borderColor: '#0078D4', padding: '0 0.6rem' }}
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-                        </button>
-                      </>
-                    )}
+                    {/* Sync-Status Badge (Variante C: kein OneDrive-Login) */}
+                    <div
+                      id="sync-status-badge"
+                      title={syncPending > 0
+                        ? `${syncPending} Fotos ausstehend – werden synchronisiert sobald Netz verfügbar`
+                        : 'Alle Daten synchronisiert'}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '0.35rem',
+                        padding: '0.3rem 0.65rem',
+                        borderRadius: '6px',
+                        border: `1px solid ${syncPending > 0 ? 'rgba(251,191,36,0.4)' : 'var(--border)'}`,
+                        backgroundColor: syncPending > 0 ? 'rgba(251,191,36,0.06)' : 'var(--surface)',
+                        fontSize: '0.78rem',
+                        color: syncPending > 0 ? '#FBBF24' : 'var(--text-muted)',
+                        whiteSpace: 'nowrap',
+                        userSelect: 'none',
+                        transition: 'all 0.3s ease',
+                      }}
+                    >
+                      <span style={{
+                        width: '7px', height: '7px', borderRadius: '50%',
+                        backgroundColor: syncPending > 0 ? '#FBBF24' : '#10B981',
+                        flexShrink: 0,
+                      }} />
+                      <span className="hide-mobile">
+                        {syncPending > 0 ? `${syncPending} ausstehend` : 'Synchronisiert'}
+                      </span>
+                    </div>
                   </>
                 )}
 
                 {/* Admin Tools Group */}
                 {userRole === 'admin' && !isTechnicianMode && (
-                  <div style={{
+                <div style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '0.3rem',
-                    background: 'rgba(255, 255, 255, 0.03)',
+                    gap: '3px',
+                    background: isDarkMode ? 'rgba(255, 255, 255, 0.03)' : '#F4F6F9',
                     padding: '3px',
-                    borderRadius: '9999px',
-                    border: '1px solid var(--border)',
+                    borderRadius: '4px',
+                    border: isDarkMode ? '1px solid rgba(255,255,255,0.08)' : '1px solid #D5D9E0',
                   }}>
                     <button
                       className="btn btn-ghost"
@@ -929,27 +925,53 @@ function App() {
               </div>
             )}
 
-            {/* User-Info Pill – ganz rechts, immer sichtbar */}
+            {/* Dark / Light Mode Toggle */}
+            <button
+              id="dark-mode-toggle"
+              onClick={() => setIsDarkMode(prev => !prev)}
+              title={isDarkMode ? 'Heller Modus aktivieren' : 'Dunkler Modus aktivieren'}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.4rem',
+                background: isDarkMode ? 'rgba(255,255,255,0.06)' : '#FFFFFF',
+                border: isDarkMode ? '1px solid rgba(255,255,255,0.12)' : '1px solid #D5D9E0',
+                borderRadius: '4px',
+                padding: '0.3rem 0.7rem',
+                cursor: 'pointer',
+                color: isDarkMode ? '#94A3B8' : '#4B5563',
+                fontSize: '13px',
+                fontWeight: 500,
+                transition: 'all 0.15s ease',
+                flexShrink: 0,
+              }}
+            >
+              {isDarkMode ? <Sun size={14} /> : <Moon size={14} />}
+              <span className="hide-mobile">{isDarkMode ? 'Hell' : 'Dunkel'}</span>
+            </button>
+
+            {/* User-Info – ganz rechts */}
             <div style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '0.5rem',
-              background: 'rgba(255,255,255,0.04)',
+              gap: '8px',
+              background: isDarkMode ? 'rgba(255,255,255,0.04)' : '#F4F6F9',
               padding: '4px 10px 4px 12px',
-              borderRadius: '9999px',
-              border: '1px solid var(--border)',
+              borderRadius: '4px',
+              border: isDarkMode ? '1px solid rgba(255,255,255,0.08)' : '1px solid #D5D9E0',
               flexShrink: 0,
-              marginLeft: '0.25rem'
+              marginLeft: '4px'
             }}>
-              <div style={{ lineHeight: 1.2 }}>
-                <div style={{ fontWeight: 700, fontSize: '0.8rem', color: 'var(--text-main)' }}>{currentUser.name}</div>
-                <div style={{ color: 'var(--q-primary)', fontSize: '0.6rem', fontWeight: 800, textTransform: 'uppercase' }}>{currentUser.role}</div>
+              <div style={{ lineHeight: 1.25 }}>
+                <div style={{ fontWeight: 600, fontSize: '13px', color: isDarkMode ? 'var(--text-main)' : '#1F2937' }}>{currentUser.name}</div>
+                <div style={{ color: isDarkMode ? '#64748B' : '#6B7280', fontSize: '11px', fontWeight: 400, textTransform: 'uppercase' }}>{currentUser.role}</div>
               </div>
               <button
                 onClick={handleLogout}
                 className="btn btn-ghost"
                 title="Abmelden"
-                style={{ padding: '0.35rem', color: '#F87171', borderRadius: '50%' }}
+                style={{ padding: '4px', color: isDarkMode ? '#F87171' : '#6B7280', borderRadius: '3px' }}
               >
                 <LogOut size={14} />
               </button>
@@ -958,7 +980,7 @@ function App() {
         </div>
       </header>
 
-      <main className="container" style={{ marginTop: effectiveMode === 'technician' ? '1rem' : '2rem', padding: effectiveMode === 'technician' ? '0.5rem' : '1rem', maxWidth: effectiveMode === 'technician' ? undefined : 'none' }}>
+      <main className="container" style={{ marginTop: effectiveMode === 'technician' ? '0.5rem' : '1rem', padding: effectiveMode === 'technician' ? '0.5rem' : '1rem 1.25rem', maxWidth: effectiveMode === 'technician' ? undefined : 'none' }}>
 
         {/* ── Supabase Debug-Banner: zeigt Verbindungsstatus für iPad-Diagnose ── */}
         {view === 'dashboard' && supabaseStatus && (

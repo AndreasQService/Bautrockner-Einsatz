@@ -1,0 +1,69 @@
+﻿
+> qservice@0.0.0 build
+> vite build
+
+[36mvite v7.3.1 [32mbuilding client environment for production...[36m[39m
+transforming...
+[32mÔ£ô[39m 1722 modules transformed.
+node.exe : [31mÔ£ù[39m 
+Build failed in 1.51s
+In Zeile:1 Zeichen:1
++ & "C:\Program 
+Files\nodejs/node.exe" 
+"C:\Program 
+Files\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~
+    + CategoryInfo          : 
+    NotSpecified: ([31mÔ£ù  
+  [39m Build failed in 1.51   
+ s:String) [], RemoteExcep    
+tion
+    + FullyQualifiedErrorId : 
+    NativeCommandError
+ 
+[31merror during build:
+[31msrc/services/PDFService.j
+s (79:31): Expression 
+expected[31m
+file: [36mC:/QTool/src/servic
+es/PDFService.js:79:31[31m
+[33m
+77:         };
+78: 
+79:         const blob = 
+await 
+pdf(<DamageReportDocument 
+data={docData} />).toBlob();
+                              
+     ^
+80: 
+81:         const now = new 
+Date();
+[31m
+    at getRollupError (file://
+/C:/QTool/node_modules/rollup/
+dist/es/shared/parseAst.js:402
+:41)
+    at ParseError.initialise (
+file:///C:/QTool/node_modules/
+rollup/dist/es/shared/node-ent
+ry.js:14465:28)
+    at convertNode (file:///C:
+/QTool/node_modules/rollup/dis
+t/es/shared/node-entry.js:1643
+7:10)
+    at convertProgram (file://
+/C:/QTool/node_modules/rollup/
+dist/es/shared/node-entry.js:1
+5677:12)
+    at Module.setSource (file:
+///C:/QTool/node_modules/rollu
+p/dist/es/shared/node-entry.js
+:17392:24)
+    at async 
+ModuleLoader.addModuleSource (
+file:///C:/QTool/node_modules/
+rollup/dist/es/shared/node-ent
+ry.js:21474:13)[39m

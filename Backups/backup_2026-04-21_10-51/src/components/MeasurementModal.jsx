@@ -1,0 +1,1153 @@
+import React, { useRef, useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
+import { X, Save, Eraser, Pen, Undo, Trash2, FileText, Loader, Check, Hand, ChevronUp, ChevronDown, Plus, Edit3, RotateCcw, PenOff, Camera, Image } from 'lucide-react';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
+import CameraCaptureModal from './CameraCaptureModal';
+
+const MeasurementModal = ({ isOpen, onClose, onSave, rooms, projectTitle, initialData, readOnly, measurementHistory }) => {
+
+    const canvasRef = useRef(null);
+    const containerRef = useRef(null);
+    const isInitializedRef = useRef(null); // Track initialization per session
+    const [isDrawing, setIsDrawing] = useState(false);
+    const [color, setColor] = useState('#000000');
+    const [lineWidth, setLineWidth] = useState(2);
+    const [activeTool, setActiveTool] = useState('pen'); // 'pen' or 'eraser'
+    const [measurements, setMeasurements] = useState([]);
+    const [history, setHistory] = useState([]); // Array of ImageData
+    const [historyStep, setHistoryStep] = useState(-1);
+    const [isScrollMode, setIsScrollMode] = useState(false); // New state for Scroll Mode
+    const [isCanvasExpanded, setIsCanvasExpanded] = useState(true); // Skizze standardmässig sichtbar
+    const [isSketchLocked, setIsSketchLocked] = useState(true); // Default to Locked for safety
+    const [globalSettings, setGlobalSettings] = useState({
+        date: new Date().toISOString().split('T')[0],
+        temp: '',
+        humidity: '',
+        device: ''
+    });
+    const [availableDevices, setAvailableDevices] = useState([]);
+
+    useEffect(() => {
+        const savedDevices = localStorage.getItem('qtool_measurement_devices');
+        if (savedDevices) {
+            try {
+                const parsed = JSON.parse(savedDevices);
+                // Safer way to flatten for older browsers
+                let flattened = [];
+                Object.keys(parsed).forEach(key => {
+                    if (Array.isArray(parsed[key])) {
+                        parsed[key].forEach(d => {
+                            if (d && d.name) flattened.push(d.name);
+                        });
+                    }
+                });
+                setAvailableDevices(Array.from(new Set(flattened))); // unique names
+            } catch (e) {
+                console.error("Error loading devices for modal", e);
+            }
+        }
+    }, [isOpen]);
+    const [saveAsPdf, setSaveAsPdf] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
+    const [isSuccess, setIsSuccess] = useState(false);
+    const [stylusOnlyMode, setStylusOnlyMode] = useState(true); // Palm Rejection standardmäßig AN
+    const [showCamera, setShowCamera] = useState(false);
+    const [galleryPhotos, setGalleryPhotos] = useState([]); // Messprotokoll-Fotos (2-Spalten-Grid)
+
+    // Always lock the sketch by default when the modal opens
+    useEffect(() => {
+        if (isOpen) {
+            setIsSketchLocked(true);
+            setStylusOnlyMode(true); // Palm Rejection beim Reset aktiv lassen
+        }
+    }, [isOpen]);
+
+    // Calculate History View Data
+    // Calculate History View Data - PIVOT
+    const { historyColumns, historyRows } = React.useMemo(() => {
+        if (!measurementHistory || measurementHistory.length === 0) return { historyColumns: [], historyRows: [] };
+
+        // 1. Get all unique MP names
+        const allPointNames = new Set(['Messpunkt 1', 'Messpunkt 2', 'Messpunkt 3', 'Messpunkt 4']); // Ensure at least 4 default points
+
+        // Add current measurements (the "capture" template) to ensure they are visible
+        if (measurements && measurements.length > 0) {
+            measurements.forEach(m => {
+                if (m.pointName) allPointNames.add(m.pointName);
+            });
+        }
+
+        measurementHistory.forEach(entry => {
+            if (entry && Array.isArray(entry.measurements)) {
+                entry.measurements.forEach(m => {
+                    if (m && m.pointName) allPointNames.add(m.pointName);
+                });
+            }
+        });
+
+        // Sort columns naturally (MP 1, MP 2, MP 10)
+        const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+        const sortedColumns = Array.from(allPointNames).sort(collator.compare);
+
+        // 2. Sort history by Date Descending (Newest first)
+        const sortedHistory = [...measurementHistory].sort((a, b) =>
+            new Date(b.date || 0) - new Date(a.date || 0)
+        );
+
+        // 3. Build Rows
+        const rows = sortedHistory.map((entry, idx) => {
+            if (!entry) return null;
+            const entryDate = entry.globalSettings?.date || entry.date;
+
+            // Find "previous" (older) entry for comparison
+            // Since sorted Descending, previous is at idx + 1
+            const prevEntry = sortedHistory[idx + 1];
+
+            const rowData = {
+                id: entry.id || `hist_${idx}`,
+                date: entryDate,
+                points: {},
+                protocolUrl: entry.protocolUrl
+            };
+
+            const entryMeasurements = Array.isArray(entry.measurements) ? entry.measurements : [];
+            const prevMeasurements = (prevEntry && Array.isArray(prevEntry.measurements)) ? prevEntry.measurements : [];
+
+            sortedColumns.forEach(mpName => {
+                const currM = entryMeasurements.find(m => m && m.pointName === mpName);
+                if (!currM) return; // No data for this MP in this entry
+
+                const cell = {
+                    w_value: currM.w_value,
+                    b_value: currM.b_value,
+                    w_color: 'inherit',
+                    b_color: 'inherit'
+                };
+
+                // Compare with previous
+                if (prevEntry) {
+                    const prevM = prevMeasurements.find(m => m && m.pointName === mpName);
+                    if (prevM) {
+                        const parse = (v) => parseFloat(String(v).replace(',', '.'));
+
+                        const wc = parse(currM.w_value);
+                        const wp = parse(prevM.w_value);
+                        if (!isNaN(wc) && !isNaN(wp)) {
+                            if (wc < wp) cell.w_color = '#10B981'; // Good
+                            if (wc > wp) cell.w_color = '#EF4444'; // Bad
+                        }
+
+                        const bc = parse(currM.b_value);
+                        const bp = parse(prevM.b_value);
+                        if (!isNaN(bc) && !isNaN(bp)) {
+                            if (bc < bp) cell.b_color = '#10B981';
+                            if (bc > bp) cell.b_color = '#EF4444';
+                        }
+                    }
+                }
+                rowData.points[mpName] = cell;
+            });
+            return rowData;
+        }).filter(Boolean);
+
+        return { historyColumns: sortedColumns, historyRows: rows };
+
+    }, [measurementHistory, measurements]);
+
+
+
+    // Initialize measurements based on rooms or initialData
+    useEffect(() => {
+        if (!isOpen) {
+            isInitializedRef.current = null;
+            // Clear history on close to prevent carry-over if key doesn't change
+            setHistory([]);
+            setHistoryStep(-1);
+            return;
+        }
+
+        if (isSuccess) return;
+
+        const currentRoomId = rooms && rooms.length > 0 ? rooms[0].id : null;
+        if (!currentRoomId) return;
+
+        if (isInitializedRef.current === currentRoomId) return;
+        isInitializedRef.current = currentRoomId;
+
+        let initTimer = null;
+        const roomData = initialData ? initialData[currentRoomId] : null;
+
+        const performInit = () => {
+            const canvas = canvasRef.current;
+            if (!canvas) {
+                // If canvas not ready yet, retry in 50ms
+                initTimer = setTimeout(performInit, 50);
+                return;
+            }
+
+            if (roomData) {
+                setMeasurements(roomData.measurements || []);
+                setGlobalSettings(roomData.globalSettings || {
+                    date: new Date().toISOString().split('T')[0],
+                    temp: '',
+                    humidity: '',
+                    device: ''
+                });
+                if (roomData.galleryPhotos) setGalleryPhotos(roomData.galleryPhotos);
+
+                if (roomData.canvasImage) {
+                    const img = new window.Image();
+                    img.onload = () => {
+                        const ctx = canvas.getContext('2d');
+                        ctx.fillStyle = '#ffffff';
+                        ctx.fillRect(0, 0, canvas.width, canvas.height);
+                        ctx.drawImage(img, 0, 0);
+                        saveParamsToHistory(canvas);
+                    };
+                    img.src = roomData.canvasImage;
+                } else {
+                    initCanvas();
+                }
+            } else {
+                // Default measurements
+                const initial = [
+                    { id: `p${Date.now()}`, pointName: 'Messpunkt 1', w_value: '', b_value: '', notes: '' },
+                    { id: `p${Date.now() + 1}`, pointName: 'Messpunkt 2', w_value: '', b_value: '', notes: '' },
+                    { id: `p${Date.now() + 2}`, pointName: 'Messpunkt 3', w_value: '', b_value: '', notes: '' },
+                    { id: `p${Date.now() + 3}`, pointName: 'Messpunkt 4', w_value: '', b_value: '', notes: '' }
+                ];
+                setMeasurements(initial);
+                setGlobalSettings({
+                    date: new Date().toISOString().split('T')[0],
+                    temp: '',
+                    humidity: '',
+                    device: ''
+                });
+                initCanvas();
+            }
+        };
+
+        // Start initialization
+        performInit();
+
+        return () => {
+            if (initTimer) clearTimeout(initTimer);
+        };
+    }, [isOpen, rooms, initialData, isSuccess]);
+
+    const initCanvas = () => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        // Fill white background explicitly (better for toDataURL than transparency)
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        // Clear center to allow grid background to show through if needed,
+        // but actually clearRect keeps transparency.
+        // If we want white, we stay white.
+        // ctx.clearRect(0, 0, canvas.width, canvas.height);
+        saveParamsToHistory(canvas);
+    };
+
+    const saveParamsToHistory = (canvas) => {
+        const ctx = canvas.getContext('2d');
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        setHistory(prev => [...prev.slice(0, historyStep + 1), imageData]);
+        setHistoryStep(prev => prev + 1);
+    };
+
+    // Fotos im Canvas 2-spaltig zeichnen wenn galleryPhotos sich ändert
+    useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        if (galleryPhotos.length === 0) return;
+        const cols = Math.min(2, galleryPhotos.length);
+        const cellW = canvas.width / cols;
+        const cellH = canvas.height;
+        let loaded = 0;
+        galleryPhotos.forEach((photo, index) => {
+            const img = new window.Image();
+            img.onload = () => {
+                const col = index % 2;
+                const x = col * cellW;
+                const scale = Math.min(cellW / img.width, cellH / img.height);
+                const drawX = x + (cellW - img.width * scale) / 2;
+                const drawY = (cellH - img.height * scale) / 2;
+                ctx.drawImage(img, drawX, drawY, img.width * scale, img.height * scale);
+                loaded++;
+                if (loaded === galleryPhotos.length) saveParamsToHistory(canvas);
+            };
+            img.src = photo.src;
+        });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [galleryPhotos]);
+
+    const handleUndo = () => {
+        if (historyStep > 0) {
+            const newStep = historyStep - 1;
+            const imageData = history[newStep];
+            const canvas = canvasRef.current;
+            const ctx = canvas.getContext('2d');
+            ctx.putImageData(imageData, 0, 0);
+            setHistoryStep(newStep);
+        }
+    };
+
+
+
+    const getCoordinates = (e) => {
+        const canvas = canvasRef.current;
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+
+        return {
+            x: (e.clientX - rect.left) * scaleX,
+            y: (e.clientY - rect.top) * scaleY
+        };
+    };
+
+    // Optimization: Cache context and use requestAnimationFrame
+    const ctxRef = useRef(null);
+    const rafRef = useRef(null);
+    const lastCoords = useRef(null);
+
+    const startDrawing = (e) => {
+        if (!isOpen || isSketchLocked) return;
+        if (stylusOnlyMode && e.pointerType !== 'pen') return;
+        if (isScrollMode) return;
+
+        if (e.target.setPointerCapture) {
+            try { e.target.setPointerCapture(e.pointerId); } catch (err) { }
+        }
+
+        const coords = getCoordinates(e);
+        lastCoords.current = coords;
+
+        const canvas = canvasRef.current;
+        if (!ctxRef.current) ctxRef.current = canvas.getContext('2d', { willReadFrequently: true });
+        const ctx = ctxRef.current;
+
+        ctx.beginPath();
+        ctx.moveTo(coords.x, coords.y);
+
+        if (activeTool === 'eraser') {
+            ctx.globalCompositeOperation = 'destination-out';
+            ctx.lineWidth = 30; // Thicker eraser
+        } else {
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.strokeStyle = color;
+            ctx.lineWidth = lineWidth;
+        }
+        setIsDrawing(true);
+    };
+
+    const draw = (e) => {
+        if (!isDrawing) return;
+        if (stylusOnlyMode && e.pointerType !== 'pen') return;
+
+        lastCoords.current = getCoordinates(e);
+
+        if (!rafRef.current) {
+            rafRef.current = requestAnimationFrame(() => {
+                rafRef.current = null;
+                if (!isDrawing || !lastCoords.current) return;
+
+                const ctx = ctxRef.current;
+                const coords = lastCoords.current;
+                ctx.lineTo(coords.x, coords.y);
+                ctx.stroke();
+            });
+        }
+    };
+
+    const stopDrawing = (e) => {
+        if (isDrawing) {
+            if (rafRef.current) cancelAnimationFrame(rafRef.current);
+            rafRef.current = null;
+
+            if (e && e.target.releasePointerCapture) {
+                try { e.target.releasePointerCapture(e.pointerId); } catch (err) { }
+            }
+            setIsDrawing(false);
+            saveParamsToHistory(canvasRef.current);
+        }
+    };
+
+    const handlePhotoUpload = (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const img = new window.Image();
+            img.onload = () => {
+                const canvas = canvasRef.current;
+                const ctx = canvas.getContext('2d');
+
+                // Keep the canvas background white/grid and draw image on top
+                // Or clear and draw image? User wants it as alternative to white sheet.
+                // ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                const scale = Math.min(canvas.width / img.width, canvas.height / img.height);
+                const x = (canvas.width / 2) - (img.width / 2) * scale;
+                const y = (canvas.height / 2) - (img.height / 2) * scale;
+
+                ctx.drawImage(img, x, y, img.width * scale, img.height * scale);
+                saveParamsToHistory(canvas);
+            };
+            img.src = event.target.result;
+        };
+        reader.readAsDataURL(file);
+    };
+
+    const clearCanvas = () => {
+        const canvas = canvasRef.current;
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        saveParamsToHistory(canvas);
+    };
+
+    const handleCameraCapture = (file) => {
+        setShowCamera(false);
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            setGalleryPhotos(prev => [...prev, { id: Date.now() + Math.random(), src: event.target.result }]);
+        };
+        reader.readAsDataURL(file);
+    };
+
+    const handleSave = async () => {
+        if (!containerRef.current || isSaving) return;
+
+        setIsSaving(true);
+        try {
+            // Capture the entire modal content (sketch + table)
+            const canvas = await html2canvas(containerRef.current, {
+                scale: 2, // Higher resolution
+                backgroundColor: '#ffffff'
+            });
+
+            // Capture canvas state as DataURL for restoration
+            const toggleCanvas = canvasRef.current;
+            const canvasDataUrl = toggleCanvas ? toggleCanvas.toDataURL() : null;
+
+            if (saveAsPdf) {
+                // Generate PDF
+                const pdf = new jsPDF('p', 'mm', 'a4');
+                const imgData = canvas.toDataURL('image/png');
+                const pdfWidth = pdf.internal.pageSize.getWidth();
+                const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+
+                pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+
+                // Create PDF Blob
+                const pdfBlob = pdf.output('blob');
+                const file = new File([pdfBlob], `Messprotokoll_${projectTitle || 'Neu'}_${rooms[0]?.name || ''}.pdf`, { type: 'application/pdf' });
+
+                await onSave({
+                    file,
+                    measurements,
+                    globalSettings,
+                    canvasImage: canvasDataUrl,
+                    galleryPhotos
+                });
+            } else {
+                // Standard Image Save
+                await new Promise((resolve) => {
+                    canvas.toBlob(async (blob) => {
+                        const file = new File([blob], `Messprotokoll_${projectTitle || 'Neu'}_${Date.now()}.png`, { type: 'image/png' });
+
+                        await onSave({
+                            file,
+                            measurements,
+                            globalSettings,
+                            canvasImage: canvasDataUrl
+                        });
+                        resolve();
+                    }, 'image/png');
+                });
+            }
+
+            // Show success state briefly
+            setIsSuccess(true);
+            setTimeout(() => {
+                setIsSuccess(false);
+                setIsSaving(false);
+                onClose();
+            }, 1000);
+
+        } catch (err) {
+            console.error("Error saving sketch:", err);
+            alert("Fehler beim Speichern der Skizze.");
+            setIsSaving(false);
+        }
+    };
+
+    const updateMeasurement = (index, field, value) => {
+        const newMeasurements = [...measurements];
+        newMeasurements[index][field] = value;
+        setMeasurements(newMeasurements);
+    };
+
+    const addMeasurement = () => {
+        // Use Date.now() for unique IDs
+        const newPoint = {
+            id: `p${Date.now()}`,
+            pointName: `Messpunkt ${measurements.length + 1}`,
+            w_value: '',
+            b_value: '',
+            notes: ''
+        };
+        setMeasurements([...measurements, newPoint]);
+    };
+
+    const removeMeasurement = (index) => {
+        const newMeasurements = measurements.filter((_, i) => i !== index);
+        setMeasurements(newMeasurements);
+    };
+
+    if (!isOpen) return null;
+
+    return createPortal(
+        <div style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.8)', zIndex: 10000,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: '2rem'
+        }}>
+            <div ref={containerRef} style={{
+                backgroundColor: 'var(--surface)',
+                borderRadius: '8px',
+                width: '95vw',
+                maxWidth: '1100px',
+                height: '92vh',
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden',
+                color: 'var(--text-main)',
+                border: '1px solid var(--border)'
+            }}>
+                {/* Header */}
+                <div style={{ padding: '1rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'var(--background)' }}>
+                    <div>
+                        <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 'bold', color: 'var(--text-main)' }}>Messprotokoll</h3>
+                        <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                            {projectTitle} {rooms.length === 1 && ` - ${rooms[0].name}`}
+                        </div>
+                    </div>
+                    <div className="no-print" style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                            {/* <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+                                <X size={20} />
+                            </button> */}
+                        </div>
+                        <button
+                            onClick={handleSave}
+                            disabled={isSaving}
+                            className={`btn ${isSuccess ? 'btn-success' : 'btn-primary'}`}
+                            style={{
+                                display: 'flex', gap: '0.5rem', alignItems: 'center',
+                                backgroundColor: isSuccess ? '#10B981' : undefined,
+                                borderColor: isSuccess ? '#10B981' : undefined
+                            }}
+                        >
+                            {isSaving ? (
+                                <Loader size={18} className="animate-spin" />
+                            ) : isSuccess ? (
+                                <Check size={18} />
+                            ) : (
+                                // saveAsPdf ? <FileText size={18} /> : <Save size={18} />
+                                null
+                            )}
+                            {isSaving ? 'Speichert...' : isSuccess ? 'Gespeichert!' : (readOnly ? 'Schliessen' : 'Fertig')}
+                        </button>
+                    </div>
+                </div>
+
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+
+                    {/* Toolbar & Canvas - Sticky */}
+                    {/* Toolbar & Canvas - Sticky - Hidden in History View */}
+                    {!readOnly && (
+                        <div style={{
+                            padding: '1rem',
+                            borderBottom: '1px solid var(--border)',
+                            position: 'sticky',
+                            top: 0,
+                            backgroundColor: 'var(--surface)',
+                            zIndex: 10
+                        }}>
+                            <div className="no-print" style={{ marginBottom: '0.5rem', display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                                <span style={{ fontWeight: 'bold', fontSize: '0.9rem', color: 'var(--text-main)' }}>Werkzeuge:</span>
+
+                                {isSketchLocked ? (
+                                    <button
+                                        onClick={() => setIsSketchLocked(false)}
+                                        style={{
+                                            padding: '0.5rem 1rem',
+                                            borderRadius: '4px',
+                                            background: 'var(--primary)',
+                                            border: '1px solid var(--primary)',
+                                            color: 'white',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '0.5rem',
+                                            fontSize: '0.9rem',
+                                            fontWeight: 500
+                                        }}
+                                        title="Zeichnen aktivieren"
+                                    >
+                                        <Edit3 size={16} /> Skizze bearbeiten
+                                    </button>
+                                ) : (
+                                    <>
+                                        <button
+                                            onClick={() => { setIsScrollMode(false); setColor('#000000'); setLineWidth(2); }}
+                                            style={{
+                                                padding: '0.5rem 0.75rem',
+                                                borderRadius: '6px',
+                                                background: (!isScrollMode && color === '#000000') ? 'var(--primary)' : 'rgba(255,255,255,0.05)',
+                                                border: (!isScrollMode && color === '#000000') ? '1px solid var(--primary)' : '1px solid var(--border)',
+                                                color: (!isScrollMode && color === '#000000') ? 'white' : 'var(--text-main)',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '0.4rem'
+                                            }}
+                                            title="Stift Schwarz"
+                                        >
+                                            <Pen size={16} />
+                                            <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>Stift</span>
+                                        </button>
+                                        <button
+                                            onClick={() => { setIsScrollMode(false); setActiveTool('pen'); setColor('#ef4444'); setLineWidth(2); }}
+                                            style={{
+                                                padding: '0.5rem',
+                                                borderRadius: '6px',
+                                                background: (!isScrollMode && activeTool === 'pen' && color === '#ef4444') ? 'rgba(239, 68, 68, 0.2)' : 'rgba(255,255,255,0.05)',
+                                                border: (!isScrollMode && activeTool === 'pen' && color === '#ef4444') ? '1px solid #ef4444' : '1px solid var(--border)',
+                                                color: '#ef4444'
+                                            }}
+                                            title="Stift Rot"
+                                        >
+                                            <Pen size={16} />
+                                        </button>
+                                        <button
+                                            onClick={() => { setIsScrollMode(false); setActiveTool('pen'); setColor('#3b82f6'); setLineWidth(2); }}
+                                            style={{
+                                                padding: '0.5rem',
+                                                borderRadius: '6px',
+                                                background: (!isScrollMode && activeTool === 'pen' && color === '#3b82f6') ? 'rgba(59, 130, 246, 0.2)' : 'rgba(255,255,255,0.05)',
+                                                border: (!isScrollMode && activeTool === 'pen' && color === '#3b82f6') ? '1px solid #3b82f6' : '1px solid var(--border)',
+                                                color: '#3b82f6'
+                                            }}
+                                            title="Stift Blau"
+                                        >
+                                            <Pen size={16} />
+                                        </button>
+                                        <button
+                                            onClick={() => { setIsScrollMode(false); setActiveTool('eraser'); }}
+                                            style={{
+                                                padding: '0.5rem 0.75rem',
+                                                borderRadius: '6px',
+                                                background: (!isScrollMode && activeTool === 'eraser') ? '#f1f5f9' : 'rgba(255,255,255,0.05)',
+                                                border: (!isScrollMode && activeTool === 'eraser') ? '1px solid #cbd5e1' : '1px solid var(--border)',
+                                                color: '#475569',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '0.4rem'
+                                            }}
+                                            title="Radiergummi"
+                                        >
+                                            <Eraser size={16} />
+                                            <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>Radierer</span>
+                                        </button>
+                                        <button
+                                            onClick={() => setShowCamera(true)}
+                                            style={{
+                                                padding: '0.5rem',
+                                                borderRadius: '6px',
+                                                background: 'rgba(255,255,255,0.05)',
+                                                border: '1px solid var(--border)',
+                                                color: 'var(--text-main)',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '0.4rem'
+                                            }}
+                                            title="Kamera starten"
+                                        >
+                                            <Camera size={16} />
+                                            <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>Foto</span>
+                                        </button>
+
+                                        <button
+                                            onClick={() => document.getElementById('sketch-photo-upload').click()}
+                                            style={{
+                                                padding: '0.5rem',
+                                                borderRadius: '6px',
+                                                background: 'rgba(255,255,255,0.05)',
+                                                border: '1px solid var(--border)',
+                                                color: 'var(--text-main)',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '0.4rem'
+                                            }}
+                                            title="Bild aus Galerie laden"
+                                        >
+                                            <Image size={16} />
+                                            <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>Galerie</span>
+                                        </button>
+
+                                        <input
+                                            id="sketch-photo-upload"
+                                            type="file"
+                                            accept="image/*,.heic,.heif"
+                                            multiple
+                                            style={{ display: 'none' }}
+                                            onChange={(e) => {
+                                                const files = Array.from(e.target.files || []);
+                                                if (files.length === 0) return;
+                                                files.forEach(file => {
+                                                    const reader = new FileReader();
+                                                    reader.onload = (ev) => {
+                                                        setGalleryPhotos(prev => [...prev, { id: Date.now() + Math.random(), src: ev.target.result }]);
+                                                    };
+                                                    reader.readAsDataURL(file);
+                                                });
+                                                e.target.value = '';
+                                            }}
+                                        />
+
+                                        <button
+                                            onClick={() => setIsSketchLocked(true)}
+                                            style={{
+                                                padding: '0.5rem 0.75rem',
+                                                borderRadius: '6px',
+                                                background: 'rgba(16, 185, 129, 0.15)',
+                                                border: '1px solid #10B981',
+                                                color: '#10B981',
+                                                marginLeft: '0.5rem',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '0.4rem'
+                                            }}
+                                            title="Skizze sperren"
+                                        >
+                                            <PenOff size={16} />
+                                            <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>Sperren</span>
+                                        </button>
+                                    </>
+                                )}
+
+                                <div style={{ width: '1px', height: '24px', background: 'var(--border)', margin: '0 0.5rem' }}></div>
+
+                                <button
+                                    onClick={() => setStylusOnlyMode(!stylusOnlyMode)}
+                                    style={{
+                                        padding: '0.5rem 0.75rem',
+                                        borderRadius: '6px',
+                                        background: stylusOnlyMode ? '#F59E0B' : 'rgba(255,255,255,0.05)',
+                                        border: stylusOnlyMode ? '1px solid #F59E0B' : '1px solid var(--border)',
+                                        color: stylusOnlyMode ? 'white' : 'var(--text-main)',
+                                        marginRight: '0.5rem',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '0.4rem',
+                                        fontWeight: 600,
+                                        fontSize: '0.8rem'
+                                    }}
+                                    disabled={isSketchLocked}
+                                    title={stylusOnlyMode ? "Nur Stift (Handballen ignorieren)" : "Touch & Stift"}
+                                >
+                                    <Pen size={16} />
+                                    <span>{stylusOnlyMode ? "Nur Stift" : "Stift & Hand"}</span>
+                                </button>
+
+                                <button
+                                    onClick={() => setIsScrollMode(!isScrollMode)}
+                                    style={{
+                                        padding: '0.5rem 0.75rem',
+                                        borderRadius: '6px',
+                                        background: isScrollMode ? 'var(--primary)' : 'rgba(255,255,255,0.05)',
+                                        border: isScrollMode ? '1px solid var(--primary)' : '1px solid var(--border)',
+                                        color: isScrollMode ? 'white' : 'var(--text-main)',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '0.4rem'
+                                    }}
+                                    title={isScrollMode ? "Scrollen aktiv (Zeichnen deaktiviert)" : "Zeichnen aktiv"}
+                                >
+                                    <Hand size={16} />
+                                    <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>Scrollen</span>
+                                </button>
+
+                                <div style={{ width: '1px', height: '24px', background: 'var(--border)', margin: '0 0.5rem' }}></div>
+
+                                <button onClick={handleUndo} disabled={historyStep <= 0 || isSketchLocked} style={{ padding: '0.5rem', borderRadius: '4px', background: 'transparent', border: '1px solid var(--border)', color: historyStep <= 0 || isSketchLocked ? 'var(--text-muted)' : 'var(--text-main)', opacity: historyStep <= 0 || isSketchLocked ? 0.5 : 1 }} title="Rückgängig"><Undo size={16} /></button>
+
+                                <button
+                                    onClick={() => setIsCanvasExpanded(!isCanvasExpanded)}
+                                    style={{
+                                        padding: '0.5rem',
+                                        borderRadius: '4px',
+                                        background: 'transparent',
+                                        border: '1px solid var(--border)',
+                                        marginLeft: 'auto',
+                                        color: 'var(--text-main)'
+                                    }}
+                                    title={isCanvasExpanded ? "Skizze einklappen" : "Skizze ausklappen"}
+                                >
+                                    {isCanvasExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                                </button>
+                            </div>
+
+                            <div style={{ display: isCanvasExpanded ? 'block' : 'none', position: 'relative', border: '1px solid var(--border)', borderRadius: '4px', overflow: 'hidden', touchAction: isSketchLocked ? 'auto' : 'none', pointerEvents: isSketchLocked ? 'none' : 'auto' }}>
+                                <canvas
+                                    ref={canvasRef}
+                                    width={960}
+                                    height={280}
+                                    style={{ width: '100%', height: '280px', cursor: isScrollMode ? 'grab' : 'crosshair', display: 'block', backgroundColor: 'white', backgroundImage: `linear-gradient(to right, #e0e0e0 1px, transparent 1px), linear-gradient(to bottom, #e0e0e0 1px, transparent 1px)`, backgroundSize: '40px 40px', touchAction: 'none' }}
+                                    onPointerDown={startDrawing}
+                                    onPointerMove={draw}
+                                    onPointerUp={stopDrawing}
+                                    onPointerLeave={stopDrawing}
+                                    onPointerCancel={stopDrawing}
+                                />
+                                {/* Löschen-Overlay pro Foto-Zelle */}
+                                {galleryPhotos.map((photo, index) => {
+                                    const cols = Math.min(2, galleryPhotos.length);
+                                    const rightEdgePct = ((index % 2) + 1) / cols * 100;
+                                    return (
+                                        <button
+                                            key={photo.id}
+                                            type="button"
+                                            title="Foto löschen"
+                                            onClick={() => setGalleryPhotos(prev => prev.filter(p => p.id !== photo.id))}
+                                            style={{ position: 'absolute', top: '8px', left: `calc(${rightEdgePct}% - 44px)`, background: 'rgba(220,38,38,0.92)', color: 'white', border: 'none', borderRadius: '50%', width: '36px', height: '36px', display: isSketchLocked ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: 20, pointerEvents: isSketchLocked ? 'none' : 'auto', boxShadow: '0 2px 8px rgba(0,0,0,0.5)' }}
+                                        >
+                                            <X size={16} />
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Room Name Header */}
+                    <div style={{ padding: '1rem 1rem 0 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', color: 'var(--primary)', margin: 0 }}>
+                            {rooms.length === 1 ? rooms[0].name : 'Unbekannter Raum'}
+                        </h2>
+                    </div>
+
+                    {/* Global Room Info */}
+                    {/* Global Room Info - Hidden in History View */}
+                    {!readOnly && (
+                        <div style={{ padding: '0.5rem 1rem 0 1rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '1rem' }}>
+                            <div>
+                                <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Datum</label>
+                                <input
+                                    type="date"
+                                    value={globalSettings.date}
+                                    onChange={e => setGlobalSettings({ ...globalSettings, date: e.target.value })}
+                                    className="form-input"
+                                    style={{ width: '100%', padding: '0.6rem', minHeight: '40px' }}
+                                />
+                            </div>
+                            <div>
+                                <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Raumtemp. (°C)</label>
+                                <input
+                                    type="number"
+                                    step="any"
+                                    inputMode="decimal"
+                                    value={globalSettings.temp}
+                                    onChange={e => setGlobalSettings({ ...globalSettings, temp: e.target.value })}
+                                    className="form-input no-spinner"
+                                    style={{ width: '100%', padding: '0.6rem', minHeight: '40px' }}
+                                    placeholder="20.5"
+                                    autoComplete="off"
+                                />
+                            </div>
+                            <div>
+                                <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Luftfeuchte (%)</label>
+                                <input
+                                    type="number"
+                                    step="any"
+                                    inputMode="decimal"
+                                    value={globalSettings.humidity}
+                                    onChange={e => setGlobalSettings({ ...globalSettings, humidity: e.target.value })}
+                                    className="form-input no-spinner"
+                                    style={{ width: '100%', padding: '0.6rem', minHeight: '40px' }}
+                                    placeholder="55"
+                                    autoComplete="off"
+                                />
+                            </div>
+                            <div>
+                                <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Messgerät</label>
+                                <input
+                                    type="text"
+                                    list="available-devices"
+                                    value={globalSettings.device}
+                                    onChange={e => setGlobalSettings({ ...globalSettings, device: e.target.value })}
+                                    className="form-input"
+                                    style={{ width: '100%', padding: '0.6rem', minHeight: '40px' }}
+                                    placeholder="z.B. Trotec"
+                                />
+                                <datalist id="available-devices">
+                                    {availableDevices.map((d, i) => (
+                                        <option key={i} value={d} />
+                                    ))}
+                                </datalist>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Measurements Table */}
+                    <div style={{ padding: '1rem' }}>
+                        {/* Current Measurements Table (Only if not readOnly) */}
+                        {!readOnly && (
+                            <div style={{ marginBottom: '2rem', overflowX: 'auto' }}>
+                                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
+                                    <thead>
+                                        <tr style={{ background: 'var(--background)', borderBottom: '2px solid var(--border)' }}>
+                                            <th style={{ padding: '0.5rem', textAlign: 'left', width: '30%', color: 'var(--text-muted)' }}>Messpunkt</th>
+                                            <th style={{ padding: '0.5rem', textAlign: 'left', width: '20%', color: 'var(--text-muted)' }}>Wand</th>
+                                            <th style={{ padding: '0.5rem', textAlign: 'left', width: '20%', color: 'var(--text-muted)' }}>Boden</th>
+                                            <th style={{ padding: '0.5rem', textAlign: 'left', color: 'var(--text-muted)' }}>Bemerkung</th>
+                                            <th style={{ padding: '0.5rem', width: '40px' }}></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {measurements.map((row, idx) => (
+                                            <tr key={row.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                                                <td style={{ padding: '0.25rem' }}>
+                                                    <input
+                                                        type="text"
+                                                        value={row.pointName}
+                                                        onChange={(e) => updateMeasurement(idx, 'pointName', e.target.value)}
+                                                        className="form-input"
+                                                        style={{ width: '100%', padding: '0.75rem', fontSize: '1rem', minHeight: '44px', userSelect: 'text', WebkitUserSelect: 'text' }}
+                                                        autoComplete="off"
+                                                    />
+                                                </td>
+                                                <td style={{ padding: '0.25rem' }}>
+                                                    <input
+                                                        type="text"
+                                                        inputMode="decimal"
+                                                        value={row.w_value}
+                                                        onChange={(e) => updateMeasurement(idx, 'w_value', e.target.value)}
+                                                        className="form-input"
+                                                        style={{ width: '100%', padding: '0.75rem', fontSize: '1rem', minHeight: '44px', touchAction: 'manipulation', userSelect: 'text', WebkitUserSelect: 'text' }}
+                                                        placeholder="Wert..."
+                                                        autoComplete="off"
+                                                    />
+                                                </td>
+                                                <td style={{ padding: '0.25rem' }}>
+                                                    <input
+                                                        type="text"
+                                                        inputMode="decimal"
+                                                        value={row.b_value}
+                                                        onChange={(e) => updateMeasurement(idx, 'b_value', e.target.value)}
+                                                        className="form-input"
+                                                        style={{ width: '100%', padding: '0.75rem', fontSize: '1rem', minHeight: '44px', touchAction: 'manipulation', userSelect: 'text', WebkitUserSelect: 'text' }}
+                                                        placeholder="Wert..."
+                                                        autoComplete="off"
+                                                    />
+                                                </td>
+                                                <td style={{ padding: '0.25rem' }}>
+                                                    <input
+                                                        type="text"
+                                                        value={row.notes}
+                                                        onChange={(e) => updateMeasurement(idx, 'notes', e.target.value)}
+                                                        className="form-input"
+                                                        style={{ width: '100%', padding: '0.75rem', fontSize: '1rem', minHeight: '44px', userSelect: 'text', WebkitUserSelect: 'text' }}
+                                                        placeholder="..."
+                                                        autoComplete="off"
+                                                    />
+                                                </td>
+                                                <td style={{ padding: '0.25rem', textAlign: 'center' }}>
+                                                    <button
+                                                        onClick={() => removeMeasurement(idx)}
+                                                        style={{ background: 'transparent', border: 'none', color: '#EF4444', cursor: 'pointer', padding: '4px' }}
+                                                        title="Messpunkt löschen"
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+
+                                <button
+                                    onClick={addMeasurement}
+                                    className="no-print"
+                                    style={{
+                                        marginTop: '0.5rem',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '0.5rem',
+                                        padding: '0.5rem 1rem',
+                                        minHeight: '44px',
+                                        background: 'transparent',
+                                        border: '1px dashed var(--border)',
+                                        borderRadius: '4px',
+                                        color: 'var(--primary)',
+                                        cursor: 'pointer',
+                                        width: '100%',
+                                        justifyContent: 'center'
+                                    }}
+                                >
+                                    <Plus size={16} /> weiteren Messpunkt hinzufügen
+                                </button>
+                            </div>
+                        )}
+
+                        {/* History Comparison Table */}
+                        {historyRows.length > 0 && readOnly && (
+                            <div style={{ marginTop: (!readOnly ? '2rem' : '0') }}>
+                                <h4 style={{ fontSize: '1rem', fontWeight: 'bold', marginBottom: '0.5rem', color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    <RotateCcw size={16} /> Bisherige Messverläufe
+                                </h4>
+                                <div style={{ overflowX: 'auto' }}>
+                                    {historyColumns.length >= 8 ? (
+                                        /* Transposed View for many points (Points in Rows, Dates in Columns) */
+                                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                                            <thead>
+                                                <tr style={{ background: 'var(--background)', borderBottom: '2px solid var(--border)' }}>
+                                                    <th style={{ padding: '0.75rem 0.5rem', textAlign: 'left', color: 'var(--text-muted)', minWidth: '150px', position: 'sticky', left: 0, backgroundColor: 'var(--background)', zIndex: 11 }}>Messbereich / Punkt</th>
+                                                    {[...historyRows].reverse().map(row => (
+                                                        <th key={row.id} style={{ padding: '0.5rem', textAlign: 'center', color: 'var(--text-muted)', minWidth: '100px', backgroundColor: 'var(--background)' }}>
+                                                            {row.date ? new Date(row.date).toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '-'}
+                                                            <div style={{ fontSize: '0.7em', fontWeight: 'normal', marginTop: '2px' }}>(W / B)</div>
+                                                        </th>
+                                                    ))}
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {historyColumns.map(col => (
+                                                    <tr key={col} style={{ borderBottom: '1px solid var(--border)' }}>
+                                                        <td style={{ padding: '0.6rem 0.5rem', fontWeight: 'bold', color: 'var(--primary)', position: 'sticky', left: 0, backgroundColor: 'var(--surface)', zIndex: 10, borderRight: '1px solid var(--border)' }}>
+                                                            {col}
+                                                        </td>
+                                                        {[...historyRows].reverse().map(row => {
+                                                            const cell = row.points[col];
+                                                            return (
+                                                                <td key={row.id} style={{ padding: '0.5rem', textAlign: 'center', backgroundColor: row.id === 'current' ? 'rgba(59, 130, 246, 0.05)' : 'transparent' }}>
+                                                                    {cell ? (
+                                                                        <div style={{ display: 'flex', justifyContent: 'center', gap: '6px' }}>
+                                                                            <span style={{
+                                                                                color: cell.w_color,
+                                                                                fontWeight: cell.w_color !== 'inherit' && cell.w_color !== 'var(--text-main)' ? 'bold' : 'normal',
+                                                                                minWidth: '25px',
+                                                                                textAlign: 'right'
+                                                                            }}>
+                                                                                {cell.w_value || '-'}
+                                                                            </span>
+                                                                            <span style={{ color: 'var(--text-muted)', opacity: 0.3 }}>/</span>
+                                                                            <span style={{
+                                                                                color: cell.b_color,
+                                                                                fontWeight: cell.b_color !== 'inherit' && cell.b_color !== 'var(--text-main)' ? 'bold' : 'normal',
+                                                                                minWidth: '25px',
+                                                                                textAlign: 'left'
+                                                                            }}>
+                                                                                {cell.b_value || '-'}
+                                                                            </span>
+                                                                        </div>
+                                                                    ) : (
+                                                                        <span style={{ color: 'var(--text-muted)' }}>-</span>
+                                                                    )}
+                                                                </td>
+                                                            );
+                                                        })}
+                                                    </tr>
+                                                ))}
+                                                {/* Protocol Row Removed */}
+                                            </tbody>
+                                        </table>
+                                    ) : (
+                                        /* Original View for few points (Dates in Rows, Points in Columns) */
+                                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                                            <thead>
+                                                <tr style={{ background: 'var(--background)', borderBottom: '2px solid var(--border)' }}>
+                                                    <th style={{ padding: '0.5rem', textAlign: 'left', color: 'var(--text-muted)', minWidth: '100px' }}>Datum</th>
+                                                    {historyColumns.map(col => (
+                                                        <th key={col} style={{ padding: '0.5rem', textAlign: 'center', color: 'var(--text-muted)', minWidth: '100px' }}>
+                                                            {col}<br />
+                                                            <span style={{ fontSize: '0.7em', fontWeight: 'normal' }}>(W / B)</span>
+                                                        </th>
+                                                    ))}
+                                                    {/* Protocol Header Removed */}
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {historyRows.map(row => (
+                                                    <tr key={row.id} style={{ borderBottom: '1px solid var(--border)', backgroundColor: row.id === 'current' ? 'rgba(59, 130, 246, 0.05)' : 'transparent' }}>
+                                                        <td style={{ padding: '0.5rem', color: 'var(--text-muted)' }}>
+                                                            {row.date ? new Date(row.date).toLocaleDateString('de-CH') : '-'}
+                                                        </td>
+                                                        {historyColumns.map(col => {
+                                                            const cell = row.points[col];
+                                                            return (
+                                                                <td key={col} style={{ padding: '0.5rem', textAlign: 'center' }}>
+                                                                    {cell ? (
+                                                                        <div style={{ display: 'flex', justifyContent: 'center', gap: '6px' }}>
+                                                                            <span style={{
+                                                                                color: cell.w_color,
+                                                                                fontWeight: cell.w_color !== 'inherit' && cell.w_color !== 'var(--text-main)' ? 'bold' : 'normal',
+                                                                                minWidth: '25px',
+                                                                                textAlign: 'right'
+                                                                            }}>
+                                                                                {cell.w_value || '-'}
+                                                                            </span>
+                                                                            <span style={{ color: 'var(--text-muted)', opacity: 0.5 }}>/</span>
+                                                                            <span style={{
+                                                                                color: cell.b_color,
+                                                                                fontWeight: cell.b_color !== 'inherit' && cell.b_color !== 'var(--text-main)' ? 'bold' : 'normal',
+                                                                                minWidth: '25px',
+                                                                                textAlign: 'left'
+                                                                            }}>
+                                                                                {cell.b_value || '-'}
+                                                                            </span>
+                                                                        </div>
+                                                                    ) : (
+                                                                        <span style={{ color: 'var(--text-muted)' }}>-</span>
+                                                                    )}
+                                                                </td>
+                                                            );
+                                                        })}
+                                                        {/* Protocol Cell Removed */}
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {historyRows.length === 0 && readOnly && (
+                            <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                                <RotateCcw size={48} style={{ opacity: 0.2, marginBottom: '1rem' }} />
+                                <p>Keine historischen Daten vorhanden.</p>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+            {showCamera && (
+                <CameraCaptureModal
+                    onClose={() => setShowCamera(false)}
+                    onCapture={handleCameraCapture}
+                />
+            )}
+        </div>
+        , document.body);
+};
+
+export default MeasurementModal;

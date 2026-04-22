@@ -4,48 +4,23 @@ import './tw.css'
 import './index.css'
 import ErrorBoundary from './ErrorBoundary.jsx'
 
-const isLocalhost = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+// ─── Variante C: Offline-Blobs → Supabase Storage synchen (kein MSAL) ───────
+// Startet beim App-Boot im Hintergrund, blockiert Render nicht.
+import('./lib/sync/supabaseSyncWorker.js')
+  .then(({ syncPendingToSupabase }) => syncPendingToSupabase())
+  .then(({ synced }) => { if (synced > 0) console.info(`[Boot] ☁️ ${synced} Fotos zu Supabase synchronisiert`); })
+  .catch((e) => console.warn('[Boot] Sync fehlgeschlagen:', e.message));
 
-Promise.all([
-  import('@azure/msal-browser'),
-  import('@azure/msal-react'),
-  import('./App.jsx'),
-  import('./msalConfig.js'),
-]).then(async ([
-  { PublicClientApplication },
-  { MsalProvider },
-  { default: App },
-  { msalConfig },
-]) => {
-
+// ─── App rendern (kein MSAL-Provider nötig) ──────────────────────────────────
+import('./App.jsx').then(({ default: App }) => {
   const root = createRoot(document.getElementById('root'));
-
-  if (isLocalhost) {
-    // Vollständiger MSAL-Flow auf Localhost
-    const msalInstance = new PublicClientApplication(msalConfig);
-    const timeout = new Promise((_, r) => setTimeout(() => r(new Error('MSAL timeout')), 5000));
-    const render = () => root.render(
-      <StrictMode><MsalProvider instance={msalInstance}><ErrorBoundary><App /></ErrorBoundary></MsalProvider></StrictMode>
-    );
-    Promise.race([
-      msalInstance.initialize().then(() => msalInstance.handleRedirectPromise().catch(() => null)),
-      timeout
-    ]).then(render).catch(e => { console.warn('[MSAL]', e.message); render(); });
-
-  } else {
-    // Auf Vercel / iPad / Netzwerk: Echter MSAL-Flow mit Popup-Login
-    // loginPopup funktioniert auf Chrome/iPad besser als loginRedirect
-    const msalInstance = new PublicClientApplication(msalConfig);
-    const render = () => root.render(
-      <StrictMode><MsalProvider instance={msalInstance}><ErrorBoundary><App /></ErrorBoundary></MsalProvider></StrictMode>
-    );
-    msalInstance.initialize()
-      .then(() => msalInstance.handleRedirectPromise().catch(() => null))
-      .then(render)
-      .catch(e => { console.warn('[MSAL Vercel]', e.message); render(); });
-  }
-
+  root.render(
+    <StrictMode>
+      <ErrorBoundary>
+        <App />
+      </ErrorBoundary>
+    </StrictMode>
+  );
 }).catch(err => {
   console.error('[QTool] Ladefehler:', err);
 });
-

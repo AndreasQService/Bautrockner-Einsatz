@@ -1,0 +1,76 @@
+﻿[36mvite v7.3.1 [32mbuilding client environment for production...[36m[39m
+transforming...
+[32mÔ£ô[39m 24 modules transformed.
+node.exe : [31mÔ£ù[39m 
+Build failed in 457ms
+In Zeile:1 Zeichen:1
++ & "C:\Program 
+Files\nodejs/node.exe" 
+"C:\Program 
+Files\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~
+    + CategoryInfo          : 
+    NotSpecified: ([31mÔ£ù  
+  [39m Build failed in 457m   
+ s:String) [], RemoteExcep    
+tion
+    + FullyQualifiedErrorId : 
+    NativeCommandError
+ 
+[31merror during build:
+[31m[vite:esbuild] Transform 
+failed with 1 error:
+C:/QTool/src/components/Damage
+Form.jsx:906:24: ERROR: 
+Expected ")" but found 
+"{"[31m
+file: [36mC:/QTool/src/compon
+ents/DamageForm.jsx:906:24[31
+m
+[33m
+[33mExpected ")" but found 
+"{"[33m
+904 |                      
+</div>
+905 |  
+906 |                         
+ {/* Schadensbilder Upload */}
+    |                         
+ ^
+907 |                  <div>
+908 |                      
+<label style={{ fontSize: 
+'0.75rem', textTransform: 
+'uppercase', letterSpacing: 
+'0.05em', color: ...
+[31m
+    at failureErrorWithLog (C:
+\QTool\node_modules\esbuild\li
+b\main.js:1467:15)
+    at C:\QTool\node_modules\e
+sbuild\lib\main.js:736:50
+    at 
+responseCallbacks.<computed> (
+C:\QTool\node_modules\esbuild\
+lib\main.js:603:9)
+    at handleIncomingPacket (C
+:\QTool\node_modules\esbuild\l
+ib\main.js:658:12)
+    at Socket.readFromStdout (
+C:\QTool\node_modules\esbuild\
+lib\main.js:581:7)
+    at Socket.emit 
+(node:events:508:28)
+    at addChunk (node:internal
+/streams/readable:559:12)
+    at 
+readableAddChunkPushByteMode (
+node:internal/streams/readable
+:510:3)
+    at Readable.push (node:int
+ernal/streams/readable:390:5)
+    at Pipe.onStreamRead (node
+:internal/stream_base_commons:
+189:23)[39m

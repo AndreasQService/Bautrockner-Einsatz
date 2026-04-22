@@ -14,16 +14,15 @@
     "test:report": "playwright show-report"
   },
   "dependencies": {
-    "@azure/msal-browser": "^5.4.0",
-    "@azure/msal-react": "^5.0.6",
+    "@azure/msal-browser": "^5.8.0",
     "@google/generative-ai": "^0.24.1",
-    "@microsoft/microsoft-graph-client": "^3.0.7",
     "@react-pdf/renderer": "^4.3.2",
     "@supabase/supabase-js": "^2.95.3",
     "buffer": "^6.0.3",
     "exceljs": "^4.4.0",
     "file-saver": "^2.0.5",
     "html2canvas": "^1.4.1",
+    "idb": "^8.0.3",
     "jspdf": "^4.1.0",
     "jspdf-autotable": "^5.0.7",
     "leaflet": "^1.9.4",
@@ -35,6 +34,7 @@
     "react-dom": "^19.2.0",
     "react-leaflet": "^5.0.0",
     "rosetta": "^1.1.0",
+    "uuid": "^14.0.0",
     "xlsx": "^0.18.5",
     "xlsx-js-style": "^1.2.0"
   },

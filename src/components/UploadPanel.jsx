@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, memo } from "react";
 import { supabase } from "../supabaseClient";
 import { Upload, FileText, X, Image as ImageIcon } from "lucide-react";
 import { createPortal } from 'react-dom';
@@ -12,9 +12,9 @@ function safeName(filename) {
  * UploadPanel - "Smart Universal Dropzone"
  * - Akzeptiert: PDF, MSG, TXT (Analyse) UND Bilder (JPG, PNG) (Direkt-Upload)
  * - Verarbeitet alles automatisch (Client-Side AI Analysis)
+ * - memo(): verhindert Re-renders wenn Props unverändert (SessionLock-Heartbeat)
  */
-export default function UploadPanel({ caseId, onCaseCreated, onExtractionComplete, onImagesUploaded }) {
-  console.log("UploadPanel Loaded - VERSION 2026.1.1 (Gemini-1.5-Flash)");
+function UploadPanel({ caseId, onCaseCreated, onExtractionComplete, onImagesUploaded }) {
   const [files, setFiles] = useState([]);
   const [textInput, setTextInput] = useState("");
   const [status, setStatus] = useState("");
@@ -843,3 +843,5 @@ ${textContext}`;
     </>
   );
 }
+
+export default memo(UploadPanel);

@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🏠 WohnungsScout Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #080d1a; --bg2: #0f1729; --card: #111c30;
+  --border: rgba(99,102,241,0.18); --primary: #6366f1;
+  --accent: #06b6d4; --green: #10b981; --yellow: #f59e0b;
+  --red: #ef4444; --text: #e2e8f0; --muted: #64748b;
+  --glass: rgba(99,102,241,0.07);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+body::before {
+  content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  background: radial-gradient(ellipse 70% 40% at 15% 0%, rgba(99,102,241,0.13) 0%, transparent 70%),
+              radial-gradient(ellipse 50% 30% at 85% 100%, rgba(6,182,212,0.08) 0%, transparent 60%);
+}
+
+/* Header */
+header {
+  position: sticky; top: 0; z-index: 100;
+  background: rgba(8,13,26,0.92); backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border);
+  padding: 0.85rem 2rem;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.logo { display: flex; align-items: center; gap: 0.75rem; }
+.logo-box {
+  width: 38px; height: 38px; border-radius: 10px;
+  background: linear-gradient(135deg, var(--primary), var(--accent));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.1rem; box-shadow: 0 0 20px rgba(99,102,241,0.35);
+}
+.logo h1 { font-size: 1.15rem; font-weight: 800; }
+.logo h1 span { color: var(--primary); }
+.header-right { display: flex; align-items: center; gap: 1rem; }
+.last-run { font-size: 0.75rem; color: var(--muted); }
+.btn-scrape {
+  background: linear-gradient(135deg, var(--primary), #4f46e5);
+  border: none; color: white; padding: 0.5rem 1rem;
+  border-radius: 8px; font-size: 0.82rem; font-weight: 700;
+  cursor: pointer; transition: all 0.2s; white-space: nowrap;
+  box-shadow: 0 2px 12px rgba(99,102,241,0.3);
+}
+.btn-scrape:hover { transform: translateY(-1px); box-shadow: 0 4px 20px rgba(99,102,241,0.5); }
+.btn-scrape:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+
+/* Stats row */
+.stats-row {
+  position: relative; z-index: 1;
+  display: grid; grid-template-columns: repeat(5, 1fr);
+  gap: 1rem; padding: 1.5rem 2rem 0;
+}
+.stat-card {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 14px; padding: 1rem 1.25rem;
+  cursor: pointer; transition: all 0.2s;
+}
+.stat-card:hover { border-color: rgba(99,102,241,0.4); transform: translateY(-1px); }
+.stat-card.active { border-color: var(--primary); box-shadow: 0 0 20px rgba(99,102,241,0.2); }
+.stat-label { font-size: 0.72rem; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+.stat-value { font-size: 1.8rem; font-weight: 800; margin: 0.2rem 0; }
+.stat-sub { font-size: 0.72rem; color: var(--muted); }
+.stat-card.top .stat-value { color: var(--green); }
+.stat-card.gut .stat-value { color: var(--accent); }
+.stat-card.mittel .stat-value { color: var(--yellow); }
+.stat-card.schwach .stat-value { color: var(--muted); }
+
+/* Filters bar */
+.filters {
+  position: relative; z-index: 1;
+  display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;
+  padding: 1.25rem 2rem;
+}
+.filter-group { display: flex; align-items: center; gap: 0.5rem; }
+.filter-group label { font-size: 0.75rem; color: var(--muted); white-space: nowrap; }
+select, input[type=number], input[type=text] {
+  background: var(--card); border: 1px solid var(--border);
+  color: var(--text); border-radius: 8px; padding: 0.4rem 0.7rem;
+  font-size: 0.8rem; font-family: inherit; outline: none;
+  transition: border-color 0.2s;
+}
+select:focus, input:focus { border-color: var(--primary); }
+select option { background: var(--bg2); }
+.filter-toggle {
+  display: flex; align-items: center; gap: 0.35rem;
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 8px; padding: 0.4rem 0.7rem;
+  font-size: 0.8rem; cursor: pointer; transition: all 0.2s; color: var(--text);
+}
+.filter-toggle.on { border-color: var(--green); color: var(--green); background: rgba(16,185,129,0.08); }
+.btn-reset { background: none; border: 1px solid var(--border); border-radius: 8px; color: var(--muted); font-size: 0.78rem; padding: 0.4rem 0.75rem; cursor: pointer; transition: all 0.2s; }
+.btn-reset:hover { border-color: var(--primary); color: var(--text); }
+
+/* Table */
+.table-wrap {
+  position: relative; z-index: 1;
+  margin: 0 2rem 2rem;
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 16px; overflow: hidden;
+}
+table { width: 100%; border-collapse: collapse; }
+thead th {
+  background: rgba(99,102,241,0.08);
+  padding: 0.75rem 1rem; text-align: left;
+  font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.05em; color: var(--muted);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+tbody tr {
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  transition: background 0.15s;
+  cursor: pointer;
+}
+tbody tr:hover { background: var(--glass); }
+tbody tr:last-child { border-bottom: none; }
+td { padding: 0.75rem 1rem; font-size: 0.83rem; vertical-align: middle; }
+.score-badge {
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  padding: 0.2rem 0.55rem; border-radius: 20px;
+  font-size: 0.72rem; font-weight: 700; white-space: nowrap;
+}
+.score-top    { background: rgba(16,185,129,0.15); color: var(--green); border: 1px solid rgba(16,185,129,0.3); }
+.score-gut    { background: rgba(6,182,212,0.15); color: var(--accent); border: 1px solid rgba(6,182,212,0.3); }
+.score-mittel { background: rgba(245,158,11,0.12); color: var(--yellow); border: 1px solid rgba(245,158,11,0.3); }
+.score-schwach{ background: rgba(100,116,139,0.15); color: var(--muted); border: 1px solid rgba(100,116,139,0.3); }
+.icon-yes { color: var(--green); }
+.icon-no  { color: var(--muted); opacity: 0.5; }
+.source-chip {
+  background: var(--glass); border: 1px solid var(--border);
+  border-radius: 4px; padding: 0.15rem 0.45rem;
+  font-size: 0.68rem; font-weight: 600; color: var(--muted);
+}
+.price { font-weight: 700; color: var(--text); }
+.price-drop { color: var(--green); }
+.addr { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.new-badge {
+  background: rgba(99,102,241,0.2); color: var(--primary);
+  border: 1px solid rgba(99,102,241,0.4); border-radius: 10px;
+  padding: 0.1rem 0.4rem; font-size: 0.65rem; font-weight: 700;
+  margin-left: 0.35rem; vertical-align: middle;
+}
+.ext-link { color: var(--muted); text-decoration: none; transition: color 0.2s; font-size: 0.9rem; }
+.ext-link:hover { color: var(--primary); }
+.fav-btn { background: none; border: none; cursor: pointer; font-size: 1rem; transition: transform 0.2s; padding: 0.2rem; }
+.fav-btn:hover { transform: scale(1.3); }
+
+/* Empty state */
+.empty { text-align: center; padding: 4rem 2rem; color: var(--muted); }
+.empty h3 { margin-bottom: 0.5rem; font-size: 1.1rem; }
+
+/* Toast */
+.toast {
+  position: fixed; bottom: 2rem; right: 2rem; z-index: 999;
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 12px; padding: 0.85rem 1.25rem;
+  font-size: 0.85rem; box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+  animation: slideUp 0.3s ease; display: none;
+}
+@keyframes slideUp { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+
+/* Responsive */
+@media (max-width: 1100px) { .stats-row { grid-template-columns: repeat(3,1fr); } }
+@media (max-width: 700px) {
+  .stats-row { grid-template-columns: 1fr 1fr; }
+  .table-wrap { margin: 0 1rem 2rem; overflow-x: auto; }
+}
+
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-box">🏠</div>
+    <div>
+      <h1>Wohnungs<span>Scout</span></h1>
+      <div style="font-size:0.68rem;color:var(--muted)">Schweizer Immobilien-Monitor</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="last-run">Letzter Scan: <span id="lastRun">–</span></div>
+    <button class="btn-scrape" id="scrapeBtn" onclick="triggerScrape()">⚡ Jetzt scannen</button>
+  </div>
+</header>
+
+<!-- Stats -->
+<div class="stats-row">
+  <div class="stat-card" onclick="setFilter('score','')">
+    <div class="stat-label">Alle Inserate</div>
+    <div class="stat-value" id="statTotal">–</div>
+    <div class="stat-sub" id="statNewToday">heute: –</div>
+  </div>
+  <div class="stat-card top" onclick="setFilter('score','top')">
+    <div class="stat-label">🟢 Top-Treffer</div>
+    <div class="stat-value" id="statTop">–</div>
+    <div class="stat-sub">60+ Punkte</div>
+  </div>
+  <div class="stat-card gut" onclick="setFilter('score','gut')">
+    <div class="stat-label">🔵 Gut</div>
+    <div class="stat-value" id="statGut">–</div>
+    <div class="stat-sub">40–59 Punkte</div>
+  </div>
+  <div class="stat-card mittel" onclick="setFilter('score','mittel')">
+    <div class="stat-label">🟡 Mittel</div>
+    <div class="stat-value" id="statMittel">–</div>
+    <div class="stat-sub">20–39 Punkte</div>
+  </div>
+  <div class="stat-card schwach" onclick="setFilter('score','schwach')">
+    <div class="stat-label">⚪ Schwach</div>
+    <div class="stat-value" id="statSchwach">–</div>
+    <div class="stat-sub">&lt;20 Punkte</div>
+  </div>
+</div>
+
+<!-- Filters -->
+<div class="filters">
+  <div class="filter-group">
+    <label>Score</label>
+    <select id="fScore" onchange="loadListings()">
+      <option value="">Alle</option>
+      <option value="top">🟢 Top</option>
+      <option value="gut">🔵 Gut</option>
+      <option value="mittel">🟡 Mittel</option>
+      <option value="schwach">⚪ Schwach</option>
+    </select>
+  </div>
+  <div class="filter-group">
+    <label>Quelle</label>
+    <select id="fSource" onchange="loadListings()">
+      <option value="">Alle</option>
+      <option value="newhome">Newhome</option>
+      <option value="homegate">Homegate</option>
+    </select>
+  </div>
+  <div class="filter-group">
+    <label>Max CHF</label>
+    <input type="number" id="fPrice" placeholder="z.B. 2500" step="100" style="width:100px" oninput="debouncedLoad()">
+  </div>
+  <div class="filter-group">
+    <label>Min Zi</label>
+    <input type="number" id="fRooms" placeholder="3" step="0.5" style="width:70px" oninput="debouncedLoad()">
+  </div>
+  <div class="filter-group">
+    <label>Ort</label>
+    <input type="text" id="fCity" placeholder="Kreuzlingen..." style="width:130px" oninput="debouncedLoad()">
+  </div>
+  <button class="filter-toggle" id="fParking" onclick="toggleFilter('fParking', 'parking')">🅿️ Parkplatz</button>
+  <button class="filter-toggle" id="fBalcony" onclick="toggleFilter('fBalcony', 'balcony')">🌿 Balkon</button>
+  <button class="btn-reset" onclick="resetFilters()">↺ Reset</button>
+  <div style="margin-left:auto;font-size:0.78rem;color:var(--muted)" id="resultCount"></div>
+</div>
+
+<!-- Table -->
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Score</th>
+        <th>Datum</th>
+        <th>Quelle</th>
+        <th>Ort</th>
+        <th>Adresse</th>
+        <th>Zi</th>
+        <th>m²</th>
+        <th>Preis CHF</th>
+        <th>🅿️</th>
+        <th>🌿</th>
+        <th>Link</th>
+        <th>⭐</th>
+      </tr>
+    </thead>
+    <tbody id="listingsBody">
+      <tr><td colspan="12"><div class="empty"><h3>Lade Inserate...</h3></div></td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API = '';  // Gleicher Host
+let filterState = { parking: false, balcony: false };
+let favorites = new Set();
+let debounceTimer = null;
+const today = new Date().toLocaleDateString('de-CH');
+
+// ── Helpers ──────────────────────────────────────────
+
+function showToast(msg, duration = 3000) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.display = 'block';
+  setTimeout(() => t.style.display = 'none', duration);
+}
+
+function debouncedLoad() {
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(loadListings, 400);
+}
+
+function setFilter(key, val) {
+  if (key === 'score') document.getElementById('fScore').value = val;
+  loadListings();
+}
+
+function toggleFilter(elId, key) {
+  filterState[key] = !filterState[key];
+  const el = document.getElementById(elId);
+  el.classList.toggle('on', filterState[key]);
+  loadListings();
+}
+
+function resetFilters() {
+  document.getElementById('fScore').value = '';
+  document.getElementById('fSource').value = '';
+  document.getElementById('fPrice').value = '';
+  document.getElementById('fRooms').value = '';
+  document.getElementById('fCity').value = '';
+  filterState = { parking: false, balcony: false };
+  document.getElementById('fParking').classList.remove('on');
+  document.getElementById('fBalcony').classList.remove('on');
+  loadListings();
+}
+
+// ── Stats ─────────────────────────────────────────────
+
+async function loadStats() {
+  try {
+    const r = await fetch(`${API}/api/stats`);
+    const d = await r.json();
+    document.getElementById('statTotal').textContent = d.total || 0;
+    document.getElementById('statNewToday').textContent = `heute: ${d.new_today || 0} neu`;
+    document.getElementById('statTop').textContent = d.by_score?.top || 0;
+    document.getElementById('statGut').textContent = d.by_score?.gut || 0;
+    document.getElementById('statMittel').textContent = d.by_score?.mittel || 0;
+    document.getElementById('statSchwach').textContent = d.by_score?.schwach || 0;
+    if (d.last_run) {
+      const dt = new Date(d.last_run);
+      document.getElementById('lastRun').textContent = dt.toLocaleString('de-CH');
+    }
+  } catch(e) {
+    console.error('Stats-Fehler:', e);
+  }
+}
+
+// ── Listings ──────────────────────────────────────────
+
+async function loadListings() {
+  const params = new URLSearchParams();
+  const score = document.getElementById('fScore').value;
+  const source = document.getElementById('fSource').value;
+  const price = document.getElementById('fPrice').value;
+  const rooms = document.getElementById('fRooms').value;
+  const city = document.getElementById('fCity').value;
+
+  if (score) params.append('score', score);
+  if (source) params.append('source', source);
+  if (price) params.append('max_price', price);
+  if (rooms) params.append('min_rooms', rooms);
+  if (city) params.append('city', city);
+  if (filterState.parking) params.append('parking', 'true');
+  if (filterState.balcony) params.append('balcony', 'true');
+  params.append('limit', '200');
+
+  try {
+    const r = await fetch(`${API}/api/listings?${params}`);
+    const d = await r.json();
+    document.getElementById('resultCount').textContent = `${d.total} Inserate`;
+    renderTable(d.listings || []);
+  } catch(e) {
+    document.getElementById('listingsBody').innerHTML =
+      `<tr><td colspan="12"><div class="empty"><h3>⚠️ API nicht erreichbar</h3><p>Starte: <code>python main.py</code></p></div></td></tr>`;
+  }
+}
+
+function scoreLabel(score) {
+  const map = { top: '🟢 Top', gut: '🔵 Gut', mittel: '🟡 Mittel', schwach: '⚪ Schwach' };
+  const cls = `score-badge score-${score}`;
+  return `<span class="${cls}">${map[score] || score}</span>`;
+}
+
+function formatDate(iso) {
+  if (!iso) return '–';
+  const d = new Date(iso);
+  const isToday = d.toLocaleDateString('de-CH') === today;
+  const str = d.toLocaleDateString('de-CH');
+  return isToday ? `<span style="color:var(--green);font-weight:600">${str} <span class="new-badge">NEU</span></span>` : str;
+}
+
+function renderTable(listings) {
+  const body = document.getElementById('listingsBody');
+  if (!listings.length) {
+    body.innerHTML = `<tr><td colspan="12"><div class="empty"><h3>🔍 Keine Inserate gefunden</h3><p>Andere Filter versuchen oder Scan starten.</p></div></td></tr>`;
+    return;
+  }
+  body.innerHTML = listings.map(l => {
+    const isFav = favorites.has(l.id);
+    const priceHistory = l.price_history || [];
+    const priceDropped = priceHistory.length > 1 && priceHistory[priceHistory.length-1].change < 0;
+    return `<tr onclick="openListing('${l.url}')">
+      <td>${scoreLabel(l.score)}</td>
+      <td style="font-size:0.77rem">${formatDate(l.first_seen)}</td>
+      <td><span class="source-chip">${l.source}</span></td>
+      <td>${l.city || '–'}</td>
+      <td class="addr" title="${l.address || l.title || ''}">${l.address || l.title || '–'}</td>
+      <td>${l.rooms != null ? l.rooms : '–'}</td>
+      <td>${l.area_m2 != null ? l.area_m2 : '–'}</td>
+      <td class="price ${priceDropped ? 'price-drop' : ''}">${l.price_chf ? 'CHF ' + l.price_chf.toLocaleString('de-CH') : '–'}${priceDropped ? ' ↓' : ''}</td>
+      <td>${l.has_parking ? '<span class="icon-yes">✓</span>' : '<span class="icon-no">–</span>'}</td>
+      <td>${l.has_balcony ? '<span class="icon-yes">✓</span>' : '<span class="icon-no">–</span>'}</td>
+      <td onclick="event.stopPropagation()">
+        ${l.url ? `<a href="${l.url}" target="_blank" class="ext-link" title="Anzeige öffnen">↗</a>` : '–'}
+      </td>
+      <td onclick="event.stopPropagation()">
+        <button class="fav-btn" onclick="toggleFav(${l.id})" title="${isFav ? 'Aus Favoriten entfernen' : 'Als Favorit markieren'}">${isFav ? '⭐' : '☆'}</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function openListing(url) {
+  if (url) window.open(url, '_blank');
+}
+
+// ── Favorites ─────────────────────────────────────────
+
+async function loadFavorites() {
+  try {
+    const r = await fetch(`${API}/api/favorites`);
+    const d = await r.json();
+    favorites = new Set(d.map(f => f.listing?.id).filter(Boolean));
+  } catch(e) {}
+}
+
+async function toggleFav(id) {
+  if (favorites.has(id)) {
+    await fetch(`${API}/api/favorites/${id}`, { method: 'DELETE' });
+    favorites.delete(id);
+    showToast('⭐ Aus Favoriten entfernt');
+  } else {
+    await fetch(`${API}/api/favorites/${id}`, { method: 'POST' });
+    favorites.add(id);
+    showToast('⭐ Als Favorit gespeichert');
+  }
+  loadListings();
+}
+
+// ── Scraper-Trigger ───────────────────────────────────
+
+async function triggerScrape() {
+  const btn = document.getElementById('scrapeBtn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Läuft...';
+  showToast('🚀 Scraper gestartet – Bitte warten...', 5000);
+  try {
+    await fetch(`${API}/api/scrape/now`, { method: 'POST' });
+    setTimeout(() => {
+      loadStats(); loadListings();
+      btn.disabled = false; btn.textContent = '⚡ Jetzt scannen';
+      showToast('✅ Scan abgeschlossen!');
+    }, 15000);
+  } catch(e) {
+    btn.disabled = false; btn.textContent = '⚡ Jetzt scannen';
+    showToast('❌ Fehler: API nicht erreichbar');
+  }
+}
+
+// ── Init ──────────────────────────────────────────────
+
+async function init() {
+  await loadFavorites();
+  await loadStats();
+  await loadListings();
+  // Auto-refresh alle 60s
+  setInterval(() => { loadStats(); loadListings(); }, 60000);
+}
+
+init();
+</script>
+</body>
+</html>

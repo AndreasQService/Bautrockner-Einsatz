@@ -1,0 +1,40 @@
+search:
+  locations:
+    - "Kreuzlingen"
+    - "Bottighofen"
+    - "Konstanz"
+    - "Gottlieben"
+    - "Tägerwilen"
+    - "Emmishofen"
+  radius_km: 15
+
+filter:
+  max_price_chf: 3000
+  min_rooms: 3.0
+  min_area_m2: 60
+
+preferences:
+  prefer_parking: true
+  prefer_balcony: true
+  prefer_modern: true
+
+scoring:
+  parking: 20
+  balcony: 15
+  modern: 10
+  price_below_max: 25     # Preis mind 200 unter Maximum
+  large_area: 10          # Fläche mind 20m² über Minimum
+
+schedule:
+  interval_minutes: 30
+  daily_summary_time: "08:00"
+
+notifications:
+  email:
+    enabled: false
+    smtp_host: "smtp.gmail.com"
+    smtp_port: 587
+    sender: ""
+    recipient: ""
+    password: ""
+  min_score_for_instant: "top"

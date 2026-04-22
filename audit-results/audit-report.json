@@ -1,0 +1,329 @@
+{
+  "meta": {
+    "url": "http://localhost:5174/",
+    "date": "2026-04-22T07:14:00.938Z"
+  },
+  "theme": {},
+  "computedStyles": {
+    "body_fontFamily": "\"Segoe UI\", Tahoma, Arial, sans-serif",
+    "body_fontSize": "14px",
+    "body_color": "rgb(31, 41, 55)",
+    "body_backgroundColor": "rgb(242, 244, 246)",
+    "header_backgroundColor": "rgb(255, 255, 255)",
+    "header_height": "56px",
+    "header_borderBottom": "0.571429px solid rgb(213, 217, 224)",
+    "btnPrimary_bg": "rgb(30, 109, 183)",
+    "btnPrimary_color": "rgb(255, 255, 255)",
+    "btnPrimary_fontSize": "13px",
+    "btnPrimary_height": "31px",
+    "btnPrimary_radius": "4px",
+    "btnOutline_bg": "rgb(255, 255, 255)",
+    "btnOutline_border": "rgb(213, 217, 224)",
+    "btnOutline_color": "rgb(31, 41, 55)",
+    "btnOutline_height": "35px",
+    "btnGhost_color": "rgb(75, 85, 99)",
+    "th_backgroundColor": "rgb(242, 244, 246)",
+    "th_color": "rgb(75, 85, 99)",
+    "th_fontSize": "12px",
+    "th_fontWeight": "700",
+    "th_padding": "8px 10px",
+    "td_color": "rgb(31, 41, 55)",
+    "td_fontSize": "13px",
+    "td_fontWeight": "500",
+    "td_padding": "4px 6.4px",
+    "card_backgroundColor": "rgb(255, 255, 255)",
+    "card_borderColor": "rgb(213, 217, 224)",
+    "card_borderRadius": "4px",
+    "card_padding": "14px 16px"
+  },
+  "typography": [
+    {
+      "tag": "DIV",
+      "class": "",
+      "text": "admin",
+      "fontSize": "11px"
+    },
+    {
+      "tag": "TH",
+      "class": "",
+      "text": "Projekt / Objekt",
+      "fontSize": "10.88px"
+    },
+    {
+      "tag": "SPAN",
+      "class": "",
+      "text": "Eingang",
+      "fontSize": "9.44px"
+    },
+    {
+      "tag": "SPAN",
+      "class": "",
+      "text": "Kontakt",
+      "fontSize": "9.44px"
+    },
+    {
+      "tag": "SPAN",
+      "class": "",
+      "text": "Aufnahme",
+      "fontSize": "9.44px"
+    },
+    {
+      "tag": "SPAN",
+      "class": "",
+      "text": "Leckortung",
+      "fontSize": "9.44px"
+    },
+    {
+      "tag": "SPAN",
+      "class": "",
+      "text": "Bericht",
+      "fontSize": "9.44px"
+    },
+    {
+      "tag": "SPAN",
+      "class": "",
+      "text": "Trocknung",
+      "fontSize": "9.44px"
+    },
+    {
+      "tag": "SPAN",
+      "class": "",
+      "text": "Instandst.",
+      "fontSize": "9.44px"
+    },
+    {
+      "tag": "SPAN",
+      "class": "",
+      "text": "Rechnung",
+      "fontSize": "9.44px"
+    },
+    {
+      "tag": "SPAN",
+      "class": "",
+      "text": "Abschluss",
+      "fontSize": "9.44px"
+    },
+    {
+      "tag": "DIV",
+      "class": "",
+      "text": "8105 Regensdorf",
+      "fontSize": "10.88px"
+    },
+    {
+      "tag": "DIV",
+      "class": "",
+      "text": "20250412 · Kompass Immobi",
+      "fontSize": "9.92px"
+    },
+    {
+      "tag": "SPAN",
+      "class": "",
+      "text": "22.04.26",
+      "fontSize": "11.52px"
+    },
+    {
+      "tag": "DIV",
+      "class": "",
+      "text": "8600 Dübendorf",
+      "fontSize": "10.88px"
+    },
+    {
+      "tag": "DIV",
+      "class": "",
+      "text": "20260210 · Wintimmo Treuh",
+      "fontSize": "9.92px"
+    },
+    {
+      "tag": "SPAN",
+      "class": "",
+      "text": "22.04.26",
+      "fontSize": "11.52px"
+    },
+    {
+      "tag": "DIV",
+      "class": "",
+      "text": "20260175 · Fashion Outlet",
+      "fontSize": "9.92px"
+    },
+    {
+      "tag": "SPAN",
+      "class": "",
+      "text": "22.04.26",
+      "fontSize": "11.52px"
+    },
+    {
+      "tag": "DIV",
+      "class": "",
+      "text": "8134 Adliswil",
+      "fontSize": "10.88px"
+    }
+  ],
+  "contrast": [
+    {
+      "element": "Tabellenkopf",
+      "selector": ".data-table th",
+      "color": "rgb(75, 85, 99)",
+      "background": "rgb(242, 244, 246)",
+      "fontSize": "12px",
+      "fontWeight": "700",
+      "contrastRatio": "6.85:1",
+      "required": "4.5:1",
+      "wcagAA": "✅ PASS"
+    },
+    {
+      "element": "Tabellenzelle",
+      "selector": ".data-table td",
+      "color": "rgb(31, 41, 55)",
+      "background": "rgba(0, 0, 0, 0)",
+      "fontSize": "13px",
+      "fontWeight": "500",
+      "contrastRatio": "1.43:1",
+      "required": "4.5:1",
+      "wcagAA": "❌ FAIL"
+    },
+    {
+      "element": "Primärbutton",
+      "selector": ".btn-primary",
+      "color": "rgb(255, 255, 255)",
+      "background": "rgb(30, 109, 183)",
+      "fontSize": "13px",
+      "fontWeight": "500",
+      "contrastRatio": "5.35:1",
+      "required": "4.5:1",
+      "wcagAA": "✅ PASS"
+    },
+    {
+      "element": "Sekundärbutton",
+      "selector": ".btn-outline",
+      "color": "rgb(31, 41, 55)",
+      "background": "rgb(255, 255, 255)",
+      "fontSize": "13px",
+      "fontWeight": "500",
+      "contrastRatio": "14.68:1",
+      "required": "4.5:1",
+      "wcagAA": "✅ PASS"
+    },
+    {
+      "element": "Body Text",
+      "selector": "body",
+      "color": "rgb(31, 41, 55)",
+      "background": "rgb(242, 244, 246)",
+      "fontSize": "14px",
+      "fontWeight": "400",
+      "contrastRatio": "13.31:1",
+      "required": "4.5:1",
+      "wcagAA": "✅ PASS"
+    },
+    {
+      "element": "Card Text",
+      "selector": ".card",
+      "color": "rgb(31, 41, 55)",
+      "background": "rgb(255, 255, 255)",
+      "fontSize": "14px",
+      "fontWeight": "400",
+      "contrastRatio": "14.68:1",
+      "required": "4.5:1",
+      "wcagAA": "✅ PASS"
+    }
+  ],
+  "buttons": [
+    {
+      "text": "Neuer Auftrag",
+      "height": "31px",
+      "width": "134px",
+      "wcag": "WARNING"
+    },
+    {
+      "text": "Import",
+      "height": "31px",
+      "width": "90px",
+      "wcag": "WARNING"
+    },
+    {
+      "text": "Dunkel",
+      "height": "30px",
+      "width": "85px",
+      "wcag": "WARNING"
+    },
+    {
+      "text": "Abmelden",
+      "height": "22px",
+      "width": "22px",
+      "wcag": "CRITICAL"
+    },
+    {
+      "text": "✕",
+      "height": "24px",
+      "width": "13px",
+      "wcag": "WARNING"
+    },
+    {
+      "text": "Aktuell",
+      "height": "28px",
+      "width": "64px",
+      "wcag": "WARNING"
+    },
+    {
+      "text": "Archiv",
+      "height": "28px",
+      "width": "60px",
+      "wcag": "WARNING"
+    },
+    {
+      "text": "Filter",
+      "height": "24px",
+      "width": "64px",
+      "wcag": "WARNING"
+    },
+    {
+      "text": "Projekt löschen",
+      "height": "20px",
+      "width": "20px",
+      "wcag": "CRITICAL"
+    },
+    {
+      "text": "Auftrag via WhatsApp",
+      "height": "22px",
+      "width": "22px",
+      "wcag": "CRITICAL"
+    },
+    {
+      "text": "Bericht löschen",
+      "height": "24px",
+      "width": "24px",
+      "wcag": "WARNING"
+    },
+    {
+      "text": "Projekt löschen",
+      "height": "20px",
+      "width": "20px",
+      "wcag": "CRITICAL"
+    },
+    {
+      "text": "Auftrag via WhatsApp",
+      "height": "22px",
+      "width": "22px",
+      "wcag": "CRITICAL"
+    },
+    {
+      "text": "Bericht löschen",
+      "height": "24px",
+      "width": "24px",
+      "wcag": "WARNING"
+    },
+    {
+      "text": "Projekt löschen",
+      "height": "20px",
+      "width": "20px",
+      "wcag": "CRITICAL"
+    }
+  ],
+  "wcagIssues": [],
+  "screenshots": [
+    "C:\\QTool\\audit-results\\dashboard-light-1600x900-top.png",
+    "C:\\QTool\\audit-results\\dashboard-light-1600x900-scroll.png",
+    "C:\\QTool\\audit-results\\dashboard-light-1920x1080-top.png",
+    "C:\\QTool\\audit-results\\dashboard-light-1920x1080-scroll.png",
+    "C:\\QTool\\audit-results\\dashboard-light-full-1600.png"
+  ]
+}

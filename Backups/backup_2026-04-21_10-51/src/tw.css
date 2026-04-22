@@ -1,0 +1,2 @@
+/* Tailwind CSS v4 — separate Datei um Parser-Konflikte mit index.css zu vermeiden */
+@import "tailwindcss";

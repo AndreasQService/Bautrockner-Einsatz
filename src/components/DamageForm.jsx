@@ -11,13 +11,13 @@ if (typeof window !== 'undefined') {
     }
 }
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Camera, Image, Trash, X, Plus, Edit3, Save, Upload, FileText, CheckCircle, Circle, AlertTriangle, Play, HelpCircle, ArrowLeft, Mail, Map, MapPin, Folder, Mic, Paperclip, Table, Download, Check, Settings, RotateCcw, ChevronDown, ChevronUp, Briefcase, Hammer, ClipboardList, MicOff, Eye, Database, Phone, UserPlus, Link, Unlink, GripVertical } from 'lucide-react'
 import { supabase } from '../supabaseClient';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
-import { buildProjectFolderName, uploadReport, uploadPhotoFile, uploadPhotoAndGetUrl, getPhotoDownloadUrl } from '../services/OneDriveService';
+import { buildProjectFolderName, uploadPhotoAndGetUrl, getPhotoDownloadUrl } from '../services/OneDriveService';
 import { savePhotoLocally, updatePhotoSyncStatus, deleteOldSyncedPhotos, getPendingCount } from '../services/PhotoStorage';
 import { swissPLZ } from '../data/swiss_plz';
 
@@ -728,10 +728,9 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         // Initial load
         // refreshAudioDevices(); // Potentially blocking if hardware issue
 
-        // Auto-Bereinigung: Supabase-Fotos > 30 Tage mit OneDrive-Backup löschen
-        // Läuft still im Hintergrund, 5s verzögert um den Start nicht zu blockieren
+
+        // Cleanup wird in Variante C durch den Backend-Worker erledigt
         const cleanupTimer = setTimeout(() => {
-            cleanupOldSupabasePhotos();
             deleteOldSyncedPhotos(30); // Alte IndexedDB-Fotos bereinigen
         }, 5000);
 
@@ -1402,6 +1401,9 @@ END:VCARD`;
                             supabasePath = fileName;
                             supabaseUrl = publicUrl;
                             console.log('[Supabase] ✅ Backup gespeichert:', fileName);
+
+                            // IndexedDB-Status auf 'synced' → Badge-Counter geht auf 0
+                            updatePhotoSyncStatus(tempId, 'synced').catch(() => {});
                         } else {
                             console.warn('[Supabase] Backup-Fehler:', sbErr.message);
                         }
@@ -1410,17 +1412,49 @@ END:VCARD`;
                     }
                 }
 
-                // ── SCHRITT 2: OneDrive (zusätzlich – permanentes Archiv) ──────
-                if (!isDoc) {
+                // ── SCHRITT 2: Journal-Eintrag für Backend-Upload (Variante C) ───────────
+                // Das Backend (Supabase Edge Function) übernimmt den
+                // eigentlichen Upload nach OneDrive/SharePoint.
+                // Kein direkter OneDrive-Aufruf im Frontend.
+                if (!isDoc && supabasePath) {
                     try {
-                        odResult = await uploadPhotoAndGetUrl(odFolder, subFolder, file);
-                        if (odResult) {
-                            console.log('[OneDrive] ✅ Foto hochgeladen:', odResult.odPath);
-                        } else {
-                            console.warn('[OneDrive] ⚠️ Kein Token – nur Supabase-Backup aktiv');
+                        const { supabase: sb } = await import('../supabaseClient.js');
+                        if (sb) {
+                            await sb.from('project_image_uploads').upsert({
+                                local_image_id:  tempId,
+                                project_id:      formData.id || formData.projectNumber || 'tmp',
+                                filename:        file.name,
+                                mime_type:       file.type || 'image/jpeg',
+                                size_bytes:      file.size,
+                                storage_bucket:  'case-files',
+                                storage_path:    supabasePath,
+                                storage_status:  'uploaded_to_backend',
+                                remote_path:     `QTool/${odFolder}/Fotos/${subFolder.replace(/[^a-zA-Z0-9]/g, '_')}/${file.name}`,
+                                updated_at:      new Date().toISOString(),
+                            }, { onConflict: 'local_image_id', ignoreDuplicates: false });
+                            console.log('[Variante C] ✅ Journal-Eintrag erstellt – Backend lädt hoch');
+
+                            // ── Sofortiger Worker-Trigger (fire & forget) ──────
+                            // Ruft den Backend-Worker direkt auf statt auf Cron zu
+                            // warten (max. 1 Minute). Bilder erscheinen so in
+                            // Sekunden in SharePoint statt nach bis zu 1 Minute.
+                            fetch(
+                              `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/onedrive-upload-worker`,
+                              {
+                                method: 'POST',
+                                headers: {
+                                  'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+                                  'Content-Type': 'application/json',
+                                },
+                                body: '{}',
+                              }
+                            ).then(r => {
+                              if (r.ok) console.log('[Variante C] 🚀 Worker sofort getriggert');
+                            }).catch(() => {}); // Fire & forget – niemals UI blockieren
                         }
-                    } catch (odErr) {
-                        console.warn('[OneDrive] fehlgeschlagen (Supabase-Backup aktiv):', odErr.message);
+                    } catch (jErr) {
+                        // Journal-Fehler ist nicht kritisch – Bild ist in Supabase Storage gesichert
+                        console.warn('[Variante C] Journal-Fehler (Bild trotzdem gesichert):', jErr.message);
                     }
                 }
 
@@ -1457,30 +1491,11 @@ END:VCARD`;
         }
     };
 
-    // --- Auto-Bereinigung: Supabase-Fotos > 30 Tage mit OneDrive-Backup löschen ---
-    const cleanupOldSupabasePhotos = async () => {
-        if (!supabase) return;
-        try {
-            const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-            const { data: projects, error } = await supabase
-                .from('reports')
-                .select('id, images')
-                .lt('updated_at', thirtyDaysAgo);
-            if (error || !projects) return;
-            for (const project of projects) {
-                const images = Array.isArray(project.images) ? project.images : [];
-                const toDelete = images
-                    .filter(img => img.storagePath && img.oneDriveItemId)
-                    .map(img => img.storagePath);
-                if (toDelete.length > 0) {
-                    const { error: delErr } = await supabase.storage.from('case-files').remove(toDelete);
-                    if (!delErr) console.log(`[Supabase Cleanup] 🗑️ ${toDelete.length} Fotos bereinigt`);
-                }
-            }
-        } catch (e) {
-            console.warn('[Supabase Cleanup] Fehler:', e.message);
-        }
-    };
+
+
+    // Cleanup in Variante C: Der Backend-Worker (Edge Function) übernimmt
+    // das Löschen verifizierter Blobs nach der Sicherheitsfrist.
+    // Die alte cleanupOldSupabasePhotos()-Funktion wurde entfernt.
 
     const handleRoomImageDrop = (e, room) => {
         e.preventDefault();
@@ -2460,6 +2475,24 @@ END:VCARD`;
         setShowEmailImport(false);
     };
 
+    // ─── Stabile Callbacks für UploadPanel ────────────────────────────────────
+    // Hier definiert weil handleEmailImport (oben) als Dep gebraucht wird.
+    const handleUploadPanelCaseCreated = useCallback((newId) => {
+        setFormData(prev => ({ ...prev, id: newId }));
+    }, []);
+
+    const handleUploadPanelExtraction = useCallback((data) => {
+        console.log('Extraction complete, applying data direct:', data);
+        handleEmailImport(data);
+    }, [handleEmailImport]);
+
+    const handleUploadPanelImages = useCallback((newImages) => {
+        setFormData(prev => ({
+            ...prev,
+            images: [...(prev.images || []), ...newImages],
+        }));
+    }, []);
+
     const handlePDFClick = () => {
 
         setShowReportModal(true);
@@ -2752,17 +2785,9 @@ END:VCARD`;
                     <div style={{ marginBottom: '1.5rem' }}>
                         <UploadPanel
                             caseId={formData.id}
-                            onCaseCreated={(newId) => setFormData(prev => ({ ...prev, id: newId }))}
-                            onExtractionComplete={(data) => {
-                                console.log("Extraction complete, applying data direct:", data);
-                                handleEmailImport(data);
-                            }}
-                            onImagesUploaded={(newImages) => {
-                                setFormData(prev => ({
-                                    ...prev,
-                                    images: [...(prev.images || []), ...newImages]
-                                }));
-                            }}
+                            onCaseCreated={handleUploadPanelCaseCreated}
+                            onExtractionComplete={handleUploadPanelExtraction}
+                            onImagesUploaded={handleUploadPanelImages}
                         />
 
                         {/* AI Suggestions Confirmation Panel */}
@@ -5568,7 +5593,7 @@ END:VCARD`;
                                     className="btn-glass"
                                     onClick={toggleMeasuresListening}
                                     style={{
-                                        width: '32px', height: '32px', borderRadius: '50%',
+                                        width: '32px', height: '32px',
                                         padding: '0',
                                         fontSize: '0.75rem',
                                         display: 'flex',
