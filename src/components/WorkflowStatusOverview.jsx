@@ -306,15 +306,18 @@ function StepCell({ report, step, stepIdx, activeIdx, store, onOpenPopover, open
   // IN ARBEIT:   bg #FFF6E2 / border #D6B56B
   // Text immer:  #1F2937
   const styles = {
-    done:    { bg: '#EAF4EC', fg: '#1F2937', border: '#7FB38A' },
-    skip:    { bg: '#F2F3F5', fg: '#9CA3AF', border: '#B8C0CC' },
+    done:    { bg: 'rgba(16,185,129,0.12)',  fg: '#10B981', border: 'transparent' },
+    skip:    { bg: 'rgba(100,116,139,0.08)', fg: '#475569', border: 'transparent' },
     date:    {
-      bg:     urgency?.bg || '#EAF1FB',
-      fg:     '#1F2937',
-      border: urgency?.border || '#7EA5D8',
+      bg:     urgency?.color === '#DC2626' ? 'rgba(220,38,38,0.13)'
+            : urgency?.color === '#EF4444' ? 'rgba(239,68,68,0.12)'
+            : urgency?.color === '#F59E0B' ? 'rgba(245,158,11,0.12)'
+            : 'rgba(59,130,246,0.12)',
+      fg:     urgency?.color || '#3B82F6',
+      border: (urgency?.color || '#3B82F6') + '55',
     },
-    active:  kontaktEscStyle || { bg: '#EAF1FB', fg: '#1F2937', border: '#7EA5D8' },
-    pending: { bg: 'transparent', fg: '#9CA3AF', border: 'transparent' },
+    active:  kontaktEscStyle || { bg: 'rgba(59,130,246,0.15)', fg: '#60A5FA', border: 'rgba(59,130,246,0.45)' },
+    pending: { bg: 'rgba(255,255,255,0.02)', fg: '#334155', border: 'transparent' },
   }
   const s = styles[state]
   const isOpen = openPopoverId === `${report.id}__${step.id}`
@@ -326,7 +329,7 @@ function StepCell({ report, step, stepIdx, activeIdx, store, onOpenPopover, open
     onOpenPopover(report.id, step.id, rect)
   }
 
-  // Fixed "Eingang" cell – DONE-Statusfarben aus Spec
+  // Fixed "Eingang" cell
   if (isFixed) {
     const entryDate = fmtShort(report.date)
     return (
@@ -334,13 +337,13 @@ function StepCell({ report, step, stepIdx, activeIdx, store, onOpenPopover, open
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           width: '100%', minHeight: 36,
-          borderRadius: 4,
-          backgroundColor: '#D1FAE5',
-          border: '2px solid #059669',
+          borderRadius: 6,
+          backgroundColor: 'rgba(16,185,129,0.12)',
+          border: '1px solid rgba(16,185,129,0.2)',
           boxSizing: 'border-box',
         }}>
           <span style={{
-            fontSize: '11px', fontWeight: 700, color: '#065F46',
+            fontSize: '11px', fontWeight: 700, color: '#10B981',
             lineHeight: 1, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.01em',
           }}>
             {entryDate || '—'}
@@ -361,13 +364,13 @@ function StepCell({ report, step, stepIdx, activeIdx, store, onOpenPopover, open
             position: 'relative',
             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
             width: '100%', minHeight: 36,
-            borderRadius: 4, border: `2px solid ${isOpen ? '#2E6DB7' : s.border || '#D1D5DB'}`,
+            borderRadius: 4, border: `1.5px solid ${isOpen ? '#2E6DB7' : s.border || 'transparent'}`,
             cursor: 'pointer', gap: 1, transition: 'all 0.12s',
             backgroundColor: s.bg,
             color: s.fg,
-            fontWeight: 700,
-            fontSize: '11px',
-            opacity: state === 'skip' ? 0.65 : 1,
+            fontWeight: state === 'active' ? 700 : 500,
+            fontSize: '0.58rem',
+            opacity: state === 'skip' ? 0.5 : 1,
             outline: isOpen ? '2px solid rgba(46,109,183,0.25)' : 'none',
             outlineOffset: 1,
           }}
