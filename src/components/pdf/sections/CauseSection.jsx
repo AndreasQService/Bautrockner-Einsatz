@@ -38,12 +38,10 @@ const CauseSection = ({ data }) => {
                         {cause && <Text style={styles.textBlock}>{cause}</Text>}
                     </View>
 
-                    {/* Schadenfotos Grid — minPresenceAhead verhindert Orphan-Titel */}
+                    {/* Schadenfotos Grid — break erzwingt neue Seite, kein Orphan möglich */}
                     {causeImages.length > 0 && (
-                        <View style={{ marginTop: 10 }}>
-                            <View minPresenceAhead={200}>
-                                <Text style={styles.sectionTitle}>FOTOS ZUR URSACHE</Text>
-                            </View>
+                        <View break style={{ marginTop: 10 }}>
+                            <Text style={styles.sectionTitle}>FOTOS ZUR URSACHE</Text>
                             <ImageGrid images={causeImages} showName={false} />
                         </View>
                     )}
