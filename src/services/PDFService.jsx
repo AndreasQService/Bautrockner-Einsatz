@@ -140,8 +140,9 @@ export const PDFService = {
         const now = new Date();
         const timeStr = `${String(now.getHours()).padStart(2, '0')}-${String(now.getMinutes()).padStart(2, '0')}`;
         const dateStr = now.toLocaleDateString('de-CH').replace(/\./g, '-');
-        const projNum = formData.projectNumber || formData.projectTitle || 'Project';
-        const location = formData.locationDetails || formData.city || 'Schadenort';
+        const sanitize = (s) => String(s || '').replace(/[/\\?%*:|"<>]/g, '-').replace(/-+/g, '-').trim();
+        const projNum = sanitize(formData.projectNumber || formData.projectTitle || 'Project');
+        const location = sanitize(formData.locationDetails || formData.city || 'Schadenort');
         const fileName = `${projNum}_${location}_${dateStr}_${timeStr}.pdf`;
 
         return { blob, fileName };
