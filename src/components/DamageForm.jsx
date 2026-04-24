@@ -12,6 +12,7 @@ if (typeof window !== 'undefined') {
 }
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import TechnicianModeView from './TechnicianModeView';
 import { createPortal } from 'react-dom';
 import { Camera, Image, Trash, X, Plus, Edit3, Save, Upload, FileText, CheckCircle, Circle, AlertTriangle, Play, HelpCircle, ArrowLeft, Mail, Map, MapPin, Folder, Mic, Paperclip, Table, Download, Check, Settings, RotateCcw, ChevronDown, ChevronUp, Briefcase, Hammer, ClipboardList, MicOff, Eye, Database, Phone, UserPlus, Link, Unlink, GripVertical } from 'lucide-react'
 import { supabase } from '../supabaseClient';
@@ -274,6 +275,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
     const [visibleRoomImages, setVisibleRoomImages] = useState({}); // Stores roomId -> boolean for toggle
     const [conflicts, setConflicts] = useState({}); // Stores { fieldPath: { original: '...', new: '...' } }
     const [isContactsExpanded, setIsContactsExpanded] = useState(mode !== 'technician');
+    const [techTab, setTechTab] = useState('uebersicht');
     const [isRoomsExpanded, setIsRoomsExpanded] = useState(true);
     const [isOnline, setIsOnline] = useState(navigator.onLine);
     const [pendingSyncCount, setPendingSyncCount] = useState(0);
@@ -2634,6 +2636,28 @@ END:VCARD`;
             </button>
         </div>
     );
+
+    // ── TECHNIKER MODUS: Tab-basierte Mobile-First Ansicht ──────────────────
+    if (mode === 'technician') {
+        return (
+            <TechnicianModeView
+                formData={formData}
+                setFormData={setFormData}
+                onCancel={onCancel}
+                onSave={onSave}
+                techTab={techTab}
+                setTechTab={setTechTab}
+                setShowCameraModal={setShowCameraModal}
+                setCameraContext={setCameraContext}
+                setShowMeasurementModal={setShowMeasurementModal}
+                setActiveRoomForMeasurement={setActiveRoomForMeasurement}
+                setIsNewMeasurement={setIsNewMeasurement}
+                showAddDeviceForm={showAddDeviceForm}
+                setShowAddDeviceForm={setShowAddDeviceForm}
+                handleCategorySelect={handleCategorySelect}
+            />
+        );
+    }
 
     return (
         <>
