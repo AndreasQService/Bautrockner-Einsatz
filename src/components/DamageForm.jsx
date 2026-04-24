@@ -2655,6 +2655,12 @@ END:VCARD`;
                 showAddDeviceForm={showAddDeviceForm}
                 setShowAddDeviceForm={setShowAddDeviceForm}
                 handleCategorySelect={handleCategorySelect}
+                setShowAddRoomForm={setShowAddRoomForm}
+                showAddRoomForm={showAddRoomForm}
+                newRoom={newRoom}
+                setNewRoom={setNewRoom}
+                handleAddRoom={handleAddRoom}
+                roomOptions={ROOM_OPTIONS}
             />
         );
     }

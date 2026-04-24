@@ -1,5 +1,6 @@
 ﻿import React from 'react';
 import { Camera, Phone, MapPin, Save, ArrowLeft, Plus, X, Settings, CheckCircle } from 'lucide-react';
+import AddRoomForm from './AddRoomForm';
 
 const TABS = [
   { id: 'uebersicht', label: 'Übersicht',  icon: '🏠', color: '#3B82F6' },
@@ -25,6 +26,8 @@ export default function TechnicianModeView({
   setShowMeasurementModal, setActiveRoomForMeasurement, setIsNewMeasurement,
   showAddDeviceForm, setShowAddDeviceForm,
   handleCategorySelect,
+  setShowAddRoomForm, showAddRoomForm,
+  newRoom, setNewRoom, handleAddRoom, roomOptions,
 }) {
   const activeDevices = (formData.devices||[]).filter(d=>!d.returnedAt);
   const contact = formData.contacts?.[0];
@@ -58,8 +61,8 @@ export default function TechnicianModeView({
         {/* Row 2: Tabs */}
         <div style={{display:'flex',borderTop:'1px solid rgba(255,255,255,0.05)'}}>
           {TABS.map(t=>(
-            <button key={t.id} type="button" onClick={()=>setTechTab(t.id)} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:'0.15rem',padding:'0.5rem 0.2rem',background:'none',border:'none',cursor:'pointer',color:techTab===t.id?t.color:'#475569',borderBottom:techTab===t.id?`2.5px solid ${t.color}`:'2.5px solid transparent',fontSize:'0.58rem',fontWeight:techTab===t.id?700:500,minHeight:'50px',transition:'all 0.15s'}}>
-              <span style={{fontSize:'1.1rem',lineHeight:1}}>{t.icon}</span>{t.label}
+            <button key={t.id} type="button" onClick={()=>setTechTab(t.id)} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'0.5rem 0.2rem',background:'none',border:'none',cursor:'pointer',color:techTab===t.id?t.color:'#475569',borderBottom:techTab===t.id?`2.5px solid ${t.color}`:'2.5px solid transparent',fontSize:'0.65rem',fontWeight:techTab===t.id?700:500,minHeight:'40px',transition:'all 0.15s'}}>
+              {t.label}
             </button>
           ))}
         </div>
@@ -73,19 +76,41 @@ export default function TechnicianModeView({
           {/* Status tiles */}
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'0.65rem'}}>
             {[
-              {s:'Schadenaufnahme',icon:'📋',c:'59,130,246'},
-              {s:'Leckortung',icon:'💧',c:'249,115,22'},
-              {s:'Trocknung',icon:'💨',c:'34,197,94'},
-              {s:'Kontrollmessung',icon:'📐',c:'168,85,247'},
-            ].map(({s,icon,c})=>{
+              {s:'Schadenaufnahme',icon:'📋',c:'59,130,246',tab:'aufnahme',onTileClick:()=>{setTechTab('aufnahme');setShowAddRoomForm&&setShowAddRoomForm(true);}},
+              {s:'Leckortung',icon:'💧',c:'249,115,22',tab:'leck',onTileClick:()=>setTechTab('leck')},
+              {s:'Trocknung',icon:'💨',c:'34,197,94',tab:'trocknung',onTileClick:()=>setTechTab('trocknung')},
+              {s:'Kontrollmessung',icon:'📐',c:'168,85,247',tab:'messung',onTileClick:()=>setTechTab('messung')},
+            ].map(({s,icon,c,tab,onTileClick})=>{
               const done = statusDone(s) || formData.status==='Abgeschlossen';
               const active = formData.status===s;
               return (
-                <div key={s} style={{...card(),background:done?`rgba(${c},0.1)`:'rgba(255,255,255,0.02)',border:`1px solid rgba(${c},${done?'0.3':'0.08'})`}}>
-                  <div style={{fontSize:'1rem',marginBottom:'0.25rem'}}>{icon}</div>
+                <button
+                  key={s}
+                  type="button"
+                  onClick={onTileClick}
+                  style={{
+                    ...card(),
+                    background:done?`rgba(${c},0.1)`:'rgba(255,255,255,0.02)',
+                    border:`1px solid rgba(${c},${done?'0.3':'0.08'})`,
+                    cursor:'pointer',
+                    textAlign:'left',
+                    width:'100%',
+                    transition:'all 0.15s',
+                    display:'flex',
+                    flexDirection:'column',
+                    alignItems:'flex-start',
+                    gap:'0.15rem',
+                  }}
+                  onMouseEnter={e=>{e.currentTarget.style.background=`rgba(${c},0.18)`;e.currentTarget.style.border=`1px solid rgba(${c},0.5)`;}}
+                  onMouseLeave={e=>{e.currentTarget.style.background=done?`rgba(${c},0.1)`:'rgba(255,255,255,0.02)';e.currentTarget.style.border=`1px solid rgba(${c},${done?'0.3':'0.08'})`;}}
+                >
+                  <div style={{fontSize:'1.1rem',marginBottom:'0.2rem'}}>{icon}</div>
                   <div style={{fontSize:'0.78rem',fontWeight:700,color:done?`rgb(${c})`:'#94A3B8'}}>{s}</div>
-                  <div style={{fontSize:'0.62rem',fontWeight:600,color:done?'#22C55E':active?'#F97316':'#475569'}}>{done?'✓ Erledigt':active?'● Aktiv':'○ Offen'}</div>
-                </div>
+                  <div style={{fontSize:'0.62rem',fontWeight:600,color:done?'#22C55E':active?'#F97316':'#475569',display:'flex',alignItems:'center',gap:'0.3rem'}}>
+                    {done?'✓ Erledigt':active?'● Aktiv':'○ Offen'}
+                  </div>
+                  <div style={{marginTop:'0.35rem',fontSize:'0.6rem',color:`rgba(${c},0.7)`,fontWeight:600,letterSpacing:'0.05em'}}>→ öffnen</div>
+                </button>
               );
             })}
           </div>
@@ -99,18 +124,33 @@ export default function TechnicianModeView({
           )}
 
           {/* Nächste Aufgabe */}
-          <div style={{...card(),background:'rgba(59,130,246,0.07)',border:'1px solid rgba(59,130,246,0.25)',display:'flex',alignItems:'center',justifyContent:'space-between',gap:'0.75rem'}}>
-            <div>
-              <span style={{...label,color:'#3B82F6',marginBottom:'0.3rem'}}>➡ Nächste Aufgabe</span>
-              <div style={{fontSize:'0.95rem',fontWeight:700}}>
-                {formData.status==='Schadenaufnahme'?'Aufnahme vervollständigen':
-                 formData.status==='Leckortung'?'Leckortung durchführen':
-                 formData.status==='Trocknung'?'Kontrollmessung durchführen':
-                 formData.status==='Instandsetzung'?'Instandsetzung abschliessen':'Projekt abgeschlossen ✓'}
-              </div>
-            </div>
-            <ArrowLeft size={18} style={{color:'#3B82F6',transform:'rotate(180deg)',flexShrink:0}}/>
-          </div>
+          {(()=>{
+            const nextTab =
+              formData.status==='Schadenaufnahme'?'aufnahme':
+              formData.status==='Leckortung'?'leck':
+              formData.status==='Trocknung'?'messung':
+              formData.status==='Instandsetzung'?'aufnahme':'uebersicht';
+            const nextLabel =
+              formData.status==='Schadenaufnahme'?'Aufnahme vervollständigen':
+              formData.status==='Leckortung'?'Leckortung durchführen':
+              formData.status==='Trocknung'?'Kontrollmessung durchführen':
+              formData.status==='Instandsetzung'?'Instandsetzung abschliessen':'Projekt abgeschlossen ✓';
+            return (
+              <button
+                type="button"
+                onClick={()=>setTechTab(nextTab)}
+                style={{...card(),background:'rgba(59,130,246,0.07)',border:'1px solid rgba(59,130,246,0.25)',display:'flex',alignItems:'center',justifyContent:'space-between',gap:'0.75rem',cursor:'pointer',width:'100%',textAlign:'left',transition:'all 0.15s'}}
+                onMouseEnter={e=>{e.currentTarget.style.background='rgba(59,130,246,0.14)';}}
+                onMouseLeave={e=>{e.currentTarget.style.background='rgba(59,130,246,0.07)';}}
+              >
+                <div>
+                  <span style={{...label,color:'#3B82F6',marginBottom:'0.3rem'}}>➡ Nächste Aufgabe</span>
+                  <div style={{fontSize:'0.95rem',fontWeight:700}}>{nextLabel}</div>
+                </div>
+                <ArrowLeft size={18} style={{color:'#3B82F6',transform:'rotate(180deg)',flexShrink:0}}/>
+              </button>
+            );
+          })()}
 
           {/* Aktive Geräte */}
           {activeDevices.length>0 && (
@@ -170,7 +210,20 @@ export default function TechnicianModeView({
           <div style={card()}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'0.75rem'}}>
               <span style={{...label,marginBottom:0,color:'#3B82F6'}}>🏠 Räume ({formData.rooms?.length||0})</span>
+              <button type="button" onClick={()=>setShowAddRoomForm&&setShowAddRoomForm(v=>!v)} style={{background:showAddRoomForm?'rgba(239,68,68,0.12)':'rgba(59,130,246,0.15)',border:`1px solid ${showAddRoomForm?'rgba(239,68,68,0.3)':'rgba(59,130,246,0.3)'}`,borderRadius:'8px',color:showAddRoomForm?'#EF4444':'#3B82F6',padding:'0.4rem 0.75rem',cursor:'pointer',fontSize:'0.78rem',fontWeight:700,display:'flex',alignItems:'center',gap:'0.3rem',minHeight:'36px'}}>
+                {showAddRoomForm ? <><X size={14}/> Abbrechen</> : <><Plus size={14}/> Raum</>}
+              </button>
             </div>
+            {showAddRoomForm && newRoom !== undefined && (
+              <AddRoomForm
+                formData={formData}
+                newRoom={newRoom}
+                setNewRoom={setNewRoom}
+                handleAddRoom={handleAddRoom}
+                setShowAddRoomForm={setShowAddRoomForm}
+                roomOptions={roomOptions}
+              />
+            )}
             {(formData.rooms||[]).map((room,ri)=>{
               const photos=(formData.images||[]).filter(img=>img.roomId===room.id||img.assignedTo===room.name);
               const lvlColor=room.damageLevel==='Sehr nass'?'#EF4444':room.damageLevel==='Nass'?'#F97316':room.damageLevel==='Feucht'?'#FBBF24':'#22C55E';

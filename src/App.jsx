@@ -11,7 +11,7 @@ import LoginScreen from './components/LoginScreen'
 import EmailImportModalV2 from './components/EmailImportModalV2'
 import i18n from './i18n'
 import { buildProjectFolderName, uploadProjectJson } from "./services/OneDriveService";
-import { getPersonalDriveId, initOneDriveAuth } from './lib/onedrive/auth.js';
+
 
 function App() {
   // Neuer Tab = neue sessionStorage → startet immer auf Dashboard
@@ -146,7 +146,8 @@ function App() {
   useEffect(() => { isSessionActiveRef.current = isSessionActive; }, [isSessionActive]);
 
   // UI-Sperr-Variablen
-  const isLockedByOtherMode = !isSessionActive;
+  // Im Techniker-Modus ist der Lock komplett deaktiviert — Techniker arbeiten immer im Feld
+  const isLockedByOtherMode = (projectMode === 'technician' || isTechnicianMode) ? false : !isSessionActive;
   const isReadOnly = isLockedByOtherMode;
   const sessionLockMessage = isLockedByOtherMode
     ? 'Dieses Projekt ist aktuell im anderen Modus geöffnet und kann hier momentan nicht bearbeitet werden.'
@@ -284,14 +285,7 @@ function App() {
     }
   }, [view, selectedReport]);
 
-  // ── Einmalig: Persönliche Drive ID ermitteln (für Backend-Worker Konfiguration) ──
-  useEffect(() => {
-    const run = async () => {
-      await initOneDriveAuth();       // MSAL initialisieren + Cache laden
-      await getPersonalDriveId();     // Drive ID loggen
-    };
-    run().catch(() => {});
-  }, []);
+
 
 
   // Fetch reports from Supabase on mount

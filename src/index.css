@@ -816,7 +816,13 @@ input:-webkit-autofill:active {
 }
 .print-only { display: none; }
 
-/* ── DATEPICKER (Dark Mode Standard) ────────────────────────────────────── */
+/* ── SELECT + DATEPICKER (Dark Mode Standard) ────────────────────────────── */
+select {
+  color-scheme: dark;
+}
+[data-theme="light"] select {
+  color-scheme: light;
+}
 input[type="date"],
 input[type="time"],
 input[type="datetime-local"] {
