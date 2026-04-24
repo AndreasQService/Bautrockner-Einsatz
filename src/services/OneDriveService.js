@@ -5,27 +5,20 @@
  * Ordnerstruktur: OneDrive/QTool/[Projektnr]_[Strasse]_[Ort]/
  */
 
+import { getGraphAccessToken } from '../lib/onedrive/auth.js';
+
 const GRAPH_BASE = 'https://graph.microsoft.com/v1.0';
 const ROOT_FOLDER = 'QTool';
 
 // ─── Token ───────────────────────────────────────────────────────────────────
 
-let _msalInstance = null;
-
-export function setMsalInstance(instance) {
-  _msalInstance = instance;
-}
-
+/**
+ * Liefert ein frisches Access-Token über die zentrale auth.js.
+ * Gibt null zurück wenn kein Account angemeldet (kein Wurf).
+ */
 async function getAccessToken() {
-  if (!_msalInstance) return null;
-  const accounts = _msalInstance.getAllAccounts();
-  if (!accounts.length) return null;
   try {
-    const result = await _msalInstance.acquireTokenSilent({
-      scopes: ['Files.ReadWrite.All'],
-      account: accounts[0],
-    });
-    return result.accessToken;
+    return await getGraphAccessToken();
   } catch {
     return null;
   }
