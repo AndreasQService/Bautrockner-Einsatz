@@ -106,7 +106,10 @@ export async function updatePhotoSyncStatus(photoId, updates) {
 }
 
 /**
- * Alle pending Fotos eines Projekts laden (für Sync)
+ * Alle pending Fotos eines Projekts laden (für Sync).
+ * Gibt zurück:
+ *   - status 'pending' oder 'error'
+ *   - status 'synced' aber ohne oneDriveItemId (OneDrive-Upload fehlgeschlagen, Supabase ok)
  */
 export async function getPendingPhotos(projectId) {
     const db = await openDB();
@@ -117,7 +120,11 @@ export async function getPendingPhotos(projectId) {
         const req = index.getAll(projectId);
         req.onsuccess = () => {
             const all = req.result || [];
-            resolve(all.filter(p => p.syncStatus === 'pending' || p.syncStatus === 'error'));
+            resolve(all.filter(p =>
+                p.syncStatus === 'pending' ||
+                p.syncStatus === 'error'   ||
+                (p.syncStatus === 'synced' && !p.oneDriveItemId) // OneDrive fehlte
+            ));
         };
         req.onerror = () => reject(req.error);
     });
