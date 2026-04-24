@@ -388,6 +388,69 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         };
     }, [formData.id]); // Nur neu starten wenn Projekt wechselt
 
+    // ── OneDrive-Backfill: Supabase-Fotos → persönliches OneDrive ─────────────
+    // Läuft einmal beim Öffnen eines Projekts. Findet alle Fotos die in Supabase
+    // gesichert sind (storagePath vorhanden) aber noch nicht auf OneDrive sind
+    // (oneDriveItemId fehlt). Download via Supabase Storage → Upload via User-Token.
+    // Funktioniert auf jedem Gerät, da Blobs per HTTP aus Supabase geladen werden.
+    useEffect(() => {
+        if (!formData.id || !supabase) return;
+
+        const backfill = async () => {
+            const odFolder = buildProjectFolderName(
+                formData.projectNumber || formData.id || 'Unbekannt',
+                formData
+            );
+
+            // Alle Bilder die in Supabase sind aber nicht in OneDrive
+            const missing = (formData.images || []).filter(
+                img => img.storagePath && !img.oneDriveItemId && !img.uploading
+            );
+
+            if (missing.length === 0) return;
+            console.log(`[OneDrive-Backfill] 🔄 ${missing.length} Fotos ohne OneDrive-Link – starte Backfill...`);
+
+            for (const img of missing) {
+                try {
+                    // Blob von Supabase Storage laden
+                    const { data: blob, error: dlErr } = await supabase.storage
+                        .from('case-files')
+                        .download(img.storagePath);
+
+                    if (dlErr || !blob) {
+                        console.warn(`[OneDrive-Backfill] ⚠️ Download fehlgeschlagen: ${img.storagePath}`);
+                        continue;
+                    }
+
+                    // Upload ins persönliche OneDrive
+                    const subFolder = img.roomName || img.assignedTo || 'Sonstiges';
+                    const file = new File([blob], img.name || 'foto.jpg', { type: blob.type || 'image/jpeg' });
+                    const odResult = await uploadPhotoAndGetUrl(odFolder, subFolder, file);
+
+                    if (odResult?.itemId || odResult?.odPath) {
+                        setFormData(prev => ({
+                            ...prev,
+                            images: prev.images.map(i =>
+                                i.id === img.id ? {
+                                    ...i,
+                                    oneDriveItemId: odResult.itemId || null,
+                                    oneDrivePath:   odResult.odPath  || null,
+                                } : i
+                            )
+                        }));
+                        console.log(`[OneDrive-Backfill] ✅ ${img.name} → OneDrive`);
+                    }
+                } catch (err) {
+                    console.warn(`[OneDrive-Backfill] ⚠️ Fehler bei ${img.name}:`, err.message);
+                }
+            }
+        };
+
+        // 3s warten bis formData vollständig geladen ist
+        const timer = setTimeout(backfill, 3000);
+        return () => clearTimeout(timer);
+    }, [formData.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
     // Auto-Save Effect
 
     useEffect(() => {
