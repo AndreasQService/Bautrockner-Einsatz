@@ -189,6 +189,7 @@ export async function signOutOneDrive() {
  */
 export async function getPersonalDriveId() {
   try {
+    await initOneDriveAuth(); // MSAL muss initialisiert sein
     const token = await getGraphAccessToken();
     const resp  = await fetch('https://graph.microsoft.com/v1.0/me/drive', {
       headers: { Authorization: `Bearer ${token}` }
