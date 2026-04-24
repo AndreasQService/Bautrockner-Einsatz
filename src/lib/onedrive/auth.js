@@ -182,3 +182,25 @@ export async function signOutOneDrive() {
   if (!account) return;
   await msal.logoutPopup({ account });
 }
+
+/**
+ * Gibt die Drive ID des persönlichen OneDrives zurück und loggt sie.
+ * Einmalig aufrufen um ONEDRIVE_DRIVE_ID für den Backend-Worker zu ermitteln.
+ */
+export async function getPersonalDriveId() {
+  try {
+    const token = await getGraphAccessToken();
+    const resp  = await fetch('https://graph.microsoft.com/v1.0/me/drive', {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    const data = await resp.json();
+    console.log('✅ PERSÖNLICHE DRIVE ID:', data.id);
+    console.log('   driveType:', data.driveType);
+    console.log('   owner:    ', data.owner?.user?.displayName);
+    return data.id;
+  } catch (e) {
+    console.warn('Drive ID Fehler:', e.message);
+    return null;
+  }
+}
+

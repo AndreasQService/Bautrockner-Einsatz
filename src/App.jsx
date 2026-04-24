@@ -11,6 +11,7 @@ import LoginScreen from './components/LoginScreen'
 import EmailImportModalV2 from './components/EmailImportModalV2'
 import i18n from './i18n'
 import { buildProjectFolderName, uploadProjectJson } from "./services/OneDriveService";
+import { getPersonalDriveId } from './lib/onedrive/auth.js';
 
 function App() {
   // Neuer Tab = neue sessionStorage → startet immer auf Dashboard
@@ -282,6 +283,11 @@ function App() {
       localStorage.removeItem('qservice_selected_report_id');
     }
   }, [view, selectedReport]);
+
+  // ── Einmalig: Persönliche Drive ID ermitteln (für Backend-Worker Konfiguration) ──
+  useEffect(() => {
+    getPersonalDriveId().catch(() => {});
+  }, []);
 
   // Fetch reports from Supabase on mount
   useEffect(() => {
