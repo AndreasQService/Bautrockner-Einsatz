@@ -13,9 +13,9 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 
-const HEARTBEAT_INTERVAL = 20_000;  // alle 20s heartbeat senden
+const HEARTBEAT_INTERVAL = 10_000;  // alle 10s heartbeat senden
 const POLL_INTERVAL      =  5_000;  // alle 5s Poll
-const SESSION_TIMEOUT    = 60_000;  // Session gilt als tot nach 60s
+const SESSION_TIMEOUT    = 25_000;  // Session gilt als tot nach 25s
 
 export function useSessionLock(supabase, sessionToken, selectedReportId, view, resolvedMode, sessionStartedAt) {
   const [lockedProjectIds, setLockedProjectIds]   = useState(new Set());
