@@ -1412,6 +1412,19 @@ END:VCARD`;
                     }
                 }
 
+                // ── SCHRITT 1.5: OneDrive persönlich (direkt, via User-Token) ─────────
+                if (!isDoc) {
+                    try {
+                        const uploadedOd = await uploadPhotoAndGetUrl(odFolder, subFolder, file);
+                        if (uploadedOd?.itemId || uploadedOd?.odPath) {
+                            odResult = uploadedOd;
+                            console.log('[OneDrive] ✅ Foto direkt hochgeladen:', uploadedOd.odPath);
+                        }
+                    } catch (odErr) {
+                        console.warn('[OneDrive] Direkter Upload fehlgeschlagen (Journal übernimmt):', odErr.message);
+                    }
+                }
+
                 // ── SCHRITT 2: Journal-Eintrag für Backend-Upload (Variante C) ───────────
                 // Das Backend (Supabase Edge Function) übernimmt den
                 // eigentlichen Upload nach OneDrive/SharePoint.
