@@ -816,15 +816,7 @@ function App() {
 
             {view === 'dashboard' && (
               <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                {userRole === 'admin' && (
-                  <button
-                    className={`btn ${isTechnicianMode ? 'btn-primary' : 'btn-outline'}`}
-                    onClick={() => setIsTechnicianMode(prev => !prev)}
-                    style={{ padding: '0.5rem 1rem' }}
-                  >
-                    {isTechnicianMode ? 'Techniker' : 'Desktop'}
-                  </button>
-                )}
+
 
                 {!isTechnicianMode && (
                   <>

@@ -12,7 +12,6 @@ if (typeof window !== 'undefined') {
 }
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import TechnicianModeView from './TechnicianModeView';
 import { createPortal } from 'react-dom';
 import { Camera, Image, Trash, X, Plus, Edit3, Save, Upload, FileText, CheckCircle, Circle, AlertTriangle, Play, HelpCircle, ArrowLeft, Mail, Map, MapPin, Folder, Mic, Paperclip, Table, Download, Check, Settings, RotateCcw, ChevronDown, ChevronUp, Briefcase, Hammer, ClipboardList, MicOff, Eye, Database, Phone, UserPlus, Link, Unlink, GripVertical } from 'lucide-react'
 import { supabase } from '../supabaseClient';
@@ -275,7 +274,6 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
     const [visibleRoomImages, setVisibleRoomImages] = useState({}); // Stores roomId -> boolean for toggle
     const [conflicts, setConflicts] = useState({}); // Stores { fieldPath: { original: '...', new: '...' } }
     const [isContactsExpanded, setIsContactsExpanded] = useState(mode !== 'technician');
-    const [techTab, setTechTab] = useState('uebersicht');
     const [isRoomsExpanded, setIsRoomsExpanded] = useState(true);
     const [isOnline, setIsOnline] = useState(navigator.onLine);
     const [pendingSyncCount, setPendingSyncCount] = useState(0);
@@ -735,6 +733,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
     const [isMeasurementReadOnly, setIsMeasurementReadOnly] = useState(false); // Explicit read-only mode for modal
     const [activeRoomForMeasurement, setActiveRoomForMeasurement] = useState(null); // Track which room we are editing
     const [showAddDeviceForm, setShowAddDeviceForm] = useState(false);
+    const [techTab, setTechTab] = useState(null); // null = Kachel-Home
     const [showAddRoomForm, setShowAddRoomForm] = useState(false);
 
     const [unsubscribeStates, setUnsubscribeStates] = useState({}); // { [idx]: { endDate, counterEnd, hours } }
@@ -2637,31 +2636,49 @@ END:VCARD`;
         </div>
     );
 
-    // ── TECHNIKER MODUS: Tab-basierte Mobile-First Ansicht ──────────────────
-    if (mode === 'technician') {
+    // ── TECHNIKER MODUS: Kachel-Home ────────────────────────────────────────
+    if (mode === 'technician' && techTab === null) {
+        const TECH_TILES = [
+            { id: 'uebersicht', label: 'Übersicht',  icon: '📋', color: '#3B82F6', status: null },
+            { id: 'aufnahme',   label: 'Schadenaufnahme',   icon: '🔍', color: '#F97316', status: 'Schadenaufnahme' },
+            { id: 'leck',       label: 'Leckortung',       icon: '💧', color: '#06B6D4', status: 'Leckortung' },
+            { id: 'trocknung',  label: 'Trocknung',  icon: '🌬', color: '#A855F7', status: 'Trocknung' },
+            { id: 'messung',    label: 'Messung',    icon: '📏', color: '#10B981', status: null },
+        ];
+        const adresse = [formData.street, [formData.zip, formData.city].filter(Boolean).join(' ')].filter(Boolean).join(', ');
+        const sub = [formData.projectNumber, formData.damageCategory].filter(Boolean).join(' · ');
         return (
-            <TechnicianModeView
-                formData={formData}
-                setFormData={setFormData}
-                onCancel={onCancel}
-                onSave={onSave}
-                techTab={techTab}
-                setTechTab={setTechTab}
-                setShowCameraModal={setShowCameraModal}
-                setCameraContext={setCameraContext}
-                setShowMeasurementModal={setShowMeasurementModal}
-                setActiveRoomForMeasurement={setActiveRoomForMeasurement}
-                setIsNewMeasurement={setIsNewMeasurement}
-                showAddDeviceForm={showAddDeviceForm}
-                setShowAddDeviceForm={setShowAddDeviceForm}
-                handleCategorySelect={handleCategorySelect}
-                setShowAddRoomForm={setShowAddRoomForm}
-                showAddRoomForm={showAddRoomForm}
-                newRoom={newRoom}
-                setNewRoom={setNewRoom}
-                handleAddRoom={handleAddRoom}
-                roomOptions={ROOM_OPTIONS}
-            />
+            <div style={{ minHeight:'100vh', backgroundColor:'#0F172A', padding:'2rem 1.25rem 3rem', fontFamily:'Inter,system-ui,sans-serif', color:'#F1F5F9' }}>
+                <div style={{ marginBottom:'2.5rem' }}>
+                    <div style={{ fontSize:'1.5rem', fontWeight:800, lineHeight:1.2 }}>{adresse || 'Schadenort'}</div>
+                    {sub && <div style={{ fontSize:'0.85rem', color:'#64748B', marginTop:'0.4rem', fontWeight:500 }}>{sub}</div>}
+                </div>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'1rem' }}>
+                    {TECH_TILES.slice(0,4).map(tile => (
+                        <button key={tile.id} onClick={() => { if (tile.status) setFormData(prev => ({ ...prev, status: tile.status })); setTechTab(tile.id); }} style={{
+                            background:'#1E293B', border:`2px solid ${tile.color}`,
+                            borderRadius:'16px', padding:'2.5rem 1rem', cursor:'pointer',
+                            display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
+                            gap:'0.75rem', boxShadow:`0 4px 20px ${tile.glow}`, minHeight:'130px', transition:'transform 0.15s'
+                        }}>
+                            
+                            <span style={{ fontSize:'1rem', fontWeight:700, color:'#F1F5F9' }}>{tile.label}</span>
+                        </button>
+                    ))}
+                </div>
+                <div style={{ display:'flex', justifyContent:'center', marginTop:'1rem' }}>
+                    <button onClick={() => { if (TECH_TILES[4].status) setFormData(prev => ({ ...prev, status: TECH_TILES[4].status })); setTechTab(TECH_TILES[4].id); }} style={{
+                        background:'#1E293B', border:`2px solid ${TECH_TILES[4].color}`,
+                        borderRadius:'16px', padding:'2.5rem 1rem', cursor:'pointer',
+                        display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
+                        gap:'0.75rem', boxShadow:`0 4px 20px ${TECH_TILES[4].glow}`,
+                        width:'calc(50% - 0.5rem)', minHeight:'130px'
+                    }}>
+                        
+                        <span style={{ fontSize:'1rem', fontWeight:700, color:'#F1F5F9' }}>{TECH_TILES[4].label}</span>
+                    </button>
+                </div>
+            </div>
         );
     }
 
@@ -2754,7 +2771,7 @@ END:VCARD`;
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', paddingBottom: '1rem', borderBottom: '1px solid var(--border)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1 }}>
                         <button
-                            onClick={onCancel}
+                            onClick={mode === 'technician' ? () => setTechTab(null) : onCancel}
                             className="btn-glass"
                             style={{
                                 width: '42px',
@@ -2807,6 +2824,7 @@ END:VCARD`;
                             </div>
                         )}
 
+                        {mode !== 'technician' && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
                             <label style={{ fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 700 }}>Projektstatus</label>
                             <select
@@ -2828,6 +2846,7 @@ END:VCARD`;
                                 ))}
                             </select>
                         </div>
+                        )}
 
                         {/* Lieferantenrechnung Badge */}
                         {mode === 'desktop' && formData.images?.some(img => img.assignedTo === 'Sonstiges') && (
@@ -2849,6 +2868,7 @@ END:VCARD`;
                         )}
 
                         {/* Calendar Push Button */}
+                        {mode !== 'technician' && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
                             <label style={{ fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 700 }}>Export</label>
                             <button
@@ -2874,6 +2894,7 @@ END:VCARD`;
                                 <span>Termin</span>
                             </button>
                         </div>
+                        )}
                     </div>
                 </div>
 
@@ -3100,7 +3121,7 @@ END:VCARD`;
                 )}
 
                 {/* Address Text Details */}
-                <div className="card" style={{ marginBottom: '1.5rem', padding: '1.5rem' }}>
+                {!(mode === 'technician' && techTab === 'aufnahme') && <div className="card" style={{ marginBottom: '1.5rem', padding: '1.5rem' }}>
                     <h3 className="section-header">
                         <MapPin size={18} /> Schadenort (Adresse)
                     </h3>
@@ -3194,7 +3215,7 @@ END:VCARD`;
                             </select>
                         </div>
                     </div>
-                </div>
+                </div>}
 
                 {/* Technician: Schadenbeschreibung & Bilder (KI / Meldung) */}
                 {mode === 'technician' && (
@@ -3734,7 +3755,7 @@ END:VCARD`;
                 {/* Container for Map & Exterior Photo (Side-by-Side) */}
                 <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap', alignItems: 'stretch', marginBottom: '1.5rem' }}>
                     {/* Map Card – nur im Techniker-Modus */}
-                    {mode !== 'desktop' && (
+                    {mode === 'desktop' && (
                     <div className="card" style={{ flex: '1 1 350px', padding: '1.5rem', display: 'flex', flexDirection: 'column' }}>
                         <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.6rem', color: 'var(--primary)', borderBottom: '1px solid var(--border)', paddingBottom: '0.75rem' }}>
                             <MapPin size={18} /> Standort Karte
@@ -3865,7 +3886,7 @@ END:VCARD`;
                 </div>
 
                 {/* 2. Contacts */}
-                <div className="card" style={{ marginBottom: '1.5rem', padding: '1.5rem' }}>
+                {!(mode === 'technician' && techTab === 'aufnahme') && <div className="card" style={{ marginBottom: '1.5rem', padding: '1.5rem' }}>
                     <div
                         onClick={() => setIsContactsExpanded(!isContactsExpanded)}
                         style={{
@@ -4166,7 +4187,7 @@ END:VCARD`;
                             </div>
                         </>
                     )}
-                </div>
+                </div>}
 
 
                 {/* 3. Rooms & Photos */}
@@ -5469,29 +5490,30 @@ END:VCARD`;
                 {mode === 'desktop' && (
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem', marginTop: '1rem', marginBottom: '2rem' }}>
 
-                        {/* Checkbox: Bericht erstellt */}
+
+                        {/* Checkbox: Bericht geschickt */}
                         <label
                             onClick={e => e.stopPropagation()}
                             style={{
                                 display: 'inline-flex', alignItems: 'center', gap: '0.55rem',
                                 cursor: 'pointer', userSelect: 'none',
                                 padding: '0.38rem 0.9rem', borderRadius: 999,
-                                backgroundColor: formData.reportCreated ? 'rgba(16,185,129,0.1)' : 'rgba(255,255,255,0.04)',
-                                border: `1px solid ${formData.reportCreated ? 'rgba(16,185,129,0.35)' : 'rgba(255,255,255,0.1)'}`,
+                                backgroundColor: formData.reportSent ? 'rgba(59,130,246,0.1)' : 'rgba(255,255,255,0.04)',
+                                border: `1px solid ${formData.reportSent ? 'rgba(59,130,246,0.35)' : 'rgba(255,255,255,0.1)'}`,
                                 transition: 'all 0.18s',
                             }}
                         >
                             <input
                                 type="checkbox"
-                                checked={!!formData.reportCreated}
-                                onChange={e => setFormData(prev => ({ ...prev, reportCreated: e.target.checked }))}
-                                style={{ width: 15, height: 15, accentColor: '#10B981', cursor: 'pointer' }}
+                                checked={!!formData.reportSent}
+                                onChange={e => setFormData(prev => ({ ...prev, reportSent: e.target.checked }))}
+                                style={{ width: 15, height: 15, accentColor: '#3B82F6', cursor: 'pointer' }}
                             />
                             <span style={{
                                 fontSize: '0.82rem', fontWeight: 600,
-                                color: formData.reportCreated ? '#6EE7B7' : '#94A3B8',
+                                color: formData.reportSent ? '#93C5FD' : '#94A3B8',
                             }}>
-                                {formData.reportCreated ? '✅ Bericht erstellt' : 'Bericht erstellt'}
+                                {formData.reportSent ? 'Bericht geschickt' : 'Bericht geschickt'}
                             </span>
                         </label>
 
@@ -5524,7 +5546,7 @@ END:VCARD`;
                 )}
 
                 {/* EMAILS & PLANS (Final for User) */}
-                {mode === 'desktop' && (
+                {false && (
                     <div style={{ marginBottom: '2.5rem', backgroundColor: 'var(--surface)', padding: '1.25rem', borderRadius: '12px', border: '1px solid var(--border)', color: 'var(--text-main)', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
                             <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.6rem', margin: 0 }}>
@@ -5659,35 +5681,85 @@ END:VCARD`;
                                 "Schimmelbehandlung",
                                 "Organisation externer Handwerker",
                                 "Instandstellung"
-                            ].map((item) => (
-                                <label key={item} style={{
-                                    display: 'flex', alignItems: 'center', gap: '1rem',
-                                    padding: '1rem',
-                                    border: '1px solid var(--border)',
-                                    borderRadius: '12px',
-                                    cursor: 'pointer',
-                                    backgroundColor: (formData.selectedMeasures?.includes(item)) ? 'rgba(14, 165, 233, 0.15)' : 'rgba(255,255,255,0.02)',
-                                    borderColor: (formData.selectedMeasures?.includes(item)) ? 'var(--primary)' : 'var(--border)',
-                                    transition: 'all 0.2s ease'
-                                }}>
-                                    <input
-                                        type="checkbox"
-                                        checked={formData.selectedMeasures?.includes(item) || false}
-                                        onChange={() => {
-                                            setFormData(prev => {
-                                                const current = prev.selectedMeasures || [];
-                                                if (current.includes(item)) {
-                                                    return { ...prev, selectedMeasures: current.filter(i => i !== item) };
-                                                } else {
-                                                    return { ...prev, selectedMeasures: [...current, item] };
-                                                }
-                                            });
-                                        }}
-                                        style={{ width: '22px', height: '22px', accentColor: 'var(--primary)', cursor: 'pointer' }}
-                                    />
-                                    <span style={{ fontSize: '1rem', fontWeight: 600, color: (formData.selectedMeasures?.includes(item)) ? 'var(--text-main)' : 'var(--text-muted)' }}>{item}</span>
-                                </label>
-                            ))}
+                            ].map((item) => {
+                                const isChecked = formData.selectedMeasures?.includes(item) || false;
+                                return (
+                                    <div key={item} style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+                                        {/* Checkbox Row */}
+                                        <label style={{
+                                            display: 'flex', alignItems: 'center', gap: '1rem',
+                                            padding: '1rem',
+                                            border: '1px solid var(--border)',
+                                            borderRadius: isChecked ? '12px 12px 0 0' : '12px',
+                                            cursor: 'pointer',
+                                            backgroundColor: isChecked ? 'rgba(14,165,233,0.15)' : 'rgba(255,255,255,0.02)',
+                                            borderColor: isChecked ? 'var(--primary)' : 'var(--border)',
+                                            borderBottom: isChecked ? 'none' : undefined,
+                                            transition: 'all 0.2s ease'
+                                        }}>
+                                            <input
+                                                type="checkbox"
+                                                checked={isChecked}
+                                                onChange={() => {
+                                                    setFormData(prev => {
+                                                        const current = prev.selectedMeasures || [];
+                                                        if (current.includes(item)) {
+                                                            return { ...prev, selectedMeasures: current.filter(i => i !== item) };
+                                                        } else {
+                                                            return { ...prev, selectedMeasures: [...current, item] };
+                                                        }
+                                                    });
+                                                }}
+                                                style={{ width: '22px', height: '22px', accentColor: 'var(--primary)', cursor: 'pointer' }}
+                                            />
+                                            <span style={{ fontSize: '1rem', fontWeight: 600, color: isChecked ? 'var(--text-main)' : 'var(--text-muted)' }}>{item}</span>
+                                        </label>
+                                        {/* Titel + Textarea — erscheint wenn angehakt */}
+                                        {isChecked && (
+                                            <div style={{
+                                                border: '1px solid var(--primary)',
+                                                borderTop: 'none',
+                                                borderRadius: '0 0 12px 12px',
+                                                padding: '1rem 1rem 1rem 1rem',
+                                                backgroundColor: 'rgba(14,165,233,0.05)',
+                                            }}>
+                                                {/* Titel — entspricht sectionTitle im PDF: 16pt, blau, bold */}
+                                                <div style={{
+                                                    fontSize: '1.15rem',
+                                                    fontWeight: 700,
+                                                    color: '#0F6EA3',
+                                                    marginBottom: '0.6rem',
+                                                    letterSpacing: '0.01em'
+                                                }}>{item}</div>
+                                                {/* Notiz-Textarea */}
+                                                <textarea
+                                                    rows={3}
+                                                    placeholder={`Notizen zu ${item}...`}
+                                                    value={(formData.measureNotes || {})[item] || ''}
+                                                    onChange={e => setFormData(prev => ({
+                                                        ...prev,
+                                                        measureNotes: { ...(prev.measureNotes || {}), [item]: e.target.value }
+                                                    }))}
+                                                    onClick={e => e.stopPropagation()}
+                                                    style={{
+                                                        width: '100%',
+                                                        background: 'rgba(255,255,255,0.04)',
+                                                        border: '1px solid rgba(14,165,233,0.3)',
+                                                        borderRadius: '8px',
+                                                        color: 'var(--text-main)',
+                                                        fontSize: '0.95rem',
+                                                        padding: '0.6rem 0.75rem',
+                                                        resize: 'vertical',
+                                                        outline: 'none',
+                                                        fontFamily: 'inherit',
+                                                        boxSizing: 'border-box',
+                                                    }}
+                                                />
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
                         </div>
 
                         {/* Freitext & Mikrofon */}
@@ -5761,6 +5833,7 @@ END:VCARD`;
                 )}
 
                 {/* Pläne & Grundrisse Section */}
+                {false && (
                 <div className="card" style={{ marginBottom: '1.5rem', padding: '1.5rem' }}>
                     <h3 className="section-header">
                         <FileText size={18} /> Pläne & Grundrisse
@@ -5848,6 +5921,7 @@ END:VCARD`;
                         )}
                     </div>
                 </div>
+                )}
 
                 {mode === 'desktop' && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', marginBottom: '1.5rem' }}>

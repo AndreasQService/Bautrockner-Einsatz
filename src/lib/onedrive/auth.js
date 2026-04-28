@@ -159,16 +159,12 @@ export async function getGraphAccessToken() {
 
   } catch (error) {
     if (error instanceof InteractionRequiredAuthError) {
-      // Silent fehlgeschlagen (Consent, MFA, etc.) → Popup
-      console.warn('[Auth] Silent-Token fehlgeschlagen → Popup-Login');
-      const result = await msal.acquireTokenPopup({
-        ...loginRequest,
-        account,
-      });
-      if (result.account) msal.setActiveAccount(result.account);
-      return result.accessToken;
+      // Silent fehlgeschlagen → KEIN Popup, still scheitern
+      // (Popup nur über expliziten Login-Button durch User)
+      console.warn('[Auth] Silent-Token fehlgeschlagen – kein Popup (Background-Kontext)');
+      return null;
     }
-    // Andere Fehler (Netzwerk etc.) → weiterschmeissen
+    // Andere Fehler → weiterschmeissen
     throw new Error(`[Auth] Token-Beschaffung fehlgeschlagen: ${error.message}`);
   }
 }
