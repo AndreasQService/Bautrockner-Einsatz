@@ -300,16 +300,17 @@ function App() {
       try {
         const { data, error } = await supabase
           .from('damage_reports')
-          .select('report_data, updated_at')
-          // HINWEIS: .is('deleted_at', null) entfernt – Spalte existiert noch nicht in DB
-          // Soft-Delete wird client-seitig gefiltert (r.deleted_at check unten)
-          .order('created_at', { ascending: false });
+          .select('report_data, updated_at');
+          // HINWEIS: Client-seitige Sortierung um Statement Timeout bei großen JSONs zu verhindern
 
         if (error) {
           console.error('[Supabase] Fehler beim Laden:', error);
           setSupabaseStatus({ ok: false, count: 0, error: `${error.code}: ${error.message}` });
         } else if (data) {
-          const loadedReports = data.map(row => ({
+          const loadedReports = data
+            // Sortierung auf dem Client um DB Statement Timeouts zu vermeiden
+            .sort((a, b) => new Date(b.report_data?.date || b.updated_at).getTime() - new Date(a.report_data?.date || a.updated_at).getTime())
+            .map(row => ({
             ...row.report_data,
             _supabase_updated_at: row.updated_at,
             images: (row.report_data.images || []).map(img => ({
@@ -571,9 +572,10 @@ function App() {
       if (supabase) {
         const { data, error } = await supabase
           .from('damage_reports')
-          .select('*')
-          .order('created_at', { ascending: false }); // deleted_at Filter entfernt (Spalte noch nicht in DB)
-        if (!error && data) backupData = data;
+          .select('*');
+        if (!error && data) {
+            backupData = data.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        }
       }
       const blob = new Blob(
         [JSON.stringify(backupData, null, 2)],

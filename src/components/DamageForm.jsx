@@ -736,10 +736,13 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
     const [techTab, setTechTab] = useState(null); // null = Kachel-Home
     const [showAddRoomForm, setShowAddRoomForm] = useState(false);
     const [showTechRoomSelector, setShowTechRoomSelector] = useState(false);
+    const [techRoomSelectorMode, setTechRoomSelectorMode] = useState('messung');
+    const [techSelectedEquipmentRoom, setTechSelectedEquipmentRoom] = useState(null);
     const [techSelectedApartment, setTechSelectedApartment] = useState(null);
     const [techNewRoomName, setTechNewRoomName] = useState('');
     const [techNewRoomApt, setTechNewRoomApt] = useState(undefined);
     const [techNewRoomCustomName, setTechNewRoomCustomName] = useState('');
+    const [techFocusDeviceIndex, setTechFocusDeviceIndex] = useState(null);
 
     const [unsubscribeStates, setUnsubscribeStates] = useState({}); // { [idx]: { endDate, counterEnd, hours } }
 
@@ -1285,11 +1288,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
     })
 
     const handleAddDevice = async () => {
-        // Validation
-        if (!newDevice.room) {
-            alert("Bitte wählen Sie einen Raum aus.");
-            return false;
-        }
+        // Validation removed per user request: "es braucht nur die wohung oder den raum als option , kein muss"
 
         // manual entry fallback if no device selected?
         let deviceToAdd = {
@@ -2660,20 +2659,30 @@ END:VCARD`;
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                     {TECH_TILES.slice(0, 4).map(tile => (
-                        <button key={tile.id} onClick={() => { if (tile.status) setFormData(prev => ({ ...prev, status: tile.status })); setTechTab(tile.id); }} style={{
+                        <button key={tile.id} onClick={() => { 
+                            if (tile.status) setFormData(prev => ({ ...prev, status: tile.status })); 
+                            
+                            if (tile.id === 'trocknung') {
+                                setTechRoomSelectorMode('geraete');
+                                setShowTechRoomSelector(true);
+                            } else {
+                                setTechTab(tile.id); 
+                            }
+                        }} style={{
                             background: '#1E293B', border: `2px solid ${tile.color}`,
                             borderRadius: '16px', padding: '2.5rem 1rem', cursor: 'pointer',
                             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                             gap: '0.75rem', boxShadow: `0 4px 20px ${tile.glow}`, minHeight: '130px', transition: 'transform 0.15s'
                         }}>
 
-                            <span style={{ fontSize: '1rem', fontWeight: 700, color: '#F1F5F9' }}>{tile.label}</span>
+                            <span style={{ fontSize: '1rem', fontWeight: 700, color: '#F1F5F9' }}>{tile.label === 'Trocknung' ? 'Geräte' : tile.label}</span>
                         </button>
                     ))}
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1rem' }}>
                     <button onClick={() => {
                         if (TECH_TILES[4].status) setFormData(prev => ({ ...prev, status: TECH_TILES[4].status }));
+                        setTechRoomSelectorMode('messung');
                         setShowTechRoomSelector(true);
                     }} style={{
                         background: '#1E293B', border: `2px solid ${TECH_TILES[4].color}`,
@@ -2699,26 +2708,43 @@ END:VCARD`;
                             <div style={{ backgroundColor: '#1E293B', borderRadius: '16px', width: '100%', maxWidth: '400px', padding: '1.5rem', color: '#F1F5F9', border: '1px solid rgba(255,255,255,0.1)' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                        {activeApt && uniqueApartments.length > 1 && (
+                                        {activeApt && uniqueApartments.length > 1 && techRoomSelectorMode === 'messung' && (
                                             <button onClick={() => setTechSelectedApartment(null)} style={{ background: 'transparent', border: 'none', color: '#60A5FA', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center' }}>
                                                 <ArrowLeft size={20} />
                                             </button>
                                         )}
                                         <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700 }}>
-                                            {!activeApt ? 'Wohnung wählen' : activeApt}
+                                            {!activeApt || techRoomSelectorMode === 'geraete' ? 'Wohnung wählen' : activeApt}
                                         </h3>
                                     </div>
                                     <button onClick={() => { setShowTechRoomSelector(false); setTechSelectedApartment(null); }} style={{ background: 'transparent', border: 'none', color: '#94A3B8', cursor: 'pointer' }}><X size={20} /></button>
                                 </div>
 
-                                {!activeApt ? (
+                                {(!activeApt || techRoomSelectorMode === 'geraete') ? (
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '40vh', overflowY: 'auto', paddingBottom: '1rem' }}>
-                                        {uniqueApartments.length > 0 ? uniqueApartments.map(apt => (
-                                            <button key={apt} onClick={() => setTechSelectedApartment(apt)} style={{ padding: '1.25rem 1rem', borderRadius: '8px', background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.2)', color: '#60A5FA', fontSize: '1.05rem', fontWeight: 700, textAlign: 'left', cursor: 'pointer', display: 'flex', justifyContent: 'space-between' }}>
-                                                <span>{apt}</span>
-                                                <span style={{ fontSize: '0.8rem' }}>Räume anzeigen ➔</span>
-                                            </button>
-                                        )) : (
+                                        {uniqueApartments.length > 0 ? uniqueApartments.map(apt => {
+                                            const aptDevices = formData.equipment?.filter(e => (e.apartment || 'Allgemeiner Bereich').trim() === apt) || [];
+                                            const btnLabel = techRoomSelectorMode === 'geraete' 
+                                                ? (aptDevices.length > 0 ? 'Geräte anzeigen ➔' : 'Gerät hinzufügen ➔')
+                                                : 'Räume anzeigen ➔';
+
+                                            return (
+                                                <button key={apt} onClick={() => {
+                                                    if (techRoomSelectorMode === 'geraete') {
+                                                        setTechSelectedEquipmentRoom({ apartment: apt });
+                                                        setTechTab('trocknung');
+                                                        setShowTechRoomSelector(false);
+                                                        setTechSelectedApartment(null);
+                                                        if (aptDevices.length === 0) setShowAddDeviceForm(true);
+                                                    } else {
+                                                        setTechSelectedApartment(apt);
+                                                    }
+                                                }} style={{ padding: '1.25rem 1rem', borderRadius: '8px', background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.2)', color: '#60A5FA', fontSize: '1.05rem', fontWeight: 700, textAlign: 'left', cursor: 'pointer', display: 'flex', justifyContent: 'space-between' }}>
+                                                    <span>{apt}</span>
+                                                    <span style={{ fontSize: '0.8rem' }}>{btnLabel}</span>
+                                                </button>
+                                            );
+                                        }) : (
                                             <div style={{ textAlign: 'center', color: '#94A3B8', padding: '1rem 0' }}>Noch keine Räume angelegt.</div>
                                         )}
                                     </div>
@@ -2744,23 +2770,31 @@ END:VCARD`;
 
                                 <div style={{ marginTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '1.5rem' }}>
                                     <button onClick={() => {
-                                        const aptValue = activeApt === 'Allgemeiner Bereich' ? '' : (activeApt || '');
-                                        const tempRoom = {
-                                            id: `temp_${Date.now()}`,
-                                            name: '',
-                                            apartment: aptValue,
-                                            width: '', length: '', height: '',
-                                            dryingData: { equipment: [], dailyLogs: [] },
-                                            measurementData: { measurements: [], globalSettings: {} },
-                                            measurementHistory: []
-                                        };
-                                        setActiveRoomForMeasurement(tempRoom);
-                                        setIsNewMeasurement(true);
-                                        setShowTechRoomSelector(false);
-                                        setTechSelectedApartment(null);
-                                        setShowMeasurementModal(true);
+                                        if (techRoomSelectorMode === 'geraete') {
+                                            setTechSelectedEquipmentRoom({ apartment: '' });
+                                            setTechTab('trocknung');
+                                            setShowTechRoomSelector(false);
+                                            setTechSelectedApartment(null);
+                                            setShowAddDeviceForm(true);
+                                        } else {
+                                            const aptValue = activeApt === 'Allgemeiner Bereich' ? '' : (activeApt || '');
+                                            const tempRoom = {
+                                                id: `temp_${Date.now()}`,
+                                                name: '',
+                                                apartment: aptValue,
+                                                width: '', length: '', height: '',
+                                                dryingData: { equipment: [], dailyLogs: [] },
+                                                measurementData: { measurements: [], globalSettings: {} },
+                                                measurementHistory: []
+                                            };
+                                            setActiveRoomForMeasurement(tempRoom);
+                                            setIsNewMeasurement(true);
+                                            setShowTechRoomSelector(false);
+                                            setTechSelectedApartment(null);
+                                            setShowMeasurementModal(true);
+                                        }
                                     }} style={{ width: '100%', background: 'rgba(16, 185, 129, 0.1)', color: '#10B981', border: '1px dashed #10B981', padding: '1rem', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '0.95rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
-                                        <Plus size={18} /> Neuer Raum / Neue Messung
+                                        <Plus size={18} /> {techRoomSelectorMode === 'geraete' ? 'Gerät hinzufügen' : 'Neuer Raum / Neue Messung'}
                                     </button>
                                 </div>
                             </div>
@@ -3024,8 +3058,8 @@ END:VCARD`;
                             }}
                         />
                     </div>
-                    {/* Schritt-Abschluss Checkbox — nur Techniker, nicht Übersicht */}
-                    {mode === 'technician' && techTab && techTab !== 'uebersicht' && (() => {
+                    {/* Schritt-Abschluss Checkbox — nur Techniker, nicht Übersicht, nicht Trocknung */}
+                    {mode === 'technician' && techTab && techTab !== 'uebersicht' && techTab !== 'trocknung' && (() => {
                         const tabStatusMap = {
                             aufnahme: 'Leckortung',
                             leck: 'Trocknung',
@@ -3385,7 +3419,7 @@ END:VCARD`;
                 )}
 
                 {/* Address Text Details */}
-                {!(mode === 'technician' && (techTab === 'aufnahme' || techTab === 'messung')) && <div className="card" style={{ marginBottom: '1.5rem', padding: '1.5rem' }}>
+                {!(mode === 'technician' && (techTab === 'aufnahme' || techTab === 'messung' || techTab === 'trocknung')) && <div className="card" style={{ marginBottom: '1.5rem', padding: '1.5rem' }}>
                     <h3 className="section-header">
                         <MapPin size={18} /> Schadenort (Adresse)
                     </h3>
@@ -3482,7 +3516,7 @@ END:VCARD`;
                 </div>}
 
                 {/* Technician: Schadenbeschreibung & Bilder (KI / Meldung) */}
-                {mode === 'technician' && (
+                {mode === 'technician' && techTab === 'aufnahme' && (
                     <div style={{ marginBottom: '1.5rem', borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>
                         <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                             <FileText size={18} /> Schadenbeschreibung (KI / Meldung)
@@ -4150,7 +4184,7 @@ END:VCARD`;
                 </div>
 
                 {/* 2. Contacts */}
-                {!(mode === 'technician' && (techTab === 'aufnahme' || techTab === 'messung')) && <div className="card" style={{ marginBottom: '1.5rem', padding: '1.5rem' }}>
+                {!(mode === 'technician' && (techTab === 'aufnahme' || techTab === 'messung' || techTab === 'trocknung')) && <div className="card" style={{ marginBottom: '1.5rem', padding: '1.5rem' }}>
                     <div
                         onClick={() => setIsContactsExpanded(!isContactsExpanded)}
                         style={{
@@ -4455,6 +4489,8 @@ END:VCARD`;
 
 
                 {/* 3. Rooms & Photos */}
+                {!(mode === 'technician' && techTab === 'trocknung') && (
+                <>
                 <div style={{ marginBottom: '2rem' }}>
                     <div style={{ marginBottom: '1rem' }}>
                         {mode !== 'technician' && (
@@ -4482,7 +4518,7 @@ END:VCARD`;
                         )}
 
 
-                        {mode === 'technician' && techTab !== 'messung' && (
+                        {mode === 'technician' && techTab === 'aufnahme' && (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                                 {/* NEW: Schadenursache Section (Technician) */}
                                 <div className="card" style={{ marginBottom: '1rem', padding: '1.5rem' }}>
@@ -6335,6 +6371,8 @@ END:VCARD`;
                         </div>
                     </div>
                 )}
+                </>
+                )}
                 {/* 4. Drying Equipment - Visible ONLY in 'Trocknung' status */}
                 {formData.status === 'Trocknung' && (
                     <div style={{ marginBottom: '2rem', borderTop: '1px solid var(--border)', paddingTop: '1.5rem', ...(mode === 'desktop' ? { display: 'flex', flexDirection: 'column' } : {}) }}>
@@ -6349,17 +6387,19 @@ END:VCARD`;
 
                         {/* Add Device Form */}
                         <div style={{ backgroundColor: '#1E293B', padding: '1rem', borderRadius: '8px', marginBottom: '1rem', border: '1px solid var(--border)', ...(mode === 'desktop' ? { order: 3, marginTop: '2rem' } : {}) }}>
-                            <button
-                                type="button"
-                                className={`btn ${showAddDeviceForm ? 'btn-ghost' : 'btn-primary'}`}
-                                onClick={() => setShowAddDeviceForm(!showAddDeviceForm)}
-                                style={{ width: '100%', marginBottom: showAddDeviceForm ? '1rem' : '0', color: showAddDeviceForm ? '#EF4444' : 'white', borderColor: showAddDeviceForm ? '#EF4444' : 'transparent' }}
-                            >
-                                {showAddDeviceForm ? <X size={16} /> : <Plus size={16} />}
-                                {showAddDeviceForm ? " Abbrechen" : " Gerät hinzufügen"}
-                            </button>
+                            {mode !== 'technician' && (
+                                <button
+                                    type="button"
+                                    className={`btn ${showAddDeviceForm ? 'btn-ghost' : 'btn-primary'}`}
+                                    onClick={() => setShowAddDeviceForm(!showAddDeviceForm)}
+                                    style={{ width: '100%', marginBottom: showAddDeviceForm ? '1rem' : '0', color: showAddDeviceForm ? '#EF4444' : 'white', borderColor: showAddDeviceForm ? '#EF4444' : 'transparent' }}
+                                >
+                                    {showAddDeviceForm ? <X size={16} /> : <Plus size={16} />}
+                                    {showAddDeviceForm ? " Abbrechen" : " Gerät hinzufügen"}
+                                </button>
+                            )}
 
-                            {showAddDeviceForm && (
+                            {showAddDeviceForm && mode !== 'technician' && (
                                 <>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '0.5rem' }}>
                                         {/* Inventory Selection (Matches Technician Mode) */}
@@ -6410,7 +6450,7 @@ END:VCARD`;
                                             }}
                                         />
 
-                                        {/* Apartment Selection (Required) */}
+                                        {/* Apartment Selection */}
                                         <select
                                             className="form-input"
                                             value={newDevice.apartment || ''}
@@ -6424,7 +6464,7 @@ END:VCARD`;
                                             }}
                                             style={{ borderColor: !newDevice.apartment ? '#F87171' : '' }}
                                         >
-                                            <option value="">Wohnung wählen... (Pflicht)</option>
+                                            <option value="">Wohnung wählen... (Optional)</option>
                                             {[...new Set([...formData.rooms.map(r => r.apartment).filter(Boolean), ...(formData.contacts || []).map(c => c.name ? c.name.trim().split(/\s+/).pop() : '').filter(Boolean)])].sort().map(apt => (
                                                 <option key={apt} value={apt}>{apt}</option>
                                             ))}
@@ -6439,7 +6479,7 @@ END:VCARD`;
                                         {((newDevice.apartment && ![...new Set([...formData.rooms.map(r => r.apartment).filter(Boolean), ...(formData.contacts || []).map(c => c.name ? c.name.trim().split(/\s+/).pop() : '').filter(Boolean)])].sort().includes(newDevice.apartment)) || !formData.rooms.some(r => r.apartment)) && (
                                             <input
                                                 type="text"
-                                                placeholder="Wohnung eingeben (Pflicht)"
+                                                placeholder="Wohnung eingeben (Optional)"
                                                 className="form-input"
                                                 value={newDevice.apartment || ''}
                                                 onChange={(e) => setNewDevice(prev => ({ ...prev, apartment: e.target.value }))}
@@ -6522,7 +6562,7 @@ END:VCARD`;
                                         type="button"
                                         className="btn btn-primary"
                                         style={{ width: '100%', marginTop: '0.5rem' }}
-                                        disabled={!newDevice.deviceNumber || !newDevice.room || !newDevice.apartment || newDevice.counterStart === ''}
+                                        disabled={!newDevice.deviceNumber}
                                         onClick={async (e) => {
                                             e.preventDefault();
                                             const success = await handleAddDevice();
@@ -6547,6 +6587,142 @@ END:VCARD`;
                                     </button>
                                 </>
                             )}
+                            
+                            {showAddDeviceForm && mode === 'technician' && (
+                                <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.85)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+                                    <div style={{ backgroundColor: '#1E293B', borderRadius: '16px', width: '100%', maxWidth: '400px', padding: '1.5rem', color: '#F1F5F9', border: '1px solid rgba(255,255,255,0.1)' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                                            <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700 }}>Gerät hinzufügen</h3>
+                                            <button onClick={() => setShowAddDeviceForm(false)} style={{ background: 'transparent', border: 'none', color: '#94A3B8', cursor: 'pointer' }}><X size={20} /></button>
+                                        </div>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                            <input
+                                                type="text"
+                                                placeholder="Geräte-Nr. scannen oder tippen *"
+                                                className="form-input"
+                                                autoFocus
+                                                value={newDevice.deviceNumber}
+                                                onChange={(e) => {
+                                                    setNewDevice(prev => ({ ...prev, deviceNumber: e.target.value, apartment: techSelectedEquipmentRoom?.apartment || prev.apartment }));
+                                                    setSelectedDevice(null);
+                                                }}
+                                                style={{ fontSize: '1.1rem', padding: '1rem' }}
+                                            />
+                                            <button
+                                                type="button"
+                                                className="btn btn-primary"
+                                                style={{ width: '100%', padding: '1rem', fontSize: '1rem' }}
+                                                disabled={!newDevice.deviceNumber}
+                                                onClick={async (e) => {
+                                                    e.preventDefault();
+                                                    if (!newDevice.apartment && techSelectedEquipmentRoom?.apartment) {
+                                                        newDevice.apartment = techSelectedEquipmentRoom.apartment;
+                                                    }
+                                                    const success = await handleAddDevice();
+                                                    if (success) {
+                                                        setShowAddDeviceForm(false);
+                                                    }
+                                                }}
+                                            >
+                                                Speichern
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {Object.keys(unsubscribeStates).length > 0 && mode === 'technician' && (() => {
+                                const idxStr = Object.keys(unsubscribeStates)[0];
+                                const idx = parseInt(idxStr, 10);
+                                const draft = unsubscribeStates[idxStr];
+                                const device = formData.equipment[idx];
+                                if (!device) return null;
+
+                                return (
+                                    <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.85)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+                                        <div style={{ backgroundColor: '#1E293B', borderRadius: '16px', width: '100%', maxWidth: '400px', padding: '1.5rem', color: '#F1F5F9', border: '1px solid rgba(255,255,255,0.1)' }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                                                <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700 }}>Gerät abmelden</h3>
+                                                <button onClick={() => {
+                                                    const newStates = { ...unsubscribeStates };
+                                                    delete newStates[idxStr];
+                                                    setUnsubscribeStates(newStates);
+                                                    setTechFocusDeviceIndex(null);
+                                                }} style={{ background: 'transparent', border: 'none', color: '#94A3B8', cursor: 'pointer' }}><X size={20} /></button>
+                                            </div>
+                                            
+                                            <div style={{ marginBottom: '1.5rem', padding: '1rem', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: '8px' }}>
+                                                <div style={{ fontWeight: 600, fontSize: '1.1rem', color: 'var(--primary)', marginBottom: '0.25rem' }}>#{device.deviceNumber} {device.model || device.type ? `- ${device.model || device.type}` : ''}</div>
+                                                <div style={{ fontSize: '0.9rem', color: '#94A3B8' }}>{device.room} {device.apartment ? `(${device.apartment})` : ''}</div>
+                                                <div style={{ fontSize: '0.85rem', color: '#94A3B8', marginTop: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.5rem' }}>Start: {device.startDate} • Zähler: {device.counterStart} kWh</div>
+                                            </div>
+
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                                                    <div>
+                                                        <label style={{ fontSize: '0.8rem', color: '#94A3B8', display: 'block', marginBottom: '0.3rem', fontWeight: 600 }}>Zähler Ende</label>
+                                                        <input
+                                                            type="number"
+                                                            className="form-input"
+                                                            placeholder="Endstand"
+                                                            autoFocus
+                                                            style={{ fontSize: '1.1rem', padding: '0.75rem', width: '100%' }}
+                                                            value={draft.counterEnd || ''}
+                                                            onChange={(e) => setUnsubscribeStates(prev => ({ ...prev, [idx]: { ...prev[idx], counterEnd: e.target.value } }))}
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label style={{ fontSize: '0.8rem', color: '#94A3B8', display: 'block', marginBottom: '0.3rem', fontWeight: 600 }}>Laufzeit/Std.</label>
+                                                        <input
+                                                            type="number"
+                                                            className="form-input"
+                                                            placeholder="Std."
+                                                            style={{ fontSize: '1.1rem', padding: '0.75rem', width: '100%' }}
+                                                            value={draft.hours || ''}
+                                                            onChange={(e) => setUnsubscribeStates(prev => ({ ...prev, [idx]: { ...prev[idx], hours: e.target.value } }))}
+                                                        />
+                                                    </div>
+                                                </div>
+
+                                                <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
+                                                    <button
+                                                        type="button"
+                                                        className="btn btn-ghost"
+                                                        style={{ flex: 1, color: '#94A3B8', border: '1px solid var(--border)', padding: '0.75rem' }}
+                                                        onClick={() => {
+                                                            const newStates = { ...unsubscribeStates };
+                                                            delete newStates[idxStr];
+                                                            setUnsubscribeStates(newStates);
+                                                            setTechFocusDeviceIndex(null);
+                                                        }}
+                                                    >
+                                                        Abbrechen
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        className="btn btn-primary"
+                                                        style={{ flex: 1, padding: '0.75rem', fontWeight: 600 }}
+                                                        onClick={() => {
+                                                            const newEquipment = [...formData.equipment];
+                                                            newEquipment[idx].endDate = draft.endDate;
+                                                            newEquipment[idx].counterEnd = draft.counterEnd;
+                                                            newEquipment[idx].hours = draft.hours;
+                                                            setFormData(prev => ({ ...prev, equipment: newEquipment }));
+
+                                                            const newStates = { ...unsubscribeStates };
+                                                            delete newStates[idxStr];
+                                                            setUnsubscribeStates(newStates);
+                                                            setTechFocusDeviceIndex(null);
+                                                        }}
+                                                    >
+                                                        Speichern
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })()}
                         </div>
 
 
@@ -6573,9 +6749,15 @@ END:VCARD`;
                         )}
 
 
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', ...(mode === 'desktop' ? { order: 1 } : {}) }}>
+                        {mode === 'desktop' && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', order: 1 }}>
                             {formData.equipment
                                 .map((d, i) => ({ ...d, _originalIndex: i }))
+                                .filter(device => {
+                                    if (mode !== 'technician') return true;
+                                    if (techFocusDeviceIndex !== null) return device._originalIndex === techFocusDeviceIndex;
+                                    return !techSelectedEquipmentRoom?.apartment || (device.apartment || 'Allgemeiner Bereich').trim() === techSelectedEquipmentRoom.apartment;
+                                })
                                 .sort((a, b) => {
                                     const aDone = !!a.endDate;
                                     const bDone = !!b.endDate;
@@ -6587,7 +6769,12 @@ END:VCARD`;
                                     return (
                                         <div key={idx} style={{ backgroundColor: '#1E293B', border: '1px solid var(--border)', borderRadius: '8px', padding: '0.75rem', color: 'white' }}>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
-                                                <span style={{ fontWeight: 600, color: 'var(--primary)', minWidth: '40px' }}>#{device.deviceNumber}</span>
+                                                <div style={{ minWidth: '40px', display: 'flex', flexDirection: 'column' }}>
+                                                    <span style={{ fontWeight: 600, color: 'var(--primary)' }}>#{device.deviceNumber}</span>
+                                                    {(device.model || (device.type && device.type !== 'Unbekannt')) && (
+                                                        <span style={{ fontSize: '0.65rem', color: '#94A3B8', fontWeight: 600 }}>{device.model || device.type}</span>
+                                                    )}
+                                                </div>
                                                 <div style={{ flex: 1, textAlign: 'center' }}>
                                                     <div style={{ fontSize: '1.2rem', fontWeight: 700 }}>
                                                         {device.room}
@@ -6612,27 +6799,13 @@ END:VCARD`;
                                                     // ALREADY DONE STATE
                                                     return (
                                                         <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '0.5rem', marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-                                                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem' }}>
-                                                                <div style={{ gridColumn: 'span 3' }}>
-                                                                    <label style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Abmelde-Datum</label>
-                                                                    <input
-                                                                        type="date"
-                                                                        className="form-input"
-                                                                        style={{ fontSize: '0.9rem', padding: '0.4rem', width: '100%' }}
-                                                                        value={device.endDate}
-                                                                        onChange={(e) => {
-                                                                            const newEquipment = [...formData.equipment];
-                                                                            newEquipment[idx].endDate = e.target.value;
-                                                                            setFormData(prev => ({ ...prev, equipment: newEquipment }));
-                                                                        }}
-                                                                    />
-                                                                </div>
-                                                                <div style={{ gridColumn: 'span 2' }}>
-                                                                    <label style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Zähler Ende</label>
+                                                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                                                                <div>
+                                                                    <label style={{ fontSize: '0.75rem', color: '#94A3B8', display: 'block', marginBottom: '0.2rem' }}>Zähler Ende</label>
                                                                     <input
                                                                         type="number"
                                                                         className="form-input"
-                                                                        style={{ fontSize: '0.9rem', padding: '0.4rem' }}
+                                                                        style={{ fontSize: '0.9rem', padding: '0.4rem', width: '100%' }}
                                                                         value={device.counterEnd || ''}
                                                                         onChange={(e) => {
                                                                             const newEquipment = [...formData.equipment];
@@ -6642,11 +6815,11 @@ END:VCARD`;
                                                                     />
                                                                 </div>
                                                                 <div>
-                                                                    <label style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Laufzeit/Std.</label>
+                                                                    <label style={{ fontSize: '0.75rem', color: '#94A3B8', display: 'block', marginBottom: '0.2rem' }}>Laufzeit/Std.</label>
                                                                     <input
                                                                         type="number"
                                                                         className="form-input"
-                                                                        style={{ fontSize: '0.9rem', padding: '0.4rem' }}
+                                                                        style={{ fontSize: '0.9rem', padding: '0.4rem', width: '100%' }}
                                                                         value={device.hours || ''}
                                                                         onChange={(e) => {
                                                                             const newEquipment = [...formData.equipment];
@@ -6678,92 +6851,17 @@ END:VCARD`;
                                                             </button>
                                                         </div>
                                                     );
-                                                } else if (isUnsubscribing) {
-                                                    // EDITING STATE (Unsubscribing process)
-                                                    return (
-                                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '0.5rem', marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-                                                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem' }}>
-                                                                <div style={{ gridColumn: 'span 3' }}>
-                                                                    <label style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Abmelde-Datum</label>
-                                                                    <input
-                                                                        type="date"
-                                                                        className="form-input"
-                                                                        style={{ fontSize: '0.9rem', padding: '0.4rem', width: '100%' }}
-                                                                        value={draft.endDate || ''}
-                                                                        onChange={(e) => setUnsubscribeStates(prev => ({ ...prev, [idx]: { ...prev[idx], endDate: e.target.value } }))}
-                                                                    />
-                                                                </div>
-                                                                <div style={{ gridColumn: 'span 2' }}>
-                                                                    <label style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Zähler Ende</label>
-                                                                    <input
-                                                                        type="number"
-                                                                        className="form-input"
-                                                                        placeholder="Endstand"
-                                                                        autoFocus
-                                                                        style={{ fontSize: '0.9rem', padding: '0.4rem' }}
-                                                                        value={draft.counterEnd || ''}
-                                                                        onChange={(e) => setUnsubscribeStates(prev => ({ ...prev, [idx]: { ...prev[idx], counterEnd: e.target.value } }))}
-                                                                    />
-                                                                </div>
-                                                                <div>
-                                                                    <label style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Laufzeit/Std.</label>
-                                                                    <input
-                                                                        type="number"
-                                                                        className="form-input"
-                                                                        placeholder="Std."
-                                                                        style={{ fontSize: '0.9rem', padding: '0.4rem' }}
-                                                                        value={draft.hours || ''}
-                                                                        onChange={(e) => setUnsubscribeStates(prev => ({ ...prev, [idx]: { ...prev[idx], hours: e.target.value } }))}
-                                                                    />
-                                                                </div>
-                                                            </div>
-                                                            <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                                                <button
-                                                                    type="button"
-                                                                    className="btn btn-ghost"
-                                                                    style={{ flex: 1, color: '#94A3B8', border: '1px solid var(--border)' }}
-                                                                    onClick={() => {
-                                                                        // Cancel
-                                                                        const newStates = { ...unsubscribeStates };
-                                                                        delete newStates[idx];
-                                                                        setUnsubscribeStates(newStates);
-                                                                    }}
-                                                                >
-                                                                    Abbrechen
-                                                                </button>
-                                                                <button
-                                                                    type="button"
-                                                                    className="btn btn-primary"
-                                                                    style={{ flex: 1 }}
-                                                                    onClick={() => {
-                                                                        // Commit
-                                                                        const newEquipment = [...formData.equipment];
-                                                                        newEquipment[idx].endDate = draft.endDate;
-                                                                        newEquipment[idx].counterEnd = draft.counterEnd;
-                                                                        newEquipment[idx].hours = draft.hours;
-                                                                        setFormData(prev => ({ ...prev, equipment: newEquipment }));
 
-                                                                        // Clear state
-                                                                        const newStates = { ...unsubscribeStates };
-                                                                        delete newStates[idx];
-                                                                        setUnsubscribeStates(newStates);
-                                                                    }}
-                                                                >
-                                                                    Speichern
-                                                                </button>
-                                                            </div>
-                                                        </div>
-                                                    );
                                                 } else {
                                                     // IDLE STATE (Active)
                                                     return (
-                                                        <div style={{ marginTop: '0.5rem' }}>
+                                                        <div style={{ marginTop: '0.75rem' }}>
                                                             <button
                                                                 type="button"
                                                                 style={{
-                                                                    width: '100%', fontSize: '0.9rem', padding: '0.5rem', fontWeight: 600,
+                                                                    width: '100%', fontSize: '0.9rem', padding: '0.75rem', fontWeight: 600,
                                                                     color: '#F59E0B', backgroundColor: 'rgba(245, 158, 11, 0.15)',
-                                                                    border: '1px solid #F59E0B', borderRadius: '4px',
+                                                                    border: '1px solid #F59E0B', borderRadius: '8px',
                                                                     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', cursor: 'pointer', textTransform: 'uppercase'
                                                                 }}
                                                                 onClick={() => {
@@ -6787,10 +6885,31 @@ END:VCARD`;
                                         </div>
                                     );
                                 })}
-                            {formData.equipment.length === 0 && (
+                            {formData.equipment.filter(device => mode !== 'technician' || !techSelectedEquipmentRoom?.apartment || (device.apartment || 'Allgemeiner Bereich').trim() === techSelectedEquipmentRoom.apartment).length === 0 && (
                                 <div style={{ textAlign: 'center', color: '#9CA3AF', fontSize: '0.9rem' }}>Keine Geräte installiert.</div>
                             )}
                         </div>
+                        )}
+
+                        {mode === 'technician' && (
+                            <div style={{ marginTop: '1.5rem', padding: '0 0.75rem' }}>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        // Find first available apartment if not set
+                                        if (!techSelectedEquipmentRoom?.apartment) {
+                                            const apts = [...new Set(formData.equipment.map(e => e.apartment).filter(Boolean))];
+                                            if (apts.length > 0) setTechSelectedEquipmentRoom({ apartment: apts[0] });
+                                        }
+                                        setShowAddDeviceForm(true);
+                                    }}
+                                    style={{ width: '100%', background: 'rgba(16, 185, 129, 0.15)', color: '#10B981', border: '1px solid #10B981', padding: '0.75rem', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '0.9rem', textTransform: 'uppercase', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
+                                >
+                                    <Plus size={18} /> Gerät hinzufügen
+                                </button>
+                            </div>
+                        )}
+
 
 
                     </div>
@@ -6801,54 +6920,154 @@ END:VCARD`;
                 {(mode === 'desktop' || !['Schadenaufnahme', 'Leckortung'].includes(formData.status)) && formData.equipment?.length > 0 && (
                     <div style={{ marginBottom: '1.5rem', backgroundColor: 'var(--surface)', padding: '1.25rem', borderRadius: '12px', border: '1px solid var(--border)', color: 'var(--text-main)', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}>
                         <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.6rem', color: 'var(--primary)' }}>
-                            <Database size={18} /> Zusammenfassung Trocknung
+                            <Database size={18} /> Geräteliste
                         </h3>
                         <div style={{ overflowX: 'auto' }}>
-                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
-                                <thead>
-                                    <tr style={{ borderBottom: '2px solid var(--border)' }}>
-                                        <th style={{ textAlign: 'left', padding: '0.75rem' }}>Gerät</th>
-                                        <th style={{ textAlign: 'center', padding: '0.75rem' }}>Dauer (Tage)</th>
-                                        <th style={{ textAlign: 'center', padding: '0.75rem' }}>Betriebsstunden</th>
-                                        <th style={{ textAlign: 'right', padding: '0.75rem' }}>Verbrauch (kWh)</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {formData.equipment.filter(d => d.endDate).map((device, idx) => {
-                                        const hasMeter = device.counterEnd && device.counterStart;
-                                        const hasKw = device.energyConsumption && device.hours;
-                                        let consumption = 0;
-                                        if (hasMeter) {
-                                            consumption = parseFloat(device.counterEnd) - parseFloat(device.counterStart);
-                                        } else if (hasKw) {
-                                            consumption = parseFloat(device.energyConsumption) * parseFloat(device.hours);
-                                        }
+                            {mode === 'technician' ? (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                    {formData.equipment
+                                        .map((d, i) => ({ ...d, _originalIndex: i }))
+                                        .filter(device => !techSelectedEquipmentRoom?.apartment || (device.apartment || 'Allgemeiner Bereich').trim() === techSelectedEquipmentRoom.apartment)
+                                        .map((device) => {
+                                            const idx = device._originalIndex;
+                                            const isFinished = !!device.endDate;
+                                            const hasMeter = device.counterEnd && device.counterStart;
+                                            const hasKw = device.energyConsumption && device.hours;
+                                            let consumption = 0;
+                                            if (hasMeter) {
+                                                consumption = parseFloat(device.counterEnd) - parseFloat(device.counterStart);
+                                            } else if (hasKw) {
+                                                consumption = parseFloat(device.energyConsumption) * parseFloat(device.hours);
+                                            }
 
-                                        return (
-                                            <tr key={idx} style={{ borderBottom: '1px solid var(--border)' }}>
-                                                <td style={{ padding: '0.75rem' }}>#{device.deviceNumber} ({device.room})</td>
-                                                <td style={{ textAlign: 'center', padding: '0.75rem' }}>{getDaysDiff(device.startDate, device.endDate)}</td>
-                                                <td style={{ textAlign: 'center', padding: '0.75rem' }}>{device.hours} h</td>
-                                                <td style={{ textAlign: 'right', padding: '0.75rem' }}>
-                                                    {consumption.toFixed(2)}
-                                                    {!hasMeter && hasKw && <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginLeft: '2px' }}>*</span>}
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                    {formData.equipment.filter(d => d.endDate).length === 0 && (
-                                        <tr>
-                                            <td colSpan="4" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>Keine abgeschlossenen Trocknungen vorhanden.</td>
+                                            return (
+                                                <div 
+                                                    key={idx}
+                                                    style={{ 
+                                                        backgroundColor: '#1E293B', 
+                                                        border: '1px solid var(--border)', 
+                                                        borderRadius: '8px', 
+                                                        padding: '0.75rem', 
+                                                        cursor: !isFinished ? 'pointer' : 'default',
+                                                        display: 'flex',
+                                                        justifyContent: 'space-between',
+                                                        alignItems: 'center'
+                                                    }}
+                                                    onClick={() => {
+                                                        if (!isFinished) {
+                                                            if (techSelectedEquipmentRoom && techSelectedEquipmentRoom.apartment) {
+                                                                if ((device.apartment || 'Allgemeiner Bereich').trim() !== techSelectedEquipmentRoom.apartment) {
+                                                                    setTechSelectedEquipmentRoom(null);
+                                                                }
+                                                            }
+                                                            setUnsubscribeStates(prev => ({
+                                                                ...prev,
+                                                                [idx]: {
+                                                                    endDate: new Date().toISOString().split('T')[0],
+                                                                    counterEnd: '',
+                                                                    hours: ''
+                                                                }
+                                                            }));
+                                                            setTechFocusDeviceIndex(idx);
+                                                        }
+                                                    }}
+                                                >
+                                                    <div style={{ flex: 1, paddingRight: '1rem' }}>
+                                                        <div style={{ fontWeight: 600, color: 'var(--text-main)' }}>
+                                                            #{device.deviceNumber} {device.model ? `- ${device.model}` : (device.type && device.type !== 'Unbekannt' ? `- ${device.type}` : '')}
+                                                        </div>
+                                                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+                                                            {device.room}
+                                                        </div>
+                                                    </div>
+                                                    <div style={{ textAlign: 'right', minWidth: '80px' }}>
+                                                        {isFinished ? (
+                                                            <>
+                                                                <div style={{ fontWeight: 600, color: 'var(--text-main)' }}>{consumption.toFixed(2)} kWh</div>
+                                                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>{device.hours} h • {getDaysDiff(device.startDate, device.endDate)} Tg.</div>
+                                                            </>
+                                                        ) : (
+                                                            <span style={{ fontSize: '0.7rem', color: '#10B981', backgroundColor: 'rgba(16, 185, 129, 0.15)', padding: '4px 8px', borderRadius: '4px', textTransform: 'uppercase', fontWeight: 700 }}>Aktiv</span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                        {formData.equipment.filter(device => !techSelectedEquipmentRoom?.apartment || (device.apartment || 'Allgemeiner Bereich').trim() === techSelectedEquipmentRoom.apartment).length === 0 && (
+                                            <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>Keine Geräte vorhanden.</div>
+                                        )}
+                                        {formData.equipment.filter(device => !techSelectedEquipmentRoom?.apartment || (device.apartment || 'Allgemeiner Bereich').trim() === techSelectedEquipmentRoom.apartment).length > 0 && (
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem', backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: '8px', border: '1px solid var(--border)', marginTop: '0.5rem' }}>
+                                                <div style={{ fontWeight: 700, color: 'var(--text-main)' }}>Gesamt</div>
+                                                <div style={{ textAlign: 'right', fontWeight: 700, color: 'var(--text-main)' }}>
+                                                    <div>{totalDryingKwh.toFixed(2)} kWh</div>
+                                                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 400 }}>{totalDryingHours.toFixed(1)} h</div>
+                                                </div>
+                                            </div>
+                                        )}
+                                </div>
+                            ) : (
+                                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
+                                    <thead>
+                                        <tr style={{ borderBottom: '2px solid var(--border)' }}>
+                                            <th style={{ textAlign: 'left', padding: '0.75rem' }}>Gerät</th>
+                                            <th style={{ textAlign: 'center', padding: '0.75rem' }}>Dauer (Tage)</th>
+                                            <th style={{ textAlign: 'center', padding: '0.75rem' }}>Betriebsstunden</th>
+                                            <th style={{ textAlign: 'right', padding: '0.75rem' }}>Verbrauch (kWh)</th>
                                         </tr>
-                                    )}
-                                    <tr style={{ fontWeight: 700, backgroundColor: 'rgba(255,255,255,0.02)' }}>
-                                        <td style={{ padding: '0.75rem' }}>Gesamt</td>
-                                        <td style={{ textAlign: 'center', padding: '0.75rem' }}>-</td>
-                                        <td style={{ textAlign: 'center', padding: '0.75rem' }}>{totalDryingHours.toFixed(1)} h</td>
-                                        <td style={{ textAlign: 'right', padding: '0.75rem' }}>{totalDryingKwh.toFixed(2)} kWh</td>
-                                    </tr>
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody>
+                                        {formData.equipment.map((device, idx) => {
+                                            const isFinished = !!device.endDate;
+                                            const hasMeter = device.counterEnd && device.counterStart;
+                                            const hasKw = device.energyConsumption && device.hours;
+                                            let consumption = 0;
+                                            if (hasMeter) {
+                                                consumption = parseFloat(device.counterEnd) - parseFloat(device.counterStart);
+                                            } else if (hasKw) {
+                                                consumption = parseFloat(device.energyConsumption) * parseFloat(device.hours);
+                                            }
+
+                                            return (
+                                                <tr key={idx} style={{ borderBottom: '1px solid var(--border)' }}>
+                                                    <td style={{ padding: '0.75rem' }}>
+                                                        <div style={{ fontWeight: 600 }}>#{device.deviceNumber} {device.model ? `- ${device.model}` : (device.type && device.type !== 'Unbekannt' ? `- ${device.type}` : '')}</div>
+                                                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+                                                            {device.room}
+                                                            {!isFinished && <span style={{ fontSize: '0.65rem', color: '#10B981', marginLeft: '6px', backgroundColor: 'rgba(16, 185, 129, 0.15)', padding: '2px 6px', borderRadius: '4px', textTransform: 'uppercase', fontWeight: 700 }}>Aktiv</span>}
+                                                        </div>
+                                                    </td>
+                                                    <td style={{ textAlign: 'center', padding: '0.75rem' }}>
+                                                        {isFinished ? getDaysDiff(device.startDate, device.endDate) : '-'}
+                                                    </td>
+                                                    <td style={{ textAlign: 'center', padding: '0.75rem' }}>
+                                                        {isFinished ? `${device.hours} h` : '-'}
+                                                    </td>
+                                                    <td style={{ textAlign: 'right', padding: '0.75rem' }}>
+                                                        {isFinished ? (
+                                                            <>
+                                                                {consumption.toFixed(2)}
+                                                                {!hasMeter && hasKw && <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginLeft: '2px' }}>*</span>}
+                                                            </>
+                                                        ) : '-'}
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                        {formData.equipment.length === 0 && (
+                                            <tr>
+                                                <td colSpan="4" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>Keine Geräte vorhanden.</td>
+                                            </tr>
+                                        )}
+                                        <tr style={{ fontWeight: 700, backgroundColor: 'rgba(255,255,255,0.02)' }}>
+                                            <td style={{ padding: '0.75rem' }}>Gesamt</td>
+                                            <td style={{ textAlign: 'center', padding: '0.75rem' }}>-</td>
+                                            <td style={{ textAlign: 'center', padding: '0.75rem' }}>{totalDryingHours.toFixed(1)} h</td>
+                                            <td style={{ textAlign: 'right', padding: '0.75rem' }}>{totalDryingKwh.toFixed(2)} kWh</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            )}
                         </div>
                     </div>
                 )}
