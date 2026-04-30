@@ -133,7 +133,7 @@ function App() {
 
   const resolvedProjectMode = projectMode === 'technician' ? 'technician' : 'desktop';
 
-  const { lockedProjectIds, isSessionActive, setIsSessionActive } = useSessionLock(
+  const { lockedProjectIds, isSessionActive, setIsSessionActive, takeOverLock } = useSessionLock(
     supabase,
     mySessionToken,
     selectedReport?.id ?? null,
@@ -802,15 +802,21 @@ function App() {
               </button>
             )}
 
-            {/* Projektspezifischer Mode-Toggle: nur im Projekt-View (details/new-report) */}
-            {(view === 'details' || view === 'new-report') && userRole === 'admin' && (
+            {/* Mode-Toggle: immer sichtbar für admin */}
+            {userRole === 'admin' && (
               <button
-                className={`btn ${projectMode === 'technician' ? 'btn-primary' : 'btn-outline'}`}
-                onClick={() => setProjectModeExclusive(projectMode === 'technician' ? 'desktop' : 'technician')}
+                className={`btn ${(view === 'dashboard' ? isTechnicianMode : projectMode === 'technician') ? 'btn-primary' : 'btn-outline'}`}
+                onClick={() => {
+                  if (view === 'dashboard') {
+                    setIsTechnicianMode(prev => !prev)
+                  } else {
+                    setProjectModeExclusive(projectMode === 'technician' ? 'desktop' : 'technician')
+                  }
+                }}
                 style={{ padding: '0.5rem 1rem' }}
-                title={projectMode === 'technician' ? 'Auf Desktop-Modus wechseln' : 'Auf Techniker-Modus wechseln'}
+                title="Zwischen Desktop- und Techniker-Modus wechseln"
               >
-                {projectMode === 'technician' ? 'Techniker' : 'Desktop'}
+                {(view === 'dashboard' ? isTechnicianMode : projectMode === 'technician') ? 'Techniker' : 'Desktop'}
               </button>
             )}
 
@@ -1018,6 +1024,7 @@ function App() {
           mode={isTechnicianMode ? 'technician' : 'desktop'}
           supabase={supabase}
           currentUser={currentUser}
+          users={users}
           lockedProjectIds={lockedProjectIds}
           onReportsChanged={async () => {
             // Reload from Supabase after a status change
@@ -1067,14 +1074,8 @@ function App() {
                   </div>
                   <button
                     onClick={async () => {
-                      // Neue Session übernehmen
-                      const newToken = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}`;
-                      sessionStorage.setItem('qtool_session_token', newToken);
-                      sessionTokenRef.current = newToken;
-                      sessionStartedAtRef.current = Date.now();
-                      setIsSessionActive(true);
-                      // Presence mit neuem Token und aktuellem Modus neu starten
-                      await setupPresenceForProject(selectedReport?.id, resolvedProjectMode);
+                      // Session-Lock erzwingen
+                      await takeOverLock();
                     }}
                     style={{
                       background: 'white', color: '#dc2626',

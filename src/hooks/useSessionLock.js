@@ -196,5 +196,36 @@ export function useSessionLock(supabase, sessionToken, selectedReportId, view, r
     pollSessions();
   }, [view, selectedReportId, resolvedMode, upsertSession, pollSessions]);
 
-  return { lockedProjectIds, isSessionActive, setIsSessionActive };
+  // ── Session übernehmen (Force Lock) ──────────────────────────────────
+  const takeOverLock = useCallback(async () => {
+    try {
+      if (!supabase) {
+        alert("Fehler: Supabase nicht initialisiert");
+        return;
+      }
+      if (!reportIdRef.current) {
+        alert("Fehler: Keine Report ID vorhanden");
+        return;
+      }
+      
+      // Lösche alle anderen Sessions für dieses Projekt
+      const { error: delError } = await supabase
+        .from('project_sessions')
+        .delete()
+        .eq('open_project_id', reportIdRef.current)
+        .neq('session_token', tokenRef.current);
+        
+      if (delError) {
+        alert("Fehler beim Löschen der Sperre: " + delError.message);
+      }
+        
+      // Aktualisiere unsere eigene Session sofort
+      await upsertSession();
+      setIsSessionActive(true);
+    } catch (e) {
+      alert("Unerwarteter Fehler: " + e.message);
+    }
+  }, [supabase, upsertSession]);
+
+  return { lockedProjectIds, isSessionActive, setIsSessionActive, takeOverLock };
 }

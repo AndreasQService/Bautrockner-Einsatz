@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { Camera, Phone, MapPin, Save, ArrowLeft, Plus, X, Settings, CheckCircle } from 'lucide-react';
 import AddRoomForm from './AddRoomForm';
 
@@ -79,7 +79,11 @@ export default function TechnicianModeView({
               {s:'Schadenaufnahme',icon:'📋',c:'59,130,246',tab:'aufnahme',onTileClick:()=>{setTechTab('aufnahme');setShowAddRoomForm&&setShowAddRoomForm(true);}},
               {s:'Leckortung',icon:'💧',c:'249,115,22',tab:'leck',onTileClick:()=>setTechTab('leck')},
               {s:'Trocknung',icon:'💨',c:'34,197,94',tab:'trocknung',onTileClick:()=>setTechTab('trocknung')},
-              {s:'Kontrollmessung',icon:'📐',c:'168,85,247',tab:'messung',onTileClick:()=>setTechTab('messung')},
+              {s:'Kontrollmessung',icon:'📐',c:'168,85,247',tab:'messung',onTileClick:()=>{
+                setActiveRoomForMeasurement(formData.rooms && formData.rooms.length > 0 ? formData.rooms[0] : null);
+                setIsNewMeasurement(true);
+                setShowMeasurementModal(true);
+              }},
             ].map(({s,icon,c,tab,onTileClick})=>{
               const done = statusDone(s) || formData.status==='Abgeschlossen';
               const active = formData.status===s;

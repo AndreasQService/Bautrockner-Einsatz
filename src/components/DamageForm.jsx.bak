@@ -11,14 +11,16 @@ if (typeof window !== 'undefined') {
     }
 }
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Camera, Image, Trash, X, Plus, Edit3, Save, Upload, FileText, CheckCircle, Circle, AlertTriangle, Play, HelpCircle, ArrowLeft, Mail, Map, MapPin, Folder, Mic, Paperclip, Table, Download, Check, Settings, RotateCcw, ChevronDown, ChevronUp, Briefcase, Hammer, ClipboardList, MicOff, Eye, Database, Phone, UserPlus, Link, Unlink, GripVertical } from 'lucide-react'
 import { supabase } from '../supabaseClient';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
-import { buildProjectFolderName, uploadReport, uploadPhotoFile, uploadPhotoAndGetUrl, getPhotoDownloadUrl } from '../services/OneDriveService';
+import { buildProjectFolderName, uploadPhotoAndGetUrl, getPhotoDownloadUrl } from '../services/OneDriveService';
+import { savePhotoLocally, updatePhotoSyncStatus, deleteOldSyncedPhotos, getPendingCount } from '../services/PhotoStorage';
 import { swissPLZ } from '../data/swiss_plz';
+
 import { DEVICE_INVENTORY } from '../data/device_inventory';
 import { pdf } from '@react-pdf/renderer';
 import DamageReportDocument from './pdf/DamageReportDocument';
@@ -29,6 +31,7 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import CameraCaptureModal from './CameraCaptureModal';
 import MeasurementModal from './MeasurementModal';
+import { applyDryingCheck } from '../features/projects/dryingCheckService';
 import { generateMeasurementExcel } from '../utils/MeasurementExcelExporter';
 
 /* Custom PDF Icon */
@@ -152,6 +155,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         return { street, zip, city };
     }
     const [caseId, setCaseId] = useState(null);
+    const [isCauseExpanded, setIsCauseExpanded] = useState(true);
 
     const initialAddressParts = parseAddress(initialData?.address);
 
@@ -271,8 +275,184 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
     const [conflicts, setConflicts] = useState({}); // Stores { fieldPath: { original: '...', new: '...' } }
     const [isContactsExpanded, setIsContactsExpanded] = useState(mode !== 'technician');
     const [isRoomsExpanded, setIsRoomsExpanded] = useState(true);
+    const [isOnline, setIsOnline] = useState(navigator.onLine);
+    const [pendingSyncCount, setPendingSyncCount] = useState(0);
+    const [isSyncing, setIsSyncing] = useState(false);
+
+    // ── Auto-Sync: Pending Fotos hochladen wenn Netz zurückkommt ─────────────
+    useEffect(() => {
+        const syncPendingPhotos = async () => {
+            if (isSyncing) return;
+            setIsSyncing(true);
+
+            console.log('[Sync] 🔄 Netz verfügbar – starte Sync ausstehender Fotos...');
+
+            try {
+                const { getPendingPhotos } = await import('../services/PhotoStorage');
+                const pending = await getPendingPhotos(formData.id || 'temp');
+
+                if (pending.length === 0) {
+                    console.log('[Sync] ✅ Keine ausstehenden Fotos.');
+                    setPendingSyncCount(0);
+                    return;
+                }
+
+                console.log(`[Sync] ${pending.length} Fotos ausstehend...`);
+                let synced = 0;
+
+                for (const photo of pending) {
+                    try {
+                        const meta = photo.meta || {};
+                        const subFolder = meta.subFolder || 'Sonstiges';
+                        const odFolder = meta.odFolder || buildProjectFolderName(formData.projectNumber || formData.id || 'Unbekannt', formData);
+
+                        // Supabase Upload
+                        let supabasePath = photo.supabasePath;
+                        if (!supabasePath && supabase) {
+                            const ext = photo.name.split('.').pop();
+                            const fileName = `cases/${formData.id || 'temp'}/images/${Date.now()}_${photo.id}.${ext}`;
+                            const { error } = await supabase.storage.from('case-files').upload(fileName, photo.blob);
+                            if (!error) supabasePath = fileName;
+                        }
+
+                        // OneDrive Upload
+                        let oneDriveItemId = photo.oneDriveItemId;
+                        let oneDrivePath = photo.oneDrivePath;
+                        if (!oneDriveItemId) {
+                            const odResult = await uploadPhotoAndGetUrl(odFolder, subFolder, new File([photo.blob], photo.name, { type: photo.type }));
+                            if (odResult) {
+                                oneDriveItemId = odResult.itemId;
+                                oneDrivePath = odResult.odPath;
+                            }
+                        }
+
+                        // IndexedDB Status aktualisieren
+                        await updatePhotoSyncStatus(photo.id, {
+                            supabasePath,
+                            oneDriveItemId,
+                            oneDrivePath,
+                            syncStatus: oneDriveItemId ? 'synced' : (supabasePath ? 'synced' : 'error'),
+                        });
+
+                        // formData image Eintrag aktualisieren
+                        setFormData(prev => ({
+                            ...prev,
+                            images: prev.images.map(img =>
+                                img.localId === photo.id ? {
+                                    ...img,
+                                    storagePath: supabasePath,
+                                    oneDriveItemId,
+                                    oneDrivePath,
+                                } : img
+                            )
+                        }));
+
+                        synced++;
+                    } catch (photoErr) {
+                        console.warn(`[Sync] Foto ${photo.id} fehlgeschlagen:`, photoErr.message);
+                    }
+                }
+
+                console.log(`[Sync] ✅ ${synced}/${pending.length} Fotos synchronisiert`);
+                setPendingSyncCount(pending.length - synced);
+            } catch (e) {
+                console.warn('[Sync] Fehler:', e.message);
+            } finally {
+                setIsSyncing(false);
+            }
+        };
+
+        // Pending-Count beim Mount laden
+        getPendingCount().then(count => setPendingSyncCount(count));
+
+        // Online-Event: automatisch syncen wenn Netz zurückkommt
+        const handleOnline = () => {
+            setIsOnline(true);
+            console.log('[Netz] ✅ Online – starte Auto-Sync...');
+            syncPendingPhotos();
+        };
+        const handleOffline = () => {
+            setIsOnline(false);
+            console.log('[Netz] ⚠️ Offline-Modus aktiv');
+        };
+
+        window.addEventListener('online', handleOnline);
+        window.addEventListener('offline', handleOffline);
+
+        // Beim Mount: wenn bereits online, sofort syncen
+        if (navigator.onLine) syncPendingPhotos();
+
+        return () => {
+            window.removeEventListener('online', handleOnline);
+            window.removeEventListener('offline', handleOffline);
+        };
+    }, [formData.id]); // Nur neu starten wenn Projekt wechselt
+
+    // ── OneDrive-Backfill: Supabase-Fotos → persönliches OneDrive ─────────────
+    // Läuft einmal beim Öffnen eines Projekts. Findet alle Fotos die in Supabase
+    // gesichert sind (storagePath vorhanden) aber noch nicht auf OneDrive sind
+    // (oneDriveItemId fehlt). Download via Supabase Storage → Upload via User-Token.
+    // Funktioniert auf jedem Gerät, da Blobs per HTTP aus Supabase geladen werden.
+    useEffect(() => {
+        if (!formData.id || !supabase) return;
+
+        const backfill = async () => {
+            const odFolder = buildProjectFolderName(
+                formData.projectNumber || formData.id || 'Unbekannt',
+                formData
+            );
+
+            // Alle Bilder die in Supabase sind aber nicht in OneDrive
+            const missing = (formData.images || []).filter(
+                img => img.storagePath && !img.oneDriveItemId && !img.uploading
+            );
+
+            if (missing.length === 0) return;
+            console.log(`[OneDrive-Backfill] 🔄 ${missing.length} Fotos ohne OneDrive-Link – starte Backfill...`);
+
+            for (const img of missing) {
+                try {
+                    // Blob von Supabase Storage laden
+                    const { data: blob, error: dlErr } = await supabase.storage
+                        .from('case-files')
+                        .download(img.storagePath);
+
+                    if (dlErr || !blob) {
+                        console.warn(`[OneDrive-Backfill] ⚠️ Download fehlgeschlagen: ${img.storagePath}`);
+                        continue;
+                    }
+
+                    // Upload ins persönliche OneDrive
+                    const subFolder = img.roomName || img.assignedTo || 'Sonstiges';
+                    const file = new File([blob], img.name || 'foto.jpg', { type: blob.type || 'image/jpeg' });
+                    const odResult = await uploadPhotoAndGetUrl(odFolder, subFolder, file);
+
+                    if (odResult?.itemId || odResult?.odPath) {
+                        setFormData(prev => ({
+                            ...prev,
+                            images: prev.images.map(i =>
+                                i.id === img.id ? {
+                                    ...i,
+                                    oneDriveItemId: odResult.itemId || null,
+                                    oneDrivePath:   odResult.odPath  || null,
+                                } : i
+                            )
+                        }));
+                        console.log(`[OneDrive-Backfill] ✅ ${img.name} → OneDrive`);
+                    }
+                } catch (err) {
+                    console.warn(`[OneDrive-Backfill] ⚠️ Fehler bei ${img.name}:`, err.message);
+                }
+            }
+        };
+
+        // 3s warten bis formData vollständig geladen ist
+        const timer = setTimeout(backfill, 3000);
+        return () => clearTimeout(timer);
+    }, [formData.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // Auto-Save Effect
+
     useEffect(() => {
         // Skip auto-save if it's the very first render/empty (optional check)
         if (!formData.projectTitle && !formData.id) return;
@@ -450,11 +630,11 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
     // QR-Code aus Feldern generieren
     const buildQR = async (fields) => {
         const lines = ['BEGIN:VCARD', 'VERSION:3.0'];
-        if (fields.name)  lines.push(`FN:${fields.name}`);
-        if (fields.name)  lines.push(`ORG:${fields.name}`);
+        if (fields.name) lines.push(`FN:${fields.name}`);
+        if (fields.name) lines.push(`ORG:${fields.name}`);
         if (fields.phone) lines.push(`TEL;TYPE=CELL:${fields.phone}`);
         if (fields.email) lines.push(`EMAIL:${fields.email}`);
-        if (fields.note)  lines.push(`NOTE:${fields.note}`);
+        if (fields.note) lines.push(`NOTE:${fields.note}`);
         lines.push('END:VCARD');
         try {
             const dataUrl = await QRCode.toDataURL(lines.join('\n'), {
@@ -468,10 +648,10 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
     // QR-Modal öffnen
     const handleContactQR = (contact) => {
         const fields = {
-            name:  contact.name  || '',
+            name: contact.name || '',
             phone: contact.phone || '',
             email: contact.email || '',
-            note:  [contact.floor, contact.role].filter(Boolean).join(' · '),
+            note: [contact.floor, contact.role].filter(Boolean).join(' · '),
         };
         setQrEditFields(fields);
         setQrSessionKey(Date.now()); // neuer Key = Inputs neu mounten
@@ -553,6 +733,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
     const [isMeasurementReadOnly, setIsMeasurementReadOnly] = useState(false); // Explicit read-only mode for modal
     const [activeRoomForMeasurement, setActiveRoomForMeasurement] = useState(null); // Track which room we are editing
     const [showAddDeviceForm, setShowAddDeviceForm] = useState(false);
+    const [techTab, setTechTab] = useState(null); // null = Kachel-Home
     const [showAddRoomForm, setShowAddRoomForm] = useState(false);
 
     const [unsubscribeStates, setUnsubscribeStates] = useState({}); // { [idx]: { endDate, counterEnd, hours } }
@@ -606,9 +787,17 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
     // UI State for Technician Mode "Add Room" toggle
     const [isAddRoomExpanded, setIsAddRoomExpanded] = useState(false);
 
+
     useEffect(() => {
         // Initial load
         // refreshAudioDevices(); // Potentially blocking if hardware issue
+
+
+        // Cleanup wird in Variante C durch den Backend-Worker erledigt
+        const cleanupTimer = setTimeout(() => {
+            deleteOldSyncedPhotos(30); // Alte IndexedDB-Fotos bereinigen
+        }, 5000);
+
 
         // Listen for device changes (plugging in/out)
         /*
@@ -619,8 +808,10 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         */
 
         return () => {
+            clearTimeout(cleanupTimer);
             // navigator.mediaDevices.ondevicechange = null;
         };
+
     }, []);
 
     const startRecording = async (targetId = 'modal') => {
@@ -629,11 +820,25 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         }
 
         try {
-            const constraints = {
-                audio: selectedDeviceId ? { deviceId: { exact: selectedDeviceId } } : true
+            const audioConstraints = {
+                echoCancellation: true,   // Browser-Verarbeitung für sauberes Signal
+                noiseSuppression: true,   // Hilft bei schwachem BT/AirPods-Signal
+                autoGainControl: true,    // Boost für leise Mikrofone
             };
-            const stream = await navigator.mediaDevices.getUserMedia(constraints);
-            mediaRecorderRef.current = new MediaRecorder(stream);
+            if (selectedDeviceId) audioConstraints.deviceId = { exact: selectedDeviceId };
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints });
+
+            // Beste MIME-Type für Browser-Kompatibilität (Whisper unterstützt webm, mp4, ogg)
+            const preferredMimes = [
+                'audio/webm;codecs=opus',
+                'audio/webm',
+                'audio/ogg;codecs=opus',
+                'audio/mp4'
+            ];
+            const supportedMime = preferredMimes.find(m => MediaRecorder.isTypeSupported(m)) || '';
+            console.log("Using MIME type:", supportedMime || 'browser default');
+
+            mediaRecorderRef.current = new MediaRecorder(stream, supportedMime ? { mimeType: supportedMime } : {});
             const audioChunks = [];
 
             mediaRecorderRef.current.ondataavailable = (event) => {
@@ -643,8 +848,9 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
             };
 
             mediaRecorderRef.current.onstop = async () => {
-                const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-                console.log("Recording finished. Size:", audioBlob.size, "Type:", audioBlob.type);
+                const actualMime = mediaRecorderRef.current?.mimeType || supportedMime || 'audio/webm';
+                const audioBlob = new Blob(audioChunks, { type: actualMime });
+                console.log("Recording finished. Size:", audioBlob.size, "Type:", actualMime);
 
                 try {
                     if (audioBlob.size > 0) {
@@ -761,6 +967,9 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
             const data = await response.json();
 
             if (data.text) {
+                // Log raw Whisper response for debugging
+                console.log("Whisper raw response:", JSON.stringify(data.text));
+
                 // Clean up the new text: removing leading dots/whitespace
                 let newText = data.text.trim();
 
@@ -783,8 +992,9 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
 
                 // If nothing remains (or just a dot), it was effectively silence
                 if (cleanText === '' || cleanText === '.') {
-                    console.warn("Whisper hallucination detected (likely silence):", newText);
-                    alert("Keine Sprache erkannt (Stille). Bitte lauter sprechen.");
+                    console.warn("Whisper hallucination detected (likely silence):", newText, "Blob size:", audioBlob?.size);
+                    const sizeHint = audioBlob?.size < 5000 ? "\n\nMikrofon-Signal zu leise – bitte Lautstärke erhöhen." : "";
+                    alert("Keine Sprache erkannt. Bitte lauter und deutlicher sprechen." + sizeHint);
                     return;
                 }
 
@@ -1188,7 +1398,7 @@ END:VCARD`;
         }));
     };
 
-    // --- Image Upload Handler (Supabase) ---
+    // --- Image Upload Handler: Supabase (Pflicht-Backup) + OneDrive (Primärarchiv) ---
     const handleImageUpload = async (files, contextData = {}) => {
         if (!files || files.length === 0) return;
 
@@ -1220,62 +1430,131 @@ END:VCARD`;
                     formData
                 );
 
-                // ── Primär: OneDrive ──────────────────────────────────────────
+                let supabasePath = null;
+                let supabaseUrl = null;
+                let odResult = null;
+                let localPreviewUrl = previewUrl; // Fallback: blob-URL aus createObjectURL
+
+                // ── SCHRITT 0: IndexedDB (sofort, offline, garantiert) ────────
                 if (!isDoc) {
-                    console.log('[OneDrive] 🖼️ Foto-Upload startet:', file.name, '→', odFolder, '/', subFolder);
-                    let odResult = null;
                     try {
-                        odResult = await uploadPhotoAndGetUrl(odFolder, subFolder, file);
-                    } catch (odErr) {
-                        console.warn('[OneDrive] Foto-Upload fehlgeschlagen, nutze Supabase als Fallback:', odErr.message);
-                    }
-
-                    if (!odResult) {
-                        console.warn('[OneDrive] ⚠️ uploadPhotoAndGetUrl gab null zurück (kein Token?) → Supabase-Fallback');
-                    }
-
-                    if (odResult) {
-                        // OneDrive erfolgreich → URL = temporäre Download-URL (gültig ~1h)
-                        // Lokale blob-URL bleibt als Fallback für aktuelle Session
+                        localPreviewUrl = await savePhotoLocally(tempId, formData.id || 'temp', file, {
+                            subFolder, odFolder, contextData
+                        });
+                        // State sofort mit lokaler URL aktualisieren (kein Netz nötig!)
                         setFormData(prev => ({
                             ...prev,
                             images: prev.images.map(img =>
-                                img.id === tempId ? {
-                                    ...img,
-                                    preview: odResult.downloadUrl || previewUrl,
-                                    previewFallback: previewUrl,
-                                    oneDriveItemId: odResult.itemId,
-                                    oneDrivePath: odResult.odPath,
-                                    uploading: false,
-                                } : img
+                                img.id === tempId ? { ...img, preview: localPreviewUrl, localId: tempId } : img
                             )
                         }));
-                        continue; // Supabase überspringen
+                        console.log('[IndexedDB] ✅ Foto lokal gesichert:', tempId);
+                    } catch (idbErr) {
+                        console.warn('[IndexedDB] Lokaler Speicher fehlgeschlagen:', idbErr.message);
                     }
                 }
 
-                // ── Fallback: Supabase Storage (Dokumente oder kein OneDrive-Login) ──
+                // ── SCHRITT 1: Supabase (immer – garantierter Backup) ─────────
                 if (supabase) {
-                    const ext = file.name.split('.').pop();
-                    const fileName = `cases/${formData.id || 'temp'}/images/${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${ext}`;
-                    const { error } = await supabase.storage.from('case-files').upload(fileName, file);
-                    if (error) throw error;
-                    const { data: { publicUrl } } = supabase.storage.from('case-files').getPublicUrl(fileName);
-                    setFormData(prev => ({
-                        ...prev,
-                        images: prev.images.map(img =>
-                            img.id === tempId ? { ...img, preview: publicUrl, storagePath: fileName, uploading: false } : img
-                        )
-                    }));
-                } else {
-                    // Offline: nur lokale Vorschau
-                    setFormData(prev => ({
-                        ...prev,
-                        images: prev.images.map(img =>
-                            img.id === tempId ? { ...img, uploading: false } : img
-                        )
-                    }));
+                    try {
+                        const ext = file.name.split('.').pop();
+                        const fileName = `cases/${formData.id || 'temp'}/images/${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${ext}`;
+                        const { error: sbErr } = await supabase.storage.from('case-files').upload(fileName, file);
+                        if (!sbErr) {
+                            const { data: { publicUrl } } = supabase.storage.from('case-files').getPublicUrl(fileName);
+                            supabasePath = fileName;
+                            supabaseUrl = publicUrl;
+                            console.log('[Supabase] ✅ Backup gespeichert:', fileName);
+
+                            // IndexedDB-Status auf 'synced' → Badge-Counter geht auf 0
+                            updatePhotoSyncStatus(tempId, 'synced').catch(() => {});
+                        } else {
+                            console.warn('[Supabase] Backup-Fehler:', sbErr.message);
+                        }
+                    } catch (sbEx) {
+                        console.warn('[Supabase] Backup fehlgeschlagen:', sbEx.message);
+                    }
                 }
+
+                // ── SCHRITT 1.5: OneDrive persönlich (direkt, via User-Token) ─────────
+                if (!isDoc) {
+                    try {
+                        const uploadedOd = await uploadPhotoAndGetUrl(odFolder, subFolder, file);
+                        if (uploadedOd?.itemId || uploadedOd?.odPath) {
+                            odResult = uploadedOd;
+                            console.log('[OneDrive] ✅ Foto direkt hochgeladen:', uploadedOd.odPath);
+                        }
+                    } catch (odErr) {
+                        console.warn('[OneDrive] Direkter Upload fehlgeschlagen (Journal übernimmt):', odErr.message);
+                    }
+                }
+
+                // ── SCHRITT 2: Journal-Eintrag für Backend-Upload (Variante C) ───────────
+                // Das Backend (Supabase Edge Function) übernimmt den
+                // eigentlichen Upload nach OneDrive/SharePoint.
+                // Kein direkter OneDrive-Aufruf im Frontend.
+                if (!isDoc && supabasePath) {
+                    try {
+                        const { supabase: sb } = await import('../supabaseClient.js');
+                        if (sb) {
+                            await sb.from('project_image_uploads').upsert({
+                                local_image_id:  tempId,
+                                project_id:      formData.id || formData.projectNumber || 'tmp',
+                                filename:        file.name,
+                                mime_type:       file.type || 'image/jpeg',
+                                size_bytes:      file.size,
+                                storage_bucket:  'case-files',
+                                storage_path:    supabasePath,
+                                storage_status:  'uploaded_to_backend',
+                                remote_path:     `QTool/${odFolder}/Fotos/${subFolder.replace(/[^a-zA-Z0-9]/g, '_')}/${file.name}`,
+                                updated_at:      new Date().toISOString(),
+                            }, { onConflict: 'local_image_id', ignoreDuplicates: false });
+                            console.log('[Variante C] ✅ Journal-Eintrag erstellt – Backend lädt hoch');
+
+                            // ── Sofortiger Worker-Trigger (fire & forget) ──────
+                            // Ruft den Backend-Worker direkt auf statt auf Cron zu
+                            // warten (max. 1 Minute). Bilder erscheinen so in
+                            // Sekunden in SharePoint statt nach bis zu 1 Minute.
+                            fetch(
+                              `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/onedrive-upload-worker`,
+                              {
+                                method: 'POST',
+                                headers: {
+                                  'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+                                  'Content-Type': 'application/json',
+                                },
+                                body: '{}',
+                              }
+                            ).then(r => {
+                              if (r.ok) console.log('[Variante C] 🚀 Worker sofort getriggert');
+                            }).catch(() => {}); // Fire & forget – niemals UI blockieren
+                        }
+                    } catch (jErr) {
+                        // Journal-Fehler ist nicht kritisch – Bild ist in Supabase Storage gesichert
+                        console.warn('[Variante C] Journal-Fehler (Bild trotzdem gesichert):', jErr.message);
+                    }
+                }
+
+                // ── SCHRITT 3: State mit beiden Pfaden aktualisieren ──────────
+                setFormData(prev => ({
+                    ...prev,
+                    images: prev.images.map(img =>
+                        img.id === tempId ? {
+                            ...img,
+                            // Vorschau: OneDrive → Supabase → blob (Session)
+                            preview: odResult?.downloadUrl || supabaseUrl || previewUrl,
+                            previewFallback: supabaseUrl || previewUrl,
+                            // OneDrive (permanent)
+                            oneDriveItemId: odResult?.itemId || null,
+                            oneDrivePath: odResult?.odPath || null,
+                            // Supabase (temporärer Backup, periodisch bereinigt)
+                            storagePath: supabasePath,
+                            supabaseBackedUpAt: supabasePath ? new Date().toISOString() : null,
+                            uploading: false,
+                            error: !supabasePath && !odResult,
+                        } : img
+                    )
+                }));
 
             } catch (error) {
                 console.error('Upload failed:', error);
@@ -1288,6 +1567,12 @@ END:VCARD`;
             }
         }
     };
+
+
+
+    // Cleanup in Variante C: Der Backend-Worker (Edge Function) übernimmt
+    // das Löschen verifizierter Blobs nach der Sicherheitsfrist.
+    // Die alte cleanupOldSupabasePhotos()-Funktion wurde entfernt.
 
     const handleRoomImageDrop = (e, room) => {
         e.preventDefault();
@@ -1707,65 +1992,36 @@ END:VCARD`;
                 }
             } catch (e) { console.error("Logo load error", e); }
 
-            // Build Static Map via OSM tiles (fetch blob → objectURL → canvas, no CORS taint)
+            // Build Static Map via Google Static Maps API
             let staticMapUrl = null;
             try {
                 const mapAddress = dataToUse.street
                     ? `${dataToUse.street}, ${dataToUse.zip || ''} ${dataToUse.city || ''}`
                     : dataToUse.address;
                 if (mapAddress) {
-                    const geoResp = await fetch(`/nominatim/search?q=${encodeURIComponent(mapAddress)}&format=json&limit=1`);
-                    const geoData = await geoResp.json();
-                    if (geoData && geoData.length > 0) {
-                        const lat = parseFloat(geoData[0].lat);
-                        const lon = parseFloat(geoData[0].lon);
-                        const zoom = 15;
-                        const lon2tile = (l, z) => Math.floor((l + 180) / 360 * Math.pow(2, z));
-                        const lat2tile = (l, z) => Math.floor((1 - Math.log(Math.tan(l * Math.PI / 180) + 1 / Math.cos(l * Math.PI / 180)) / Math.PI) / 2 * Math.pow(2, z));
-                        const tileX = lon2tile(lon, zoom);
-                        const tileY = lat2tile(lat, zoom);
-                        const cols = 3, rows = 2, tileSize = 256;
-                        const offX = Math.floor(cols / 2), offY = Math.floor(rows / 2);
-                        const canvas = document.createElement('canvas');
-                        canvas.width = cols * tileSize;
-                        canvas.height = rows * tileSize;
-                        const ctx = canvas.getContext('2d');
-                        // Fetch tiles as blobs → objectURLs (avoids canvas CORS taint)
-                        // Each promise resolves only AFTER img.onload draws the tile onto the canvas
-                        const tilePromises = [];
-                        for (let r = 0; r < rows; r++) {
-                            for (let c = 0; c < cols; c++) {
-                                const tileUrl = `/osm-tile/${zoom}/${tileX + c - offX}/${tileY + r - offY}.png`;
-                                const col = c; // capture for closure
-                                const row = r;
-                                const p = fetch(tileUrl)
-                                    .then(resp => resp.blob())
-                                    .then(blob => new Promise(res => {
-                                        const oUrl = URL.createObjectURL(blob);
-                                        const img = new Image();
-                                        img.onload = () => {
-                                            ctx.drawImage(img, col * tileSize, row * tileSize);
-                                            URL.revokeObjectURL(oUrl);
-                                            res();
-                                        };
-                                        img.onerror = () => { URL.revokeObjectURL(oUrl); res(); };
-                                        img.src = oUrl;
-                                    }))
-                                    .catch(() => Promise.resolve());
-                                tilePromises.push(p);
-                            }
-                        }
-                        await Promise.all(tilePromises);
-                        // Red pin marker
-                        const cx = offX * tileSize + tileSize / 2;
-                        const cy = offY * tileSize + tileSize / 2;
-                        ctx.beginPath(); ctx.arc(cx, cy - 10, 9, 0, 2 * Math.PI);
-                        ctx.fillStyle = '#e53e3e'; ctx.fill();
-                        ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
-                        staticMapUrl = canvas.toDataURL('image/jpeg', 0.9);
+                    const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+                    const params = new URLSearchParams({
+                        center: mapAddress,
+                        zoom: '15',
+                        size: '640x300',
+                        scale: '2',
+                        maptype: 'roadmap',
+                        markers: `color:red|${mapAddress}`,
+                        key: apiKey,
+                        language: 'de',
+                    });
+                    const googleMapUrl = `/google-staticmap?${params.toString()}`;
+                    const resp = await fetch(googleMapUrl);
+                    if (resp.ok) {
+                        const blob = await resp.blob();
+                        staticMapUrl = await new Promise((resolve) => {
+                            const reader = new FileReader();
+                            reader.onloadend = () => resolve(reader.result);
+                            reader.readAsDataURL(blob);
+                        });
                     }
                 }
-            } catch (e) { console.warn("Static map error", e); }
+            } catch (e) { console.warn('Google Static Map error', e); }
 
             // Pre-process images - Filter out PDFs and non-renderable documents
             console.log("PDF GEN: Starting image processing...");
@@ -1775,7 +2031,9 @@ END:VCARD`;
                     const isDocCategory = ['schadensbericht', 'arbeitsrapporte', 'messprotokolle', 'sonstiges', 'pläne', 'lieferantenrechnungen'].includes(category);
                     const isProbablyPDF = img.preview?.toLowerCase().includes('.pdf') || img.type?.includes('pdf');
 
-                    if (img.includeInReport === false || isDocCategory || isProbablyPDF) {
+                    const isImageFile = img.preview && /\.(jpg|jpeg|png|gif|webp|heic|heif)/i.test(img.preview);
+
+                    if (img.includeInReport === false || isProbablyPDF || (isDocCategory && !isImageFile)) {
                         return { ...img, isRenderable: false };
                     }
 
@@ -1823,19 +2081,37 @@ END:VCARD`;
             }
 
             // Prepare Data for Document Component
+            // Räume: Kontakt-Etage überschreibt altes room.stockwerk aus DB
+            const liveContacts = dataToUse.contacts || [];
+            const enrichedRooms = (dataToUse.rooms || []).map(room => {
+                const apt = (room.apartment || '').toLowerCase().trim();
+                const match = liveContacts.find(c => {
+                    const cn = (c.name || '').toLowerCase().trim();
+                    return cn && apt && (cn.includes(apt) || apt.includes(cn));
+                });
+                const floor = (match?.floor || '').trim();
+                return floor ? { ...room, stockwerk: floor } : room;
+            });
+
             const docData = {
                 ...dataToUse,
+                rooms: enrichedRooms,
                 damageType: dataToUse.damageCategory || '-',
                 images: processedImages,
-                damageTypeImages: processedHeroImages, // All selected cause photos
-                damageTypeImage: processedHeroImages[0] || null, // Primary one for fallback
+                damageTypeImages: processedHeroImages,
+                damageTypeImage: processedHeroImages[0] || null,
                 exteriorPhoto: processedExteriorPhoto,
                 logo: logoData,
-                staticMapUrl: staticMapUrl,
+                staticMapUrl: staticMapUrl || null,
             };
 
+
             // Generate Blob using @react-pdf
-            const blob = await pdf(<DamageReportDocument key={Math.random()} data={docData} />).toBlob();
+            const rawBlob = await pdf(<DamageReportDocument key={Math.random()} data={docData} />).toBlob();
+            if (!rawBlob || rawBlob.size === 0) {
+                throw new Error('PDF Blob ist leer - Layout-Fehler in react-pdf');
+            }
+            const blob = new Blob([rawBlob], { type: 'application/pdf' });
             const now = new Date();
             const timeStr = `${String(now.getHours()).padStart(2, '0')}-${String(now.getMinutes()).padStart(2, '0')}`;
             const dateStr = now.toLocaleDateString('de-CH').replace(/\./g, '-');
@@ -1845,6 +2121,7 @@ END:VCARD`;
 
             // 1. Download File
             saveAs(blob, fileName);
+
 
             // 2. Upload to OneDrive (silent - no error if not logged in)
             try {
@@ -2132,7 +2409,7 @@ END:VCARD`;
                 mergeField('clientPhone', data.auftraggeber.telefon);
                 mergeField('clientEmail', data.auftraggeber.email);
                 mergeField('clientStreet', data.auftraggeber.strasse_nr);
-                mergeField('clientZip',  data.auftraggeber.plz);
+                mergeField('clientZip', data.auftraggeber.plz);
                 mergeField('clientCity', data.auftraggeber.ort);
             }
             // Fallback: wenn KI Auftraggeber-Kontakt in handwerker-Block gelegt hat
@@ -2153,7 +2430,7 @@ END:VCARD`;
             if (data.schadenort) {
                 mergeField('street', data.schadenort.strasse_nr);
                 mergeField('locationDetails', data.schadenort.bezeichnung);
-                mergeField('zip',  data.schadenort.plz);
+                mergeField('zip', data.schadenort.plz);
                 mergeField('city', data.schadenort.ort);
             }
 
@@ -2169,8 +2446,16 @@ END:VCARD`;
             }
             if (data.rechnungs_details) {
                 mergeField('ownerName', data.rechnungs_details.eigentuemer);
+                mergeField('ownerStreet', data.rechnungs_details.strasse);
+                mergeField('ownerZip', data.rechnungs_details.plz);
+                mergeField('ownerCity', data.rechnungs_details.ort);
                 mergeField('ownerEmail', data.rechnungs_details.email_rechnung);
                 mergeField('invoiceReference', data.rechnungs_details.vermerk);
+            }
+            // Fallback: KI hat Eigentümer als Kontakt erkannt, aber nicht in rechnungs_details geschrieben
+            if (!nextData.ownerName) {
+                const eigKontakt = (data.kontakte || []).find(c => c.rolle === 'Eig.' || c.rolle === 'Eigentümer' || c.rolle === 'Eig');
+                if (eigKontakt?.name) nextData.ownerName = eigKontakt.name;
             }
 
             // --- KONTAKTE aufbauen ---
@@ -2203,13 +2488,13 @@ END:VCARD`;
             // _blockRolle = im Modal per Dropdown korrigierte Rolle (hat Vorrang)
             const blockRoleMap = {
                 'auftraggeber': 'Auftraggeber',
-                'verwaltung':   'Verwaltung',
-                'eigentuemer':  'Eig.',
-                'hauswart':     'HW',
-                'handwerker':   'Handw.',
-                'mieter':       'Mieter',
+                'verwaltung': 'Verwaltung',
+                'eigentuemer': 'Eig.',
+                'hauswart': 'HW',
+                'handwerker': 'Handw.',
+                'mieter': 'Mieter',
             };
-            const neueRollen = ['auftraggeber','verwaltung','eigentuemer','hauswart','handwerker'];
+            const neueRollen = ['auftraggeber', 'verwaltung', 'eigentuemer', 'hauswart', 'handwerker'];
             neueRollen.forEach(key => {
                 const k = data[key];
                 if (!k) return;
@@ -2267,6 +2552,24 @@ END:VCARD`;
         setShowEmailImport(false);
     };
 
+    // ─── Stabile Callbacks für UploadPanel ────────────────────────────────────
+    // Hier definiert weil handleEmailImport (oben) als Dep gebraucht wird.
+    const handleUploadPanelCaseCreated = useCallback((newId) => {
+        setFormData(prev => ({ ...prev, id: newId }));
+    }, []);
+
+    const handleUploadPanelExtraction = useCallback((data) => {
+        console.log('Extraction complete, applying data direct:', data);
+        handleEmailImport(data);
+    }, [handleEmailImport]);
+
+    const handleUploadPanelImages = useCallback((newImages) => {
+        setFormData(prev => ({
+            ...prev,
+            images: [...(prev.images || []), ...newImages],
+        }));
+    }, []);
+
     const handlePDFClick = () => {
 
         setShowReportModal(true);
@@ -2312,6 +2615,7 @@ END:VCARD`;
             <button
                 onClick={(e) => {
                     e.stopPropagation();
+                    if (!window.confirm(`Dokument "${img.name}" wirklich löschen?`)) return;
                     setFormData(prev => ({
                         ...prev,
                         images: prev.images.filter(i => i !== img)
@@ -2331,6 +2635,52 @@ END:VCARD`;
             </button>
         </div>
     );
+
+    // ── TECHNIKER MODUS: Kachel-Home ────────────────────────────────────────
+    if (mode === 'technician' && techTab === null) {
+        const TECH_TILES = [
+            { id: 'uebersicht', label: 'Übersicht',  icon: '📋', color: '#3B82F6', status: null },
+            { id: 'aufnahme',   label: 'Schadenaufnahme',   icon: '🔍', color: '#F97316', status: 'Schadenaufnahme' },
+            { id: 'leck',       label: 'Leckortung',       icon: '💧', color: '#06B6D4', status: 'Leckortung' },
+            { id: 'trocknung',  label: 'Trocknung',  icon: '🌬', color: '#A855F7', status: 'Trocknung' },
+            { id: 'messung',    label: 'Messung',    icon: '📏', color: '#10B981', status: null },
+        ];
+        const adresse = [formData.street, [formData.zip, formData.city].filter(Boolean).join(' ')].filter(Boolean).join(', ');
+        const sub = [formData.projectNumber, formData.damageCategory].filter(Boolean).join(' · ');
+        return (
+            <div style={{ minHeight:'100vh', backgroundColor:'#0F172A', padding:'2rem 1.25rem 3rem', fontFamily:'Inter,system-ui,sans-serif', color:'#F1F5F9' }}>
+                <div style={{ marginBottom:'2.5rem' }}>
+                    <div style={{ fontSize:'1.5rem', fontWeight:800, lineHeight:1.2 }}>{adresse || 'Schadenort'}</div>
+                    {sub && <div style={{ fontSize:'0.85rem', color:'#64748B', marginTop:'0.4rem', fontWeight:500 }}>{sub}</div>}
+                </div>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'1rem' }}>
+                    {TECH_TILES.slice(0,4).map(tile => (
+                        <button key={tile.id} onClick={() => { if (tile.status) setFormData(prev => ({ ...prev, status: tile.status })); setTechTab(tile.id); }} style={{
+                            background:'#1E293B', border:`2px solid ${tile.color}`,
+                            borderRadius:'16px', padding:'2.5rem 1rem', cursor:'pointer',
+                            display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
+                            gap:'0.75rem', boxShadow:`0 4px 20px ${tile.glow}`, minHeight:'130px', transition:'transform 0.15s'
+                        }}>
+                            
+                            <span style={{ fontSize:'1rem', fontWeight:700, color:'#F1F5F9' }}>{tile.label}</span>
+                        </button>
+                    ))}
+                </div>
+                <div style={{ display:'flex', justifyContent:'center', marginTop:'1rem' }}>
+                    <button onClick={() => { if (TECH_TILES[4].status) setFormData(prev => ({ ...prev, status: TECH_TILES[4].status })); setTechTab(TECH_TILES[4].id); }} style={{
+                        background:'#1E293B', border:`2px solid ${TECH_TILES[4].color}`,
+                        borderRadius:'16px', padding:'2.5rem 1rem', cursor:'pointer',
+                        display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
+                        gap:'0.75rem', boxShadow:`0 4px 20px ${TECH_TILES[4].glow}`,
+                        width:'calc(50% - 0.5rem)', minHeight:'130px'
+                    }}>
+                        
+                        <span style={{ fontSize:'1rem', fontWeight:700, color:'#F1F5F9' }}>{TECH_TILES[4].label}</span>
+                    </button>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <>
@@ -2421,7 +2771,7 @@ END:VCARD`;
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', paddingBottom: '1rem', borderBottom: '1px solid var(--border)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1 }}>
                         <button
-                            onClick={onCancel}
+                            onClick={mode === 'technician' ? () => setTechTab(null) : onCancel}
                             className="btn-glass"
                             style={{
                                 width: '42px',
@@ -2474,6 +2824,7 @@ END:VCARD`;
                             </div>
                         )}
 
+                        {mode !== 'technician' && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
                             <label style={{ fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 700 }}>Projektstatus</label>
                             <select
@@ -2495,6 +2846,7 @@ END:VCARD`;
                                 ))}
                             </select>
                         </div>
+                        )}
 
                         {/* Lieferantenrechnung Badge */}
                         {mode === 'desktop' && formData.images?.some(img => img.assignedTo === 'Sonstiges') && (
@@ -2516,6 +2868,7 @@ END:VCARD`;
                         )}
 
                         {/* Calendar Push Button */}
+                        {mode !== 'technician' && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
                             <label style={{ fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 700 }}>Export</label>
                             <button
@@ -2541,6 +2894,7 @@ END:VCARD`;
                                 <span>Termin</span>
                             </button>
                         </div>
+                        )}
                     </div>
                 </div>
 
@@ -2558,17 +2912,9 @@ END:VCARD`;
                     <div style={{ marginBottom: '1.5rem' }}>
                         <UploadPanel
                             caseId={formData.id}
-                            onCaseCreated={(newId) => setFormData(prev => ({ ...prev, id: newId }))}
-                            onExtractionComplete={(data) => {
-                                console.log("Extraction complete, applying data direct:", data);
-                                handleEmailImport(data);
-                            }}
-                            onImagesUploaded={(newImages) => {
-                                setFormData(prev => ({
-                                    ...prev,
-                                    images: [...(prev.images || []), ...newImages]
-                                }));
-                            }}
+                            onCaseCreated={handleUploadPanelCaseCreated}
+                            onExtractionComplete={handleUploadPanelExtraction}
+                            onImagesUploaded={handleUploadPanelImages}
                         />
 
                         {/* AI Suggestions Confirmation Panel */}
@@ -2775,7 +3121,7 @@ END:VCARD`;
                 )}
 
                 {/* Address Text Details */}
-                <div className="card" style={{ marginBottom: '1.5rem', padding: '1.5rem' }}>
+                {!(mode === 'technician' && techTab === 'aufnahme') && <div className="card" style={{ marginBottom: '1.5rem', padding: '1.5rem' }}>
                     <h3 className="section-header">
                         <MapPin size={18} /> Schadenort (Adresse)
                     </h3>
@@ -2869,7 +3215,7 @@ END:VCARD`;
                             </select>
                         </div>
                     </div>
-                </div>
+                </div>}
 
                 {/* Technician: Schadenbeschreibung & Bilder (KI / Meldung) */}
                 {mode === 'technician' && (
@@ -3042,7 +3388,7 @@ END:VCARD`;
                                 >
                                     <Upload size={22} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
                                     <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', transition: 'color 0.2s', textAlign: 'center' }}>
-                                        Bilder hier ablegen, <u>klicken</u> oder <kbd style={{fontSize:'0.75rem', padding:'1px 4px', background:'var(--border)', borderRadius:'3px'}}>Ctrl+V</kbd> zum Einfügen
+                                        Bilder hier ablegen, <u>klicken</u> oder <kbd style={{ fontSize: '0.75rem', padding: '1px 4px', background: 'var(--border)', borderRadius: '3px' }}>Ctrl+V</kbd> zum Einfügen
                                     </span>
                                 </div>
                                 <input
@@ -3066,21 +3412,38 @@ END:VCARD`;
                 {/* Desktop-Only: Schadenbeschreibung (AI Extracted) */}
                 {mode === 'desktop' && (
                     <div className="card" style={{ marginBottom: '1.5rem', padding: '1.5rem' }}>
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: '1.5rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.75rem' }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: '1rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.75rem' }}>
                             <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.6rem', margin: 0 }}>
                                 <FileText size={18} /> Schadenbeschreibung (KI / Meldung)
                             </h3>
-                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: 'var(--text-muted)', cursor: 'pointer' }}>
-                                <input
-                                    type="checkbox"
-                                    checked={formData.includeDescriptionInReport}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, includeDescriptionInReport: e.target.checked }))}
-                                    style={{ width: '18px', height: '18px', accentColor: '#0F6EA3' }}
-                                />
-                                In Bericht aufnehmen
-                            </label>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                <button
+                                    type="button"
+                                    onClick={() => isRecording === 'desc-desktop' ? stopRecording() : startRecording('desc-desktop')}
+                                    style={{
+                                        width: '32px', height: '32px', borderRadius: '50%',
+                                        border: `1px solid ${isRecording === 'desc-desktop' ? '#ef4444' : 'var(--border)'}`,
+                                        backgroundColor: isRecording === 'desc-desktop' ? 'rgba(239,68,68,0.12)' : 'rgba(14,165,233,0.08)',
+                                        color: isRecording === 'desc-desktop' ? '#ef4444' : '#38bdf8',
+                                        cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+                                    }}
+                                    title={isRecording === 'desc-desktop' ? 'Aufnahme stoppen' : 'Diktieren starten'}
+                                >
+                                    {isRecording === 'desc-desktop' ? <MicOff size={16} /> : <Mic size={16} />}
+                                </button>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: 'var(--text-muted)', cursor: 'pointer' }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={formData.includeDescriptionInReport}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, includeDescriptionInReport: e.target.checked }))}
+                                        style={{ width: '18px', height: '18px', accentColor: '#0F6EA3' }}
+                                    />
+                                    In Bericht aufnehmen
+                                </label>
+                            </div>
                         </div>
                         <textarea
+                            id="desc-desktop"
                             value={formData.description || ''}
                             onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
                             placeholder="Beschrieb aus der Meldung..."
@@ -3120,7 +3483,7 @@ END:VCARD`;
                                         <div
                                             className="btn-glass"
                                             style={{
-                                                position: 'relative', width: '100px', height: '100px', borderRadius: '12px', overflow: 'hidden',
+                                                position: 'relative', width: '140px', height: '140px', borderRadius: '12px', overflow: 'hidden',
                                                 cursor: 'pointer',
                                                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                                                 border: img.includeInReport !== false ? '2px solid #0F6EA3' : '1px solid var(--border)'
@@ -3182,7 +3545,7 @@ END:VCARD`;
                                                         const isChecked = e.target.checked;
                                                         setFormData(prev => ({
                                                             ...prev,
-                                                            images: prev.images.map(i => i.id === img.id ? { ...i, includeInReport: isChecked } : i)
+                                                            images: prev.images.map(i => i === img ? { ...i, includeInReport: isChecked } : i)
                                                         }));
                                                     }}
                                                 />
@@ -3212,7 +3575,7 @@ END:VCARD`;
                                 ))}
 
                                 <label style={{
-                                    width: '90px', height: '90px',
+                                    width: '140px', height: '140px',
                                     border: '1px dashed var(--border)', borderRadius: '8px',
                                     display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                                     cursor: 'pointer', backgroundColor: 'var(--surface-hover)',
@@ -3391,7 +3754,8 @@ END:VCARD`;
 
                 {/* Container for Map & Exterior Photo (Side-by-Side) */}
                 <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap', alignItems: 'stretch', marginBottom: '1.5rem' }}>
-                    {/* Map Card */}
+                    {/* Map Card – nur im Techniker-Modus */}
+                    {mode === 'desktop' && (
                     <div className="card" style={{ flex: '1 1 350px', padding: '1.5rem', display: 'flex', flexDirection: 'column' }}>
                         <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.6rem', color: 'var(--primary)', borderBottom: '1px solid var(--border)', paddingBottom: '0.75rem' }}>
                             <MapPin size={18} /> Standort Karte
@@ -3450,6 +3814,7 @@ END:VCARD`;
                             </div>
                         )}
                     </div>
+                    )}
 
                     {/* 1b. Exterior Photo (Aussenaufnahme) - Show only if exists */}
                     {formData.exteriorPhoto && (
@@ -3521,7 +3886,7 @@ END:VCARD`;
                 </div>
 
                 {/* 2. Contacts */}
-                <div className="card" style={{ marginBottom: '1.5rem', padding: '1.5rem' }}>
+                {!(mode === 'technician' && techTab === 'aufnahme') && <div className="card" style={{ marginBottom: '1.5rem', padding: '1.5rem' }}>
                     <div
                         onClick={() => setIsContactsExpanded(!isContactsExpanded)}
                         style={{
@@ -3558,260 +3923,245 @@ END:VCARD`;
                                 gap: '1.25rem'
                             }}>
                                 {formData.contacts.map((contact, idx) => {
-                                    const roleColorMap = { 'Auftraggeber':'#3b82f6','Verwaltung':'#f59e0b','Eigentümer':'#8b5cf6','Handwerker':'#ef4444','Hauswart':'#94a3b8','Mieter':'#10b981','Sonstiges':'#64748b' };
+                                    const roleColorMap = { 'Auftraggeber': '#3b82f6', 'Verwaltung': '#f59e0b', 'Eigentümer': '#8b5cf6', 'Handwerker': '#ef4444', 'Hauswart': '#94a3b8', 'Mieter': '#10b981', 'Sonstiges': '#64748b' };
                                     const rc = roleColorMap[contact.role] || '#64748b';
                                     return (
-                                    <div key={idx} className="glass-card" style={{
-                                        display: 'flex', flexDirection: 'column', gap: '0',
-                                        padding: '0', position: 'relative',
-                                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                                        minWidth: 0, overflow: 'hidden', borderTop: `3px solid ${rc}`
-                                    }}>
-                                        {/* Rollen-Header */}
-                                        <div style={{ fontSize: '0.72rem', fontWeight: 700, color: rc, textTransform: 'uppercase', letterSpacing: '0.07em', padding: '0.6rem 1.2rem 0.4rem', borderBottom: `1px solid ${rc}22` }}>
-                                            {contact.role || 'Kontakt'}
-                                        </div>
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '1.25rem 1.5rem 1.5rem' }}>
-                                        {/* Row 1: Name & vCard (Blue Button) */}
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                                            <label style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)', fontWeight: 750 }}>Name</label>
-                                            <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'stretch' }}>
-                                                <input
-                                                    type="text"
-                                                    placeholder="Name"
-                                                    className="form-input"
-                                                    value={contact.name}
-                                                    onChange={(e) => {
-                                                        const newContacts = [...formData.contacts];
-                                                        newContacts[idx].name = e.target.value;
-                                                        setFormData({ ...formData, contacts: newContacts });
-                                                    }}
-                                                    style={{ fontWeight: 700, fontSize: '0.95rem', flex: 1, padding: '0.55rem 0.7rem', minWidth: 0 }}
-                                                />
-                                                <button
-                                                    type="button"
-                                                    onClick={() => downloadVCard(contact)}
-                                                    className="btn-glass"
-                                                    style={{
-                                                        padding: '0 0.5rem',
-                                                        borderRadius: '8px',
-                                                        cursor: 'pointer',
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        justifyContent: 'center',
-                                                        backgroundColor: 'rgba(15, 110, 163, 0.15)',
-                                                        border: '1px solid rgba(15, 110, 163, 0.25)',
-                                                        color: '#0F6EA3',
-                                                        flexShrink: 0
-                                                    }}
-                                                    title="vCard downloaden"
-                                                >
-                                                    <VcfIcon size={20} />
-                                                </button>
-                                                {/* QR-Code Button */}
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleContactQR(contact)}
-                                                    style={{
-                                                        padding: '0 0.6rem',
-                                                        height: '36px',
-                                                        borderRadius: '8px',
-                                                        cursor: 'pointer',
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        justifyContent: 'center',
-                                                        backgroundColor: 'rgba(16, 185, 129, 0.12)',
-                                                        border: '1px solid rgba(16, 185, 129, 0.35)',
-                                                        color: '#10b981',
-                                                        flexShrink: 0,
-                                                        fontSize: '15px',
-                                                    }}
-                                                    title="QR-Code zum Scannen"
-                                                >
-                                                    QR
-                                                </button>
+                                        <div key={idx} className="glass-card" style={{
+                                            display: 'flex', flexDirection: 'column', gap: '0',
+                                            padding: '0', position: 'relative',
+                                            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                            minWidth: 0, overflow: 'hidden', borderTop: `3px solid ${rc}`
+                                        }}>
+                                            {/* Rollen-Header */}
+                                            <div style={{ fontSize: '0.72rem', fontWeight: 700, color: rc, textTransform: 'uppercase', letterSpacing: '0.07em', padding: '0.6rem 1.2rem 0.4rem', borderBottom: `1px solid ${rc}22` }}>
+                                                {contact.role || 'Kontakt'}
                                             </div>
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '1.25rem 1.5rem 1.5rem' }}>
+                                                {/* Row 1: Name & vCard (Blue Button) */}
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                                                    <label style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)', fontWeight: 750 }}>{['AG', 'HW', 'Handwerker'].includes(contact.role) ? 'Firma' : 'Name'}</label>
+                                                    <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'stretch' }}>
+                                                        <input
+                                                            type="text"
+                                                            placeholder="Name"
+                                                            className="form-input"
+                                                            data-lpignore="true"
+                                                            autoComplete="off"
+                                                            value={contact.name}
+                                                            onChange={(e) => {
+                                                                const newContacts = [...formData.contacts];
+                                                                newContacts[idx].name = e.target.value;
+                                                                setFormData({ ...formData, contacts: newContacts });
+                                                            }}
+                                                            style={{ fontWeight: 700, fontSize: '0.85rem', padding: '0.45rem 0.7rem', width: '100%' }}
+                                                        />
+                                                    </div>
+                                                </div>
+
+
+                                                {/* Row 1b: Ansprechperson – nur bei Firma-Rollen */}
+                                                {contact.role !== 'Mieter' && (
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                                                        <label style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)', fontWeight: 750 }}>Ansprechperson</label>
+                                                        <input
+                                                            type="text"
+                                                            placeholder="Vorname Name"
+                                                            className="form-input"
+                                                            value={contact.contactPerson || ''}
+                                                            onChange={(e) => {
+                                                                const newContacts = [...formData.contacts];
+                                                                newContacts[idx].contactPerson = e.target.value;
+                                                                setFormData({ ...formData, contacts: newContacts });
+                                                            }}
+                                                            style={{ fontSize: '0.85rem', padding: '0.45rem 0.7rem' }}
+                                                        />
+                                                    </div>
+                                                )}
+
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                                                    <label style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)', fontWeight: 750 }}>Etage / Rolle</label>
+                                                    <div style={{
+                                                        display: 'grid',
+                                                        gridTemplateColumns: 'minmax(0, 1.2fr) minmax(0, 0.8fr)',
+                                                        gap: '0.4rem',
+                                                        alignItems: 'center',
+                                                        width: '100%'
+                                                    }}>
+                                                        <input
+                                                            type="text"
+                                                            placeholder="Etage"
+                                                            className="form-input"
+                                                            value={contact.floor || ''}
+                                                            onChange={(e) => {
+                                                                const newContacts = [...formData.contacts];
+                                                                newContacts[idx].floor = e.target.value;
+                                                                setFormData({ ...formData, contacts: newContacts });
+                                                            }}
+                                                            style={{
+                                                                fontSize: '0.85rem',
+                                                                fontWeight: 600,
+                                                                padding: '0.55rem 0.6rem',
+                                                                width: '100%',
+                                                                minWidth: 0
+                                                            }}
+                                                        />
+                                                        <select
+                                                            className="form-input"
+                                                            value={contact.role || 'Mieter'}
+                                                            onChange={(e) => {
+                                                                const newContacts = [...formData.contacts];
+                                                                newContacts[idx].role = e.target.value;
+                                                                setFormData({ ...formData, contacts: newContacts });
+                                                            }}
+                                                            style={{
+                                                                fontSize: '0.8rem',
+                                                                fontWeight: 600,
+                                                                padding: '0.55rem 0.3rem',
+                                                                width: '100%',
+                                                                minWidth: 0,
+                                                                textAlign: 'center'
+                                                            }}
+                                                        >
+                                                            <option value="Auftraggeber">AG</option>
+                                                            <option value="Mieter">Mieter</option>
+                                                            <option value="Eigentümer">Eig.</option>
+                                                            <option value="Hauswart">HW</option>
+                                                            <option value="Verwaltung">Verw.</option>
+                                                            <option value="Handwerker">Handw.</option>
+                                                            <option value="Sonstiges">Sonst.</option>
+                                                        </select>
+                                                    </div>
+                                                </div>
+
+                                                {/* Row 3: Telefon */}
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                                                    <label style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)', fontWeight: 750 }}>Telefon</label>
+                                                    <input
+                                                        type="text"
+                                                        placeholder="+41 79 123 45 67"
+                                                        className="form-input"
+                                                        value={contact.phone}
+                                                        onChange={(e) => {
+                                                            const newContacts = [...formData.contacts];
+                                                            newContacts[idx].phone = e.target.value;
+                                                            setFormData({ ...formData, contacts: newContacts });
+                                                        }}
+                                                        onBlur={(e) => {
+                                                            let val = e.target.value.replace(/\s+/g, '');
+                                                            if (val.match(/^0\d{9}$/)) {
+                                                                val = '+41' + val.substring(1);
+                                                            }
+                                                            if (val.match(/^\+41\d{9}$/)) {
+                                                                val = val.replace(/(\+41)(\d{2})(\d{3})(\d{2})(\d{2})/, '$1 $2 $3 $4 $5');
+                                                            }
+                                                            else if (val.match(/^\+41\d{8}$/)) {
+                                                                val = val.replace(/(\+41)(\d{2})(\d{2})(\d{2})(\d{2})/, '$1 $2 $3 $4 $5');
+                                                            }
+                                                            if (val !== e.target.value) {
+                                                                const newContacts = [...formData.contacts];
+                                                                newContacts[idx].phone = val;
+                                                                setFormData({ ...formData, contacts: newContacts });
+                                                            }
+                                                        }}
+                                                        style={{ width: '100%', fontSize: '0.95rem', fontWeight: 600, padding: '0.55rem 0.7rem' }}
+                                                    />
+                                                </div>
+
+                                                {/* Row 4: E-Mail */}
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                                                    <label style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)', fontWeight: 750 }}>E-Mail</label>
+                                                    <input
+                                                        type="email"
+                                                        placeholder="email@firma.ch"
+                                                        className="form-input"
+                                                        data-lpignore="true"
+                                                        autoComplete="off"
+                                                        value={contact.email || ''}
+                                                        onChange={(e) => {
+                                                            const newContacts = [...formData.contacts];
+                                                            newContacts[idx].email = e.target.value;
+                                                            setFormData({ ...formData, contacts: newContacts });
+                                                        }}
+                                                        style={{ width: '100%', fontSize: '0.9rem', padding: '0.55rem 0.7rem' }}
+                                                    />
+                                                </div>
+
+                                                {/* Action Buttons Row (Bottom Right) */}
+                                                <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '0.15rem' }}>
+                                                    {/* Call Button */}
+                                                    <a
+                                                        href={contact.phone ? `tel:${contact.phone}` : '#'}
+                                                        className="btn-glass"
+                                                        style={{
+                                                            padding: '0.45rem',
+                                                            borderRadius: '8px',
+                                                            color: '#10B981',
+                                                            cursor: contact.phone ? 'pointer' : 'default',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
+                                                            opacity: contact.phone ? 1 : 0.3,
+                                                            backgroundColor: 'rgba(16, 185, 129, 0.08)',
+                                                            border: '1px solid rgba(16, 185, 129, 0.15)'
+                                                        }}
+                                                        title="Anrufen"
+                                                    >
+                                                        <Phone size={16} />
+                                                    </a>
+
+                                                    {/* QR-Code Button */}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleContactQR(contact)}
+                                                        className="btn-glass"
+                                                        style={{
+                                                            padding: '0.45rem 0.6rem',
+                                                            borderRadius: '8px',
+                                                            cursor: 'pointer',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
+                                                            backgroundColor: 'rgba(16, 185, 129, 0.08)',
+                                                            border: '1px solid rgba(16, 185, 129, 0.15)',
+                                                            color: '#10B981',
+                                                            fontSize: '0.75rem',
+                                                            fontWeight: 700,
+                                                        }}
+                                                        title="QR-Code zum Scannen"
+                                                    >
+                                                        QR
+                                                    </button>
+
+                                                    {/* Delete Button */}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            if (window.confirm('Kontakt wirklich löschen?')) {
+                                                                handleRemoveContact(idx);
+                                                            }
+                                                        }}
+                                                        className="btn-glass"
+                                                        style={{
+                                                            padding: '0.45rem',
+                                                            borderRadius: '8px',
+                                                            color: '#EF4444',
+                                                            cursor: 'pointer',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
+                                                            backgroundColor: 'rgba(239, 68, 68, 0.08)',
+                                                            border: '1px solid rgba(239, 68, 68, 0.15)'
+                                                        }}
+                                                        title="Löschen"
+                                                    >
+                                                        <Trash size={16} />
+                                                    </button>
+                                                </div>
+
+                                                {/* Delete Button (Absolute top-right or separate) */}
+
+                                            </div> {/* end inner padding div */}
                                         </div>
-
-
-                                        {/* Row 1b: Ansprechperson – nur bei Firma-Rollen */}
-                                        {contact.role !== 'Mieter' && (
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                                            <label style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)', fontWeight: 750 }}>Ansprechperson</label>
-                                            <input
-                                                type="text"
-                                                placeholder="Vorname Name"
-                                                className="form-input"
-                                                value={contact.contactPerson || ''}
-                                                onChange={(e) => {
-                                                    const newContacts = [...formData.contacts];
-                                                    newContacts[idx].contactPerson = e.target.value;
-                                                    setFormData({ ...formData, contacts: newContacts });
-                                                }}
-                                                style={{ fontSize: '0.85rem', padding: '0.45rem 0.7rem' }}
-                                            />
-                                        </div>
-                                        )}
-
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                                            <label style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)', fontWeight: 750 }}>Etage / Rolle</label>
-                                            <div style={{
-                                                display: 'grid',
-                                                gridTemplateColumns: 'minmax(0, 1.2fr) minmax(0, 0.8fr)',
-                                                gap: '0.4rem',
-                                                alignItems: 'center',
-                                                width: '100%'
-                                            }}>
-                                                <input
-                                                    type="text"
-                                                    placeholder="Etage"
-                                                    className="form-input"
-                                                    value={contact.floor || ''}
-                                                    onChange={(e) => {
-                                                        const newContacts = [...formData.contacts];
-                                                        newContacts[idx].floor = e.target.value;
-                                                        setFormData({ ...formData, contacts: newContacts });
-                                                    }}
-                                                    style={{
-                                                        fontSize: '0.85rem',
-                                                        fontWeight: 600,
-                                                        padding: '0.55rem 0.6rem',
-                                                        width: '100%',
-                                                        minWidth: 0
-                                                    }}
-                                                />
-                                                <select
-                                                    className="form-input"
-                                                    value={contact.role || 'Mieter'}
-                                                    onChange={(e) => {
-                                                        const newContacts = [...formData.contacts];
-                                                        newContacts[idx].role = e.target.value;
-                                                        setFormData({ ...formData, contacts: newContacts });
-                                                    }}
-                                                    style={{
-                                                        fontSize: '0.8rem',
-                                                        fontWeight: 600,
-                                                        padding: '0.55rem 0.3rem',
-                                                        width: '100%',
-                                                        minWidth: 0,
-                                                        textAlign: 'center'
-                                                    }}
-                                                >
-                                                    <option value="Auftraggeber">AG</option>
-                                                    <option value="Mieter">Mieter</option>
-                                                    <option value="Eigentümer">Eig.</option>
-                                                    <option value="Hauswart">HW</option>
-                                                    <option value="Verwaltung">Verw.</option>
-                                                    <option value="Handwerker">Handw.</option>
-                                                    <option value="Sonstiges">Sonst.</option>
-                                                </select>
-                                            </div>
-                                        </div>
-
-                                        {/* Row 3: Telefon */}
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                                            <label style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)', fontWeight: 750 }}>Telefon</label>
-                                            <input
-                                                type="text"
-                                                placeholder="+41 79 123 45 67"
-                                                className="form-input"
-                                                value={contact.phone}
-                                                onChange={(e) => {
-                                                    const newContacts = [...formData.contacts];
-                                                    newContacts[idx].phone = e.target.value;
-                                                    setFormData({ ...formData, contacts: newContacts });
-                                                }}
-                                                onBlur={(e) => {
-                                                    let val = e.target.value.replace(/\s+/g, '');
-                                                    if (val.match(/^0\d{9}$/)) {
-                                                        val = '+41' + val.substring(1);
-                                                    }
-                                                    if (val.match(/^\+41\d{9}$/)) {
-                                                        val = val.replace(/(\+41)(\d{2})(\d{3})(\d{2})(\d{2})/, '$1 $2 $3 $4 $5');
-                                                    }
-                                                    else if (val.match(/^\+41\d{8}$/)) {
-                                                        val = val.replace(/(\+41)(\d{2})(\d{2})(\d{2})(\d{2})/, '$1 $2 $3 $4 $5');
-                                                    }
-                                                    if (val !== e.target.value) {
-                                                        const newContacts = [...formData.contacts];
-                                                        newContacts[idx].phone = val;
-                                                        setFormData({ ...formData, contacts: newContacts });
-                                                    }
-                                                }}
-                                                style={{ width: '100%', fontSize: '0.95rem', fontWeight: 600, padding: '0.55rem 0.7rem' }}
-                                            />
-                                        </div>
-
-                                        {/* Row 4: E-Mail */}
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                                            <label style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)', fontWeight: 750 }}>E-Mail</label>
-                                            <input
-                                                type="email"
-                                                placeholder="email@firma.ch"
-                                                className="form-input"
-                                                value={contact.email || ''}
-                                                onChange={(e) => {
-                                                    const newContacts = [...formData.contacts];
-                                                    newContacts[idx].email = e.target.value;
-                                                    setFormData({ ...formData, contacts: newContacts });
-                                                }}
-                                                style={{ width: '100%', fontSize: '0.9rem', padding: '0.55rem 0.7rem' }}
-                                            />
-                                        </div>
-
-                                        {/* Action Buttons Row (Bottom Right) */}
-                                        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '0.15rem' }}>
-                                            {/* Call Button */}
-                                            <a
-                                                href={contact.phone ? `tel:${contact.phone}` : '#'}
-                                                className="btn-glass"
-                                                style={{
-                                                    padding: '0.45rem',
-                                                    borderRadius: '8px',
-                                                    color: '#10B981',
-                                                    cursor: contact.phone ? 'pointer' : 'default',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'center',
-                                                    opacity: contact.phone ? 1 : 0.3,
-                                                    backgroundColor: 'rgba(16, 185, 129, 0.08)',
-                                                    border: '1px solid rgba(16, 185, 129, 0.15)'
-                                                }}
-                                                title="Anrufen"
-                                            >
-                                                <Phone size={16} />
-                                            </a>
-
-                                            {/* Delete Button */}
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    if (window.confirm('Kontakt wirklich löschen?')) {
-                                                        handleRemoveContact(idx);
-                                                    }
-                                                }}
-                                                className="btn-glass"
-                                                style={{
-                                                    padding: '0.45rem',
-                                                    borderRadius: '8px',
-                                                    color: '#EF4444',
-                                                    cursor: 'pointer',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'center',
-                                                    backgroundColor: 'rgba(239, 68, 68, 0.08)',
-                                                    border: '1px solid rgba(239, 68, 68, 0.15)'
-                                                }}
-                                                title="Löschen"
-                                            >
-                                                <Trash size={16} />
-                                            </button>
-                                        </div>
-
-                                        {/* Delete Button (Absolute top-right or separate) */}
-
-                                        </div> {/* end inner padding div */}
-                                    </div>
                                     );
                                 })}
                             </div>
@@ -3837,7 +4187,7 @@ END:VCARD`;
                             </div>
                         </>
                     )}
-                </div>
+                </div>}
 
 
                 {/* 3. Rooms & Photos */}
@@ -3939,6 +4289,7 @@ END:VCARD`;
                                             type="file"
                                             multiple
                                             accept="image/*"
+                                            capture="environment"
                                             style={{ display: 'none' }}
                                             onChange={(e) => handleCategorySelect(e, 'Schadenfotos')}
                                         />
@@ -3979,7 +4330,7 @@ END:VCARD`;
                                                                 e.stopPropagation();
                                                                 setFormData(prev => ({
                                                                     ...prev,
-                                                                    images: prev.images.map(i => i.preview === img.preview ? { ...i, includeInReport: i.includeInReport === false } : i)
+                                                                    images: prev.images.map(i => i === img ? { ...i, includeInReport: !img.includeInReport } : i)
                                                                 }));
                                                             }}
                                                             title="Im Bericht anzeigen"
@@ -4032,7 +4383,7 @@ END:VCARD`;
                                 {showAddRoomForm && (
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '0.5rem', backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid var(--border)' }}>
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                                             <select
+                                            <select
                                                 className="form-input"
                                                 value={newRoom.apartment || ''}
                                                 onChange={(e) => {
@@ -4153,13 +4504,13 @@ END:VCARD`;
                                 justifyContent: 'space-between',
                                 alignItems: 'center'
                             }}>
-                                <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, paddingRight: '1rem' }}>
-                                    <span style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{room.name}</span>
+                                <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem', flex: 1, minWidth: 0, paddingRight: '1rem', flexWrap: 'wrap' }}>
+                                    <span style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--primary)', whiteSpace: 'nowrap' }}>{room.name}</span>
+                                    {room.stockwerk && (
+                                        <span style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--primary)', opacity: 0.75, whiteSpace: 'nowrap' }}>• {room.stockwerk}</span>
+                                    )}
                                     {room.apartment && (
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.2rem' }}>
-                                            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Objekt:</span>
-                                            <span style={{ fontSize: '0.9rem', color: 'var(--text-main)', fontWeight: 600 }}>{room.apartment}</span>
-                                        </div>
+                                        <span style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--primary)', opacity: 0.75, whiteSpace: 'nowrap' }}>• Whg {room.apartment}</span>
                                     )}
                                 </div>
                                 <div style={{
@@ -4228,7 +4579,8 @@ END:VCARD`;
                                                 <Edit3 size={16} /> Bearbeiten
                                             </button>
                                         </>
-                                    ) : mode !== 'desktop' ? (
+                                    ) : (
+                                        // Noch keine Messung — Button für alle Modi anzeigen
                                         <button
                                             type="button"
                                             onClick={(e) => {
@@ -4239,7 +4591,7 @@ END:VCARD`;
                                                 setShowMeasurementModal(true);
                                             }}
                                             style={{
-                                                padding: '0.8rem 0.5rem',
+                                                padding: mode === 'technician' ? '0.8rem 0.5rem' : '0.4rem 0.6rem',
                                                 borderRadius: '6px',
                                                 border: '1px solid #059669',
                                                 backgroundColor: 'rgba(16, 185, 129, 0.2)',
@@ -4248,17 +4600,17 @@ END:VCARD`;
                                                 alignItems: 'center',
                                                 justifyContent: 'center',
                                                 gap: '0.4rem',
-                                                fontSize: '1rem',
+                                                fontSize: mode === 'technician' ? '1rem' : '0.75rem',
                                                 cursor: 'pointer',
                                                 flex: 1,
-                                                minHeight: '50px',
+                                                minHeight: mode === 'technician' ? '50px' : '44px',
                                                 fontWeight: 700,
                                                 gridColumn: 'span 2'
                                             }}
                                         >
                                             <Plus size={18} /> Messung starten
                                         </button>
-                                    ) : null}
+                                    )}
 
                                     {/* History Button */}
                                     {room.measurementHistory && room.measurementHistory.length > 0 && (
@@ -4457,7 +4809,7 @@ END:VCARD`;
                                                                                         const isChecked = e.target.checked;
                                                                                         setFormData(prev => ({
                                                                                             ...prev,
-                                                                                            images: prev.images.map(i => i.id === img.id ? { ...i, includeInReport: isChecked } : i)
+                                                                                            images: prev.images.map(i => i === img ? { ...i, includeInReport: isChecked } : i)
                                                                                         }));
                                                                                     }}
                                                                                 />
@@ -4575,37 +4927,42 @@ END:VCARD`;
                                                                             </button>
                                                                         )}
 
-                                                                        {mode !== 'technician' && (
-                                                                            <button
-                                                                                type="button"
-                                                                                className="btn btn-ghost"
-                                                                                title="Bild löschen"
-                                                                                style={{
-                                                                                    color: '#EF4444',
-                                                                                    padding: '0',
-                                                                                    backgroundColor: '#1E293B',
-                                                                                    border: '1px solid var(--border)',
-                                                                                    borderRadius: '50%',
-                                                                                    width: '36px',
-                                                                                    height: '36px',
-                                                                                    display: 'flex',
-                                                                                    alignItems: 'center',
-                                                                                    justifyContent: 'center',
-                                                                                    boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
-                                                                                    cursor: 'pointer'
-                                                                                }}
-                                                                                onClick={() => {
-                                                                                    if (window.confirm('Bild wirklich löschen?')) {
-                                                                                        setFormData(prev => ({
-                                                                                            ...prev,
-                                                                                            images: prev.images.filter(i => i !== img && (!thermalImg || i !== thermalImg))
-                                                                                        }));
-                                                                                    }
-                                                                                }}
-                                                                            >
-                                                                                <Trash size={16} />
-                                                                            </button>
-                                                                        )}
+                                                                        <button
+                                                                            type="button"
+                                                                            className="btn btn-ghost"
+                                                                            title="Bild löschen"
+                                                                            style={{
+                                                                                color: '#EF4444',
+                                                                                padding: mode === 'technician' ? '0 0.5rem' : '0',
+                                                                                backgroundColor: '#1E293B',
+                                                                                border: '1px solid rgba(239,68,68,0.3)',
+                                                                                borderRadius: mode === 'technician' ? '8px' : '50%',
+                                                                                width: mode === 'technician' ? 'auto' : '36px',
+                                                                                height: '36px',
+                                                                                minWidth: '36px',
+                                                                                display: 'flex',
+                                                                                alignItems: 'center',
+                                                                                justifyContent: 'center',
+                                                                                gap: '6px',
+                                                                                boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
+                                                                                cursor: 'pointer',
+                                                                                fontWeight: 700,
+                                                                                fontSize: '0.8rem',
+                                                                                whiteSpace: 'nowrap'
+                                                                            }}
+                                                                            onClick={() => {
+                                                                                if (window.confirm('Bild wirklich löschen?')) {
+                                                                                    setFormData(prev => ({
+                                                                                        ...prev,
+                                                                                        images: prev.images.filter(i => i !== img && (!thermalImg || i !== thermalImg))
+                                                                                    }));
+                                                                                }
+                                                                            }}
+                                                                        >
+                                                                            <Trash size={16} />
+                                                                            {mode === 'technician' && 'Löschen'}
+                                                                        </button>
+
                                                                     </div>
 
                                                                 </div>
@@ -4821,94 +5178,179 @@ END:VCARD`;
                 {/* Schadenursache - Cause & Photos (Desktop Only) */}
                 {mode === 'desktop' && (
                     <div className="card" style={{ marginBottom: '2rem', border: '1px solid var(--border)', padding: '1.5rem', backgroundColor: 'var(--surface)' }}>
-                        <h3 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '1.5rem', color: 'var(--text-main)' }}>Schadenursache</h3>
-
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem', marginBottom: '2rem' }}>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                    <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>Schadenursache</span>
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-                                            if (!SR) { alert('Diktat wird von diesem Browser nicht unterst\u00fctzt.'); return; }
-                                            if (window.__dictRec) { window.__dictRec.stop(); window.__dictRec = null; return; }
-                                            const rec = new SR();
-                                            rec.lang = 'de-DE';
-                                            rec.continuous = true;
-                                            rec.interimResults = false;
-                                            rec.onresult = (e) => {
-                                                const text = Array.from(e.results).map(r => r[0].transcript).join(' ');
-                                                setFormData(prev => ({ ...prev, cause: (prev.cause ? prev.cause + ' ' : '') + text }));
-                                            };
-                                            rec.onerror = (e) => { console.error('Diktat Fehler:', e); window.__dictRec = null; };
-                                            rec.onend = () => { window.__dictRec = null; };
-                                            window.__dictRec = rec;
-                                            rec.start();
-                                        }}
-                                        style={{
-                                            display: 'flex', alignItems: 'center', gap: '0.4rem',
-                                            padding: '0.35rem 0.8rem', borderRadius: '6px', border: 'none',
-                                            backgroundColor: 'rgba(14,165,233,0.15)',
-                                            color: '#38bdf8', cursor: 'pointer',
-                                            fontSize: '0.8rem', fontWeight: 700
-                                        }}
-                                        title="Diktieren starten / stoppen"
-                                    >
-                                        <Mic size={15} /> Diktieren
-                                    </button>
-                                </div>
-                                <textarea
-                                    className="form-input"
-                                    rows={3}
-                                    value={formData.cause || ''}
-                                    onChange={e => setFormData({ ...formData, cause: e.target.value })}
-                                    placeholder="Beschreibung der Ursache..."
-                                />
-                            </div>
-                        </div>
-
-                        <div>
-                            <h4 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--text-main)' }}>Fotos zur Ursache</h4>
-                            <div
-                                style={{
-                                    border: '2px dashed var(--border)', borderRadius: 'var(--radius)',
-                                    padding: '2rem 1rem', textAlign: 'center', cursor: 'pointer',
-                                    backgroundColor: 'rgba(255,255,255,0.02)', transition: 'all 0.2s',
-                                    marginBottom: '1rem', display: 'flex', flexDirection: 'column',
-                                    alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)'
-                                }}
-                                onClick={() => document.getElementById('file-upload-Schadenfotos-desktop').click()}
-                                onDragOver={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.backgroundColor = 'rgba(56, 189, 248, 0.1)'; e.currentTarget.style.color = 'var(--primary)'; }}
-                                onDragLeave={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.02)'; e.currentTarget.style.color = 'var(--text-muted)'; }}
-                                onDrop={(e) => handleCategoryDrop(e, 'Schadenfotos')}
-                            >
-                                <Plus size={24} style={{ marginBottom: '0.5rem', opacity: 0.5 }} />
-                                <span style={{ fontSize: '0.85rem' }}>Schadenfoto hochladen / Drop</span>
-                                <input id="file-upload-Schadenfotos-desktop" type="file" multiple accept="image/*" style={{ display: 'none' }} onChange={(e) => handleCategorySelect(e, 'Schadenfotos')} />
-                            </div>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                                {formData.images.filter(img => img.assignedTo === 'Schadenfotos').map((item, idx) => (
-                                    <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem', backgroundColor: '#1E293B', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
-                                        <div style={{ width: '80px', height: '80px', flexShrink: 0, borderRadius: '4px', border: item.includeInReport !== false ? '2px solid #0F6EA3' : 'none', overflow: 'hidden' }}>
-                                            <img src={item.preview} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                        </div>
-                                        <div style={{ display: 'flex', alignItems: 'center', padding: '0 0.5rem', cursor: 'pointer' }}
-                                            onClick={() => setFormData(prev => ({ ...prev, images: prev.images.map(i => i.preview === item.preview ? { ...i, includeInReport: i.includeInReport === false } : i) }))}>
-                                            <input type="checkbox" checked={item.includeInReport !== false} readOnly style={{ width: '1.25rem', height: '1.25rem', cursor: 'pointer', accentColor: '#0F6EA3' }} />
-                                        </div>
-                                        <div style={{ flex: 1, fontWeight: 500, color: 'var(--text-main)' }}>
-                                            {item.name}
-                                            {item.includeInReport !== false && <div style={{ fontSize: '0.8rem', color: '#0F6EA3', fontWeight: 600 }}>In Bericht</div>}
-                                        </div>
-                                        <button type="button" className="btn btn-ghost" onClick={() => setFormData(prev => ({ ...prev, images: prev.images.filter(i => i !== item) }))} style={{ color: '#EF4444', padding: '0.5rem', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(239, 68, 68, 0.1)' }}><Trash size={18} /></button>
-                                    </div>
-                                ))}
-                                {formData.images.filter(img => img.assignedTo === 'Schadenfotos').length === 0 && (
-                                    <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.9rem', fontStyle: 'italic' }}>Keine Schadenfotos vorhanden.</div>
+                        {/* Collapsible Header */}
+                        <div
+                            onClick={() => setIsCauseExpanded(prev => !prev)}
+                            style={{
+                                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                                cursor: 'pointer', userSelect: 'none',
+                                marginBottom: isCauseExpanded ? '1.5rem' : 0,
+                                paddingBottom: isCauseExpanded ? '1rem' : 0,
+                                borderBottom: isCauseExpanded ? '1px solid var(--border)' : 'none',
+                                transition: 'margin 0.2s, padding 0.2s'
+                            }}
+                        >
+                            <h3 style={{ marginBottom: 0, fontSize: '1.1rem', fontWeight: 700, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <AlertTriangle size={18} /> Schadenursache
+                                {!isCauseExpanded && (
+                                    <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-muted)', marginLeft: '0.5rem' }}>
+                                        {formData.images?.filter(img => img.assignedTo === 'Schadenfotos').length > 0
+                                            ? `(${formData.images.filter(img => img.assignedTo === 'Schadenfotos').length} Fotos)`
+                                            : formData.cause ? '(Ausgefüllt)' : ''}
+                                    </span>
                                 )}
+                            </h3>
+                            <div style={{ color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>{isCauseExpanded ? 'Einklappen' : 'Ausklappen'}</span>
+                                <ChevronDown size={20} style={{ transform: isCauseExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.3s ease' }} />
                             </div>
                         </div>
+
+                        {isCauseExpanded && (<>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem', marginBottom: '2rem' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                        <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>Schadenursache</span>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+                                                if (!SR) { alert('Diktat wird von diesem Browser nicht unterst\u00fctzt.'); return; }
+                                                if (window.__dictRec) { window.__dictRec.stop(); window.__dictRec = null; return; }
+                                                const rec = new SR();
+                                                rec.lang = 'de-DE';
+                                                rec.continuous = true;
+                                                rec.interimResults = false;
+                                                rec.onresult = (e) => {
+                                                    const text = Array.from(e.results).map(r => r[0].transcript).join(' ');
+                                                    setFormData(prev => ({ ...prev, cause: (prev.cause ? prev.cause + ' ' : '') + text }));
+                                                };
+                                                rec.onerror = (e) => { console.error('Diktat Fehler:', e); window.__dictRec = null; };
+                                                rec.onend = () => { window.__dictRec = null; };
+                                                window.__dictRec = rec;
+                                                rec.start();
+                                            }}
+                                            style={{
+                                                display: 'flex', alignItems: 'center', gap: '0.4rem',
+                                                padding: '0.35rem 0.8rem', borderRadius: '6px', border: 'none',
+                                                backgroundColor: 'rgba(14,165,233,0.15)',
+                                                color: '#38bdf8', cursor: 'pointer',
+                                                fontSize: '0.8rem', fontWeight: 700
+                                            }}
+                                            title="Diktieren starten / stoppen"
+                                        >
+                                            <Mic size={15} /> Diktieren
+                                        </button>
+                                    </div>
+                                    <textarea
+                                        className="form-input"
+                                        rows={3}
+                                        value={formData.cause || ''}
+                                        onChange={e => setFormData({ ...formData, cause: e.target.value })}
+                                        placeholder="Beschreibung der Ursache..."
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <h4 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--text-main)' }}>Fotos zur Ursache</h4>
+                                <div
+                                    style={{
+                                        border: '2px dashed var(--border)', borderRadius: 'var(--radius)',
+                                        padding: '2rem 1rem', textAlign: 'center', cursor: 'pointer',
+                                        backgroundColor: 'rgba(255,255,255,0.02)', transition: 'all 0.2s',
+                                        marginBottom: '1rem', display: 'flex', flexDirection: 'column',
+                                        alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)'
+                                    }}
+                                    onClick={() => document.getElementById('file-upload-Schadenfotos-desktop').click()}
+                                    onDragOver={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.backgroundColor = 'rgba(56, 189, 248, 0.1)'; e.currentTarget.style.color = 'var(--primary)'; }}
+                                    onDragLeave={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.02)'; e.currentTarget.style.color = 'var(--text-muted)'; }}
+                                    onDrop={(e) => handleCategoryDrop(e, 'Schadenfotos')}
+                                >
+                                    <Plus size={24} style={{ marginBottom: '0.5rem', opacity: 0.5 }} />
+                                    <span style={{ fontSize: '0.85rem' }}>Schadenfoto hochladen / Drop</span>
+                                    <input id="file-upload-Schadenfotos-desktop" type="file" multiple accept="image/*" style={{ display: 'none' }} onChange={(e) => handleCategorySelect(e, 'Schadenfotos')} />
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                    {formData.images.filter(img => img.assignedTo === 'Schadenfotos').map((item, idx) => (
+                                        <div key={idx} style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start', border: '1px solid var(--border)', padding: '0.5rem', borderRadius: '6px', backgroundColor: 'var(--background)' }}>
+                                            {/* Thumbnail + Controls */}
+                                            <div style={{ flex: '0 0 140px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
+                                                <div style={{ width: '140px', height: '140px', borderRadius: '6px', overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+                                                    <img src={item.preview} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: 'pointer' }} onClick={() => setEditingImage(item)} />
+                                                </div>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', padding: '0 2px', alignItems: 'center' }}>
+                                                    <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', fontSize: '0.75rem', cursor: 'pointer', color: 'var(--text-main)' }}>
+                                                        <input
+                                                            type="checkbox"
+                                                            style={{ width: '16px', height: '16px', accentColor: 'var(--primary)', cursor: 'pointer' }}
+                                                            checked={item.includeInReport !== false}
+                                                            onChange={(e) => setFormData(prev => ({
+                                                                ...prev,
+                                                                images: prev.images.map(i => i === item ? { ...i, includeInReport: e.target.checked } : i)
+                                                            }))}
+                                                        />
+                                                        <span style={{ fontWeight: 600 }}>Bericht</span>
+                                                    </label>
+                                                    <button
+                                                        type="button"
+                                                        title="Bearbeiten"
+                                                        style={{ border: '1px solid var(--border)', backgroundColor: 'var(--surface)', color: 'var(--text-main)', cursor: 'pointer', padding: '6px', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                                        onClick={() => setEditingImage(item)}
+                                                    >
+                                                        <Edit3 size={16} />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            {/* Description */}
+                                            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '140px', gap: '4px' }}>
+                                                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            const tid = `imgdesc-${idx}`;
+                                                            isRecording === tid ? stopRecording() : startRecording(tid);
+                                                        }}
+                                                        style={{
+                                                            width: '32px', height: '32px', borderRadius: '50%',
+                                                            border: `1px solid ${isRecording === `imgdesc-${idx}` ? '#ef4444' : 'var(--border)'}`,
+                                                            backgroundColor: isRecording === `imgdesc-${idx}` ? 'rgba(239,68,68,0.1)' : 'rgba(14,165,233,0.08)',
+                                                            color: isRecording === `imgdesc-${idx}` ? '#ef4444' : '#38bdf8',
+                                                            cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+                                                        }}
+                                                        title={isRecording === `imgdesc-${idx}` ? 'Aufnahme stoppen' : 'Diktieren starten'}
+                                                    >
+                                                        {isRecording === `imgdesc-${idx}` ? <MicOff size={16} /> : <Mic size={16} />}
+                                                    </button>
+                                                </div>
+                                                <textarea
+                                                    id={`imgdesc-${idx}`}
+                                                    placeholder="Beschreibung..."
+                                                    className="form-input"
+                                                    style={{ fontSize: '0.9rem', padding: '0.5rem', flex: 1, width: '100%', resize: 'none', backgroundColor: 'var(--surface)', color: 'var(--text-main)' }}
+                                                    value={item.description || ''}
+                                                    onChange={(e) => {
+                                                        const newDesc = e.target.value;
+                                                        setFormData(prev => ({
+                                                            ...prev,
+                                                            images: prev.images.map(i => i.preview === item.preview ? { ...i, description: newDesc } : i)
+                                                        }));
+                                                    }}
+                                                />
+                                            </div>
+                                            {/* Delete */}
+                                            <div style={{ display: 'flex', flexDirection: 'column', height: '100px', justifyContent: 'flex-start' }}>
+                                                <button type="button" onClick={() => setFormData(prev => ({ ...prev, images: prev.images.filter(i => i !== item) }))} style={{ color: '#EF4444', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '6px', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}><Trash size={16} /></button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {formData.images.filter(img => img.assignedTo === 'Schadenfotos').length === 0 && (
+                                        <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.9rem', fontStyle: 'italic' }}>Keine Schadenfotos vorhanden.</div>
+                                    )}
+                                </div>
+                            </div>
+                        </>)}
                     </div>
                 )}
 
@@ -4926,16 +5368,17 @@ END:VCARD`;
                                     type="button"
                                     className={`btn btn-ghost ${isListeningFindings ? 'listening' : ''}`}
                                     style={{
+                                        width: '32px', height: '32px', borderRadius: '50%',
                                         color: isListeningFindings ? '#ef4444' : 'var(--text-muted)',
-                                        padding: '2px 8px', fontSize: '0.8rem',
-                                        display: 'flex', alignItems: 'center', gap: '4px',
-                                        border: '1px solid var(--border)', borderRadius: '4px'
+                                        border: `1px solid ${isListeningFindings ? '#ef4444' : 'var(--border)'}`,
+                                        backgroundColor: isListeningFindings ? 'rgba(239,68,68,0.1)' : 'transparent',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        padding: 0, cursor: 'pointer'
                                     }}
                                     onClick={toggleFindingsListening}
                                     title="Diktieren"
                                 >
-                                    {isListeningFindings ? <MicOff size={14} /> : <Mic size={14} />}
-                                    <span>Diktieren</span>
+                                    {isListeningFindings ? <MicOff size={16} /> : <Mic size={16} />}
                                 </button>
                             </div>
                             <textarea
@@ -5013,20 +5456,17 @@ END:VCARD`;
                                 type="button"
                                 className={`btn btn-ghost ${isListeningMeasures ? 'listening' : ''}`}
                                 style={{
+                                    width: '32px', height: '32px', borderRadius: '50%',
                                     color: isListeningMeasures ? '#ef4444' : 'var(--text-muted)',
-                                    padding: '2px 8px',
-                                    fontSize: '0.8rem',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '4px',
-                                    border: '1px solid var(--border)',
-                                    borderRadius: '4px'
+                                    border: `1px solid ${isListeningMeasures ? '#ef4444' : 'var(--border)'}`,
+                                    backgroundColor: isListeningMeasures ? 'rgba(239,68,68,0.1)' : 'transparent',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    padding: 0, cursor: 'pointer'
                                 }}
                                 onClick={toggleMeasuresListening}
                                 title="Diktieren"
                             >
-                                {isListeningMeasures ? <MicOff size={14} /> : <Mic size={14} />}
-                                <span>Diktieren</span>
+                                {isListeningMeasures ? <MicOff size={16} /> : <Mic size={16} />}
                             </button>
                         </div>
 
@@ -5048,7 +5488,35 @@ END:VCARD`;
 
                 {/* PDF Button - Desktop Mode (immer sichtbar) */}
                 {mode === 'desktop' && (
-                    <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1rem', marginBottom: '2rem' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem', marginTop: '1rem', marginBottom: '2rem' }}>
+
+
+                        {/* Checkbox: Bericht geschickt */}
+                        <label
+                            onClick={e => e.stopPropagation()}
+                            style={{
+                                display: 'inline-flex', alignItems: 'center', gap: '0.55rem',
+                                cursor: 'pointer', userSelect: 'none',
+                                padding: '0.38rem 0.9rem', borderRadius: 999,
+                                backgroundColor: formData.reportSent ? 'rgba(59,130,246,0.1)' : 'rgba(255,255,255,0.04)',
+                                border: `1px solid ${formData.reportSent ? 'rgba(59,130,246,0.35)' : 'rgba(255,255,255,0.1)'}`,
+                                transition: 'all 0.18s',
+                            }}
+                        >
+                            <input
+                                type="checkbox"
+                                checked={!!formData.reportSent}
+                                onChange={e => setFormData(prev => ({ ...prev, reportSent: e.target.checked }))}
+                                style={{ width: 15, height: 15, accentColor: '#3B82F6', cursor: 'pointer' }}
+                            />
+                            <span style={{
+                                fontSize: '0.82rem', fontWeight: 600,
+                                color: formData.reportSent ? '#93C5FD' : '#94A3B8',
+                            }}>
+                                {formData.reportSent ? 'Bericht geschickt' : 'Bericht geschickt'}
+                            </span>
+                        </label>
+
                         <button
                             type="button"
                             onClick={handleGeneratePDF}
@@ -5078,7 +5546,7 @@ END:VCARD`;
                 )}
 
                 {/* EMAILS & PLANS (Final for User) */}
-                {mode === 'desktop' && (
+                {false && (
                     <div style={{ marginBottom: '2.5rem', backgroundColor: 'var(--surface)', padding: '1.25rem', borderRadius: '12px', border: '1px solid var(--border)', color: 'var(--text-main)', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
                             <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.6rem', margin: 0 }}>
@@ -5253,18 +5721,20 @@ END:VCARD`;
                                     className="btn-glass"
                                     onClick={toggleMeasuresListening}
                                     style={{
-                                        padding: '0.4rem 0.75rem',
+                                        width: '32px', height: '32px',
+                                        padding: '0',
                                         fontSize: '0.75rem',
                                         display: 'flex',
                                         alignItems: 'center',
-                                        gap: '0.5rem',
+                                        justifyContent: 'center',
                                         color: isListeningMeasures ? '#EF4444' : 'var(--primary)',
-                                        borderRadius: '10px',
+                                        border: `1px solid ${isListeningMeasures ? '#EF4444' : 'var(--border)'}`,
+                                        backgroundColor: isListeningMeasures ? 'rgba(239,68,68,0.1)' : 'transparent',
+                                        borderRadius: '50%',
                                         fontWeight: 700
                                     }}
                                 >
                                     {isListeningMeasures ? <MicOff size={16} /> : <Mic size={16} />}
-                                    {isListeningMeasures ? 'Stop' : 'Diktieren'}
                                 </button>
                             </div>
                             <textarea
@@ -5313,6 +5783,7 @@ END:VCARD`;
                 )}
 
                 {/* Pläne & Grundrisse Section */}
+                {false && (
                 <div className="card" style={{ marginBottom: '1.5rem', padding: '1.5rem' }}>
                     <h3 className="section-header">
                         <FileText size={18} /> Pläne & Grundrisse
@@ -5400,6 +5871,7 @@ END:VCARD`;
                         )}
                     </div>
                 </div>
+                )}
 
                 {mode === 'desktop' && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', marginBottom: '1.5rem' }}>
@@ -5533,26 +6005,74 @@ END:VCARD`;
                                 {formData.rooms.map(room => {
                                     const hasMeasurement = !!room.measurementData;
                                     const date = hasMeasurement ? (room.measurementData.globalSettings?.date ? new Date(room.measurementData.globalSettings.date).toLocaleDateString('de-CH') : 'Kein Datum') : '-';
+                                    const allImages = [
+                                        ...(room.measurementData?.canvasImage ? [{ id: 'current', src: room.measurementData.canvasImage, label: `Aktuell · ${date}`, isCurrent: true }] : []),
+                                        ...((room.measurementHistory || []).filter(h => h?.canvasImage).map(h => ({ id: h.id, src: h.canvasImage, label: h.globalSettings?.date ? new Date(h.globalSettings.date).toLocaleDateString('de-CH') : 'Messung', isCurrent: false }))),
+                                    ];
                                     return (
                                         <div key={room.id} style={{
-                                            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                                             padding: '1rem', backgroundColor: 'rgba(255, 255, 255, 0.02)',
-                                            border: '1px solid var(--border)', borderRadius: '12px', gap: '1rem'
+                                            border: '1px solid var(--border)', borderRadius: '12px',
+                                            display: 'flex', flexDirection: 'column', gap: '0.75rem',
                                         }}>
-                                            <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-                                                <div style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--text-main)' }}>{room.name}</div>
-                                                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 500 }}>{hasMeasurement ? `Letzte Messung: ${date}` : 'Keine Messdaten'}</div>
+                                            {/* Header: Raumname + Buttons */}
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
+                                                <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+                                                    <div style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--text-main)' }}>{room.name}</div>
+                                                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 500 }}>{hasMeasurement ? `Letzte Messung: ${date}` : 'Keine Messdaten'}</div>
+                                                </div>
+                                                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                                    {room.measurementData ? (
+                                                        <>
+                                                            <button type="button" className="btn-glass" style={{ padding: '0.4rem 0.8rem', minHeight: '44px', fontSize: '0.75rem', borderRadius: '8px' }} onClick={() => { setActiveRoomForMeasurement(room); setIsNewMeasurement(true); setShowMeasurementModal(true); }}>Neue Messung</button>
+                                                            <button type="button" className="btn-glass" style={{ padding: '0.4rem 0.8rem', minHeight: '44px', fontSize: '0.75rem', borderRadius: '8px', color: 'var(--primary)' }} onClick={() => { setActiveRoomForMeasurement(room); setIsNewMeasurement(false); setShowMeasurementModal(true); }}>Bearbeiten</button>
+                                                        </>
+                                                    ) : (
+                                                        <button type="button" className="btn-glass" style={{ padding: '0.4rem 0.8rem', minHeight: '44px', fontSize: '0.75rem', borderRadius: '8px', color: 'var(--success)' }} onClick={() => { setActiveRoomForMeasurement(room); setIsNewMeasurement(false); setShowMeasurementModal(true); }}>Messung starten</button>
+                                                    )}
+                                                </div>
                                             </div>
-                                            <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                                {room.measurementData ? (
-                                                    <>
-                                                        <button type="button" className="btn-glass" style={{ padding: '0.4rem 0.8rem', fontSize: '0.75rem', borderRadius: '8px' }} onClick={() => { setActiveRoomForMeasurement(room); setIsNewMeasurement(true); setShowMeasurementModal(true); }}>Neue Messung</button>
-                                                        <button type="button" className="btn-glass" style={{ padding: '0.4rem 0.8rem', fontSize: '0.75rem', borderRadius: '8px', color: 'var(--primary)' }} onClick={() => { setActiveRoomForMeasurement(room); setIsNewMeasurement(false); setShowMeasurementModal(true); }}>Bearbeiten</button>
-                                                    </>
-                                                ) : (
-                                                    <button type="button" className="btn-glass" style={{ padding: '0.4rem 0.8rem', fontSize: '0.75rem', borderRadius: '8px', color: 'var(--success)' }} onClick={() => { setActiveRoomForMeasurement(room); setIsNewMeasurement(false); setShowMeasurementModal(true); }}>Messung starten</button>
-                                                )}
-                                            </div>
+                                            {/* Skizzen 2-Spalten Grid (responsive) */}
+                                            {allImages.length > 0 && (
+                                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', borderTop: '1px solid var(--border)', paddingTop: '0.75rem' }}>
+                                                    {allImages.map((entry) => (
+                                                        <div key={entry.id} style={{ position: 'relative', borderRadius: '8px', overflow: 'hidden', border: `1px solid ${entry.isCurrent ? 'var(--primary)' : 'var(--border)'}`, width: 'calc(50% - 0.375rem)', flexShrink: 0 }}>
+                                                            <img
+                                                                src={entry.src}
+                                                                alt={entry.label}
+                                                                style={{ width: '100%', height: '160px', objectFit: 'contain', backgroundColor: '#fff', display: 'block', cursor: 'pointer' }}
+                                                                onClick={() => window.open(entry.src, '_blank')}
+                                                            />
+                                                            <div style={{ padding: '0.3rem 0.6rem', fontSize: '0.7rem', fontWeight: 600, color: entry.isCurrent ? 'var(--primary)' : 'var(--text-muted)', borderTop: '1px solid var(--border)' }}>
+                                                                {entry.isCurrent ? `● ${entry.label}` : entry.label}
+                                                            </div>
+                                                            <button
+                                                                type="button"
+                                                                title="Bild löschen"
+                                                                onClick={() => {
+                                                                    if (!window.confirm('Dieses Messprotokoll-Bild wirklich löschen?')) return;
+                                                                    setFormData(prev => ({
+                                                                        ...prev,
+                                                                        rooms: prev.rooms.map(r => {
+                                                                            if (r.id !== room.id) return r;
+                                                                            if (entry.isCurrent) {
+                                                                                const newHistory = [...(r.measurementHistory || [])];
+                                                                                const lastHist = newHistory.pop();
+                                                                                return { ...r, measurementData: lastHist ? { ...lastHist } : null, measurementHistory: newHistory };
+                                                                            } else {
+                                                                                return { ...r, measurementHistory: (r.measurementHistory || []).filter(h => h.id !== entry.id) };
+                                                                            }
+                                                                        })
+                                                                    }));
+                                                                }}
+                                                                style={{ position: 'absolute', top: '6px', right: '6px', background: 'rgba(239,68,68,0.85)', color: 'white', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 2px 4px rgba(0,0,0,0.3)', zIndex: 10 }}
+                                                            >
+                                                                <X size={14} />
+                                                            </button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
                                         </div>
                                     );
                                 })}
@@ -6266,32 +6786,50 @@ END:VCARD`;
                             }
                         }
 
-                        // 2. Update room data (Latest & History)
+                        // Update room data (Latest & History)
                         if (activeRoomForMeasurement) {
-                            setFormData(prev => ({
-                                ...prev,
-                                rooms: prev.rooms.map(r => {
+                            setFormData(prev => {
+                                // ── Räume aktualisieren (bestehende Logik unverändert) ──
+                                const updatedRooms = prev.rooms.map(r => {
                                     if (r.id === activeRoomForMeasurement.id) {
-                                        // History Entry
-                                        const newHistoryEntry = {
-                                            id: `hist_${Date.now()}`,
-                                            date: globalSettings.date || new Date().toISOString(),
-                                            measurements: measurements.map(m => ({ ...m })), // Deep clone
-                                            globalSettings: { ...globalSettings },
-                                            canvasImage: canvasImage,
-                                            protocolUrl: protocolUrl // Store the uploaded file link
-                                        };
                                         const history = r.measurementHistory ? [...r.measurementHistory] : [];
-
+                                        const updatedHistory = isNewMeasurement
+                                            ? [...history, {
+                                                id: `hist_${Date.now()}`,
+                                                date: globalSettings.date || new Date().toISOString(),
+                                                measurements: measurements.map(m => ({ ...m })),
+                                                globalSettings: { ...globalSettings },
+                                                canvasImage: canvasImage,
+                                                protocolUrl: protocolUrl
+                                              }]
+                                            : history; // Bearbeiten: Verlauf unverändert lassen
                                         return {
                                             ...r,
                                             measurementData: { measurements, globalSettings, canvasImage, protocolUrl },
-                                            measurementHistory: [...history, newHistoryEntry]
+                                            measurementHistory: updatedHistory
                                         };
                                     }
                                     return r;
-                                })
-                            }));
+                                });
+
+                                // ── Büro-Projektkontrolle aktualisieren wenn Trocknungskontrolle ──
+                                // Bedingung: Status Trocknung + Messung hat Datum (= documentationComplete)
+                                const measuredAt = globalSettings.date
+                                    ? new Date(globalSettings.date).toISOString()
+                                    : new Date().toISOString();
+                                const documentationComplete = !!(measurements && measurements.length > 0 && globalSettings.date);
+
+                                const dryingUpdate = applyDryingCheck(
+                                    { ...prev, rooms: updatedRooms },  // aktueller State mit neuen Räumen
+                                    { measuredAt, documentationComplete }
+                                );
+
+                                // applyDryingCheck gibt null zurück wenn Bedingungen nicht erfüllt
+                                // (z.B. kein Trocknung-Status) — dann nur Räume updaten
+                                return dryingUpdate
+                                    ? { ...dryingUpdate, rooms: updatedRooms }
+                                    : { ...prev, rooms: updatedRooms };
+                            });
                         }
                     }}
                 />
@@ -6480,10 +7018,10 @@ END:VCARD`;
                         {/* Editierbare Felder */}
                         <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                             {[
-                                { key: 'name',  label: 'Name',    placeholder: 'Name' },
+                                { key: 'name', label: 'Name', placeholder: 'Name' },
                                 { key: 'phone', label: 'Telefon', placeholder: '+41 ...' },
-                                { key: 'email', label: 'E-Mail',  placeholder: 'email@...' },
-                                { key: 'note',  label: 'Notiz',   placeholder: 'Etage, Hinweis...' },
+                                { key: 'email', label: 'E-Mail', placeholder: 'email@...' },
+                                { key: 'note', label: 'Notiz', placeholder: 'Etage, Hinweis...' },
                             ].map(({ key, label, placeholder }) => (
                                 <div key={key} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                     <label style={{ fontSize: '0.7rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600, width: '52px', flexShrink: 0 }}>{label}</label>

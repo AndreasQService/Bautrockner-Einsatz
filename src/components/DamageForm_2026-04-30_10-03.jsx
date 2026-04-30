@@ -434,7 +434,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                                 i.id === img.id ? {
                                     ...i,
                                     oneDriveItemId: odResult.itemId || null,
-                                    oneDrivePath: odResult.odPath || null,
+                                    oneDrivePath:   odResult.odPath  || null,
                                 } : i
                             )
                         }));
@@ -735,11 +735,6 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
     const [showAddDeviceForm, setShowAddDeviceForm] = useState(false);
     const [techTab, setTechTab] = useState(null); // null = Kachel-Home
     const [showAddRoomForm, setShowAddRoomForm] = useState(false);
-    const [showTechRoomSelector, setShowTechRoomSelector] = useState(false);
-    const [techSelectedApartment, setTechSelectedApartment] = useState(null);
-    const [techNewRoomName, setTechNewRoomName] = useState('');
-    const [techNewRoomApt, setTechNewRoomApt] = useState(undefined);
-    const [techNewRoomCustomName, setTechNewRoomCustomName] = useState('');
 
     const [unsubscribeStates, setUnsubscribeStates] = useState({}); // { [idx]: { endDate, counterEnd, hours } }
 
@@ -1472,7 +1467,7 @@ END:VCARD`;
                             console.log('[Supabase] ✅ Backup gespeichert:', fileName);
 
                             // IndexedDB-Status auf 'synced' → Badge-Counter geht auf 0
-                            updatePhotoSyncStatus(tempId, 'synced').catch(() => { });
+                            updatePhotoSyncStatus(tempId, 'synced').catch(() => {});
                         } else {
                             console.warn('[Supabase] Backup-Fehler:', sbErr.message);
                         }
@@ -1503,16 +1498,16 @@ END:VCARD`;
                         const { supabase: sb } = await import('../supabaseClient.js');
                         if (sb) {
                             await sb.from('project_image_uploads').upsert({
-                                local_image_id: tempId,
-                                project_id: formData.id || formData.projectNumber || 'tmp',
-                                filename: file.name,
-                                mime_type: file.type || 'image/jpeg',
-                                size_bytes: file.size,
-                                storage_bucket: 'case-files',
-                                storage_path: supabasePath,
-                                storage_status: 'uploaded_to_backend',
-                                remote_path: `QTool/${odFolder}/Fotos/${subFolder.replace(/[^a-zA-Z0-9]/g, '_')}/${file.name}`,
-                                updated_at: new Date().toISOString(),
+                                local_image_id:  tempId,
+                                project_id:      formData.id || formData.projectNumber || 'tmp',
+                                filename:        file.name,
+                                mime_type:       file.type || 'image/jpeg',
+                                size_bytes:      file.size,
+                                storage_bucket:  'case-files',
+                                storage_path:    supabasePath,
+                                storage_status:  'uploaded_to_backend',
+                                remote_path:     `QTool/${odFolder}/Fotos/${subFolder.replace(/[^a-zA-Z0-9]/g, '_')}/${file.name}`,
+                                updated_at:      new Date().toISOString(),
                             }, { onConflict: 'local_image_id', ignoreDuplicates: false });
                             console.log('[Variante C] ✅ Journal-Eintrag erstellt – Backend lädt hoch');
 
@@ -1521,18 +1516,18 @@ END:VCARD`;
                             // warten (max. 1 Minute). Bilder erscheinen so in
                             // Sekunden in SharePoint statt nach bis zu 1 Minute.
                             fetch(
-                                `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/onedrive-upload-worker`,
-                                {
-                                    method: 'POST',
-                                    headers: {
-                                        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-                                        'Content-Type': 'application/json',
-                                    },
-                                    body: '{}',
-                                }
+                              `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/onedrive-upload-worker`,
+                              {
+                                method: 'POST',
+                                headers: {
+                                  'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+                                  'Content-Type': 'application/json',
+                                },
+                                body: '{}',
+                              }
                             ).then(r => {
-                                if (r.ok) console.log('[Variante C] 🚀 Worker sofort getriggert');
-                            }).catch(() => { }); // Fire & forget – niemals UI blockieren
+                              if (r.ok) console.log('[Variante C] 🚀 Worker sofort getriggert');
+                            }).catch(() => {}); // Fire & forget – niemals UI blockieren
                         }
                     } catch (jErr) {
                         // Journal-Fehler ist nicht kritisch – Bild ist in Supabase Storage gesichert
@@ -2644,253 +2639,45 @@ END:VCARD`;
     // ── TECHNIKER MODUS: Kachel-Home ────────────────────────────────────────
     if (mode === 'technician' && techTab === null) {
         const TECH_TILES = [
-            { id: 'uebersicht', label: 'Übersicht', icon: '📋', color: '#3B82F6', status: null },
-            { id: 'aufnahme', label: 'Schadenaufnahme', icon: '🔍', color: '#F97316', status: 'Schadenaufnahme' },
-            { id: 'leck', label: 'Leckortung', icon: '💧', color: '#06B6D4', status: 'Leckortung' },
-            { id: 'trocknung', label: 'Trocknung', icon: '🌬', color: '#A855F7', status: 'Trocknung' },
-            { id: 'messung', label: 'Messung', icon: '📏', color: '#10B981', status: null },
+            { id: 'uebersicht', label: 'Übersicht',  icon: '📋', color: '#3B82F6', status: null },
+            { id: 'aufnahme',   label: 'Schadenaufnahme',   icon: '🔍', color: '#F97316', status: 'Schadenaufnahme' },
+            { id: 'leck',       label: 'Leckortung',       icon: '💧', color: '#06B6D4', status: 'Leckortung' },
+            { id: 'trocknung',  label: 'Trocknung',  icon: '🌬', color: '#A855F7', status: 'Trocknung' },
+            { id: 'messung',    label: 'Messung',    icon: '📏', color: '#10B981', status: null },
         ];
         const adresse = [formData.street, [formData.zip, formData.city].filter(Boolean).join(' ')].filter(Boolean).join(', ');
         const sub = [formData.projectNumber, formData.damageCategory].filter(Boolean).join(' · ');
         return (
-            <div style={{ minHeight: '100vh', backgroundColor: '#0F172A', padding: '2rem 1.25rem 3rem', fontFamily: 'Inter,system-ui,sans-serif', color: '#F1F5F9' }}>
-                <div style={{ marginBottom: '2.5rem' }}>
-                    <div style={{ fontSize: '1.5rem', fontWeight: 800, lineHeight: 1.2 }}>{adresse || 'Schadenort'}</div>
-                    {sub && <div style={{ fontSize: '0.85rem', color: '#64748B', marginTop: '0.4rem', fontWeight: 500 }}>{sub}</div>}
+            <div style={{ minHeight:'100vh', backgroundColor:'#0F172A', padding:'2rem 1.25rem 3rem', fontFamily:'Inter,system-ui,sans-serif', color:'#F1F5F9' }}>
+                <div style={{ marginBottom:'2.5rem' }}>
+                    <div style={{ fontSize:'1.5rem', fontWeight:800, lineHeight:1.2 }}>{adresse || 'Schadenort'}</div>
+                    {sub && <div style={{ fontSize:'0.85rem', color:'#64748B', marginTop:'0.4rem', fontWeight:500 }}>{sub}</div>}
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                    {TECH_TILES.slice(0, 4).map(tile => (
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'1rem' }}>
+                    {TECH_TILES.slice(0,4).map(tile => (
                         <button key={tile.id} onClick={() => { if (tile.status) setFormData(prev => ({ ...prev, status: tile.status })); setTechTab(tile.id); }} style={{
-                            background: '#1E293B', border: `2px solid ${tile.color}`,
-                            borderRadius: '16px', padding: '2.5rem 1rem', cursor: 'pointer',
-                            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                            gap: '0.75rem', boxShadow: `0 4px 20px ${tile.glow}`, minHeight: '130px', transition: 'transform 0.15s'
+                            background:'#1E293B', border:`2px solid ${tile.color}`,
+                            borderRadius:'16px', padding:'2.5rem 1rem', cursor:'pointer',
+                            display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
+                            gap:'0.75rem', boxShadow:`0 4px 20px ${tile.glow}`, minHeight:'130px', transition:'transform 0.15s'
                         }}>
-
-                            <span style={{ fontSize: '1rem', fontWeight: 700, color: '#F1F5F9' }}>{tile.label}</span>
+                            
+                            <span style={{ fontSize:'1rem', fontWeight:700, color:'#F1F5F9' }}>{tile.label}</span>
                         </button>
                     ))}
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1rem' }}>
-                    <button onClick={() => {
-                        if (TECH_TILES[4].status) setFormData(prev => ({ ...prev, status: TECH_TILES[4].status }));
-                        setShowTechRoomSelector(true);
-                    }} style={{
-                        background: '#1E293B', border: `2px solid ${TECH_TILES[4].color}`,
-                        borderRadius: '16px', padding: '2.5rem 1rem', cursor: 'pointer',
-                        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                        gap: '0.75rem', boxShadow: `0 4px 20px ${TECH_TILES[4].glow}`,
-                        width: 'calc(50% - 0.5rem)', minHeight: '130px'
+                <div style={{ display:'flex', justifyContent:'center', marginTop:'1rem' }}>
+                    <button onClick={() => { if (TECH_TILES[4].status) setFormData(prev => ({ ...prev, status: TECH_TILES[4].status })); setTechTab(TECH_TILES[4].id); }} style={{
+                        background:'#1E293B', border:`2px solid ${TECH_TILES[4].color}`,
+                        borderRadius:'16px', padding:'2.5rem 1rem', cursor:'pointer',
+                        display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
+                        gap:'0.75rem', boxShadow:`0 4px 20px ${TECH_TILES[4].glow}`,
+                        width:'calc(50% - 0.5rem)', minHeight:'130px'
                     }}>
-
-                        <span style={{ fontSize: '1rem', fontWeight: 700, color: '#F1F5F9' }}>{TECH_TILES[4].label}</span>
+                        
+                        <span style={{ fontSize:'1rem', fontWeight:700, color:'#F1F5F9' }}>{TECH_TILES[4].label}</span>
                     </button>
                 </div>
-
-                {showTechRoomSelector && (() => {
-                    const allRooms = formData.rooms || [];
-                    const uniqueApartments = Array.from(new Set(allRooms.map(r => (r.apartment || 'Allgemeiner Bereich').trim())));
-
-                    // Auto-select if there is only one apartment
-                    const activeApt = techSelectedApartment || (uniqueApartments.length === 1 ? uniqueApartments[0] : null);
-
-                    return (
-                        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.85)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-                            <div style={{ backgroundColor: '#1E293B', borderRadius: '16px', width: '100%', maxWidth: '400px', padding: '1.5rem', color: '#F1F5F9', border: '1px solid rgba(255,255,255,0.1)' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                        {activeApt && uniqueApartments.length > 1 && (
-                                            <button onClick={() => setTechSelectedApartment(null)} style={{ background: 'transparent', border: 'none', color: '#60A5FA', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center' }}>
-                                                <ArrowLeft size={20} />
-                                            </button>
-                                        )}
-                                        <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700 }}>
-                                            {!activeApt ? 'Wohnung wählen' : activeApt}
-                                        </h3>
-                                    </div>
-                                    <button onClick={() => { setShowTechRoomSelector(false); setTechSelectedApartment(null); }} style={{ background: 'transparent', border: 'none', color: '#94A3B8', cursor: 'pointer' }}><X size={20} /></button>
-                                </div>
-
-                                {!activeApt ? (
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '40vh', overflowY: 'auto', paddingBottom: '1rem' }}>
-                                        {uniqueApartments.length > 0 ? uniqueApartments.map(apt => (
-                                            <button key={apt} onClick={() => setTechSelectedApartment(apt)} style={{ padding: '1.25rem 1rem', borderRadius: '8px', background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.2)', color: '#60A5FA', fontSize: '1.05rem', fontWeight: 700, textAlign: 'left', cursor: 'pointer', display: 'flex', justifyContent: 'space-between' }}>
-                                                <span>{apt}</span>
-                                                <span style={{ fontSize: '0.8rem' }}>Räume anzeigen ➔</span>
-                                            </button>
-                                        )) : (
-                                            <div style={{ textAlign: 'center', color: '#94A3B8', padding: '1rem 0' }}>Noch keine Räume angelegt.</div>
-                                        )}
-                                    </div>
-                                ) : (
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '40vh', overflowY: 'auto', paddingBottom: '1rem' }}>
-                                        {allRooms.filter(r => (r.apartment || 'Allgemeiner Bereich').trim() === activeApt).map(r => (
-                                            <button key={r.id} onClick={() => {
-                                                setActiveRoomForMeasurement(r);
-                                                setIsNewMeasurement(true);
-                                                setShowTechRoomSelector(false);
-                                                setTechSelectedApartment(null);
-                                                setShowMeasurementModal(true);
-                                            }} style={{ padding: '1rem', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#F1F5F9', fontSize: '1rem', fontWeight: 600, textAlign: 'left', cursor: 'pointer', display: 'flex', justifyContent: 'space-between' }}>
-                                                <span>{r.name || 'Ohne Namen'}</span>
-                                                <span style={{ color: '#94A3B8', fontSize: '0.8rem' }}>Öffnen ➔</span>
-                                            </button>
-                                        ))}
-                                        {allRooms.filter(r => (r.apartment || 'Allgemeiner Bereich').trim() === activeApt).length === 0 && (
-                                            <div style={{ textAlign: 'center', color: '#94A3B8', padding: '1rem 0' }}>Noch keine Räume angelegt.</div>
-                                        )}
-                                    </div>
-                                )}
-
-                                <div style={{ marginTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '1.5rem' }}>
-                                    <button onClick={() => {
-                                        const aptValue = activeApt === 'Allgemeiner Bereich' ? '' : (activeApt || '');
-                                        const tempRoom = {
-                                            id: `temp_${Date.now()}`,
-                                            name: '',
-                                            apartment: aptValue,
-                                            width: '', length: '', height: '',
-                                            dryingData: { equipment: [], dailyLogs: [] },
-                                            measurementData: { measurements: [], globalSettings: {} },
-                                            measurementHistory: []
-                                        };
-                                        setActiveRoomForMeasurement(tempRoom);
-                                        setIsNewMeasurement(true);
-                                        setShowTechRoomSelector(false);
-                                        setTechSelectedApartment(null);
-                                        setShowMeasurementModal(true);
-                                    }} style={{ width: '100%', background: 'rgba(16, 185, 129, 0.1)', color: '#10B981', border: '1px dashed #10B981', padding: '1rem', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '0.95rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
-                                        <Plus size={18} /> Neuer Raum / Neue Messung
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    );
-                })()}
-
-                <MeasurementModal
-                    key={activeRoomForMeasurement?.id || 'none'}
-                    isOpen={showMeasurementModal}
-                    onClose={() => {
-                        setShowMeasurementModal(false);
-                        setActiveRoomForMeasurement(null);
-                        setIsNewMeasurement(false);
-                        setIsMeasurementReadOnly(false);
-                    }}
-                    onBackToDashboard={() => {
-                        setShowMeasurementModal(false);
-                        setActiveRoomForMeasurement(null);
-                        setIsNewMeasurement(false);
-                        setIsMeasurementReadOnly(false);
-                        setTechActiveSection(null);
-                    }}
-                    onStartNew={() => setIsNewMeasurement(true)}
-                    readOnly={isMeasurementReadOnly}
-                    measurementHistory={[
-                        ...(activeRoomForMeasurement?.measurementHistory || []),
-                        ...(activeRoomForMeasurement?.measurementData?.measurements?.length > 0 ? [{
-                            id: `hist_current`,
-                            date: activeRoomForMeasurement.measurementData.globalSettings?.date || new Date().toISOString(),
-                            measurements: activeRoomForMeasurement.measurementData.measurements,
-                            globalSettings: activeRoomForMeasurement.measurementData.globalSettings,
-                            protocolUrl: activeRoomForMeasurement.measurementData.protocolUrl
-                        }] : [])
-                    ]}
-                    rooms={activeRoomForMeasurement ? [activeRoomForMeasurement] : []}
-                    allRooms={formData.rooms || []}
-                    projectTitle={formData.projectTitle}
-                    address={[formData.street, formData.zip && formData.city ? `${formData.zip} ${formData.city}` : formData.city].filter(Boolean).join(', ')}
-                    apartments={[...new Set((formData.contacts || []).filter(c => c.role === 'Mieter' || c.role === 'Eigentümer').map(c => [c.name, c.apartment].filter(Boolean).join(' - ').trim()).filter(Boolean))]}
-                    initialData={(formData.rooms || []).reduce((acc, r) => {
-                        let mData = r.measurementData;
-                        if (activeRoomForMeasurement && r.id === activeRoomForMeasurement.id && isNewMeasurement && mData && Array.isArray(mData.measurements)) {
-                            mData = {
-                                canvasImage: mData.canvasImage,
-                                globalSettings: {
-                                    ...(mData.globalSettings || {}),
-                                    date: new Date().toISOString().split('T')[0],
-                                    temp: '',
-                                    humidity: ''
-                                },
-                                measurements: mData.measurements.map(m => ({
-                                    id: m.id,
-                                    pointName: m.pointName,
-                                    w_value: '',
-                                    b_value: '',
-                                    notes: ''
-                                }))
-                            };
-                        }
-                        return { ...acc, [r.id]: mData };
-                    }, {})}
-                    onSave={async (data) => {
-                        const { file, measurements, globalSettings, canvasImage, galleryPhotos } = data;
-                        let protocolUrl = null;
-                        if (supabase && file) {
-                            try {
-                                const fileExt = file.name.split('.').pop() || (file.type === 'application/pdf' ? 'pdf' : 'png');
-                                const fileName = `cases/${formData.id || 'temp'}/protocols/${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
-                                const { error } = await supabase.storage.from('case-files').upload(fileName, file);
-                                if (!error) {
-                                    const { data: { publicUrl } } = supabase.storage.from('case-files').getPublicUrl(fileName);
-                                    protocolUrl = publicUrl;
-                                }
-                            } catch (err) { console.error(err); }
-                        }
-                        if (activeRoomForMeasurement) {
-                            setFormData(prev => {
-                                let updatedRooms;
-                                if (String(activeRoomForMeasurement.id).startsWith('temp_')) {
-                                    const history = [{
-                                        id: `hist_${Date.now()}`,
-                                        date: globalSettings.date || new Date().toISOString(),
-                                        measurements: measurements.map(m => ({ ...m })),
-                                        globalSettings: { ...globalSettings },
-                                        canvasImage: canvasImage,
-                                        protocolUrl: protocolUrl,
-                                        galleryPhotos: galleryPhotos || []
-                                    }];
-                                    const newRoom = {
-                                        ...activeRoomForMeasurement,
-                                        id: `room_${Date.now()}`,
-                                        name: globalSettings.room || 'Unbenannter Raum',
-                                        apartment: globalSettings.apartment || '',
-                                        measurementData: { measurements, globalSettings, canvasImage, protocolUrl, galleryPhotos: galleryPhotos || [] },
-                                        measurementHistory: history
-                                    };
-                                    updatedRooms = [...(prev.rooms || []), newRoom];
-                                    setTimeout(() => setActiveRoomForMeasurement(newRoom), 0);
-                                } else {
-                                    updatedRooms = (prev.rooms || []).map(r => {
-                                        if (r.id === activeRoomForMeasurement.id) {
-                                            const history = r.measurementHistory ? [...r.measurementHistory] : [];
-                                            const updatedHistory = (isNewMeasurement && r.measurementData && r.measurementData.measurements && r.measurementData.measurements.length > 0)
-                                                ? [...history, {
-                                                    id: `hist_${Date.now()}`,
-                                                    date: r.measurementData.globalSettings?.date || new Date().toISOString(),
-                                                    measurements: r.measurementData.measurements.map(m => ({ ...m })),
-                                                    globalSettings: { ...(r.measurementData.globalSettings || {}) },
-                                                    canvasImage: r.measurementData.canvasImage,
-                                                    protocolUrl: r.measurementData.protocolUrl,
-                                                    galleryPhotos: r.measurementData.galleryPhotos || []
-                                                }]
-                                                : history;
-                                            const updatedRoom = { ...r, name: globalSettings.room || r.name, apartment: globalSettings.apartment || r.apartment, measurementData: { measurements, globalSettings, canvasImage, protocolUrl, galleryPhotos: galleryPhotos || [] }, measurementHistory: updatedHistory };
-                                            setTimeout(() => setActiveRoomForMeasurement(updatedRoom), 0);
-                                            return updatedRoom;
-                                        }
-                                        return r;
-                                    });
-                                }
-                                const measuredAt = globalSettings.date ? new Date(globalSettings.date).toISOString() : new Date().toISOString();
-                                const documentationComplete = !!(measurements && measurements.length > 0 && globalSettings.date);
-                                const dryingUpdate = applyDryingCheck({ ...prev, rooms: updatedRooms }, { measuredAt, documentationComplete });
-                                return dryingUpdate ? { ...dryingUpdate, rooms: updatedRooms } : { ...prev, rooms: updatedRooms };
-                            });
-                            setIsNewMeasurement(false); // So subsequent saves don't duplicate history
-                        }
-                    }}
-                />
             </div>
         );
     }
@@ -3027,28 +2814,28 @@ END:VCARD`;
                     {/* Schritt-Abschluss Checkbox — nur Techniker, nicht Übersicht */}
                     {mode === 'technician' && techTab && techTab !== 'uebersicht' && (() => {
                         const tabStatusMap = {
-                            aufnahme: 'Leckortung',
-                            leck: 'Trocknung',
+                            aufnahme:  'Leckortung',
+                            leck:      'Trocknung',
                             trocknung: 'Instandsetzung',
-                            messung: 'Abgeschlossen',
+                            messung:   'Abgeschlossen',
                         };
                         const tabLabelMap = {
-                            aufnahme: 'Schadenaufnahme abgeschlossen',
-                            leck: 'Leckortung abgeschlossen',
+                            aufnahme:  'Schadenaufnahme abgeschlossen',
+                            leck:      'Leckortung abgeschlossen',
                             trocknung: 'Trocknung abgeschlossen',
-                            messung: 'Messung abgeschlossen',
+                            messung:   'Messung abgeschlossen',
                         };
                         const nextStatus = tabStatusMap[techTab];
                         const label = tabLabelMap[techTab] || 'Schritt abgeschlossen';
                         const isChecked = nextStatus && formData.status === nextStatus;
                         return (
                             <label style={{
-                                display: 'flex', alignItems: 'center', gap: '0.5rem',
-                                cursor: 'pointer', userSelect: 'none',
+                                display:'flex', alignItems:'center', gap:'0.5rem',
+                                cursor:'pointer', userSelect:'none',
                                 background: isChecked ? 'rgba(16,185,129,0.12)' : 'rgba(255,255,255,0.04)',
                                 border: `1.5px solid ${isChecked ? '#10B981' : 'rgba(255,255,255,0.1)'}`,
-                                borderRadius: 12, padding: '0.5rem 1rem',
-                                transition: 'all 0.15s', whiteSpace: 'nowrap'
+                                borderRadius:12, padding:'0.5rem 1rem',
+                                transition:'all 0.15s', whiteSpace:'nowrap'
                             }}>
                                 <input
                                     type="checkbox"
@@ -3061,9 +2848,9 @@ END:VCARD`;
                                             if (onSave) setTimeout(() => onSave(updated, true), 200);
                                         }
                                     }}
-                                    style={{ width: 18, height: 18, accentColor: '#10B981', cursor: 'pointer' }}
+                                    style={{ width:18, height:18, accentColor:'#10B981', cursor:'pointer' }}
                                 />
-                                <span style={{ fontSize: '0.85rem', fontWeight: 700, color: isChecked ? '#10B981' : '#94A3B8' }}>
+                                <span style={{ fontSize:'0.85rem', fontWeight:700, color: isChecked ? '#10B981' : '#94A3B8' }}>
                                     {isChecked ? '✓ ' : ''}{label}
                                 </span>
                             </label>
@@ -3089,27 +2876,27 @@ END:VCARD`;
                         )}
 
                         {mode !== 'technician' && (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-                                <label style={{ fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 700 }}>Projektstatus</label>
-                                <select
-                                    className="form-input"
-                                    style={{
-                                        padding: '0.3rem 0.6rem',
-                                        fontSize: '0.85rem',
-                                        width: 'auto',
-                                        fontWeight: 700,
-                                        border: `1.5px solid ${statusColors[formData.status || 'Pendent'] || '#94A3B8'}`,
-                                        color: statusColors[formData.status || 'Pendent'] || '#94A3B8',
-                                        backgroundColor: 'rgba(255,255,255,0.02)'
-                                    }}
-                                    value={formData.status}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value }))}
-                                >
-                                    {Object.keys(statusColors).map(status => (
-                                        <option key={status} value={status} style={{ color: '#000' }}>{status}</option>
-                                    ))}
-                                </select>
-                            </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                            <label style={{ fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 700 }}>Projektstatus</label>
+                            <select
+                                className="form-input"
+                                style={{
+                                    padding: '0.3rem 0.6rem',
+                                    fontSize: '0.85rem',
+                                    width: 'auto',
+                                    fontWeight: 700,
+                                    border: `1.5px solid ${statusColors[formData.status || 'Pendent'] || '#94A3B8'}`,
+                                    color: statusColors[formData.status || 'Pendent'] || '#94A3B8',
+                                    backgroundColor: 'rgba(255,255,255,0.02)'
+                                }}
+                                value={formData.status}
+                                onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value }))}
+                            >
+                                {Object.keys(statusColors).map(status => (
+                                    <option key={status} value={status} style={{ color: '#000' }}>{status}</option>
+                                ))}
+                            </select>
+                        </div>
                         )}
 
                         {/* Lieferantenrechnung Badge */}
@@ -3133,31 +2920,31 @@ END:VCARD`;
 
                         {/* Calendar Push Button */}
                         {mode !== 'technician' && (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-                                <label style={{ fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 700 }}>Export</label>
-                                <button
-                                    onClick={handleDownloadICS}
-                                    className="btn-glass"
-                                    title="Termin für Outlook/Kalender erstellen"
-                                    style={{
-                                        height: '38px',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '0.5rem',
-                                        padding: '0 0.75rem',
-                                        borderRadius: '8px',
-                                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                                        color: '#10B981',
-                                        border: '1px solid rgba(16, 185, 129, 0.2)',
-                                        cursor: 'pointer',
-                                        fontSize: '0.85rem',
-                                        fontWeight: 700
-                                    }}
-                                >
-                                    <CalendarIcon size={18} />
-                                    <span>Termin</span>
-                                </button>
-                            </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                            <label style={{ fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 700 }}>Export</label>
+                            <button
+                                onClick={handleDownloadICS}
+                                className="btn-glass"
+                                title="Termin für Outlook/Kalender erstellen"
+                                style={{
+                                    height: '38px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.5rem',
+                                    padding: '0 0.75rem',
+                                    borderRadius: '8px',
+                                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                                    color: '#10B981',
+                                    border: '1px solid rgba(16, 185, 129, 0.2)',
+                                    cursor: 'pointer',
+                                    fontSize: '0.85rem',
+                                    fontWeight: 700
+                                }}
+                            >
+                                <CalendarIcon size={18} />
+                                <span>Termin</span>
+                            </button>
+                        </div>
                         )}
                     </div>
                 </div>
@@ -4020,64 +3807,64 @@ END:VCARD`;
                 <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap', alignItems: 'stretch', marginBottom: '1.5rem' }}>
                     {/* Map Card – nur im Techniker-Modus */}
                     {mode === 'desktop' && (
-                        <div className="card" style={{ flex: '1 1 350px', padding: '1.5rem', display: 'flex', flexDirection: 'column' }}>
-                            <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.6rem', color: 'var(--primary)', borderBottom: '1px solid var(--border)', paddingBottom: '0.75rem' }}>
-                                <MapPin size={18} /> Standort Karte
-                            </h3>
+                    <div className="card" style={{ flex: '1 1 350px', padding: '1.5rem', display: 'flex', flexDirection: 'column' }}>
+                        <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.6rem', color: 'var(--primary)', borderBottom: '1px solid var(--border)', paddingBottom: '0.75rem' }}>
+                            <MapPin size={18} /> Standort Karte
+                        </h3>
 
-                            {(formData.street || formData.address) ? (
-                                <div style={{ position: 'relative', borderRadius: '12px', overflow: 'hidden', border: '1px solid var(--border)', flex: 1 }}>
-                                    <iframe
-                                        width="100%"
-                                        height="300"
-                                        style={{ border: 0, display: 'block', filter: 'grayscale(0.2) contrast(1.1)' }}
-                                        loading="lazy"
-                                        allowFullScreen
-                                        src={`https://maps.google.com/maps?q=${encodeURIComponent(formData.street ? `${formData.street}, ${formData.zip} ${formData.city}` : formData.address)}&t=&z=15&ie=UTF8&iwloc=&output=embed`}
-                                        title="Standort Karte"
-                                    ></iframe>
+                        {(formData.street || formData.address) ? (
+                            <div style={{ position: 'relative', borderRadius: '12px', overflow: 'hidden', border: '1px solid var(--border)', flex: 1 }}>
+                                <iframe
+                                    width="100%"
+                                    height="300"
+                                    style={{ border: 0, display: 'block', filter: 'grayscale(0.2) contrast(1.1)' }}
+                                    loading="lazy"
+                                    allowFullScreen
+                                    src={`https://maps.google.com/maps?q=${encodeURIComponent(formData.street ? `${formData.street}, ${formData.zip} ${formData.city}` : formData.address)}&t=&z=15&ie=UTF8&iwloc=&output=embed`}
+                                    title="Standort Karte"
+                                ></iframe>
 
-                                    {!formData.exteriorPhoto && (
-                                        <label
-                                            style={{
-                                                position: 'absolute',
-                                                bottom: '15px',
-                                                right: '15px',
-                                                backgroundColor: 'var(--primary)',
-                                                color: 'white',
-                                                padding: '0.6rem 1.2rem',
-                                                borderRadius: '99px',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                gap: '0.6rem',
-                                                cursor: 'pointer',
-                                                boxShadow: '0 10px 15px -3px rgba(14, 165, 233, 0.4)',
-                                                fontSize: '0.85rem',
-                                                fontWeight: 700,
-                                                zIndex: 10,
-                                                transition: 'all 0.2s'
-                                            }}
-                                            className="btn-primary"
-                                            title="Aussenaufnahme hinzufügen"
-                                        >
-                                            <Camera size={18} />
-                                            <span>Foto hinzufügen</span>
-                                            <input
-                                                type="file"
-                                                accept="image/*"
-                                                onChange={handleExteriorPhotoUpload}
-                                                style={{ display: 'none' }}
-                                            />
-                                        </label>
-                                    )}
-                                </div>
-                            ) : (
-                                <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '300px', border: '2px dashed var(--border)', borderRadius: '12px' }}>
-                                    <Map size={32} style={{ marginBottom: '1rem', opacity: 0.3 }} />
-                                    Keine Koordinaten verfügbar
-                                </div>
-                            )}
-                        </div>
+                                {!formData.exteriorPhoto && (
+                                    <label
+                                        style={{
+                                            position: 'absolute',
+                                            bottom: '15px',
+                                            right: '15px',
+                                            backgroundColor: 'var(--primary)',
+                                            color: 'white',
+                                            padding: '0.6rem 1.2rem',
+                                            borderRadius: '99px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '0.6rem',
+                                            cursor: 'pointer',
+                                            boxShadow: '0 10px 15px -3px rgba(14, 165, 233, 0.4)',
+                                            fontSize: '0.85rem',
+                                            fontWeight: 700,
+                                            zIndex: 10,
+                                            transition: 'all 0.2s'
+                                        }}
+                                        className="btn-primary"
+                                        title="Aussenaufnahme hinzufügen"
+                                    >
+                                        <Camera size={18} />
+                                        <span>Foto hinzufügen</span>
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            onChange={handleExteriorPhotoUpload}
+                                            style={{ display: 'none' }}
+                                        />
+                                    </label>
+                                )}
+                            </div>
+                        ) : (
+                            <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '300px', border: '2px dashed var(--border)', borderRadius: '12px' }}>
+                                <Map size={32} style={{ marginBottom: '1rem', opacity: 0.3 }} />
+                                Keine Koordinaten verfügbar
+                            </div>
+                        )}
+                    </div>
                     )}
 
                     {/* 1b. Exterior Photo (Aussenaufnahme) - Show only if exists */}
@@ -4785,7 +4572,96 @@ END:VCARD`;
                                     minWidth: mode === 'technician' ? '240px' : 'auto',
                                     flexShrink: 0
                                 }}>
-
+                                    {room.measurementData ? (
+                                        <>
+                                            <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setActiveRoomForMeasurement(room);
+                                                    setIsNewMeasurement(true);
+                                                    setIsMeasurementReadOnly(false);
+                                                    setShowMeasurementModal(true);
+                                                }}
+                                                className="btn-glass"
+                                                style={{
+                                                    padding: mode === 'technician' ? '0.75rem 0.5rem' : '0.4rem 0.6rem',
+                                                    borderRadius: '10px',
+                                                    border: '1px solid rgba(217, 119, 6, 0.3)',
+                                                    color: '#F59E0B',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    gap: '0.5rem',
+                                                    fontSize: mode === 'technician' ? '0.85rem' : '0.75rem',
+                                                    cursor: 'pointer',
+                                                    fontWeight: 700
+                                                }}
+                                            >
+                                                <Plus size={16} /> Neue Messung
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setActiveRoomForMeasurement(room);
+                                                    setIsNewMeasurement(true); // Always start a new series with empty values
+                                                    setIsMeasurementReadOnly(false);
+                                                    setShowMeasurementModal(true);
+                                                }}
+                                                style={{
+                                                    padding: mode === 'technician' ? '0.75rem 0.5rem' : '0.4rem 0.6rem',
+                                                    borderRadius: '8px',
+                                                    border: '1.5px solid #059669',
+                                                    backgroundColor: 'rgba(5, 150, 105, 0.1)',
+                                                    color: '#10B981',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    gap: '0.4rem',
+                                                    fontSize: mode === 'technician' ? '0.9rem' : '0.75rem',
+                                                    cursor: 'pointer',
+                                                    flex: 1,
+                                                    minHeight: mode === 'technician' ? '44px' : 'auto',
+                                                    fontWeight: 800,
+                                                    whiteSpace: 'nowrap'
+                                                }}
+                                            >
+                                                <Edit3 size={16} /> Bearbeiten
+                                            </button>
+                                        </>
+                                    ) : (
+                                        // Noch keine Messung — Button für alle Modi anzeigen
+                                        <button
+                                            type="button"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setActiveRoomForMeasurement(room);
+                                                setIsNewMeasurement(false);
+                                                setIsMeasurementReadOnly(false);
+                                                setShowMeasurementModal(true);
+                                            }}
+                                            style={{
+                                                padding: mode === 'technician' ? '0.8rem 0.5rem' : '0.4rem 0.6rem',
+                                                borderRadius: '6px',
+                                                border: '1px solid #059669',
+                                                backgroundColor: 'rgba(16, 185, 129, 0.2)',
+                                                color: '#34d399',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                gap: '0.4rem',
+                                                fontSize: mode === 'technician' ? '1rem' : '0.75rem',
+                                                cursor: 'pointer',
+                                                flex: 1,
+                                                minHeight: mode === 'technician' ? '50px' : '44px',
+                                                fontWeight: 700,
+                                                gridColumn: 'span 2'
+                                            }}
+                                        >
+                                            <Plus size={18} /> Messung starten
+                                        </button>
+                                    )}
 
                                     {/* History Button */}
                                     {room.measurementHistory && room.measurementHistory.length > 0 && (
@@ -6009,93 +5885,93 @@ END:VCARD`;
 
                 {/* Pläne & Grundrisse Section */}
                 {false && (
-                    <div className="card" style={{ marginBottom: '1.5rem', padding: '1.5rem' }}>
-                        <h3 className="section-header">
-                            <FileText size={18} /> Pläne & Grundrisse
-                        </h3>
+                <div className="card" style={{ marginBottom: '1.5rem', padding: '1.5rem' }}>
+                    <h3 className="section-header">
+                        <FileText size={18} /> Pläne & Grundrisse
+                    </h3>
 
-                        <div
-                            className="btn-glass"
-                            style={{
-                                border: '2px dashed var(--border)',
-                                borderRadius: '16px',
-                                padding: '1.5rem',
-                                textAlign: 'center',
-                                cursor: 'pointer',
-                                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                                marginBottom: '1.25rem',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                color: 'var(--text-muted)'
-                            }}
-                            onClick={() => document.getElementById('file-upload-pläne').click()}
-                            onDragOver={(e) => {
-                                e.preventDefault();
-                                e.currentTarget.style.borderColor = 'var(--primary)';
-                                e.currentTarget.style.background = 'rgba(14, 165, 233, 0.08)';
-                            }}
-                            onDragLeave={(e) => {
-                                e.preventDefault();
-                                e.currentTarget.style.borderColor = 'var(--border)';
-                                e.currentTarget.style.background = 'none';
-                            }}
-                            onDrop={(e) => handleCategoryDrop(e, 'Pläne')}
-                        >
-                            <div style={{
-                                width: '40px', height: '40px', borderRadius: '50%', backgroundColor: 'rgba(255,255,255,0.05)',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '0.75rem'
-                            }}>
-                                <Plus size={20} />
-                            </div>
-                            <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>Plan / Grundriss hochladen (PDF / Bild)</span>
-                            <input id="file-upload-pläne" type="file" multiple accept="image/*,application/pdf" style={{ display: 'none' }} onChange={(e) => handleCategorySelect(e, 'Pläne')} />
+                    <div
+                        className="btn-glass"
+                        style={{
+                            border: '2px dashed var(--border)',
+                            borderRadius: '16px',
+                            padding: '1.5rem',
+                            textAlign: 'center',
+                            cursor: 'pointer',
+                            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                            marginBottom: '1.25rem',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: 'var(--text-muted)'
+                        }}
+                        onClick={() => document.getElementById('file-upload-pläne').click()}
+                        onDragOver={(e) => {
+                            e.preventDefault();
+                            e.currentTarget.style.borderColor = 'var(--primary)';
+                            e.currentTarget.style.background = 'rgba(14, 165, 233, 0.08)';
+                        }}
+                        onDragLeave={(e) => {
+                            e.preventDefault();
+                            e.currentTarget.style.borderColor = 'var(--border)';
+                            e.currentTarget.style.background = 'none';
+                        }}
+                        onDrop={(e) => handleCategoryDrop(e, 'Pläne')}
+                    >
+                        <div style={{
+                            width: '40px', height: '40px', borderRadius: '50%', backgroundColor: 'rgba(255,255,255,0.05)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '0.75rem'
+                        }}>
+                            <Plus size={20} />
                         </div>
-
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-                            {formData.images.filter(img => img.assignedTo === 'Pläne').map((item, idx) => (
-                                <div key={idx} style={{
-                                    display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem',
-                                    backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid var(--border)',
-                                    borderRadius: '12px'
-                                }}>
-                                    {(item.file && item.file.type === 'application/pdf') || (item.name && item.name.toLowerCase().endsWith('.pdf')) ? (
-                                        <div style={{ color: '#F87171', display: 'flex', alignItems: 'center', gap: '0.6rem', flex: 1 }}>
-                                            <FileText size={18} />
-                                            <span style={{ fontSize: '0.9rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</span>
-                                            <button
-                                                type="button"
-                                                className="btn-glass"
-                                                style={{ marginLeft: 'auto', padding: '0.3rem 0.6rem', fontSize: '0.75rem', borderRadius: '8px' }}
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    const url = item.file ? URL.createObjectURL(item.file) : item.preview; if (url) window.open(url, '_blank');
-                                                }}
-                                            >
-                                                Öffnen
-                                            </button>
-                                        </div>
-                                    ) : (
-                                        <>
-                                            <img src={item.preview} alt="Vorschau" className="hover-zoom" style={{ width: '44px', height: '44px', objectFit: 'cover', borderRadius: '8px' }} />
-                                            <div style={{ flex: 1, overflow: 'hidden' }}>
-                                                <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-main)' }}>{item.name || item.assignedTo}</div>
-                                                {item.description && (
-                                                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{item.description.substring(0, 40)}...</div>
-                                                )}
-                                            </div>
-                                        </>
-                                    )}
-
-                                    <button type="button" onClick={() => { if (window.confirm('Löschen?')) setFormData(prev => ({ ...prev, images: prev.images.filter(img => img !== item) })); }} style={{ border: 'none', background: 'rgba(239, 68, 68, 0.1)', color: '#EF4444', cursor: 'pointer', padding: '6px', borderRadius: '50%', display: 'flex' }}><X size={14} /></button>
-                                </div>
-                            ))}
-                            {formData.images.filter(img => img.assignedTo === 'Pläne').length === 0 && (
-                                <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem', fontStyle: 'italic', padding: '1rem' }}>Keine Pläne vorhanden.</div>
-                            )}
-                        </div>
+                        <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>Plan / Grundriss hochladen (PDF / Bild)</span>
+                        <input id="file-upload-pläne" type="file" multiple accept="image/*,application/pdf" style={{ display: 'none' }} onChange={(e) => handleCategorySelect(e, 'Pläne')} />
                     </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                        {formData.images.filter(img => img.assignedTo === 'Pläne').map((item, idx) => (
+                            <div key={idx} style={{
+                                display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem',
+                                backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid var(--border)',
+                                borderRadius: '12px'
+                            }}>
+                                {(item.file && item.file.type === 'application/pdf') || (item.name && item.name.toLowerCase().endsWith('.pdf')) ? (
+                                    <div style={{ color: '#F87171', display: 'flex', alignItems: 'center', gap: '0.6rem', flex: 1 }}>
+                                        <FileText size={18} />
+                                        <span style={{ fontSize: '0.9rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</span>
+                                        <button
+                                            type="button"
+                                            className="btn-glass"
+                                            style={{ marginLeft: 'auto', padding: '0.3rem 0.6rem', fontSize: '0.75rem', borderRadius: '8px' }}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                const url = item.file ? URL.createObjectURL(item.file) : item.preview; if (url) window.open(url, '_blank');
+                                            }}
+                                        >
+                                            Öffnen
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <img src={item.preview} alt="Vorschau" className="hover-zoom" style={{ width: '44px', height: '44px', objectFit: 'cover', borderRadius: '8px' }} />
+                                        <div style={{ flex: 1, overflow: 'hidden' }}>
+                                            <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-main)' }}>{item.name || item.assignedTo}</div>
+                                            {item.description && (
+                                                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{item.description.substring(0, 40)}...</div>
+                                            )}
+                                        </div>
+                                    </>
+                                )}
+
+                                <button type="button" onClick={() => { if (window.confirm('Löschen?')) setFormData(prev => ({ ...prev, images: prev.images.filter(img => img !== item) })); }} style={{ border: 'none', background: 'rgba(239, 68, 68, 0.1)', color: '#EF4444', cursor: 'pointer', padding: '6px', borderRadius: '50%', display: 'flex' }}><X size={14} /></button>
+                            </div>
+                        ))}
+                        {formData.images.filter(img => img.assignedTo === 'Pläne').length === 0 && (
+                            <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem', fontStyle: 'italic', padding: '1rem' }}>Keine Pläne vorhanden.</div>
+                        )}
+                    </div>
+                </div>
                 )}
 
                 {mode === 'desktop' && (
@@ -6962,11 +6838,10 @@ END:VCARD`;
                     readOnly={isMeasurementReadOnly}
                     measurementHistory={activeRoomForMeasurement?.measurementHistory || []}
                     rooms={activeRoomForMeasurement ? [activeRoomForMeasurement] : []}
-                    allRooms={formData.rooms || []}
                     projectTitle={formData.projectTitle}
                     address={[formData.street, formData.zip && formData.city ? `${formData.zip} ${formData.city}` : formData.city].filter(Boolean).join(', ')}
-                    apartments={[...new Set((formData.contacts || []).filter(c => c.role === 'Mieter' || c.role === 'Eigentümer').map(c => [c.name, c.apartment].filter(Boolean).join(' - ').trim()).filter(Boolean))]}
-                    initialData={(formData.rooms || []).reduce((acc, r) => {
+                    apartments={[...new Set((formData.contacts||[]).filter(c=>c.apartment).map(c=>c.apartment))]}
+                    initialData={formData.rooms.reduce((acc, r) => {
                         let mData = r.measurementData;
                         // If this is the active room AND we are starting a NEW measurement based on old one
                         if (activeRoomForMeasurement && r.id === activeRoomForMeasurement.id && isNewMeasurement && mData && Array.isArray(mData.measurements)) {
@@ -7014,52 +6889,31 @@ END:VCARD`;
                             }
                         }
 
+                        // Update room data (Latest & History)
                         if (activeRoomForMeasurement) {
                             setFormData(prev => {
-                                let updatedRooms;
-                                if (String(activeRoomForMeasurement.id).startsWith('temp_')) {
-                                    const history = [{
-                                        id: `hist_${Date.now()}`,
-                                        date: globalSettings.date || new Date().toISOString(),
-                                        measurements: measurements.map(m => ({ ...m })),
-                                        globalSettings: { ...globalSettings },
-                                        canvasImage: canvasImage,
-                                        protocolUrl: protocolUrl
-                                    }];
-                                    const newRoom = {
-                                        ...activeRoomForMeasurement,
-                                        id: `room_${Date.now()}`,
-                                        name: globalSettings.room || 'Unbenannter Raum',
-                                        apartment: globalSettings.apartment || '',
-                                        measurementData: { measurements, globalSettings, canvasImage, protocolUrl },
-                                        measurementHistory: history
-                                    };
-                                    updatedRooms = [...(prev.rooms || []), newRoom];
-                                } else {
-                                    updatedRooms = (prev.rooms || []).map(r => {
-                                        if (r.id === activeRoomForMeasurement.id) {
-                                            const history = r.measurementHistory ? [...r.measurementHistory] : [];
-                                            const updatedHistory = isNewMeasurement
-                                                ? [...history, {
-                                                    id: `hist_${Date.now()}`,
-                                                    date: globalSettings.date || new Date().toISOString(),
-                                                    measurements: measurements.map(m => ({ ...m })),
-                                                    globalSettings: { ...globalSettings },
-                                                    canvasImage: canvasImage,
-                                                    protocolUrl: protocolUrl
-                                                }]
-                                                : history; // Bearbeiten: Verlauf unverändert lassen
-                                            return {
-                                                ...r,
-                                                name: globalSettings.room || r.name,
-                                                apartment: globalSettings.apartment || r.apartment,
-                                                measurementData: { measurements, globalSettings, canvasImage, protocolUrl },
-                                                measurementHistory: updatedHistory
-                                            };
-                                        }
-                                        return r;
-                                    });
-                                }
+                                // ── Räume aktualisieren (bestehende Logik unverändert) ──
+                                const updatedRooms = prev.rooms.map(r => {
+                                    if (r.id === activeRoomForMeasurement.id) {
+                                        const history = r.measurementHistory ? [...r.measurementHistory] : [];
+                                        const updatedHistory = isNewMeasurement
+                                            ? [...history, {
+                                                id: `hist_${Date.now()}`,
+                                                date: globalSettings.date || new Date().toISOString(),
+                                                measurements: measurements.map(m => ({ ...m })),
+                                                globalSettings: { ...globalSettings },
+                                                canvasImage: canvasImage,
+                                                protocolUrl: protocolUrl
+                                              }]
+                                            : history; // Bearbeiten: Verlauf unverändert lassen
+                                        return {
+                                            ...r,
+                                            measurementData: { measurements, globalSettings, canvasImage, protocolUrl },
+                                            measurementHistory: updatedHistory
+                                        };
+                                    }
+                                    return r;
+                                });
 
                                 // ── Büro-Projektkontrolle aktualisieren wenn Trocknungskontrolle ──
                                 // Bedingung: Status Trocknung + Messung hat Datum (= documentationComplete)
