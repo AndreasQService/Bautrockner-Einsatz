@@ -789,38 +789,7 @@ export default function RoomManager({
                                             </button>
                                         )}
 
-                                        {/* History Button */}
-                                        {room.measurementHistory && room.measurementHistory.length > 0 && (
-                                            <button
-                                                type="button"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setActiveRoomForMeasurement(room);
-                                                    setIsNewMeasurement(false);
-                                                    setIsMeasurementReadOnly(true); // View Only
-                                                    setShowMeasurementModal(true);
-                                                }}
-                                                style={{
-                                                    padding: mode === 'technician' ? '0.6rem 0.5rem' : '0.4rem 0.6rem',
-                                                    borderRadius: '6px',
-                                                    border: '1px solid #1d4ed8',
-                                                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                                                    color: '#60a5fa',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'center',
-                                                    gap: '0.3rem',
-                                                    fontSize: mode === 'technician' ? '0.8rem' : '0.75rem',
-                                                    cursor: 'pointer',
-                                                    flex: 1,
-                                                    minHeight: mode === 'technician' ? '44px' : 'auto',
-                                                    fontWeight: 700,
-                                                    gridColumn: mode === 'technician' && !room.measurementData ? 'span 1' : 'auto'
-                                                }}
-                                            >
-                                                <RotateCcw size={14} /> Messverlauf
-                                            </button>
-                                        )}
+
 
                                         <button
                                             type="button"

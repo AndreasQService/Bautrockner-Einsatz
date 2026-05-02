@@ -17,7 +17,7 @@ const DEVICE_TYPES = [
     'Infrarotplatte',
     'Estrich-Dämmschichttrocknung',
     'Bautrockner',
-    'Turbinen',
+    'Turbine',
     'Wasserabscheider',
     'Messgeräte',
     'Datenlogger'
@@ -33,7 +33,7 @@ const DEVICE_ICONS = {
     'Estrich-Dämmschichttrocknung': <Wrench size={18} />,
     'Messgeräte': <Thermometer size={18} />,
     'Bautrockner': <Monitor size={18} />,
-    'Turbinen': <Wind size={18} />,
+    'Turbine': <Wind size={18} />,
     'Wasserabscheider': <Package size={18} />,
     'Datenlogger': <Activity size={18} />,
     'Sonstiges': <Wrench size={18} />
@@ -328,9 +328,11 @@ export default function DeviceManager({ onBack, onNavigateToReport, reports = []
                                             </td>
                                             <td>
                                                 <div style={{ fontSize: '0.9rem', fontWeight: 500 }}>{device.model || '-'}</div>
-                                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                                    <Zap size={12} /> {device.energy_consumption || '0.0'} kW
-                                                </div>
+                                                {!['Datenlogger', 'Messgeräte'].includes(device.type) && (
+                                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                                        <Zap size={12} /> {device.energy_consumption || '0.0'} kW
+                                                    </div>
+                                                )}
                                             </td>
                                             <td style={{ textAlign: 'center' }}>
                                                 <span style={{
@@ -359,26 +361,39 @@ export default function DeviceManager({ onBack, onNavigateToReport, reports = []
                                             <td>
                                                 {device.current_project ? (
                                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-                                                        <button
-                                                            onClick={() => onNavigateToReport && onNavigateToReport(device.current_project)}
-                                                            style={{
-                                                                color: 'var(--text-main)',
+                                                        {report ? (
+                                                            <button
+                                                                onClick={() => onNavigateToReport && onNavigateToReport(device.current_project)}
+                                                                style={{
+                                                                    color: 'var(--text-main)',
+                                                                    fontWeight: 700,
+                                                                    fontSize: '0.85rem',
+                                                                    display: 'flex',
+                                                                    alignItems: 'center',
+                                                                    gap: '0.5rem',
+                                                                    padding: 0,
+                                                                    background: 'transparent',
+                                                                    border: 'none',
+                                                                    cursor: 'pointer',
+                                                                    textAlign: 'left'
+                                                                }}
+                                                                title="Zum Projekt springen"
+                                                            >
+                                                                {report.projectTitle || device.current_project}
+                                                                <ExternalLink size={12} style={{ opacity: 0.6 }} />
+                                                            </button>
+                                                        ) : (
+                                                            <div style={{
+                                                                color: '#FCA5A5',
                                                                 fontWeight: 700,
                                                                 fontSize: '0.85rem',
                                                                 display: 'flex',
                                                                 alignItems: 'center',
-                                                                gap: '0.5rem',
-                                                                padding: 0,
-                                                                background: 'transparent',
-                                                                border: 'none',
-                                                                cursor: 'pointer',
-                                                                textAlign: 'left'
-                                                            }}
-                                                            title="Zum Projekt springen"
-                                                        >
-                                                            {device.current_project}
-                                                            <ExternalLink size={12} style={{ opacity: 0.6 }} />
-                                                        </button>
+                                                                gap: '0.5rem'
+                                                            }}>
+                                                                {device.current_project} <span style={{fontSize: '0.7rem', opacity: 0.8}}>(Nicht gefunden)</span>
+                                                            </div>
+                                                        )}
                                                         <div style={{
                                                             fontSize: '0.75rem',
                                                             color: 'var(--primary)',
@@ -538,20 +553,22 @@ export default function DeviceManager({ onBack, onNavigateToReport, reports = []
                                 />
                             </div>
 
-                            <div className="form-group" style={{ marginBottom: 0 }}>
-                                <label className="form-label" style={{ opacity: 0.8 }}>Anschlusswert (kW)</label>
-                                <select
-                                    className="form-input"
-                                    value={currentDevice.energy_consumption || ''}
-                                    onChange={(e) => setCurrentDevice(prev => ({ ...prev, energy_consumption: e.target.value }))}
-                                    style={{ background: 'rgba(15, 23, 42, 0.3)' }}
-                                >
-                                    <option value="">Nicht definiert</option>
-                                    {[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.2, 1.5, 2.0, 2.5, 3.0].map(kw => (
-                                        <option key={kw} value={kw}>{kw} kW</option>
-                                    ))}
-                                </select>
-                            </div>
+                            {!['Datenlogger', 'Messgeräte'].includes(currentDevice.type) && (
+                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                    <label className="form-label" style={{ opacity: 0.8 }}>Anschlusswert (kW)</label>
+                                    <select
+                                        className="form-input"
+                                        value={currentDevice.energy_consumption || ''}
+                                        onChange={(e) => setCurrentDevice(prev => ({ ...prev, energy_consumption: e.target.value }))}
+                                        style={{ background: 'rgba(15, 23, 42, 0.3)' }}
+                                    >
+                                        <option value="">Nicht definiert</option>
+                                        {[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.2, 1.5, 2.0, 2.5, 3.0].map(kw => (
+                                            <option key={kw} value={kw}>{kw} kW</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
                         </div>
 
                         <div style={{ display: 'flex', gap: '1rem', marginTop: '3rem' }}>

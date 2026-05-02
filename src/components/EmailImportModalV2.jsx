@@ -433,12 +433,12 @@ ${text}`;
                 backdropFilter: 'blur(4px)'
             }}>
                 <div style={{
-                    backgroundColor: '#1e293b', padding: '2rem', borderRadius: '16px',
+                    backgroundColor: '#FFFFFF', padding: '2rem', borderRadius: '16px',
                     width: '900px', maxWidth: '95%', maxHeight: '90vh', overflowY: 'auto',
-                    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)', border: '1px solid rgba(255,255,255,0.1)',
-                    color: 'white'
+                    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)', border: '1px solid #E2E8F0', boxShadow: '0 10px 30px rgba(0,0,0,0.1)',
+                    color: '#1E293B'
                 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '1rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '1px solid #E2E8F0', paddingBottom: '1rem' }}>
                         <div>
                             <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 800, color: '#10b981' }}>Vorschau & Korrektur (Gemini V4)</h2>
                             {previewData.projektTitel && <p style={{ margin: '0.25rem 0 0', fontSize: '0.9rem', color: '#94a3b8' }}>{previewData.projektTitel}</p>}
@@ -606,7 +606,7 @@ ${text}`;
                         <button onClick={() => setPreviewData({ ...previewData, kontakte: [...(previewData.kontakte || []), { rolle: '', name: '', firma: '', telefon: '', zweck: '' }] })} className="btn btn-ghost" style={{ alignSelf: 'start', fontSize: '0.8rem' }}>+ Weiteren Kontakt hinzufügen</button>
                     </div>
 
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '1.5rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', borderTop: '1px solid #E2E8F0', paddingTop: '1.5rem' }}>
                         <button onClick={() => setPreviewData(null)} className="btn btn-outline" style={{ minWidth: '120px' }}>Zurück</button>
                         <button onClick={() => {
                             onImport(previewData);

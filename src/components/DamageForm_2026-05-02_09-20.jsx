@@ -2657,8 +2657,8 @@ END:VCARD`;
         <div key={idx}
             style={{
                 position: 'relative', width: '140px', height: '90px', borderRadius: '8px', overflow: 'hidden',
-                border: '1px solid #E2E8F0', cursor: 'pointer',
-                backgroundColor: '#F1F5F9',
+                border: '1px solid var(--border)', cursor: 'pointer',
+                backgroundColor: 'rgba(255,255,255,0.03)',
                 display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                 padding: '0.5rem', transition: 'all 0.2s'
             }}
@@ -2671,7 +2671,7 @@ END:VCARD`;
                 <PdfIcon size={28} /> :
                 (img.name?.toLowerCase().endsWith('.msg') ? <Mail size={28} color="var(--primary)" /> : <FileText size={28} color="var(--primary)" />)
             }
-            <div style={{ fontSize: '0.7rem', marginTop: 6, width: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'center', color: 'white', fontWeight: 500 }}>
+            <div style={{ fontSize: '0.7rem', marginTop: 6, width: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'center', color: 'var(--text-main)', fontWeight: 500 }}>
                 {img.name}
             </div>
 
@@ -2711,7 +2711,7 @@ END:VCARD`;
         const adresse = [formData.street, [formData.zip, formData.city].filter(Boolean).join(' ')].filter(Boolean).join(', ');
         const sub = [formData.projectNumber, formData.damageCategory].filter(Boolean).join(' · ');
         return (
-            <div style={{ minHeight: '100vh', backgroundColor: '#F8FAFC', padding: '2rem 1.25rem 3rem', fontFamily: 'Inter,system-ui,sans-serif', color: '#1E293B' }}>
+            <div style={{ minHeight: '100vh', backgroundColor: '#0F172A', padding: '2rem 1.25rem 3rem', fontFamily: 'Inter,system-ui,sans-serif', color: '#F1F5F9' }}>
                 <div style={{ marginBottom: '2.5rem' }}>
                     <div style={{ fontSize: '1.5rem', fontWeight: 800, lineHeight: 1.2 }}>{adresse || 'Schadenort'}</div>
                     {sub && <div style={{ fontSize: '0.85rem', color: '#64748B', marginTop: '0.4rem', fontWeight: 500 }}>{sub}</div>}
@@ -2728,12 +2728,13 @@ END:VCARD`;
                                 setTechTab(tile.id); 
                             }
                         }} style={{
-                            background: '#FFFFFF', border: '2px solid #1E6DB7',
+                            background: '#1E293B', border: `2px solid ${tile.color}`,
                             borderRadius: '16px', padding: '2.5rem 1rem', cursor: 'pointer',
                             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                            gap: '0.75rem', boxShadow: '0 4px 20px rgba(30, 109, 183, 0.15)', minHeight: '130px', transition: 'transform 0.15s'
+                            gap: '0.75rem', boxShadow: `0 4px 20px ${tile.glow}`, minHeight: '130px', transition: 'transform 0.15s'
                         }}>
-                            <span style={{ fontSize: '1rem', fontWeight: 700, color: '#1E293B' }}>{tile.label === 'Trocknung' ? 'Geräte' : tile.label}</span>
+
+                            <span style={{ fontSize: '1rem', fontWeight: 700, color: '#F1F5F9' }}>{tile.label === 'Trocknung' ? 'Geräte' : tile.label}</span>
                         </button>
                     ))}
                 </div>
@@ -2743,13 +2744,14 @@ END:VCARD`;
                         setTechRoomSelectorMode('messung');
                         setShowTechRoomSelector(true);
                     }} style={{
-                        background: '#FFFFFF', border: '2px solid #1E6DB7',
+                        background: '#1E293B', border: `2px solid ${TECH_TILES[4].color}`,
                         borderRadius: '16px', padding: '2.5rem 1rem', cursor: 'pointer',
                         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                        gap: '0.75rem', boxShadow: '0 4px 20px rgba(30, 109, 183, 0.15)',
+                        gap: '0.75rem', boxShadow: `0 4px 20px ${TECH_TILES[4].glow}`,
                         width: 'calc(50% - 0.5rem)', minHeight: '130px'
                     }}>
-                        <span style={{ fontSize: '1rem', fontWeight: 700, color: '#1E293B' }}>{TECH_TILES[4].label}</span>
+
+                        <span style={{ fontSize: '1rem', fontWeight: 700, color: '#F1F5F9' }}>{TECH_TILES[4].label}</span>
                     </button>
                 </div>
 
@@ -2761,8 +2763,8 @@ END:VCARD`;
                     const activeApt = techSelectedApartment || (uniqueApartments.length === 1 ? uniqueApartments[0] : null);
 
                     return (
-                        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(4px)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-                            <div style={{ backgroundColor: '#FFFFFF', borderRadius: '16px', width: '100%', maxWidth: '400px', padding: '1.5rem', color: '#1E293B', border: '1px solid #E2E8F0', boxShadow: '0 10px 25px rgba(0,0,0,0.05)' }}>
+                        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.85)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+                            <div style={{ backgroundColor: '#1E293B', borderRadius: '16px', width: '100%', maxWidth: '400px', padding: '1.5rem', color: '#F1F5F9', border: '1px solid rgba(255,255,255,0.1)' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                         {activeApt && uniqueApartments.length > 1 && techRoomSelectorMode === 'messung' && (
@@ -2796,9 +2798,9 @@ END:VCARD`;
                                                     } else {
                                                         setTechSelectedApartment(apt);
                                                     }
-                                                }} style={{ padding: '1.25rem 1rem', borderRadius: '8px', background: '#FFFFFF', border: '1px solid #CBD5E1', color: '#1E293B', fontSize: '1.05rem', fontWeight: 700, textAlign: 'left', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                }} style={{ padding: '1.25rem 1rem', borderRadius: '8px', background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.2)', color: '#60A5FA', fontSize: '1.05rem', fontWeight: 700, textAlign: 'left', cursor: 'pointer', display: 'flex', justifyContent: 'space-between' }}>
                                                     <span>{apt}</span>
-                                                    <span style={{ fontSize: '0.8rem', color: '#64748B', fontWeight: 600 }}>{btnLabel}</span>
+                                                    <span style={{ fontSize: '0.8rem' }}>{btnLabel}</span>
                                                 </button>
                                             );
                                         }) : (
@@ -2814,9 +2816,9 @@ END:VCARD`;
                                                 setShowTechRoomSelector(false);
                                                 setTechSelectedApartment(null);
                                                 setShowMeasurementModal(true);
-                                            }} style={{ padding: '1rem', borderRadius: '8px', background: '#FFFFFF', border: '1px solid #CBD5E1', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', color: '#1E293B', fontSize: '1rem', fontWeight: 600, textAlign: 'left', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                            }} style={{ padding: '1rem', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#F1F5F9', fontSize: '1rem', fontWeight: 600, textAlign: 'left', cursor: 'pointer', display: 'flex', justifyContent: 'space-between' }}>
                                                 <span>{r.name || 'Ohne Namen'}</span>
-                                                <span style={{ color: '#64748B', fontSize: '0.8rem' }}>Öffnen ➔</span>
+                                                <span style={{ color: '#94A3B8', fontSize: '0.8rem' }}>Öffnen ➔</span>
                                             </button>
                                         ))}
                                         {allRooms.filter(r => (r.apartment || 'Allgemeiner Bereich').trim() === activeApt).length === 0 && (
@@ -2825,7 +2827,7 @@ END:VCARD`;
                                     </div>
                                 )}
 
-                                <div style={{ marginTop: '1rem', borderTop: '1px solid #E2E8F0', boxShadow: '0 -4px 20px rgba(0,0,0,0.04)', paddingTop: '1.5rem' }}>
+                                <div style={{ marginTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '1.5rem' }}>
                                     <button onClick={() => {
                                         if (techRoomSelectorMode === 'geraete') {
                                             setTechSelectedEquipmentRoom({ apartment: '' });
@@ -2850,7 +2852,7 @@ END:VCARD`;
                                             setTechSelectedApartment(null);
                                             setShowMeasurementModal(true);
                                         }
-                                    }} style={{ width: '100%', background: '#FFFFFF', color: '#1E293B', border: '1px dashed #94A3B8', padding: '1rem', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '0.95rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                                    }} style={{ width: '100%', background: 'rgba(16, 185, 129, 0.1)', color: '#10B981', border: '1px dashed #10B981', padding: '1rem', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '0.95rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
                                         <Plus size={18} /> {techRoomSelectorMode === 'geraete' ? 'Gerät hinzufügen' : 'Neuer Raum / Neue Messung'}
                                     </button>
                                 </div>
@@ -3002,12 +3004,12 @@ END:VCARD`;
                     <div className="card" style={{ marginBottom: '1.5rem', padding: '0.75rem 1.25rem' }}>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: '0.75rem' }}>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', position: 'relative' }}>
-                                <label style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748B', fontWeight: 700 }}>PROJEKT-NR:</label>
+                                <label style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 700 }}>PROJEKT-NR:</label>
                                 <div style={{ position: 'relative' }}>
                                     <input
                                         type="text"
                                         className="form-input"
-                                        style={{ padding: '0.4rem 0.6rem', fontSize: '0.85rem', backgroundColor: '#FFFFFF', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)', fontWeight: 700, width: '100%', minWidth: 0 }}
+                                        style={{ padding: '0.4rem 0.6rem', fontSize: '0.85rem', backgroundColor: 'rgba(255,255,255,0.02)', fontWeight: 700, width: '100%', minWidth: 0 }}
                                         value={formData.projectNumber || ''}
                                         onChange={(e) => {
                                             const val = e.target.value;
@@ -3025,12 +3027,12 @@ END:VCARD`;
                                 </div>
                             </div>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', position: 'relative' }}>
-                                <label style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748B', fontWeight: 700 }}>AUFTRAGSNUMMER:</label>
+                                <label style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 700 }}>AUFTRAGSNUMMER:</label>
                                 <div style={{ position: 'relative' }}>
                                     <input
                                         type="text"
                                         className="form-input"
-                                        style={{ padding: '0.4rem 0.6rem', fontSize: '0.85rem', backgroundColor: '#FFFFFF', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)', width: '100%', minWidth: 0 }}
+                                        style={{ padding: '0.4rem 0.6rem', fontSize: '0.85rem', backgroundColor: 'rgba(255,255,255,0.02)', width: '100%', minWidth: 0 }}
                                         value={formData.orderNumber || ''}
                                         onChange={(e) => setFormData(prev => ({ ...prev, orderNumber: e.target.value }))}
                                         placeholder="Nr."
@@ -3039,12 +3041,12 @@ END:VCARD`;
                                 </div>
                             </div>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', position: 'relative' }}>
-                                <label style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748B', fontWeight: 700 }}>SCHADEN-NR:</label>
+                                <label style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 700 }}>SCHADEN-NR:</label>
                                 <div style={{ position: 'relative' }}>
                                     <input
                                         type="text"
                                         className="form-input"
-                                        style={{ padding: '0.4rem 0.6rem', fontSize: '0.85rem', backgroundColor: '#FFFFFF', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)', width: '100%', minWidth: 0 }}
+                                        style={{ padding: '0.4rem 0.6rem', fontSize: '0.85rem', backgroundColor: 'rgba(255,255,255,0.02)', width: '100%', minWidth: 0 }}
                                         value={formData.damageNumber || ''}
                                         onChange={(e) => setFormData(prev => ({ ...prev, damageNumber: e.target.value }))}
                                         placeholder="Versicherung Nr."
@@ -3053,22 +3055,22 @@ END:VCARD`;
                                 </div>
                             </div>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-                                <label style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748B', fontWeight: 700 }}>VERSICHERUNG:</label>
+                                <label style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 700 }}>VERSICHERUNG:</label>
                                 <input
                                     type="text"
                                     className="form-input"
-                                    style={{ padding: '0.4rem 0.6rem', fontSize: '0.85rem', backgroundColor: '#FFFFFF', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)', width: '100%', minWidth: 0 }}
+                                    style={{ padding: '0.4rem 0.6rem', fontSize: '0.85rem', backgroundColor: 'rgba(255,255,255,0.02)', width: '100%', minWidth: 0 }}
                                     value={formData.insurance || ''}
                                     onChange={(e) => setFormData(prev => ({ ...prev, insurance: e.target.value }))}
                                     placeholder="Gesellschaft"
                                 />
                             </div>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-                                <label style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748B', fontWeight: 700 }}>SCHADENSMELDUNG:</label>
+                                <label style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 700 }}>SCHADENSMELDUNG:</label>
                                 <input
                                     type="date"
                                     className="form-input"
-                                    style={{ padding: '0.4rem 0.6rem', fontSize: '0.85rem', backgroundColor: '#FFFFFF', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)', width: '100%', minWidth: 0 }}
+                                    style={{ padding: '0.4rem 0.6rem', fontSize: '0.85rem', backgroundColor: 'rgba(255,255,255,0.02)', width: '100%', minWidth: 0 }}
                                     value={formData.damageReportDate || ''}
                                     onChange={(e) => setFormData(prev => ({ ...prev, damageReportDate: e.target.value }))}
                                 />
@@ -3077,7 +3079,7 @@ END:VCARD`;
                     </div>
                 )}
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', paddingBottom: '1rem', borderBottom: '1px solid #E2E8F0' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', paddingBottom: '1rem', borderBottom: '1px solid var(--border)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1 }}>
                         <button
                             onClick={mode === 'technician' ? () => setTechTab(null) : onCancel}
@@ -3087,7 +3089,7 @@ END:VCARD`;
                                 padding: mode === 'technician' ? '0 1rem' : '0',
                                 width: mode === 'technician' ? 'auto' : '42px',
                                 borderRadius: '12px',
-                                color: mode === 'technician' ? '#1E6DB7' : '#1E293B',
+                                color: 'var(--text-main)',
                                 cursor: 'pointer',
                                 display: 'flex',
                                 alignItems: 'center',
@@ -3095,8 +3097,8 @@ END:VCARD`;
                                 gap: '0.4rem',
                                 fontWeight: 700,
                                 fontSize: '0.9rem',
-                                background: mode === 'technician' ? '#FFFFFF' : undefined,
-                                border: mode === 'technician' ? '2px solid #1E6DB7' : undefined,
+                                background: mode === 'technician' ? 'rgba(59,130,246,0.12)' : undefined,
+                                border: mode === 'technician' ? '1.5px solid rgba(59,130,246,0.3)' : undefined,
                             }}
                         >
                             <ArrowLeft size={22} />
@@ -3113,7 +3115,7 @@ END:VCARD`;
                                 fontWeight: 800,
                                 background: 'transparent',
                                 border: 'none',
-                                color: 'white',
+                                color: 'var(--text-main)',
                                 width: '100%',
                                 padding: '0.25rem 0',
                                 outline: 'none'
@@ -3168,7 +3170,7 @@ END:VCARD`;
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                         {mode === 'desktop' && (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-                                <label style={{ fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748B', fontWeight: 700 }}>Leistungsart</label>
+                                <label style={{ fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 700 }}>Leistungsart</label>
                                 <select
                                     className="form-input"
                                     style={{ padding: '0.3rem 0.6rem', fontSize: '0.85rem', width: 'auto', fontWeight: 600 }}
@@ -3184,7 +3186,7 @@ END:VCARD`;
                         )}
                         {mode === 'desktop' && (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-                                <label style={{ fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748B', fontWeight: 700 }}>Sachbearbeiter</label>
+                                <label style={{ fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 700 }}>Sachbearbeiter</label>
                                 <select
                                     className="form-input"
                                     style={{ padding: '0.3rem 0.6rem', fontSize: '0.85rem', width: 'auto', fontWeight: 600 }}
@@ -3202,7 +3204,7 @@ END:VCARD`;
 
                         {mode !== 'technician' && (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-                                <label style={{ fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748B', fontWeight: 700 }}>Projektstatus</label>
+                                <label style={{ fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 700 }}>Projektstatus</label>
                                 <select
                                     className="form-input"
                                     style={{
@@ -3212,7 +3214,7 @@ END:VCARD`;
                                         fontWeight: 700,
                                         border: `1.5px solid ${statusColors[formData.status || 'Pendent'] || '#94A3B8'}`,
                                         color: statusColors[formData.status || 'Pendent'] || '#94A3B8',
-                                        backgroundColor: '#FFFFFF', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)'
+                                        backgroundColor: 'rgba(255,255,255,0.02)'
                                     }}
                                     value={formData.status}
                                     onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value }))}
@@ -3293,11 +3295,11 @@ END:VCARD`;
                 {/* 1a. Project Details (Client / Manager) - ONLY DESKTOP */}
                 {mode === 'desktop' && (
                     <div className="card" style={{ marginBottom: '1.5rem', padding: '1.5rem' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', paddingBottom: '0.5rem', borderBottom: '1px solid #E2E8F0' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', paddingBottom: '0.5rem', borderBottom: '1px solid var(--border)' }}>
                             <h3 className="section-header" style={{ marginBottom: 0, paddingBottom: 0, borderBottom: 'none' }}>
                                 <Briefcase size={18} /> Auftrag & Verwaltung
                             </h3>
-                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.75rem', color: 'white', cursor: 'pointer', backgroundColor: 'rgba(255,255,255,0.05)', padding: '0.3rem 0.6rem', borderRadius: '4px', minWidth: '400px' }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.75rem', color: 'var(--text-main)', cursor: 'pointer', backgroundColor: 'rgba(255,255,255,0.05)', padding: '0.3rem 0.6rem', borderRadius: '4px', minWidth: '400px' }}>
                                 <input 
                                     type="checkbox" 
                                     checked={formData.clientIsResident || false}
@@ -3324,7 +3326,7 @@ END:VCARD`;
 
                         <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'flex-start', flexWrap: 'wrap', marginBottom: '1.25rem' }}>
                             <div style={{ flex: '1 1 300px' }}>
-                                <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748B', fontWeight: 600, marginBottom: '0.5rem', display: 'block' }}>Auftraggeber (Name/Firma)</label>
+                                <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 600, marginBottom: '0.5rem', display: 'block' }}>Auftraggeber (Name/Firma)</label>
                                 <input
                                     type="text"
                                     className="form-input"
@@ -3344,7 +3346,7 @@ END:VCARD`;
                                 />
                             </div>
                             <div style={{ flex: '1 1 200px' }}>
-                                <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748B', fontWeight: 600, marginBottom: '0.5rem', display: 'block' }}>Strasse & Nr. (AG)</label>
+                                <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 600, marginBottom: '0.5rem', display: 'block' }}>Strasse & Nr. (AG)</label>
                                 <input
                                     type="text"
                                     className="form-input"
@@ -3355,7 +3357,7 @@ END:VCARD`;
                                 />
                             </div>
                             <div style={{ width: '90px' }}>
-                                <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748B', fontWeight: 600, marginBottom: '0.5rem', display: 'block' }}>PLZ (AG)</label>
+                                <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 600, marginBottom: '0.5rem', display: 'block' }}>PLZ (AG)</label>
                                 <input
                                     type="text"
                                     className="form-input"
@@ -3366,7 +3368,7 @@ END:VCARD`;
                                 />
                             </div>
                             <div style={{ flex: '1 1 150px' }}>
-                                <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748B', fontWeight: 600, marginBottom: '0.5rem', display: 'block' }}>Ort (AG)</label>
+                                <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 600, marginBottom: '0.5rem', display: 'block' }}>Ort (AG)</label>
                                 <input
                                     type="text"
                                     className="form-input"
@@ -3381,7 +3383,7 @@ END:VCARD`;
                         <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
 
                             <div style={{ flex: '1 1 180px' }}>
-                                <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748B', fontWeight: 600, marginBottom: '0.5rem', display: 'block' }}>Ansprechperson (AG)</label>
+                                <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 600, marginBottom: '0.5rem', display: 'block' }}>Ansprechperson (AG)</label>
                                 <input
                                     type="text"
                                     className="form-input"
@@ -3401,7 +3403,7 @@ END:VCARD`;
                                 />
                             </div>
                             <div style={{ flex: '1 1 160px' }}>
-                                <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748B', fontWeight: 600, marginBottom: '0.5rem', display: 'block' }}>Telefon (AG-Kontakt)</label>
+                                <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 600, marginBottom: '0.5rem', display: 'block' }}>Telefon (AG-Kontakt)</label>
                                 <input
                                     className="form-input"
                                     placeholder="+41 XX XXX XX XX"
@@ -3420,7 +3422,7 @@ END:VCARD`;
                                 />
                             </div>
                             <div style={{ flex: '2 1 220px' }}>
-                                <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748B', fontWeight: 600, marginBottom: '0.5rem', display: 'block' }}>E-Mail (AG-Kontakt)</label>
+                                <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 600, marginBottom: '0.5rem', display: 'block' }}>E-Mail (AG-Kontakt)</label>
                                 <input
                                     type="email"
                                     className="form-input"
@@ -3447,7 +3449,7 @@ END:VCARD`;
                                 <label style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--primary)', display: 'block' }}>
                                     Eigentümer / Rechnungsdetails
                                 </label>
-                                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.75rem', color: 'white', cursor: 'pointer', backgroundColor: 'rgba(255,255,255,0.05)', padding: '0.3rem 0.6rem', borderRadius: '4px', minWidth: '400px' }}>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.75rem', color: 'var(--text-main)', cursor: 'pointer', backgroundColor: 'rgba(255,255,255,0.05)', padding: '0.3rem 0.6rem', borderRadius: '4px', minWidth: '400px' }}>
                                     <input 
                                         type="checkbox" 
                                         checked={formData.ownerIsResident || false}
@@ -3475,7 +3477,7 @@ END:VCARD`;
                             <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
                                 {/* Eigentümer */}
                                 <div style={{ flex: '2 1 200px' }}>
-                                    <label style={{ fontSize: '0.65rem', color: '#64748B', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '0.25rem' }}>Eigentümer</label>
+                                    <label style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '0.25rem' }}>Eigentümer</label>
                                     <input
                                         className="form-input"
                                         placeholder="Name/Firma"
@@ -3496,7 +3498,7 @@ END:VCARD`;
 
                                 {/* Adresse Eigentümer */}
                                 <div style={{ flex: '1.5 1 150px' }}>
-                                    <label style={{ fontSize: '0.65rem', color: '#64748B', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '0.25rem' }}>Strasse & Nr.</label>
+                                    <label style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '0.25rem' }}>Strasse & Nr.</label>
                                     <input
                                         className="form-input"
                                         placeholder="Strasse / Nr."
@@ -3509,7 +3511,7 @@ END:VCARD`;
                                 {/* PLZ / Ort */}
                                 <div style={{ width: '180px', display: 'flex', gap: '0.4rem' }}>
                                     <div style={{ flex: 1 }}>
-                                        <label style={{ fontSize: '0.65rem', color: '#64748B', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '0.25rem' }}>PLZ</label>
+                                        <label style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '0.25rem' }}>PLZ</label>
                                         <input
                                             className="form-input"
                                             placeholder="PLZ"
@@ -3519,7 +3521,7 @@ END:VCARD`;
                                         />
                                     </div>
                                     <div style={{ flex: 2 }}>
-                                        <label style={{ fontSize: '0.65rem', color: '#64748B', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '0.25rem' }}>Ort</label>
+                                        <label style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '0.25rem' }}>Ort</label>
                                         <input
                                             className="form-input"
                                             placeholder="Ort"
@@ -3547,7 +3549,7 @@ END:VCARD`;
 
                                 {/* E-Mail */}
                                 <div style={{ flex: '1 1 300px' }}>
-                                    <label style={{ fontSize: '0.65rem', color: '#64748B', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '0.25rem' }}>E-Mail (Rechnung)</label>
+                                    <label style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '0.25rem' }}>E-Mail (Rechnung)</label>
                                     <input
                                         className="form-input"
                                         placeholder="rechnung@..."
@@ -3578,7 +3580,7 @@ END:VCARD`;
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                         {/* Project Number Reference */}
                         <div style={{ marginBottom: '0.25rem' }}>
-                            <label style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748B', fontWeight: 700, display: 'block', marginBottom: '0.2rem' }}>PROJEKT-NR</label>
+                            <label style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 700, display: 'block', marginBottom: '0.2rem' }}>PROJEKT-NR</label>
                             <div style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--q-primary)', letterSpacing: '0.02em' }}>
                                 {formData.projectNumber || '---'}
                             </div>
@@ -3586,7 +3588,7 @@ END:VCARD`;
 
                         {/* Location Details */}
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                            <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748B', fontWeight: 600 }}>Objekt / Wohnung</label>
+                            <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 600 }}>Objekt / Wohnung</label>
                             <input
                                 className="form-input"
                                 placeholder="Zusatz (z.B. 2. OG links)"
@@ -3598,7 +3600,7 @@ END:VCARD`;
 
                         {/* Street */}
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                            <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748B', fontWeight: 600 }}>Strasse & Nr.</label>
+                            <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 600 }}>Strasse & Nr.</label>
                             <input
                                 className="form-input"
                                 placeholder="Strasse & Nr."
@@ -3611,7 +3613,7 @@ END:VCARD`;
                         {/* Zip and City */}
                         <div style={{ display: 'flex', gap: '0.75rem' }}>
                             <div style={{ width: '100px', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                                <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748B', fontWeight: 600 }}>PLZ</label>
+                                <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 600 }}>PLZ</label>
                                 <input
                                     list="plz-list-mobile"
                                     className="form-input"
@@ -3636,7 +3638,7 @@ END:VCARD`;
                             </datalist>
 
                             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                                <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748B', fontWeight: 600 }}>Ort</label>
+                                <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 600 }}>Ort</label>
                                 <input
                                     className="form-input"
                                     placeholder="Ort"
@@ -3649,7 +3651,7 @@ END:VCARD`;
 
                         {/* Art der Liegenschaft */}
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                            <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748B', fontWeight: 600 }}>Art der Liegenschaft</label>
+                            <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 600 }}>Art der Liegenschaft</label>
                             <select
                                 className="form-input"
                                 value={formData.propertyType || ''}
@@ -3673,9 +3675,9 @@ END:VCARD`;
                         <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                             <FileText size={18} /> Schadenbeschreibung (KI / Meldung)
                         </h3>
-                        <div style={{ backgroundColor: '#F1F5F9', padding: '1rem', borderRadius: '12px', border: '1px solid #E2E8F0', marginBottom: '1.5rem', position: 'relative' }}>
+                        <div style={{ backgroundColor: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: '12px', border: '1px solid var(--border)', marginBottom: '1.5rem', position: 'relative' }}>
                             <div style={{ position: 'absolute', top: '0.5rem', right: '0.5rem', zIndex: 10 }}>
-                                <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem', color: '#64748B', cursor: 'pointer' }}>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem', color: 'var(--text-muted)', cursor: 'pointer' }}>
                                     <input
                                         type="checkbox"
                                         checked={formData.includeDescriptionInReport}
@@ -3694,7 +3696,7 @@ END:VCARD`;
                                     width: '100%', minHeight: '120px',
                                     backgroundColor: 'transparent', border: 'none',
                                     resize: 'none',
-                                    fontFamily: 'inherit', color: 'white',
+                                    fontFamily: 'inherit', color: 'var(--text-main)',
                                     cursor: 'default',
                                     fontSize: '1rem',
                                     lineHeight: '1.5',
@@ -3706,7 +3708,7 @@ END:VCARD`;
                         <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                             <Image size={18} /> Schadensbilder (Meldung)
                         </h3>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', backgroundColor: '#FFFFFF', padding: '0.5rem', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', backgroundColor: 'var(--surface)', padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--border)' }}>
                             {formData.images && formData.images.filter(img => {
                                 const isDoc = img.type === 'document' ||
                                     img.name?.toLowerCase().endsWith('.msg') ||
@@ -3752,7 +3754,7 @@ END:VCARD`;
                                 </div>
                             ))}
                             {(!formData.images || formData.images.filter(img => !img.roomId && img.assignedTo !== 'Schadenfotos' && img.assignedTo !== 'Messprotokolle' && img.assignedTo !== 'Pläne' && !(img.type === 'document' || img.name?.toLowerCase().endsWith('.msg') || img.name?.toLowerCase().endsWith('.pdf') || img.name?.toLowerCase().endsWith('.txt'))).length === 0) && (
-                                <div style={{ color: '#64748B', fontSize: '0.85rem', width: '100%', textAlign: 'center', padding: '0.5rem' }}>Keine Bilder vorhanden.</div>
+                                <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', width: '100%', textAlign: 'center', padding: '0.5rem' }}>Keine Bilder vorhanden.</div>
                             )}
 
                             {/* Grosse Drag-and-Drop Zone – volle Breite */}
@@ -3836,8 +3838,8 @@ END:VCARD`;
                                     }}
                                     title="Bilder hier ablegen oder klicken zum Auswählen"
                                 >
-                                    <Upload size={22} style={{ color: '#64748B', flexShrink: 0 }} />
-                                    <span style={{ fontSize: '0.8rem', color: '#64748B', transition: 'color 0.2s', textAlign: 'center' }}>
+                                    <Upload size={22} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                                    <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', transition: 'color 0.2s', textAlign: 'center' }}>
                                         Bilder hier ablegen, <u>klicken</u> oder <kbd style={{ fontSize: '0.75rem', padding: '1px 4px', background: 'var(--border)', borderRadius: '3px' }}>Ctrl+V</kbd> zum Einfügen
                                     </span>
                                 </div>
@@ -3862,7 +3864,7 @@ END:VCARD`;
                 {/* Desktop-Only: Schadenbeschreibung (AI Extracted) */}
                 {mode === 'desktop' && (
                     <div className="card" style={{ marginBottom: '1.5rem', padding: '1.5rem' }}>
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: '1rem', borderBottom: '1px solid #E2E8F0', paddingBottom: '0.75rem' }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: '1rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.75rem' }}>
                             <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.6rem', margin: 0 }}>
                                 <FileText size={18} /> Schadenbeschreibung (KI / Meldung)
                             </h3>
@@ -3881,7 +3883,7 @@ END:VCARD`;
                                 >
                                     {isRecording === 'desc-desktop' ? <MicOff size={16} /> : <Mic size={16} />}
                                 </button>
-                                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: '#64748B', cursor: 'pointer' }}>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: 'var(--text-muted)', cursor: 'pointer' }}>
                                     <input
                                         type="checkbox"
                                         checked={formData.includeDescriptionInReport}
@@ -3902,9 +3904,8 @@ END:VCARD`;
                                 minHeight: '150px',
                                 padding: '1rem',
                                 borderRadius: '12px',
-                                border: '1px solid rgba(255,255,255,0.1)',
-                                backgroundColor: 'rgba(255,255,255,0.05)', 
-                                boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.2)',
+                                border: '1px solid var(--border)',
+                                backgroundColor: 'rgba(255,255,255,0.02)',
                                 color: 'var(--text-main)',
                                 resize: 'vertical',
                                 fontFamily: 'inherit',
@@ -3918,7 +3919,7 @@ END:VCARD`;
 
                         {/* Schadensbilder Upload */}
                         <div>
-                            <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748B', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
+                            <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
                                 <Image size={16} /> Zugehörige Schadensbilder
                             </label>
 
@@ -3959,7 +3960,8 @@ END:VCARD`;
                                                 }}
                                                 style={{
                                                     position: 'absolute', top: 6, right: 6,
-                                                    background: 'rgba(239, 68, 68, 0.9)', color: 'white', border: 'none', borderRadius: '50%',
+                                                    background: 'rgba(239, 68, 68, 0.9)', color: 'white',
+                                                    border: 'none', borderRadius: '50%',
                                                     width: 24, height: 24,
                                                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                                                     cursor: 'pointer', padding: 0,
@@ -3986,7 +3988,7 @@ END:VCARD`;
 
                                         {/* Action Bar Below Image */}
                                         <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', padding: '0 2px', alignItems: 'center' }}>
-                                            <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', fontSize: '0.75rem', cursor: 'pointer', color: 'white' }}>
+                                            <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', fontSize: '0.75rem', cursor: 'pointer', color: 'var(--text-main)' }}>
                                                 <input
                                                     type="checkbox"
                                                     style={{ width: '20px', height: '20px', accentColor: 'var(--primary)' }}
@@ -4005,8 +4007,8 @@ END:VCARD`;
                                                 type="button"
                                                 title="Bearbeiten"
                                                 style={{
-                                                    border: '1px solid #E2E8F0',
-                                                    backgroundColor: '#FFFFFF',
+                                                    border: '1px solid var(--border)',
+                                                    backgroundColor: '#1E293B',
                                                     color: 'white',
                                                     cursor: 'pointer',
                                                     padding: '8px',
@@ -4029,7 +4031,7 @@ END:VCARD`;
                                     border: '1px dashed var(--border)', borderRadius: '8px',
                                     display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                                     cursor: 'pointer', backgroundColor: 'var(--surface-hover)',
-                                    fontSize: '0.7rem', color: '#64748B', textAlign: 'center',
+                                    fontSize: '0.7rem', color: 'var(--text-muted)', textAlign: 'center',
                                     transition: 'all 0.2s'
                                 }}
                                     onMouseOver={(e) => e.currentTarget.style.backgroundColor = 'rgba(14, 165, 233, 0.1)'}
@@ -4156,7 +4158,7 @@ END:VCARD`;
 
                                 {/* 2. Eingegangene Dokumente (External / Uploaded) */}
                                 <div>
-                                    <div style={{ fontSize: '0.75rem', color: '#64748B', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                                         <div style={{ width: '4px', height: '12px', background: '#94A3B8', borderRadius: '2px' }} />
                                         Eingegangene Dokumente (Mail/PDF)
                                     </div>
@@ -4172,7 +4174,7 @@ END:VCARD`;
                                                 return img && !img.roomId && isDoc && !isGenerated;
                                             }).map((img, idx) => renderDocCard(img, idx))
                                         ) : (
-                                            <div style={{ fontSize: '0.75rem', color: '#64748B', italic: true, padding: '0.5rem' }}>Keine eingegangenen Dokumente</div>
+                                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', italic: true, padding: '0.5rem' }}>Keine eingegangenen Dokumente</div>
                                         )}
                                     </div>
                                 </div>
@@ -4186,12 +4188,12 @@ END:VCARD`;
                     {/* Map Card – nur im Techniker-Modus */}
                     {mode === 'desktop' && (
                         <div className="card" style={{ flex: '1 1 350px', padding: '1.5rem', display: 'flex', flexDirection: 'column' }}>
-                            <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.6rem', color: 'var(--primary)', borderBottom: '1px solid #E2E8F0', paddingBottom: '0.75rem' }}>
+                            <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.6rem', color: 'var(--primary)', borderBottom: '1px solid var(--border)', paddingBottom: '0.75rem' }}>
                                 <MapPin size={18} /> Standort Karte
                             </h3>
 
                             {(formData.street || formData.address) ? (
-                                <div style={{ position: 'relative', borderRadius: '12px', overflow: 'hidden', border: '1px solid #E2E8F0', flex: 1 }}>
+                                <div style={{ position: 'relative', borderRadius: '12px', overflow: 'hidden', border: '1px solid var(--border)', flex: 1 }}>
                                     <iframe
                                         width="100%"
                                         height="300"
@@ -4237,7 +4239,7 @@ END:VCARD`;
                                     )}
                                 </div>
                             ) : (
-                                <div style={{ padding: '3rem', textAlign: 'center', color: '#64748B', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '300px', border: '2px dashed var(--border)', borderRadius: '12px' }}>
+                                <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '300px', border: '2px dashed var(--border)', borderRadius: '12px' }}>
                                     <Map size={32} style={{ marginBottom: '1rem', opacity: 0.3 }} />
                                     Keine Koordinaten verfügbar
                                 </div>
@@ -4248,11 +4250,11 @@ END:VCARD`;
                     {/* 1b. Exterior Photo (Aussenaufnahme) - Show only if exists */}
                     {formData.exteriorPhoto && (
                         <div className="card" style={{ flex: '1 1 350px', padding: '1.5rem', display: 'flex', flexDirection: 'column' }}>
-                            <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.6rem', color: 'var(--primary)', borderBottom: '1px solid #E2E8F0', paddingBottom: '0.75rem' }}>
+                            <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.6rem', color: 'var(--primary)', borderBottom: '1px solid var(--border)', paddingBottom: '0.75rem' }}>
                                 <Camera size={18} /> Aussenaufnahme
                             </h3>
 
-                            <div style={{ position: 'relative', borderRadius: '12px', overflow: 'hidden', border: '1px solid #E2E8F0', flex: 1, backgroundColor: 'rgba(0,0,0,0.2)' }}>
+                            <div style={{ position: 'relative', borderRadius: '12px', overflow: 'hidden', border: '1px solid var(--border)', flex: 1, backgroundColor: 'rgba(0,0,0,0.2)' }}>
                                 <img
                                     src={formData.exteriorPhoto}
                                     alt="Aussenaufnahme"
@@ -4267,7 +4269,9 @@ END:VCARD`;
                                         top: '15px',
                                         right: '15px',
                                         backgroundColor: 'rgba(239, 68, 68, 0.9)',
-                                        color: 'white', border: 'none', borderRadius: '50%',
+                                        color: 'white',
+                                        border: 'none',
+                                        borderRadius: '50%',
                                         width: '36px',
                                         height: '36px',
                                         display: 'flex',
@@ -4290,7 +4294,9 @@ END:VCARD`;
                                         top: '15px',
                                         left: '15px',
                                         backgroundColor: 'rgba(15, 110, 163, 0.9)',
-                                        color: 'white', border: 'none', borderRadius: '50%',
+                                        color: 'white',
+                                        border: 'none',
+                                        borderRadius: '50%',
                                         width: '36px',
                                         height: '36px',
                                         display: 'flex',
@@ -4328,7 +4334,7 @@ END:VCARD`;
                         <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.6rem', margin: 0 }}>
                             <Folder size={18} /> Kontakte
                             {!isContactsExpanded && formData.contacts.some(c => c.name) && (
-                                <span style={{ fontSize: '0.75rem', fontWeight: 500, color: '#64748B', marginLeft: '0.5rem' }}>
+                                <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-muted)', marginLeft: '0.5rem' }}>
                                     ({formData.contacts.filter(c => c.name).length} vorhanden)
                                 </span>
                             )}
@@ -4367,7 +4373,7 @@ END:VCARD`;
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '1.25rem 1.5rem 1.5rem' }}>
                                                 {/* Row 1: Name & vCard (Blue Button) */}
                                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                                                    <label style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: '#64748B', fontWeight: 750 }}>{['AG', 'HW', 'Handwerker'].includes(contact.role) ? 'Firma' : 'Name'}</label>
+                                                    <label style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)', fontWeight: 750 }}>{['AG', 'HW', 'Handwerker'].includes(contact.role) ? 'Firma' : 'Name'}</label>
                                                     <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'stretch' }}>
                                                         <input
                                                             type="text"
@@ -4390,7 +4396,7 @@ END:VCARD`;
                                                 {/* Row 1b: Ansprechperson – nur bei Firma-Rollen */}
                                                 {!['Mieter', 'Auftraggeber', 'Verwaltung', 'Eigentümer'].includes(contact.role) && (
                                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                                                        <label style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: '#64748B', fontWeight: 750 }}>Ansprechperson</label>
+                                                        <label style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)', fontWeight: 750 }}>Ansprechperson</label>
                                                         <input
                                                             type="text"
                                                             placeholder="Vorname Name"
@@ -4407,7 +4413,7 @@ END:VCARD`;
                                                 )}
 
                                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                                                    <label style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: '#64748B', fontWeight: 750 }}>Etage / Rolle</label>
+                                                    <label style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)', fontWeight: 750 }}>Etage / Rolle</label>
                                                     <div style={{
                                                         display: 'grid',
                                                         gridTemplateColumns: 'minmax(0, 1.2fr) minmax(0, 0.8fr)',
@@ -4463,7 +4469,7 @@ END:VCARD`;
 
                                                 {/* Row 3: Telefon */}
                                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                                                    <label style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: '#64748B', fontWeight: 750 }}>Telefon</label>
+                                                    <label style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)', fontWeight: 750 }}>Telefon</label>
                                                     <input
                                                         type="text"
                                                         placeholder="+41 79 123 45 67"
@@ -4497,7 +4503,7 @@ END:VCARD`;
 
                                                 {/* Row 4: E-Mail */}
                                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                                                    <label style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: '#64748B', fontWeight: 750 }}>E-Mail</label>
+                                                    <label style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)', fontWeight: 750 }}>E-Mail</label>
                                                     <input
                                                         type="email"
                                                         placeholder="email@firma.ch"
@@ -4635,7 +4641,7 @@ END:VCARD`;
                                 <h3 className="section-header" style={{ marginBottom: 0, border: 'none' }}>
                                     <Image size={20} /> Räume / Fotos
                                     {!isRoomsExpanded && formData.rooms?.length > 0 && (
-                                        <span style={{ fontSize: '0.75rem', fontWeight: 500, color: '#64748B', marginLeft: '0.5rem' }}>
+                                        <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-muted)', marginLeft: '0.5rem' }}>
                                             ({formData.rooms.length} Raum{formData.rooms.length !== 1 ? 'äume' : ''})
                                         </span>
                                     )}
@@ -4652,7 +4658,7 @@ END:VCARD`;
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                                 {/* NEW: Schadenursache Section (Technician) */}
                                 <div className="card" style={{ marginBottom: '1rem', padding: '1.5rem' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid #E2E8F0', paddingBottom: '1rem' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid var(--border)', paddingBottom: '1rem' }}>
                                         <h4 style={{ fontSize: '1rem', fontWeight: 700, margin: 0, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                                             <AlertTriangle size={18} /> Schadenursache
                                         </h4>
@@ -4660,7 +4666,7 @@ END:VCARD`;
 
                                     <div style={{ marginBottom: '1.25rem' }}>
                                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                                            <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748B', fontWeight: 600 }}>Beschreibung der Ursache</label>
+                                            <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 600 }}>Beschreibung der Ursache</label>
                                             <button
                                                 type="button"
                                                 onClick={() => {
@@ -4701,7 +4707,7 @@ END:VCARD`;
                                     </div>
 
                                     <div>
-                                        <label style={{ fontSize: '0.8rem', color: '#64748B', marginBottom: '0.25rem', display: 'block' }}>Fotos zur Ursache</label>
+                                        <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.25rem', display: 'block' }}>Fotos zur Ursache</label>
 
                                         <div
                                             style={{
@@ -4712,7 +4718,7 @@ END:VCARD`;
                                             onClick={() => document.getElementById('cause-upload-input').click()}
                                         >
                                             <Plus size={24} color="var(--text-muted)" />
-                                            <div style={{ color: '#64748B', fontSize: '0.85rem' }}>Schadenfoto hochladen / Drop</div>
+                                            <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Schadenfoto hochladen / Drop</div>
                                         </div>
                                         <input
                                             id="cause-upload-input"
@@ -4725,7 +4731,7 @@ END:VCARD`;
                                         />
 
                                         {formData.images.filter(img => img.assignedTo === 'Schadenfotos').length === 0 ? (
-                                            <div style={{ textAlign: 'center', color: '#64748B', fontSize: '0.8rem', fontStyle: 'italic' }}>
+                                            <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem', fontStyle: 'italic' }}>
                                                 Keine Schadenfotos vorhanden.
                                             </div>
                                         ) : (
@@ -4792,7 +4798,7 @@ END:VCARD`;
                                                     </div>
                                                 ))}
                                                 {formData.images.filter(img => img.assignedTo === 'Schadenfotos').length === 0 && (
-                                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '80px', color: '#64748B', fontSize: '0.8rem', fontStyle: 'italic' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '80px', color: 'var(--text-muted)', fontSize: '0.8rem', fontStyle: 'italic' }}>
                                                         Keine Ursachenfotos
                                                     </div>
                                                 )}
@@ -4811,7 +4817,7 @@ END:VCARD`;
                                 </button>
 
                                 {showAddRoomForm && (
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '0.5rem', backgroundColor: '#F1F5F9', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '0.5rem', backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid var(--border)' }}>
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                                             <select
                                                 className="form-input"
@@ -4927,20 +4933,20 @@ END:VCARD`;
                     {formData.rooms.map(room => (
                         <div key={room.id} className="card" style={{ padding: 0, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)' }}>
                             <div style={{
-                                background: mode === 'technician' ? '#F1F5F9' : 'rgba(255,255,255,0.05)',
+                                background: 'rgba(255,255,255,0.03)',
                                 padding: '1rem 1.25rem',
-                                borderBottom: mode === 'technician' ? '1px solid #E2E8F0' : '1px solid rgba(255,255,255,0.08)',
+                                borderBottom: '1px solid var(--border)',
                                 display: 'flex',
                                 justifyContent: 'space-between',
                                 alignItems: 'center'
                             }}>
                                 <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem', flex: 1, minWidth: 0, paddingRight: '1rem', flexWrap: 'wrap' }}>
-                                    <span style={{ fontWeight: 700, fontSize: '1rem', color: mode === 'technician' ? '#1E293B' : 'var(--primary)', whiteSpace: 'nowrap' }}>{room.name}</span>
+                                    <span style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--primary)', whiteSpace: 'nowrap' }}>{room.name}</span>
                                     {room.stockwerk && (
-                                        <span style={{ fontWeight: 700, fontSize: '1rem', color: mode === 'technician' ? '#64748B' : 'var(--primary)', opacity: 0.75, whiteSpace: 'nowrap' }}>• {room.stockwerk}</span>
+                                        <span style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--primary)', opacity: 0.75, whiteSpace: 'nowrap' }}>• {room.stockwerk}</span>
                                     )}
                                     {room.apartment && (
-                                        <span style={{ fontWeight: 700, fontSize: '1rem', color: mode === 'technician' ? '#64748B' : 'var(--primary)', opacity: 0.75, whiteSpace: 'nowrap' }}>• Whg {room.apartment}</span>
+                                        <span style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--primary)', opacity: 0.75, whiteSpace: 'nowrap' }}>• Whg {room.apartment}</span>
                                     )}
                                 </div>
                                 <div style={{
@@ -5000,8 +5006,8 @@ END:VCARD`;
                                                             width: '100%',
                                                             padding: '8px',
                                                             marginBottom: '12px',
-                                                            backgroundColor: '#FFFFFF',
-                                                            border: '1px solid #E2E8F0',
+                                                            backgroundColor: '#1E293B',
+                                                            border: '1px solid var(--border)',
                                                             color: 'white',
                                                             borderRadius: '6px',
                                                             cursor: 'pointer',
@@ -5052,7 +5058,7 @@ END:VCARD`;
                                                                     style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start', border: `1px solid ${isLinkingThis ? '#0F6EA3' : 'var(--border)'}`, padding: '0.5rem', borderRadius: '6px', backgroundColor: isLinkingThis ? 'rgba(15, 110, 163, 0.1)' : 'var(--background)', cursor: 'grab', transition: 'border-color 0.15s' }}
                                                                 >
                                                                     {/* Drag Handle */}
-                                                                    <div style={{ display: 'flex', alignItems: 'center', color: '#64748B', cursor: 'grab', paddingTop: '4px', flexShrink: 0 }} title="Ziehen zum Sortieren">
+                                                                    <div style={{ display: 'flex', alignItems: 'center', color: 'var(--text-muted)', cursor: 'grab', paddingTop: '4px', flexShrink: 0 }} title="Ziehen zum Sortieren">
                                                                         <GripVertical size={18} />
                                                                     </div>
                                                                     {/* Thumbnail */}
@@ -5110,7 +5116,7 @@ END:VCARD`;
                                                                             <div style={{ fontSize: '0.65rem', color: '#10B981', fontWeight: 'bold', textAlign: 'center' }}>Bitte Ziel wählen...</div>
                                                                         )}
                                                                         <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', padding: '0 2px', alignItems: 'center' }}>
-                                                                            <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', fontSize: '0.75rem', cursor: 'pointer', color: 'white' }}>
+                                                                            <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', fontSize: '0.75rem', cursor: 'pointer', color: 'var(--text-main)' }}>
                                                                                 <input
                                                                                     type="checkbox"
                                                                                     style={{ width: '20px', height: '20px', accentColor: 'var(--primary)' }}
@@ -5129,8 +5135,8 @@ END:VCARD`;
                                                                                 type="button"
                                                                                 title="Bearbeiten"
                                                                                 style={{
-                                                                                    border: '1px solid #E2E8F0',
-                                                                                    backgroundColor: '#FFFFFF',
+                                                                                    border: '1px solid var(--border)',
+                                                                                    backgroundColor: '#1E293B',
                                                                                     color: 'white',
                                                                                     cursor: 'pointer',
                                                                                     padding: '8px',
@@ -5215,7 +5221,7 @@ END:VCARD`;
                                                                                 type="button"
                                                                                 className="btn btn-ghost"
                                                                                 title="Als Thermobild verknüpfen"
-                                                                                style={{ color: '#10B981', padding: '0', backgroundColor: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 2px rgba(0,0,0,0.1)', cursor: 'pointer' }}
+                                                                                style={{ color: '#10B981', padding: '0', backgroundColor: '#1E293B', border: '1px solid var(--border)', borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 2px rgba(0,0,0,0.1)', cursor: 'pointer' }}
                                                                                 onClick={() => setLinkingImageId(isLinkingThis ? null : img.id)}
                                                                             >
                                                                                 <Link size={16} />
@@ -5225,7 +5231,7 @@ END:VCARD`;
                                                                                 type="button"
                                                                                 className="btn btn-ghost"
                                                                                 title="Verknüpfung aufheben"
-                                                                                style={{ color: '#F59E0B', padding: '0', backgroundColor: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 2px rgba(0,0,0,0.1)', cursor: 'pointer' }}
+                                                                                style={{ color: '#F59E0B', padding: '0', backgroundColor: '#1E293B', border: '1px solid var(--border)', borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 2px rgba(0,0,0,0.1)', cursor: 'pointer' }}
                                                                                 onClick={() => {
                                                                                     setFormData(prev => ({
                                                                                         ...prev,
@@ -5244,7 +5250,7 @@ END:VCARD`;
                                                                             style={{
                                                                                 color: '#EF4444',
                                                                                 padding: mode === 'technician' ? '0 0.5rem' : '0',
-                                                                                backgroundColor: '#FFFFFF',
+                                                                                backgroundColor: '#1E293B',
                                                                                 border: '1px solid rgba(239,68,68,0.3)',
                                                                                 borderRadius: mode === 'technician' ? '8px' : '50%',
                                                                                 width: mode === 'technician' ? 'auto' : '36px',
@@ -5339,8 +5345,8 @@ END:VCARD`;
                                             gap: '0.5rem',
                                             flex: 1,
                                             padding: '0.75rem',
-                                            backgroundColor: '#FFFFFF',
-                                            border: '1px solid #E2E8F0',
+                                            backgroundColor: '#1E293B',
+                                            border: '1px solid var(--border)',
                                             color: 'white',
                                             borderRadius: '8px',
                                             cursor: 'pointer',
@@ -5385,7 +5391,7 @@ END:VCARD`;
                     </button>
 
                     {showAddRoomForm && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '0.5rem', backgroundColor: '#F1F5F9', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '0.5rem', backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid var(--border)' }}>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                                 <select
                                     className="form-input"
@@ -5487,7 +5493,7 @@ END:VCARD`;
 
                 {/* Schadenursache - Cause & Photos (Desktop Only) */}
                 {mode === 'desktop' && (
-                    <div className="card" style={{ marginBottom: '2rem', border: '1px solid #E2E8F0', padding: '1.5rem', backgroundColor: '#FFFFFF' }}>
+                    <div className="card" style={{ marginBottom: '2rem', border: '1px solid var(--border)', padding: '1.5rem', backgroundColor: 'var(--surface)' }}>
                         {/* Collapsible Header */}
                         <div
                             onClick={() => setIsCauseExpanded(prev => !prev)}
@@ -5503,7 +5509,7 @@ END:VCARD`;
                             <h3 style={{ marginBottom: 0, fontSize: '1.1rem', fontWeight: 700, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                 <AlertTriangle size={18} /> Schadenursache
                                 {!isCauseExpanded && (
-                                    <span style={{ fontSize: '0.75rem', fontWeight: 500, color: '#64748B', marginLeft: '0.5rem' }}>
+                                    <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-muted)', marginLeft: '0.5rem' }}>
                                         {formData.images?.filter(img => img.assignedTo === 'Schadenfotos').length > 0
                                             ? `(${formData.images.filter(img => img.assignedTo === 'Schadenfotos').length} Fotos)`
                                             : formData.cause ? '(Ausgefüllt)' : ''}
@@ -5564,14 +5570,14 @@ END:VCARD`;
                             </div>
 
                             <div>
-                                <h4 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '0.5rem', color: 'white' }}>Fotos zur Ursache</h4>
+                                <h4 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--text-main)' }}>Fotos zur Ursache</h4>
                                 <div
                                     style={{
                                         border: '2px dashed var(--border)', borderRadius: 'var(--radius)',
                                         padding: '2rem 1rem', textAlign: 'center', cursor: 'pointer',
-                                        backgroundColor: '#FFFFFF', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)', transition: 'all 0.2s',
+                                        backgroundColor: 'rgba(255,255,255,0.02)', transition: 'all 0.2s',
                                         marginBottom: '1rem', display: 'flex', flexDirection: 'column',
-                                        alignItems: 'center', justifyContent: 'center', color: '#64748B'
+                                        alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)'
                                     }}
                                     onClick={() => document.getElementById('file-upload-Schadenfotos-desktop').click()}
                                     onDragOver={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.backgroundColor = 'rgba(56, 189, 248, 0.1)'; e.currentTarget.style.color = 'var(--primary)'; }}
@@ -5584,14 +5590,14 @@ END:VCARD`;
                                 </div>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                                     {formData.images.filter(img => img.assignedTo === 'Schadenfotos').map((item, idx) => (
-                                        <div key={idx} style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start', border: '1px solid #E2E8F0', padding: '0.5rem', borderRadius: '6px', backgroundColor: 'var(--background)' }}>
+                                        <div key={idx} style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start', border: '1px solid var(--border)', padding: '0.5rem', borderRadius: '6px', backgroundColor: 'var(--background)' }}>
                                             {/* Thumbnail + Controls */}
                                             <div style={{ flex: '0 0 140px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
-                                                <div style={{ width: '140px', height: '140px', borderRadius: '6px', overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.05)', border: '1px solid #E2E8F0', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+                                                <div style={{ width: '140px', height: '140px', borderRadius: '6px', overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
                                                     <img src={item.preview} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: 'pointer' }} onClick={() => setEditingImage(item)} />
                                                 </div>
                                                 <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', padding: '0 2px', alignItems: 'center' }}>
-                                                    <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', fontSize: '0.75rem', cursor: 'pointer', color: 'white' }}>
+                                                    <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', fontSize: '0.75rem', cursor: 'pointer', color: 'var(--text-main)' }}>
                                                         <input
                                                             type="checkbox"
                                                             style={{ width: '16px', height: '16px', accentColor: 'var(--primary)', cursor: 'pointer' }}
@@ -5606,7 +5612,7 @@ END:VCARD`;
                                                     <button
                                                         type="button"
                                                         title="Bearbeiten"
-                                                        style={{ border: '1px solid #E2E8F0', backgroundColor: '#FFFFFF', color: 'white', cursor: 'pointer', padding: '6px', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                                        style={{ border: '1px solid var(--border)', backgroundColor: 'var(--surface)', color: 'var(--text-main)', cursor: 'pointer', padding: '6px', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                                                         onClick={() => setEditingImage(item)}
                                                     >
                                                         <Edit3 size={16} />
@@ -5638,7 +5644,7 @@ END:VCARD`;
                                                     id={`imgdesc-${idx}`}
                                                     placeholder="Beschreibung..."
                                                     className="form-input"
-                                                    style={{ fontSize: '0.9rem', padding: '0.5rem', flex: 1, width: '100%', resize: 'none', backgroundColor: '#FFFFFF', color: 'white' }}
+                                                    style={{ fontSize: '0.9rem', padding: '0.5rem', flex: 1, width: '100%', resize: 'none', backgroundColor: 'var(--surface)', color: 'var(--text-main)' }}
                                                     value={item.description || ''}
                                                     onChange={(e) => {
                                                         const newDesc = e.target.value;
@@ -5656,7 +5662,7 @@ END:VCARD`;
                                         </div>
                                     ))}
                                     {formData.images.filter(img => img.assignedTo === 'Schadenfotos').length === 0 && (
-                                        <div style={{ textAlign: 'center', color: '#64748B', fontSize: '0.9rem', fontStyle: 'italic' }}>Keine Schadenfotos vorhanden.</div>
+                                        <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.9rem', fontStyle: 'italic' }}>Keine Schadenfotos vorhanden.</div>
                                     )}
                                 </div>
                             </div>
@@ -5666,14 +5672,14 @@ END:VCARD`;
 
                 {/* Massnahmen & Feststellungen - nur Desktop */}
                 {mode === 'desktop' && (formData.status === 'Schadenaufnahme' || formData.status === 'Leckortung') && (
-                    <div style={{ marginBottom: '1.5rem', backgroundColor: '#FFFFFF', padding: '1.25rem', borderRadius: '12px', border: '1px solid #E2E8F0', color: 'white', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}>
+                    <div style={{ marginBottom: '1.5rem', backgroundColor: 'var(--surface)', padding: '1.25rem', borderRadius: '12px', border: '1px solid var(--border)', color: 'var(--text-main)', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}>
                         <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.6rem', color: 'var(--primary)' }}>
                             <Eye size={18} /> Feststellungen & Massnahmen
                         </h3>
 
                         <div style={{ marginBottom: '1.5rem', width: '100%' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
-                                <label style={{ fontSize: '0.8rem', color: '#64748B', fontWeight: 600 }}>Feststellungen</label>
+                                <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600 }}>Feststellungen</label>
                                 <button
                                     type="button"
                                     className={`btn btn-ghost ${isListeningFindings ? 'listening' : ''}`}
@@ -5700,7 +5706,7 @@ END:VCARD`;
                             />
                         </div>
 
-                        <label style={{ fontSize: '0.8rem', color: '#64748B', marginBottom: '0.75rem', display: 'block', fontWeight: 600 }}>Massnahmen (Schnellauswahl)</label>
+                        <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.75rem', display: 'block', fontWeight: 600 }}>Massnahmen (Schnellauswahl)</label>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.75rem', marginBottom: '1.5rem' }}>
                             {[
                                 "Trocknung",
@@ -5761,7 +5767,7 @@ END:VCARD`;
                         </div>
 
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                            <label style={{ fontSize: '0.8rem', color: '#64748B', fontWeight: 600 }}>Eigener Text / Ergänzungen</label>
+                            <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600 }}>Eigener Text / Ergänzungen</label>
                             <button
                                 type="button"
                                 className={`btn btn-ghost ${listeningField === 'measures' ? 'listening' : ''}`}
@@ -5857,7 +5863,7 @@ END:VCARD`;
 
                 {/* EMAILS & PLANS (Final for User) */}
                 {false && (
-                    <div style={{ marginBottom: '2.5rem', backgroundColor: '#FFFFFF', padding: '1.25rem', borderRadius: '12px', border: '1px solid #E2E8F0', color: 'white', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}>
+                    <div style={{ marginBottom: '2.5rem', backgroundColor: 'var(--surface)', padding: '1.25rem', borderRadius: '12px', border: '1px solid var(--border)', color: 'var(--text-main)', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
                             <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.6rem', margin: 0 }}>
                                 <Mail size={24} /> Emails & Kommunikation
@@ -5879,14 +5885,14 @@ END:VCARD`;
                                 padding: '1.5rem',
                                 textAlign: 'center',
                                 cursor: 'pointer',
-                                backgroundColor: '#FFFFFF', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)',
+                                backgroundColor: 'rgba(255,255,255,0.02)',
                                 transition: 'all 0.2s',
                                 marginBottom: '1rem',
                                 display: 'flex',
                                 flexDirection: 'column',
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                color: '#64748B'
+                                color: 'var(--text-muted)'
                             }}
                             onClick={() => document.getElementById('file-upload-emails').click()}
                             onDragOver={(e) => {
@@ -5931,7 +5937,7 @@ END:VCARD`;
                                     item.type === 'document';
 
                                 return (
-                                    <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem', backgroundColor: '#F1F5F9', border: '1px solid #E2E8F0', borderRadius: '8px' }}>
+                                    <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem', backgroundColor: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', borderRadius: '8px' }}>
                                         {isDoc ? (
                                             <div style={{ color: item.name?.toLowerCase().endsWith('.pdf') ? '#ef4444' : '#3b82f6', display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1 }}>
                                                 {(item.name?.toLowerCase().endsWith('.msg')) ? <Mail size={18} /> : <FileText size={18} />}
@@ -5971,7 +5977,7 @@ END:VCARD`;
                                 )
                             })}
                             {formData.images.filter(img => img.assignedTo === 'Emails').length === 0 && (
-                                <div style={{ textAlign: 'center', color: '#64748B', fontSize: '0.9rem', fontStyle: 'italic', padding: '1rem' }}>Keine Emails vorhanden.</div>
+                                <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.9rem', fontStyle: 'italic', padding: '1rem' }}>Keine Emails vorhanden.</div>
                             )}
                         </div>
                     </div>
@@ -5979,16 +5985,9 @@ END:VCARD`;
 
                 {/* 2b. Massnahmen (Measures) - Technician Only (Schadenaufnahme/Leckortung) */}
                 {mode === 'technician' && (formData.status === 'Schadenaufnahme' || formData.status === 'Leckortung') && (
-                    <div className="card" style={{
-                        marginBottom: '1.5rem',
-                        padding: '1.5rem',
-                        backgroundColor: '#F8FAFC',
-                        borderRadius: '20px',
-                        boxShadow: '0 20px 40px -10px rgba(0,0,0,0.1), 0 10px 15px -5px rgba(0,0,0,0.05)',
-                        border: '1px solid rgba(255,255,255,0.8)'
-                    }}>
-                        <h3 className="section-header" style={{ color: 'white', fontWeight: 800, fontSize: '1.1rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                            <ClipboardList size={20} color="#10B981" /> Massnahmen
+                    <div className="card" style={{ marginBottom: '1.5rem', padding: '1.5rem' }}>
+                        <h3 className="section-header">
+                            <ClipboardList size={18} /> Massnahmen
                         </h3>
 
                         {/* Checkbox Liste */}
@@ -6005,13 +6004,14 @@ END:VCARD`;
                                         {/* Checkbox Row */}
                                         <label style={{
                                             display: 'flex', alignItems: 'center', gap: '1rem',
-                                            padding: '1.25rem',
-                                            border: isChecked ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid rgba(226,232,240,0.8)',
-                                            borderRadius: isChecked ? '16px 16px 0 0' : '16px',
+                                            padding: '1rem',
+                                            border: '1px solid var(--border)',
+                                            borderRadius: isChecked ? '12px 12px 0 0' : '12px',
                                             cursor: 'pointer',
-                                            backgroundColor: isChecked ? '#ECFDF5' : '#FFFFFF',
-                                            boxShadow: isChecked ? '0 4px 12px rgba(16, 185, 129, 0.1)' : '0 2px 4px rgba(0,0,0,0.02)',
-                                            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+                                            backgroundColor: isChecked ? 'rgba(14,165,233,0.15)' : 'rgba(255,255,255,0.02)',
+                                            borderColor: isChecked ? 'var(--primary)' : 'var(--border)',
+                                            borderBottom: isChecked ? 'none' : undefined,
+                                            transition: 'all 0.2s ease'
                                         }}>
                                             <input
                                                 type="checkbox"
@@ -6026,39 +6026,37 @@ END:VCARD`;
                                                         }
                                                     });
                                                 }}
-                                                style={{ width: '22px', height: '22px', accentColor: '#10B981', cursor: 'pointer' }}
+                                                style={{ width: '22px', height: '22px', accentColor: 'var(--primary)', cursor: 'pointer' }}
                                             />
-                                            <span style={{ fontSize: '1.05rem', fontWeight: 700, color: isChecked ? '#047857' : '#475569' }}>{item}</span>
+                                            <span style={{ fontSize: '1rem', fontWeight: 600, color: isChecked ? 'var(--text-main)' : 'var(--text-muted)' }}>{item}</span>
                                         </label>
                                         {/* Titel + Textarea — erscheint wenn angehakt */}
                                         {isChecked && (
                                             <div style={{
-                                                border: '1px solid rgba(16, 185, 129, 0.4)',
+                                                border: '1px solid var(--primary)',
                                                 borderTop: 'none',
-                                                borderRadius: '0 0 16px 16px',
-                                                padding: '1.25rem',
-                                                backgroundColor: '#ECFDF5',
-                                                boxShadow: '0 8px 16px -4px rgba(16, 185, 129, 0.05)'
+                                                borderRadius: '0 0 12px 12px',
+                                                padding: '1rem 1rem 1rem 1rem',
+                                                backgroundColor: 'rgba(14,165,233,0.05)',
                                             }}>
                                                 {/* Titel — entspricht sectionTitle im PDF: 16pt, blau, bold */}
                                                 <div style={{
-                                                    fontSize: '0.85rem',
-                                                    fontWeight: 800,
-                                                    color: '#059669',
-                                                    marginBottom: '0.75rem',
-                                                    letterSpacing: '0.05em',
-                                                    textTransform: 'uppercase',
+                                                    fontSize: '1.15rem',
+                                                    fontWeight: 700,
+                                                    color: '#0F6EA3',
+                                                    marginBottom: '0.6rem',
+                                                    letterSpacing: '0.01em',
                                                     display: 'flex',
                                                     alignItems: 'center',
                                                     justifyContent: 'space-between'
                                                 }}>
-                                                    Details zu {item}
+                                                    {item}
                                                     <button
                                                         type="button"
                                                         onClick={() => toggleDictation(`note_${item}`, item)}
                                                         style={{
                                                             background: 'none', border: 'none', cursor: 'pointer',
-                                                            color: listeningField === `note_${item}` ? '#EF4444' : '#059669',
+                                                            color: listeningField === `note_${item}` ? '#EF4444' : '#0F6EA3',
                                                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                                                             padding: '4px', borderRadius: '50%',
                                                             backgroundColor: listeningField === `note_${item}` ? 'rgba(239,68,68,0.1)' : 'transparent'
@@ -6080,18 +6078,16 @@ END:VCARD`;
                                                     onClick={e => e.stopPropagation()}
                                                     style={{
                                                         width: '100%',
-                                                        backgroundColor: '#FFFFFF',
-                                                        border: '2px solid #1E6DB7',
-                                                        borderRadius: '12px',
-                                                        color: '#0F172A',
+                                                        background: 'rgba(255,255,255,0.04)',
+                                                        border: '1px solid rgba(14,165,233,0.3)',
+                                                        borderRadius: '8px',
+                                                        color: 'var(--text-main)',
                                                         fontSize: '0.95rem',
-                                                        padding: '0.8rem 1rem',
+                                                        padding: '0.6rem 0.75rem',
                                                         resize: 'vertical',
                                                         outline: 'none',
-                                                        boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.02)',
                                                         fontFamily: 'inherit',
                                                         boxSizing: 'border-box',
-                                                        transition: 'border-color 0.2s'
                                                     }}
                                                 />
                                             </div>
@@ -6103,8 +6099,8 @@ END:VCARD`;
 
                         {/* Freitext & Mikrofon */}
                         <div style={{ position: 'relative' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                                <label style={{ fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748B', fontWeight: 800 }}>Zusätzliche Massnahmen</label>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                                <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 700 }}>Eigener Text / Ergänzungen</label>
                                 <button
                                     type="button"
                                     className="btn-glass"
@@ -6116,9 +6112,9 @@ END:VCARD`;
                                         display: 'flex',
                                         alignItems: 'center',
                                         justifyContent: 'center',
-                                        color: listeningField === 'measures' ? '#EF4444' : '#64748B',
-                                        border: `2px solid ${listeningField === 'measures' ? '#EF4444' : '#1E6DB7'}`,
-                                        backgroundColor: listeningField === 'measures' ? 'rgba(239,68,68,0.1)' : '#FFFFFF',
+                                        color: listeningField === 'measures' ? '#EF4444' : 'var(--primary)',
+                                        border: `1px solid ${listeningField === 'measures' ? '#EF4444' : 'var(--border)'}`,
+                                        backgroundColor: listeningField === 'measures' ? 'rgba(239,68,68,0.1)' : 'transparent',
                                         borderRadius: '50%',
                                         fontWeight: 700
                                     }}
@@ -6131,15 +6127,7 @@ END:VCARD`;
                                 value={formData.measures || ''}
                                 onChange={(e) => setFormData(prev => ({ ...prev, measures: e.target.value }))}
                                 placeholder="Zusätzliche Massnahmen beschreiben..."
-                                style={{ 
-                                    width: '100%', minHeight: '120px', fontFamily: 'inherit', lineHeight: '1.5',
-                                    backgroundColor: '#FFFFFF',
-                                    border: '1px solid #E2E8F0',
-                                    borderRadius: '16px',
-                                    padding: '1rem',
-                                    color: '#0F172A',
-                                    boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)'
-                                }}
+                                style={{ width: '100%', minHeight: '100px', fontFamily: 'inherit', lineHeight: '1.5' }}
                             />
                         </div>
                     </div>
@@ -6200,7 +6188,7 @@ END:VCARD`;
                                 flexDirection: 'column',
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                color: '#64748B'
+                                color: 'var(--text-muted)'
                             }}
                             onClick={() => document.getElementById('file-upload-pläne').click()}
                             onDragOver={(e) => {
@@ -6229,7 +6217,7 @@ END:VCARD`;
                             {formData.images.filter(img => img.assignedTo === 'Pläne').map((item, idx) => (
                                 <div key={idx} style={{
                                     display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem',
-                                    backgroundColor: '#FFFFFF', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)', border: '1px solid #E2E8F0',
+                                    backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid var(--border)',
                                     borderRadius: '12px'
                                 }}>
                                     {(item.file && item.file.type === 'application/pdf') || (item.name && item.name.toLowerCase().endsWith('.pdf')) ? (
@@ -6252,9 +6240,9 @@ END:VCARD`;
                                         <>
                                             <img src={item.preview} alt="Vorschau" className="hover-zoom" style={{ width: '44px', height: '44px', objectFit: 'cover', borderRadius: '8px' }} />
                                             <div style={{ flex: 1, overflow: 'hidden' }}>
-                                                <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'white' }}>{item.name || item.assignedTo}</div>
+                                                <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-main)' }}>{item.name || item.assignedTo}</div>
                                                 {item.description && (
-                                                    <div style={{ fontSize: '0.8rem', color: '#64748B' }}>{item.description.substring(0, 40)}...</div>
+                                                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{item.description.substring(0, 40)}...</div>
                                                 )}
                                             </div>
                                         </>
@@ -6264,7 +6252,7 @@ END:VCARD`;
                                 </div>
                             ))}
                             {formData.images.filter(img => img.assignedTo === 'Pläne').length === 0 && (
-                                <div style={{ textAlign: 'center', color: '#64748B', fontSize: '0.85rem', fontStyle: 'italic', padding: '1rem' }}>Keine Pläne vorhanden.</div>
+                                <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem', fontStyle: 'italic', padding: '1rem' }}>Keine Pläne vorhanden.</div>
                             )}
                         </div>
                     </div>
@@ -6298,7 +6286,7 @@ END:VCARD`;
                                     flexDirection: 'column',
                                     alignItems: 'center',
                                     justifyContent: 'center',
-                                    color: '#64748B'
+                                    color: 'var(--text-muted)'
                                 }}
                                 onClick={() => document.getElementById('file-upload-Arbeitsrappporte-desktop').click()}
                                 onDragOver={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.background = 'rgba(14, 165, 233, 0.08)'; }}
@@ -6311,22 +6299,22 @@ END:VCARD`;
                             </div>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                                 {formData.images.filter(img => img.assignedTo === 'Arbeitsrappporte').map((item, idx) => (
-                                    <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem', backgroundColor: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: 'var(--radius)' }}>
+                                    <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem', backgroundColor: '#1E293B', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
                                         {(item.file && item.file.type === 'application/pdf') || (item.name && item.name.toLowerCase().endsWith('.pdf')) ? (
                                             <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '1rem', cursor: 'pointer' }} onClick={() => { if (item.file) { const pdfUrl = URL.createObjectURL(item.file); window.open(pdfUrl, '_blank'); } else if (item.preview) { window.open(item.preview, '_blank'); } else { alert("PDF Vorschau nicht verfügbar."); } }}>
                                                 <div style={{ padding: '0.5rem', backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: '4px' }}><FileText size={24} color="var(--text-main)" /></div>
-                                                <div style={{ fontSize: '1rem', color: 'white', fontWeight: 500, textDecoration: 'underline' }}>{item.name}</div>
+                                                <div style={{ fontSize: '1rem', color: 'var(--text-main)', fontWeight: 500, textDecoration: 'underline' }}>{item.name}</div>
                                             </div>
                                         ) : (
                                             <div style={{ width: '80px', height: '80px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: '4px' }}>
                                                 <img src={item.preview} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '4px' }} />
                                             </div>
                                         )}
-                                        {!((item.file && item.file.type === 'application/pdf') || (item.name && item.name.toLowerCase().endsWith('.pdf'))) && <div style={{ flex: 1, fontWeight: 500, color: 'white' }}>{item.name}</div>}
+                                        {!((item.file && item.file.type === 'application/pdf') || (item.name && item.name.toLowerCase().endsWith('.pdf'))) && <div style={{ flex: 1, fontWeight: 500, color: 'var(--text-main)' }}>{item.name}</div>}
                                         <button type="button" className="btn btn-ghost" onClick={() => setFormData(prev => ({ ...prev, images: prev.images.filter(i => i !== item) }))} style={{ color: '#EF4444', padding: '0.5rem', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(239, 68, 68, 0.1)' }}><Trash size={18} /></button>
                                     </div>
                                 ))}
-                                {formData.images.filter(img => img.assignedTo === 'Arbeitsrappporte').length === 0 && <div style={{ textAlign: 'center', color: '#64748B', fontSize: '0.9rem', fontStyle: 'italic' }}>Keine Arbeitsrapporte vorhanden.</div>}
+                                {formData.images.filter(img => img.assignedTo === 'Arbeitsrappporte').length === 0 && <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.9rem', fontStyle: 'italic' }}>Keine Arbeitsrapporte vorhanden.</div>}
                             </div>
                         </div>
                         {formData.images?.some(img => img.assignedTo === 'Sonstiges') && (
@@ -6360,7 +6348,7 @@ END:VCARD`;
                                     flexDirection: 'column',
                                     alignItems: 'center',
                                     justifyContent: 'center',
-                                    color: '#64748B'
+                                    color: 'var(--text-muted)'
                                 }}
                                 onClick={() => document.getElementById('file-upload-Sonstiges-desktop').click()}
                                 onDragOver={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.background = 'rgba(14, 165, 233, 0.08)'; }}
@@ -6380,24 +6368,24 @@ END:VCARD`;
                                 {formData.images.filter(img => img.assignedTo === 'Sonstiges').map((item, idx) => (
                                     <div key={idx} style={{
                                         display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem',
-                                        backgroundColor: '#FFFFFF', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)', border: '1px solid #E2E8F0',
+                                        backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid var(--border)',
                                         borderRadius: '12px'
                                     }}>
                                         {(item.file && item.file.type === 'application/pdf') || (item.name && item.name.toLowerCase().endsWith('.pdf')) ? (
                                             <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }} onClick={() => { if (item.file) { const pdfUrl = URL.createObjectURL(item.file); window.open(pdfUrl, '_blank'); } else if (item.preview) { window.open(item.preview, '_blank'); } }}>
                                                 <FileText size={18} color="var(--primary)" />
-                                                <div style={{ fontSize: '0.9rem', color: 'white', fontWeight: 600 }}>{item.name}</div>
+                                                <div style={{ fontSize: '0.9rem', color: 'var(--text-main)', fontWeight: 600 }}>{item.name}</div>
                                             </div>
                                         ) : (
                                             <>
                                                 <img src={item.preview} alt="" className="hover-zoom" style={{ width: '44px', height: '44px', objectFit: 'cover', borderRadius: '8px' }} />
-                                                <div style={{ flex: 1, fontWeight: 600, color: 'white', fontSize: '0.9rem' }}>{item.name}</div>
+                                                <div style={{ flex: 1, fontWeight: 600, color: 'var(--text-main)', fontSize: '0.9rem' }}>{item.name}</div>
                                             </>
                                         )}
                                         <button type="button" onClick={() => setFormData(prev => ({ ...prev, images: prev.images.filter(i => i !== item) }))} style={{ border: 'none', background: 'rgba(239, 68, 68, 0.1)', color: '#EF4444', cursor: 'pointer', padding: '6px', borderRadius: '50%', display: 'flex' }}><X size={14} /></button>
                                     </div>
                                 ))}
-                                {formData.images.filter(img => img.assignedTo === 'Sonstiges').length === 0 && <div style={{ textAlign: 'center', color: '#64748B', fontSize: '0.85rem', fontStyle: 'italic' }}>Keine Lieferantenrechnungen vorhanden.</div>}
+                                {formData.images.filter(img => img.assignedTo === 'Sonstiges').length === 0 && <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem', fontStyle: 'italic' }}>Keine Lieferantenrechnungen vorhanden.</div>}
                             </div>
                         </div>
 
@@ -6416,14 +6404,14 @@ END:VCARD`;
                                     return (
                                         <div key={room.id} style={{
                                             padding: '1rem', backgroundColor: 'rgba(255, 255, 255, 0.02)',
-                                            border: '1px solid #E2E8F0', borderRadius: '12px',
+                                            border: '1px solid var(--border)', borderRadius: '12px',
                                             display: 'flex', flexDirection: 'column', gap: '0.75rem',
                                         }}>
                                             {/* Header: Raumname + Buttons */}
                                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
                                                 <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-                                                    <div style={{ fontWeight: 700, fontSize: '1rem', color: 'white' }}>{room.name}</div>
-                                                    <div style={{ fontSize: '0.8rem', color: '#64748B', fontWeight: 500 }}>{hasMeasurement ? `Letzte Messung: ${date}` : 'Keine Messdaten'}</div>
+                                                    <div style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--text-main)' }}>{room.name}</div>
+                                                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 500 }}>{hasMeasurement ? `Letzte Messung: ${date}` : 'Keine Messdaten'}</div>
                                                 </div>
                                                 <div style={{ display: 'flex', gap: '0.5rem' }}>
                                                     {room.measurementData ? (
@@ -6506,7 +6494,7 @@ END:VCARD`;
                                             alert("Fehler beim Erstellen des Excel-Protokolls.");
                                         }
                                     }}
-                                    style={{ fontSize: '0.85rem', padding: '0.6rem 1.25rem', color: '#10B981', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700, border: '2px solid #1E6DB7' }}
+                                    style={{ fontSize: '0.85rem', padding: '0.6rem 1.25rem', color: '#10B981', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700, border: '1px solid rgba(16, 185, 129, 0.2)' }}
                                 >
                                     <Table size={16} /> Excel Export
                                 </button>
@@ -6523,7 +6511,7 @@ END:VCARD`;
                             <Settings size={24} />
                             {(mode === 'technician' && techSelectedEquipmentRoom?.apartment)
                                 ? `Geräte, Wohnung ${techSelectedEquipmentRoom.apartment}`
-                                : 'Geräte'}
+                                : 'Trocknungsgeräte'}
                         </h2>
 
 
@@ -6531,7 +6519,7 @@ END:VCARD`;
 
 
                         {/* Add Device Form */}
-                        <div style={{ backgroundColor: '#FFFFFF', padding: '1rem', borderRadius: '8px', marginBottom: '1rem', border: '1px solid #E2E8F0', ...(mode === 'desktop' ? { order: 3, marginTop: '2rem' } : {}) }}>
+                        <div style={{ backgroundColor: '#1E293B', padding: '1rem', borderRadius: '8px', marginBottom: '1rem', border: '1px solid var(--border)', ...(mode === 'desktop' ? { order: 3, marginTop: '2rem' } : {}) }}>
                             {mode !== 'technician' && (
                                 <button
                                     type="button"
@@ -6758,8 +6746,8 @@ END:VCARD`;
                             )}
                             
                             {showAddDeviceForm && mode === 'technician' && (
-                                <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(4px)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-                                    <div style={{ backgroundColor: '#FFFFFF', borderRadius: '16px', width: '100%', maxWidth: '400px', padding: '1.5rem', color: 'white', border: '1px solid #E2E8F0', boxShadow: '0 10px 25px rgba(0,0,0,0.05)' }}>
+                                <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.85)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+                                    <div style={{ backgroundColor: '#1E293B', borderRadius: '16px', width: '100%', maxWidth: '400px', padding: '1.5rem', color: '#F1F5F9', border: '1px solid rgba(255,255,255,0.1)' }}>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                                             <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700 }}>Gerät hinzufügen</h3>
                                             <button onClick={() => setShowAddDeviceForm(false)} style={{ background: 'transparent', border: 'none', color: '#94A3B8', cursor: 'pointer' }}><X size={20} /></button>
@@ -6818,7 +6806,7 @@ END:VCARD`;
                                             <select
                                                 className="form-input"
                                                 value={newDevice.apartment || 'Allgemeiner Bereich'}
-                                                onChange={(e) => setNewDevice(prev => ({ ...prev, apartment: e.target.value, room: '' }))}
+                                                onChange={(e) => setNewDevice(prev => ({ ...prev, apartment: e.target.value }))}
                                                 style={{ fontSize: '1.1rem', padding: '1rem' }}
                                             >
                                                 <option value="Allgemeiner Bereich">Allgemeiner Bereich</option>
@@ -6827,20 +6815,6 @@ END:VCARD`;
                                                     ...(formData.contacts || []).map(c => c.name ? c.name.trim().split(/\s+/).pop() : '').filter(Boolean)
                                                 ])).sort().filter(a => a !== 'Allgemeiner Bereich').map(apt => (
                                                     <option key={apt} value={apt}>{apt}</option>
-                                                ))}
-                                            </select>
-                                            
-                                            <select
-                                                className="form-input"
-                                                value={newDevice.room || ''}
-                                                onChange={(e) => setNewDevice(prev => ({ ...prev, room: e.target.value }))}
-                                                style={{ fontSize: '1.1rem', padding: '1rem' }}
-                                            >
-                                                <option value="">Raum wählen... (Optional)</option>
-                                                {formData.rooms
-                                                    .filter(r => (r.apartment || 'Allgemeiner Bereich').trim() === (newDevice.apartment || 'Allgemeiner Bereich').trim())
-                                                    .map(r => (
-                                                    <option key={r.id} value={r.name}>{r.name || 'Ohne Namen'}</option>
                                                 ))}
                                             </select>
 
@@ -6898,7 +6872,7 @@ END:VCARD`;
                                     
                                     {/* Custom Numpad UI for Technician Add Device */}
                                     {activeNumpadField && createPortal(
-                                        <div style={{ position: 'fixed', left: numpadPos.x, top: numpadPos.y, width: 280, backgroundColor: '#FFFFFF', border: '1px solid #E2E8F0', boxShadow: '0 10px 25px rgba(0,0,0,0.05)', padding: '0.75rem', zIndex: 100000, boxShadow: '0 10px 40px rgba(0,0,0,0.6)', borderRadius: 12 }}>
+                                        <div style={{ position: 'fixed', left: numpadPos.x, top: numpadPos.y, width: 280, backgroundColor: '#1E293B', border: '1px solid rgba(255,255,255,0.15)', padding: '0.75rem', zIndex: 100000, boxShadow: '0 10px 40px rgba(0,0,0,0.6)', borderRadius: 12 }}>
                                             <div 
                                                 style={{ display:'flex', justifyContent:'space-between', marginBottom:'0.5rem', alignItems:'center', cursor: 'grab', touchAction: 'none', paddingBottom: '0.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)' }}
                                                 onPointerDown={e => {
@@ -6927,17 +6901,17 @@ END:VCARD`;
                                                 </div>
                                                 <button onClick={() => setActiveNumpadField(null)} style={{ background:'transparent', border:'none', color:'#E2E8F0', cursor:'pointer' }}><X size={16}/></button>
                                             </div>
-                                            <div style={{ backgroundColor: '#F8FAFC', padding:'0.5rem', borderRadius:'6px', marginBottom:'0.5rem', fontSize:'1.4rem', fontWeight:700, textAlign:'right', color:'#fff', minHeight:'36px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                                            <div style={{ backgroundColor:'#0F172A', padding:'0.5rem', borderRadius:'6px', marginBottom:'0.5rem', fontSize:'1.4rem', fontWeight:700, textAlign:'right', color:'#fff', minHeight:'36px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
                                                 {activeNumpadField.value || '0'}
                                             </div>
                                             <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:'0.4rem' }}>
                                                 {['1','2','3','4','5','6','7','8','9',',', '0', 'DEL'].map(k => (
-                                                    <button key={k} onClick={() => handleNumpadPress(k)} style={{ padding:'0.6rem', fontSize:'1.2rem', fontWeight:700, borderRadius:'8px', backgroundColor:'rgba(255,255,255,0.1)', border:'none', color: 'white', cursor:'pointer', touchAction: 'manipulation', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                                                    <button key={k} onClick={() => handleNumpadPress(k)} style={{ padding:'0.6rem', fontSize:'1.2rem', fontWeight:700, borderRadius:'8px', backgroundColor:'rgba(255,255,255,0.1)', border:'none', color:'#F1F5F9', cursor:'pointer', touchAction: 'manipulation', display:'flex', alignItems:'center', justifyContent:'center' }}>
                                                         {k === 'DEL' ? <Delete size={18} style={{ pointerEvents: 'none' }}/> : k}
                                                     </button>
                                                 ))}
                                             </div>
-                                            <button onClick={() => setActiveNumpadField(null)} style={{ width:'100%', marginTop:'0.5rem', padding:'0.6rem', backgroundColor:'#3B82F6', color: 'white', border:'none', borderRadius:'8px', fontWeight:700, fontSize:'1rem', cursor:'pointer', touchAction: 'manipulation' }}>
+                                            <button onClick={() => setActiveNumpadField(null)} style={{ width:'100%', marginTop:'0.5rem', padding:'0.6rem', backgroundColor:'#3B82F6', color:'white', border:'none', borderRadius:'8px', fontWeight:700, fontSize:'1rem', cursor:'pointer', touchAction: 'manipulation' }}>
                                                 OK
                                             </button>
                                         </div>, document.body
@@ -6953,8 +6927,8 @@ END:VCARD`;
                                 if (!device) return null;
 
                                 return (
-                                    <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(4px)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-                                        <div style={{ backgroundColor: '#FFFFFF', borderRadius: '16px', width: '100%', maxWidth: '400px', padding: '1.5rem', color: 'white', border: '1px solid #E2E8F0', boxShadow: '0 10px 25px rgba(0,0,0,0.05)' }}>
+                                    <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.85)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+                                        <div style={{ backgroundColor: '#1E293B', borderRadius: '16px', width: '100%', maxWidth: '400px', padding: '1.5rem', color: '#F1F5F9', border: '1px solid rgba(255,255,255,0.1)' }}>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                                                 <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700 }}>Gerät abmelden</h3>
                                                 <button onClick={() => {
@@ -6968,7 +6942,7 @@ END:VCARD`;
                                             <div style={{ marginBottom: '1.5rem', padding: '1rem', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: '8px' }}>
                                                 <div style={{ fontWeight: 600, fontSize: '1.1rem', color: 'var(--primary)', marginBottom: '0.25rem' }}>#{device.deviceNumber} {device.model || device.type ? `- ${device.model || device.type}` : ''}</div>
                                                 <div style={{ fontSize: '0.9rem', color: '#94A3B8' }}>{device.room} {device.apartment ? `(${device.apartment})` : ''}</div>
-                                                <div style={{ fontSize: '0.85rem', color: '#94A3B8', marginTop: '0.5rem', borderTop: '1px solid #E2E8F0', boxShadow: '0 -4px 20px rgba(0,0,0,0.04)', paddingTop: '0.5rem' }}>Start: {device.startDate} • Zähler: {device.counterStart} kWh</div>
+                                                <div style={{ fontSize: '0.85rem', color: '#94A3B8', marginTop: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.5rem' }}>Start: {device.startDate} • Zähler: {device.counterStart} kWh</div>
                                             </div>
 
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -7002,7 +6976,7 @@ END:VCARD`;
                                                     <button
                                                         type="button"
                                                         className="btn btn-ghost"
-                                                        style={{ flex: 1, color: '#94A3B8', border: '1px solid #E2E8F0', padding: '0.75rem' }}
+                                                        style={{ flex: 1, color: '#94A3B8', border: '1px solid var(--border)', padding: '0.75rem' }}
                                                         onClick={() => {
                                                             const newStates = { ...unsubscribeStates };
                                                             delete newStates[idxStr];
@@ -7081,7 +7055,7 @@ END:VCARD`;
                                 .map((device) => {
                                     const idx = device._originalIndex;
                                     return (
-                                        <div key={idx} style={{ backgroundColor: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '0.75rem', color: 'white' }}>
+                                        <div key={idx} style={{ backgroundColor: '#1E293B', border: '1px solid var(--border)', borderRadius: '8px', padding: '0.75rem', color: 'white' }}>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
                                                 <div style={{ minWidth: '40px', display: 'flex', flexDirection: 'column' }}>
                                                     <span style={{ fontWeight: 600, color: 'var(--primary)' }}>#{device.deviceNumber}</span>
@@ -7112,7 +7086,7 @@ END:VCARD`;
                                                 if (isAbgemeldet) {
                                                     // ALREADY DONE STATE
                                                     return (
-                                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '0.5rem', marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid #E2E8F0', boxShadow: '0 -4px 20px rgba(0,0,0,0.04)' }}>
+                                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '0.5rem', marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
                                                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
                                                                 <div>
                                                                     <label style={{ fontSize: '0.75rem', color: '#94A3B8', display: 'block', marginBottom: '0.2rem' }}>Zähler Ende</label>
@@ -7217,7 +7191,7 @@ END:VCARD`;
                                         }
                                         setShowAddDeviceForm(true);
                                     }}
-                                    style={{ width: '100%', background: '#FFFFFF', color: '#1E6DB7', border: '2px solid #1E6DB7', padding: '0.75rem', borderRadius: '8px', fontWeight: 700, cursor: 'pointer', fontSize: '0.9rem', textTransform: 'uppercase', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
+                                    style={{ width: '100%', background: 'rgba(16, 185, 129, 0.15)', color: '#10B981', border: '1px solid #10B981', padding: '0.75rem', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '0.9rem', textTransform: 'uppercase', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
                                 >
                                     <Plus size={18} /> Gerät hinzufügen
                                 </button>
@@ -7232,7 +7206,7 @@ END:VCARD`;
 
                 {/* Zusammenfassung Trocknung */}
                 {(mode === 'desktop' || true) && formData.equipment?.length > 0 && (
-                    <div style={{ marginBottom: '1.5rem', backgroundColor: '#FFFFFF', padding: '1.25rem', borderRadius: '12px', border: '2px solid #1E6DB7', color: '#1E293B', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}>
+                    <div style={{ marginBottom: '1.5rem', backgroundColor: 'var(--surface)', padding: '1.25rem', borderRadius: '12px', border: '1px solid var(--border)', color: 'var(--text-main)', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}>
                         <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.6rem', color: 'var(--primary)' }}>
                             <Database size={18} /> Geräteliste
                         </h3>
@@ -7258,8 +7232,8 @@ END:VCARD`;
                                                 <div 
                                                     key={idx}
                                                     style={{ 
-                                                        backgroundColor: '#FFFFFF', 
-                                                        border: '2px solid #1E6DB7', 
+                                                        backgroundColor: '#1E293B', 
+                                                        border: '1px solid var(--border)', 
                                                         borderRadius: '8px', 
                                                         padding: '0.75rem', 
                                                         cursor: !isFinished ? 'pointer' : 'default',
@@ -7287,18 +7261,18 @@ END:VCARD`;
                                                     }}
                                                 >
                                                     <div style={{ flex: 1, paddingRight: '1rem' }}>
-                                                        <div style={{ fontWeight: 800, color: '#1E293B' }}>
+                                                        <div style={{ fontWeight: 600, color: 'var(--text-main)' }}>
                                                             #{device.deviceNumber} {device.type && device.type !== 'Unbekannt' ? `- ${device.type}` : ''} {device.model && String(device.model).trim() !== '' ? `(${device.model})` : ''}
                                                         </div>
-                                                        <div style={{ fontSize: '0.8rem', color: '#64748B', marginTop: '0.2rem' }}>
+                                                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
                                                             {device.room}
                                                         </div>
                                                     </div>
                                                     <div style={{ textAlign: 'right', minWidth: '80px' }}>
                                                         {isFinished ? (
                                                             <>
-                                                                <div style={{ fontWeight: 800, color: '#1E293B' }}>{consumption.toFixed(2)} kWh</div>
-                                                                <div style={{ fontSize: '0.75rem', color: '#475569', marginTop: '0.2rem' }}>{device.hours} h • {getDaysDiff(device.startDate, device.endDate)} Tg.</div>
+                                                                <div style={{ fontWeight: 600, color: 'var(--text-main)' }}>{consumption.toFixed(2)} kWh</div>
+                                                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>{device.hours} h • {getDaysDiff(device.startDate, device.endDate)} Tg.</div>
                                                             </>
                                                         ) : (
                                                             <span style={{ fontSize: '0.7rem', color: '#10B981', backgroundColor: 'rgba(16, 185, 129, 0.15)', padding: '4px 8px', borderRadius: '4px', textTransform: 'uppercase', fontWeight: 700 }}>Aktiv</span>
@@ -7308,14 +7282,14 @@ END:VCARD`;
                                             );
                                         })}
                                         {formData.equipment.filter(device => !techSelectedEquipmentRoom?.apartment || (device.apartment || 'Allgemeiner Bereich').trim() === techSelectedEquipmentRoom.apartment).length === 0 && (
-                                            <div style={{ textAlign: 'center', padding: '2rem', color: '#64748B' }}>Keine Geräte vorhanden.</div>
+                                            <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>Keine Geräte vorhanden.</div>
                                         )}
                                         {formData.equipment.filter(device => !techSelectedEquipmentRoom?.apartment || (device.apartment || 'Allgemeiner Bereich').trim() === techSelectedEquipmentRoom.apartment).length > 0 && (
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem', backgroundColor: '#FFFFFF', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)', borderRadius: '8px', border: '2px solid #1E6DB7', marginTop: '0.5rem' }}>
-                                                <div style={{ fontWeight: 800, color: '#1E293B' }}>Gesamt</div>
-                                                <div style={{ textAlign: 'right', fontWeight: 800, color: '#1E293B' }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem', backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: '8px', border: '1px solid var(--border)', marginTop: '0.5rem' }}>
+                                                <div style={{ fontWeight: 700, color: 'var(--text-main)' }}>Gesamt</div>
+                                                <div style={{ textAlign: 'right', fontWeight: 700, color: 'var(--text-main)' }}>
                                                     <div>{totalDryingKwh.toFixed(2)} kWh</div>
-                                                    <div style={{ fontSize: '0.8rem', color: '#475569', fontWeight: 600 }}>{totalDryingHours.toFixed(1)} h</div>
+                                                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 400 }}>{totalDryingHours.toFixed(1)} h</div>
                                                 </div>
                                             </div>
                                         )}
@@ -7343,10 +7317,10 @@ END:VCARD`;
                                             }
 
                                             return (
-                                                <tr key={idx} style={{ borderBottom: '1px solid #E2E8F0' }}>
+                                                <tr key={idx} style={{ borderBottom: '1px solid var(--border)' }}>
                                                     <td style={{ padding: '0.75rem' }}>
                                                         <div style={{ fontWeight: 600 }}>#{device.deviceNumber} {device.model ? `- ${device.model}` : (device.type && device.type !== 'Unbekannt' ? `- ${device.type}` : '')}</div>
-                                                        <div style={{ fontSize: '0.8rem', color: '#64748B', marginTop: '0.2rem' }}>
+                                                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
                                                             {device.room}
                                                             {!isFinished && <span style={{ fontSize: '0.65rem', color: '#10B981', marginLeft: '6px', backgroundColor: 'rgba(16, 185, 129, 0.15)', padding: '2px 6px', borderRadius: '4px', textTransform: 'uppercase', fontWeight: 700 }}>Aktiv</span>}
                                                         </div>
@@ -7361,7 +7335,7 @@ END:VCARD`;
                                                         {isFinished ? (
                                                             <>
                                                                 {consumption.toFixed(2)}
-                                                                {!hasMeter && hasKw && <span style={{ fontSize: '0.7rem', color: '#64748B', marginLeft: '2px' }}>*</span>}
+                                                                {!hasMeter && hasKw && <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginLeft: '2px' }}>*</span>}
                                                             </>
                                                         ) : '-'}
                                                     </td>
@@ -7370,10 +7344,10 @@ END:VCARD`;
                                         })}
                                         {formData.equipment.length === 0 && (
                                             <tr>
-                                                <td colSpan="4" style={{ textAlign: 'center', padding: '2rem', color: '#64748B' }}>Keine Geräte vorhanden.</td>
+                                                <td colSpan="4" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>Keine Geräte vorhanden.</td>
                                             </tr>
                                         )}
-                                        <tr style={{ fontWeight: 700, backgroundColor: '#FFFFFF', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)' }}>
+                                        <tr style={{ fontWeight: 700, backgroundColor: 'rgba(255,255,255,0.02)' }}>
                                             <td style={{ padding: '0.75rem' }}>Gesamt</td>
                                             <td style={{ textAlign: 'center', padding: '0.75rem' }}>-</td>
                                             <td style={{ textAlign: 'center', padding: '0.75rem' }}>{totalDryingHours.toFixed(1)} h</td>
@@ -7396,14 +7370,14 @@ END:VCARD`;
                     width: '100%',
                     maxWidth: '600px',
                     padding: '0.4rem 0.75rem',
-                    backgroundColor: mode === 'technician' ? '#F8FAFC' : '#1E293B',
-                    borderTop: mode === 'technician' ? '1px solid #E2E8F0' : '1px solid #0F172A',
+                    backgroundColor: '#0F172A',
+                    borderTop: '1px solid #334155',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
                     gap: '1rem',
                     zIndex: 100,
-                    boxShadow: mode === 'technician' ? '0 -4px 12px rgba(0,0,0,0.05)' : '0 -4px 12px rgba(0, 0, 0, 0.5)'
+                    boxShadow: '0 -4px 12px rgba(0, 0, 0, 0.5)'
                 }}>
                     {/* Status Indicator */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem', color: isSaving ? '#fbbf24' : '#10B981', transition: 'color 0.3s' }}>
@@ -7651,7 +7625,7 @@ END:VCARD`;
                         padding: '1rem'
                     }}>
                         <div style={{
-                            backgroundColor: '#FFFFFF',
+                            backgroundColor: 'var(--surface)',
                             borderRadius: '16px',
                             width: '100%',
                             maxWidth: '600px',
@@ -7659,12 +7633,12 @@ END:VCARD`;
                             display: 'flex',
                             flexDirection: 'column',
                             padding: '2rem',
-                            border: '1px solid #E2E8F0',
+                            border: '1px solid var(--border)',
                             boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)'
                         }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                                 <h3 style={{ fontSize: '1.5rem', fontWeight: 700, margin: 0, color: 'var(--primary)' }}>Bericht konfigurieren</h3>
-                                <button onClick={() => setShowReportModal(false)} style={{ background: 'none', border: 'none', color: '#64748B', cursor: 'pointer' }}>
+                                <button onClick={() => setShowReportModal(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
                                     <X size={24} />
                                 </button>
                             </div>
@@ -7774,7 +7748,7 @@ END:VCARD`;
                     onClick={() => setQrModal(null)}
                     style={{
                         position: 'fixed', inset: 0, zIndex: 99999,
-                        backgroundColor: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(4px)',
+                        backgroundColor: 'rgba(0,0,0,0.85)',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         padding: '1rem',
                     }}
@@ -7782,7 +7756,7 @@ END:VCARD`;
                     <div
                         onClick={e => e.stopPropagation()}
                         style={{
-                            background: '#FFFFFF',
+                            background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)',
                             borderRadius: '20px',
                             border: '1px solid rgba(16,185,129,0.3)',
                             boxShadow: '0 25px 60px rgba(0,0,0,0.6)',
@@ -7819,9 +7793,9 @@ END:VCARD`;
                                         style={{
                                             flex: 1, padding: '0.4rem 0.7rem',
                                             borderRadius: '8px', fontSize: '0.85rem',
-                                            border: '1px solid #E2E8F0', boxShadow: '0 10px 25px rgba(0,0,0,0.05)',
+                                            border: '1px solid rgba(255,255,255,0.1)',
                                             background: 'rgba(255,255,255,0.06)',
-                                            color: 'white', outline: 'none',
+                                            color: '#F1F5F9', outline: 'none',
                                         }}
                                     />
                                 </div>

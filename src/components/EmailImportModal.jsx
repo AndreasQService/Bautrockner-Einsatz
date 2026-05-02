@@ -266,7 +266,7 @@ const EmailImportModal = ({ onClose, onImport }) => {
             display: 'flex', alignItems: 'center', justifyContent: 'center'
         }}>
             <div style={{
-                backgroundColor: 'white', padding: '2rem', borderRadius: '8px',
+                backgroundcolor: '#1E293B', padding: '2rem', borderRadius: '8px',
                 width: '700px', maxWidth: '90%', maxHeight: '90vh', display: 'flex', flexDirection: 'column',
                 boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)'
             }}>
@@ -291,7 +291,7 @@ const EmailImportModal = ({ onClose, onImport }) => {
                 </div>
 
                 {showSettings && (
-                    <div style={{ marginBottom: '1rem', padding: '1rem', backgroundColor: '#F1F5F9', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
+                    <div style={{ marginBottom: '1rem', padding: '1rem', backgroundcolor: '#1E293B', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
                         <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.5rem' }}>OpenAI API Key</label>
                         <div style={{ display: 'flex', gap: '0.5rem' }}>
                             <input

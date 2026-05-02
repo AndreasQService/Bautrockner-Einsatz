@@ -583,10 +583,10 @@ ${textContext}`;
 
     return createPortal(
       <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.75)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }}>
-        <div style={{ backgroundColor: '#1e293b', padding: '2rem', borderRadius: '16px', width: '920px', maxWidth: '95%', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.1)', color: 'white' }}>
+        <div style={{ backgroundColor: '#FFFFFF', padding: '2rem', borderRadius: '16px', width: '920px', maxWidth: '95%', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)', border: '1px solid #E2E8F0', boxShadow: '0 10px 30px rgba(0,0,0,0.1)', color: '#1E293B' }}>
 
           {/* Header */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '1rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '1px solid #E2E8F0', paddingBottom: '1rem' }}>
             <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800, color: '#10b981' }}>KI-Analyse Ergebnis</h2>
             <button onClick={() => setPreviewData(null)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}><X size={24} /></button>
           </div>
@@ -663,7 +663,7 @@ ${textContext}`;
           </div>
 
           {/* Footer */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '1.25rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', borderTop: '1px solid #E2E8F0', paddingTop: '1.25rem' }}>
             <button onClick={() => setPreviewData(null)} className="btn btn-outline" style={{ minWidth: '120px' }}>Abbrechen</button>
             <button onClick={() => { if (onExtractionComplete) onExtractionComplete(previewData); setPreviewData(null); }} className="btn btn-primary" style={{ minWidth: '180px', backgroundColor: '#10b981', border: 'none' }}>Daten übernehmen</button>
           </div>
@@ -678,77 +678,6 @@ ${textContext}`;
     <>
       {renderPreview()}
       <div style={{ display: "flex", flexDirection: "column", gap: "1rem", marginTop: 16 }}>
-        {/* --- Drag & Drop Zone (Smart) --- */}
-        <div
-          onDragEnter={handleDrag}
-          onDragLeave={handleDrag}
-          onDragOver={handleDrag}
-          onDrop={handleDrop}
-          style={{
-            border: `2px dashed ${dragActive ? '#2563eb' : '#4b5563'}`,
-            borderRadius: "8px",
-            padding: "2rem",
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            backgroundColor: dragActive ? "rgba(37, 99, 235, 0.1)" : "transparent",
-            transition: "all 0.2s ease",
-            cursor: "pointer",
-            position: "relative"
-          }}
-          onClick={() => document.getElementById('file-upload-input').click()}
-        >
-          <input
-            id="file-upload-input"
-            type="file"
-            multiple
-            accept=".pdf,.msg,.txt,.jpg,.jpeg,.png,.gif,.heic,.heif,application/pdf,image/*"
-            style={{ display: "none" }}
-            onChange={handleFileChange}
-          />
-
-          <div style={{ display: 'flex', gap: '1rem', marginBottom: '0.5rem' }}>
-            <Upload size={32} style={{ color: "var(--text-muted)" }} />
-            <ImageIcon size={32} style={{ color: "var(--text-muted)" }} />
-          </div>
-          <p style={{ margin: 0, fontWeight: 500, color: "var(--text-main)" }}>
-            Alles hier ablegen: Dokumente & Bilder
-          </p>
-          <p style={{ margin: 0, fontSize: "0.8rem", color: "var(--text-muted)" }}>
-            PDF, MSG, TXT (Analyse) + JPG, PNG (Galerie)
-          </p>
-
-          {files.length > 0 && (
-            <div style={{ marginTop: "1rem", width: "100%", maxWidth: "300px" }} onClick={(e) => e.stopPropagation()}>
-              {files.map((f, idx) => (
-                <div key={idx} style={{
-                  display: "flex", alignItems: "center", justifyContent: "space-between",
-                  background: "var(--surface)", padding: "0.5rem", borderRadius: "4px", marginBottom: "0.25rem",
-                  border: "1px solid var(--border)"
-                }}>
-                  <span style={{ fontSize: "0.85rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {f.name}
-                  </span>
-                  <button onClick={() => removeFile(idx)} style={{ background: "none", border: "none", cursor: "pointer", color: "#ef4444" }}>
-                    <X size={16} />
-                  </button>
-                </div>
-              ))}
-              <button
-                onClick={handleUploadFiles}
-                disabled={loading}
-                style={{
-                  width: "100%", marginTop: "0.5rem", padding: "0.5rem",
-                  backgroundColor: "var(--primary)", color: "white", border: "none", borderRadius: "4px", cursor: "pointer", opacity: loading ? 0.7 : 1
-                }}
-              >
-                {loading ? "Verarbeite ..." : "Starten (Alles autom.)"}
-              </button>
-            </div>
-          )}
-        </div>
-
         {/* --- Text Input Area --- */}
         <div style={{ padding: "1rem", border: "1px solid var(--border)", borderRadius: "8px", backgroundColor: "var(--surface)" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.75rem" }}>

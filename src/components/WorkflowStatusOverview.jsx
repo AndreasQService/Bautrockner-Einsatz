@@ -161,8 +161,8 @@ function StepDot({rep,store,step,i,ai,openKey,onOpen}) {
   const days=dl?dFrom(dl):null
   const hasNote=!!sd.note
   const isOpen=openKey===`${rep.id}__${step.id}`
-  const dotColor = state==="done"?"#10B981":state==="ok"?"#3B82F6":state==="warning"?"#F59E0B":state==="overdue"?"#EF4444":state==="skip"?"#64748B":"#1E293B"
-  const dotBg = state==="done"?"#10B981":state==="ok"?"rgba(59,130,246,0.2)":state==="warning"?"#F59E0B":state==="overdue"?"#EF4444":state==="skip"?"#475569":"rgba(30,41,59,0.9)"
+  const dotColor = state==="done"?"#10B981":state==="ok"?"#3B82F6":state==="warning"?"#F59E0B":state==="overdue"?"#EF4444":state==="skip"?"#94A3B8":"#BAE6FD"
+  const dotBg = state==="done"?"#10B981":state==="ok"?"rgba(59,130,246,0.15)":state==="warning"?"#F59E0B":state==="overdue"?"#EF4444":state==="skip"?"#E2E8F0":"#F0F9FF"
   return (
     <div style={{display:"flex",alignItems:"center",flex:i<STEPS.length-1?1:"0 0 auto"}}>
       <div style={{display:"flex",flexDirection:"column",alignItems:"center",position:"relative"}}>
@@ -185,15 +185,15 @@ function StepDot({rep,store,step,i,ai,openKey,onOpen}) {
             position:"relative",
           }}>
           {state==="done"&&<Check size={14} color="white" strokeWidth={3}/>}
-          {state==="skip"&&<Minus size={13} color="white" strokeWidth={2.5}/>}
+          {state==="skip"&&<Minus size={13} color="#64748B" strokeWidth={2.5}/>}
           {(state==="warning"||state==="overdue")&&<span style={{fontSize:"0.8rem",fontWeight:900,color:"white"}}>!</span>}
           {state==="ok"&&<div style={{width:9,height:9,borderRadius:"50%",background:"#3B82F6",boxShadow:"0 0 7px #3B82F6",animation:"wfPulse 2s ease-in-out infinite"}}/>}
         </button>
-        <span style={{fontSize:"0.6rem",color:state==="pending"?"#334155":state==="done"?"#10B981":dotColor,fontWeight:state==="pending"?400:600,marginTop:3,whiteSpace:"nowrap",lineHeight:1,textAlign:"center"}}>{step.label}</span>
+        <span style={{fontSize:"0.6rem",color:state==="pending"?"#94A3B8":state==="done"?"#10B981":dotColor,fontWeight:state==="pending"?500:700,marginTop:3,whiteSpace:"nowrap",lineHeight:1,textAlign:"center"}}>{step.label}</span>
         {hasNote&&<span style={{fontSize:"0.6rem",color:"#6B7280",marginTop:2,whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:2}}>📝 Notiz</span>}
       </div>
       {i<STEPS.length-1&&(
-        <div style={{flex:1,height:2,background:i<ai?"#10B981":i===ai-1?"linear-gradient(90deg,#10B981,#334155)":"#1E293B",margin:"0 2px",marginBottom:14,minWidth:4}}/>
+        <div style={{flex:1,height:2,background:i<ai?"#10B981":i===ai-1?"linear-gradient(90deg,#10B981,#E2E8F0)":"#E2E8F0",margin:"0 2px",marginBottom:14,minWidth:4}}/>
       )}
     </div>
   )
@@ -276,11 +276,9 @@ function ProjectRow({rep,store,onSave,onSelect,openKey,onOpen}) {
       </td>
       {/* Projekt/Objekt */}
       <td style={{padding:"6px 10px",verticalAlign:"middle",minWidth:170,maxWidth:200}}>
-        {rep.projectNumber&&<div style={{fontSize:"0.9rem",color:"#F1F5F9",fontWeight:800,fontFamily:"monospace",letterSpacing:"0.04em",lineHeight:1.25,marginBottom:1}}>{rep.projectNumber}</div>}
-        <div style={{fontWeight:800,fontSize:"0.9rem",color:"#F1F5F9",lineHeight:1.25,marginBottom:2}}>{street}</div>
-        {city&&<div style={{fontSize:"0.75rem",color:"#94A3B8",lineHeight:1.2,fontWeight:600}}>{city}</div>}
-        {rep.client&&<div style={{fontSize:"0.72rem",color:"#64748B",fontWeight:600,marginTop:1}}>{rep.client}</div>}
-        {rep.description&&<div style={{fontSize:"0.7rem",color:"#94A3B8",marginTop:3,lineHeight:1.3,overflow:"hidden",display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical"}}>{rep.description}</div>}
+        {rep.projectNumber&&<div style={{fontSize:"1rem",color:"#1E6DB7",fontWeight:900,fontFamily:"monospace",letterSpacing:"0.04em",lineHeight:1.25,marginBottom:2}}>{rep.projectNumber}</div>}
+        <div style={{fontWeight:800,fontSize:"0.9rem",color:"#1E293B",lineHeight:1.25,marginBottom:2}}>{street}{city ? `, ${city}` : ''}</div>
+        {rep.description&&<div style={{fontSize:"0.72rem",color:"#64748B",marginTop:3,lineHeight:1.3,overflow:"hidden",display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical"}}>{rep.description}</div>}
       </td>
 
       {/* Start */}
@@ -402,25 +400,25 @@ export default function WorkflowStatusOverview({reports,onSelectReport,currentUs
           <table style={{minWidth:900,borderCollapse:"collapse",width:"100%"}}>
             <thead>
               {/* Row 1: Column labels */}
-              <tr style={{position:"sticky",top:0,zIndex:21,background:"#080F1C",borderBottom:"2px solid rgba(59,130,246,0.4)"}}>
-                <th style={{padding:"0.6rem 8px",fontSize:"0.68rem",fontWeight:700,color:"#94A3B8",textTransform:"uppercase",letterSpacing:"0.05em",width:46}}>Status</th>
-                <th style={{padding:"0.6rem 10px",textAlign:"left",fontSize:"0.68rem",fontWeight:700,color:"#94A3B8",textTransform:"uppercase",letterSpacing:"0.05em",width:170}}>Objekt / Projekt</th>
-                <th style={{padding:"0.6rem 6px",textAlign:"center",fontSize:"0.68rem",fontWeight:700,color:"#94A3B8",textTransform:"uppercase",letterSpacing:"0.05em",width:56}}>Start</th>
-                <th style={{padding:"0.6rem 8px",textAlign:"left",fontSize:"0.68rem",fontWeight:700,color:"#94A3B8",textTransform:"uppercase",letterSpacing:"0.05em"}}>
-                  Workflow <span style={{fontWeight:400,color:"#334155",fontSize:"0.58rem",textTransform:"none"}}>— klicken zum setzen</span>
+              <tr style={{position:"sticky",top:0,zIndex:21,background:"#FFFFFF",boxShadow:"0 1px 3px rgba(0,0,0,0.05)"}}>
+                <th style={{padding:"0.6rem 8px",fontSize:"0.68rem",fontWeight:800,color:"#64748B",textTransform:"uppercase",letterSpacing:"0.05em",width:46}}>Status</th>
+                <th style={{padding:"0.6rem 10px",textAlign:"left",fontSize:"0.68rem",fontWeight:800,color:"#64748B",textTransform:"uppercase",letterSpacing:"0.05em",width:170}}>Objekt / Projekt</th>
+                <th style={{padding:"0.6rem 6px",textAlign:"center",fontSize:"0.68rem",fontWeight:800,color:"#64748B",textTransform:"uppercase",letterSpacing:"0.05em",width:56}}>Start</th>
+                <th style={{padding:"0.6rem 8px",textAlign:"left",fontSize:"0.68rem",fontWeight:800,color:"#64748B",textTransform:"uppercase",letterSpacing:"0.05em"}}>
+                  Workflow <span style={{fontWeight:500,color:"#94A3B8",fontSize:"0.58rem",textTransform:"none"}}>— klicken zum setzen</span>
                 </th>
-                <th style={{padding:"0.6rem 10px",textAlign:"left",fontSize:"0.68rem",fontWeight:700,color:"#94A3B8",textTransform:"uppercase",letterSpacing:"0.05em",width:160}}>Nächste Aktion</th>
-                <th style={{padding:"0.6rem 6px",textAlign:"center",fontSize:"0.68rem",fontWeight:700,color:"#94A3B8",textTransform:"uppercase",letterSpacing:"0.05em",width:56}}>Tage</th>
+                <th style={{padding:"0.6rem 10px",textAlign:"left",fontSize:"0.68rem",fontWeight:800,color:"#64748B",textTransform:"uppercase",letterSpacing:"0.05em",width:160}}>Nächste Aktion</th>
+                <th style={{padding:"0.6rem 6px",textAlign:"center",fontSize:"0.68rem",fontWeight:800,color:"#64748B",textTransform:"uppercase",letterSpacing:"0.05em",width:56}}>Tage</th>
               </tr>
               {/* Row 2: Workflow step names aligned under timeline */}
-              <tr style={{position:"sticky",top:31,zIndex:20,background:"#080F1C",borderBottom:"2px solid rgba(255,255,255,0.08)"}}>
+              <tr style={{position:"sticky",top:31,zIndex:20,background:"#F8FAFC",borderBottom:"1px solid #E2E8F0"}}>
                 <td colSpan={3} style={{padding:"0.4rem 0 0.5rem 0"}}/>
                 <td style={{padding:"0.4rem 8px 0.5rem"}}>
                   <div style={{display:"flex",alignItems:"center",width:"100%"}}>
                     {STEPS.map((step,i)=>(
                       <div key={step.id} style={{display:"flex",alignItems:"center",flex:i<STEPS.length-1?1:"0 0 auto"}}>
                         <div style={{display:"flex",flexDirection:"column",alignItems:"center",minWidth:0}}>
-                          <span style={{fontSize:"0.6rem",fontWeight:600,color:"#94A3B8",textTransform:"uppercase",letterSpacing:"0.02em",whiteSpace:"nowrap",textAlign:"center",lineHeight:1}}>{step.label}</span>
+                          <span style={{fontSize:"0.6rem",fontWeight:700,color:"#64748B",textTransform:"uppercase",letterSpacing:"0.02em",whiteSpace:"nowrap",textAlign:"center",lineHeight:1}}>{step.label}</span>
                         </div>
                         {i<STEPS.length-1&&<div style={{flex:1,minWidth:4}}/>}
                       </div>

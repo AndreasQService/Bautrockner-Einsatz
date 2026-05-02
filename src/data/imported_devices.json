@@ -19,7 +19,7 @@
   },
   {
     "number": "17",
-    "type": "Turbinen",
+    "type": "Turbine",
     "model": "Corroventa T2ES",
     "status": "Inaktiv"
   },
@@ -55,7 +55,7 @@
   },
   {
     "number": "3",
-    "type": "Turbinen",
+    "type": "Turbine",
     "model": "Corroventa T2 ES",
     "status": "Aktiv"
   },
@@ -91,7 +91,7 @@
   },
   {
     "number": "34",
-    "type": "Turbinen",
+    "type": "Turbine",
     "model": "Corroventa T2 Turbine",
     "status": "Inaktiv"
   },
@@ -145,7 +145,7 @@
   },
   {
     "number": "42",
-    "type": "Turbinen",
+    "type": "Turbine",
     "model": "Corroventa T2 Turbine",
     "status": "Aktiv"
   },
@@ -181,13 +181,13 @@
   },
   {
     "number": "49",
-    "type": "Turbinen",
+    "type": "Turbine",
     "model": "Corroventa T2 Turbine",
     "status": "Inaktiv"
   },
   {
     "number": "5",
-    "type": "Turbinen",
+    "type": "Turbine",
     "model": "Corroventa T2 Es",
     "status": "Aktiv"
   },

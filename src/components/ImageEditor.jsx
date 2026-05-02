@@ -273,8 +273,8 @@ const ImageEditor = ({ image, onSave, onCancel }) => {
             <div style={{
                 flexShrink: 0,
                 padding: '0.75rem 1rem',
-                backgroundColor: '#1E293B',
-                borderBottom: '1px solid rgba(255,255,255,0.1)',
+                backgroundColor: '#FFFFFF',
+                borderBottom: '1px solid #E2E8F0',
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
@@ -287,19 +287,19 @@ const ImageEditor = ({ image, onSave, onCancel }) => {
                 <div style={{ display: 'flex', gap: '0.4rem', backgroundColor: 'rgba(255,255,255,0.05)', padding: '0.4rem', borderRadius: '12px' }}>
                     <button
                         onPointerDown={(e) => { e.stopPropagation(); setTool('pen'); }}
-                        style={{ padding: '0.6rem', borderRadius: '8px', border: 'none', background: tool === 'pen' ? '#3B82F6' : 'transparent', color: 'white', cursor: 'pointer' }}
+                        style={{ padding: '0.6rem', borderRadius: '8px', border: 'none', background: tool === 'pen' ? '#3B82F6' : 'transparent', color: '#1E293B', cursor: 'pointer' }}
                     >
                         <PenTool size={22} />
                     </button>
                     <button
                         onPointerDown={(e) => { e.stopPropagation(); setTool('circle'); }}
-                        style={{ padding: '0.6rem', borderRadius: '8px', border: 'none', background: tool === 'circle' ? '#3B82F6' : 'transparent', color: 'white', cursor: 'pointer' }}
+                        style={{ padding: '0.6rem', borderRadius: '8px', border: 'none', background: tool === 'circle' ? '#3B82F6' : 'transparent', color: '#1E293B', cursor: 'pointer' }}
                     >
                         <CircleIcon size={22} />
                     </button>
                     <button
                         onPointerDown={(e) => { e.stopPropagation(); setTool('eraser'); }}
-                        style={{ padding: '0.6rem', borderRadius: '8px', border: 'none', background: tool === 'eraser' ? '#3B82F6' : 'transparent', color: 'white', cursor: 'pointer' }}
+                        style={{ padding: '0.6rem', borderRadius: '8px', border: 'none', background: tool === 'eraser' ? '#3B82F6' : 'transparent', color: '#1E293B', cursor: 'pointer' }}
                     >
                         <Eraser size={22} />
                     </button>
@@ -341,7 +341,7 @@ const ImageEditor = ({ image, onSave, onCancel }) => {
                     <div style={{ width: '1px', background: 'rgba(255,255,255,0.15)', alignSelf: 'stretch' }} />
                     {/* Size Slider */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: 'white', opacity: 0.5 }} />
+                        <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundcolor: '#1E293B', opacity: 0.5 }} />
                         <input
                             type="range"
                             min="2"
@@ -362,7 +362,7 @@ const ImageEditor = ({ image, onSave, onCancel }) => {
                     {isInitializing && (
                         <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', backgroundColor: '#000', zIndex: 20 }}>
                             <Loader2 className="animate-spin" size={40} color="#3B82F6" />
-                            <p style={{ color: 'white', marginTop: '1rem', fontWeight: 600 }}>Editor wird geladen...</p>
+                            <p style={{ color: '#1E293B', marginTop: '1rem', fontWeight: 600 }}>Editor wird geladen...</p>
                         </div>
                     )}
                     <div style={{
@@ -398,9 +398,9 @@ const ImageEditor = ({ image, onSave, onCancel }) => {
                 {/* Integrated Description Area */}
                 <div style={{
                     flexShrink: 0,
-                    backgroundColor: '#1E293B',
+                    backgroundColor: '#FFFFFF',
                     padding: '0.75rem 1rem',
-                    borderTop: '1px solid rgba(255,255,255,0.1)',
+                    borderTop: '1px solid #E2E8F0',
                     display: 'flex',
                     flexDirection: 'column',
                     gap: '0.5rem'
@@ -409,7 +409,7 @@ const ImageEditor = ({ image, onSave, onCancel }) => {
                         <span style={{ color: '#94A3B8', fontSize: '0.8rem', fontWeight: 600 }}>BESCHREIBUNG</span>
                         <button
                             onPointerDown={(e) => { e.stopPropagation(); startVoice(); }}
-                            style={{ background: isRecording ? '#EF4444' : 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '20px', padding: '0.2rem 0.8rem', color: 'white', display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem', cursor: 'pointer' }}
+                            style={{ background: isRecording ? '#EF4444' : 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '20px', padding: '0.2rem 0.8rem', color: '#1E293B', display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem', cursor: 'pointer' }}
                         >
                             <Mic size={14} className={isRecording ? 'animate-pulse' : ''} />
                             {isRecording ? 'Hört zu...' : 'Sprechen'}
@@ -421,9 +421,9 @@ const ImageEditor = ({ image, onSave, onCancel }) => {
                         placeholder="Hier Beschreibung eingeben oder oben sprechen..."
                         style={{
                             width: '100%',
-                            backgroundColor: '#0F172A',
+                            backgroundColor: '#F8FAFC',
                             border: '1px solid #334155',
-                            color: 'white',
+                            color: '#1E293B',
                             borderRadius: '8px',
                             padding: '0.6rem',
                             fontSize: '0.9rem',
@@ -439,14 +439,14 @@ const ImageEditor = ({ image, onSave, onCancel }) => {
             <div style={{
                 flexShrink: 0,
                 padding: '0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom))',
-                backgroundColor: '#1E293B',
-                borderTop: '1px solid rgba(255,255,255,0.1)',
+                backgroundColor: '#FFFFFF',
+                borderTop: '1px solid #E2E8F0',
                 display: 'flex', justifyContent: 'space-between', alignItems: 'center'
             }}>
                 <button onClick={onCancel} style={{ padding: '0.75rem 2rem', borderRadius: '12px', border: '2px solid rgba(255,255,255,0.15)', backgroundColor: 'transparent', color: '#94A3B8', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <X size={22} /> Abbrechen
                 </button>
-                <button onClick={handleSave} style={{ padding: '0.75rem 2.5rem', borderRadius: '12px', border: 'none', backgroundColor: '#10B981', color: 'white', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)' }}>
+                <button onClick={handleSave} style={{ padding: '0.75rem 2.5rem', borderRadius: '12px', border: 'none', backgroundColor: '#10B981', color: '#1E293B', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)' }}>
                     <Save size={24} /> Speichern
                 </button>
             </div>

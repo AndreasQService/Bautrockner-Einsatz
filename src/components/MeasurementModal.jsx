@@ -195,9 +195,10 @@ const MeasurementModal = ({ isOpen, onClose, onSave, onStartNew, onBackToDashboa
         device: ''
     });
     const [isCustomRoom, setIsCustomRoom] = useState(false);
+    const [isCustomApartment, setIsCustomApartment] = useState(false);
     const [availableDevices, setAvailableDevices] = useState([]);
     const [activeNumpadField, setActiveNumpadField] = useState(null);
-    const [numpadPos, setNumpadPos] = useState({ x: window.innerWidth - 350, y: window.innerHeight - 450 });
+    const [numpadPos, setNumpadPos] = useState({ x: typeof window !== 'undefined' ? window.innerWidth - 350 : 100, y: typeof window !== 'undefined' ? window.innerHeight - 450 : 100 });
     const numpadDragRef = useRef(false);
     const numpadStartRef = useRef({ x: 0, y: 0 });
 
@@ -751,8 +752,30 @@ const MeasurementModal = ({ isOpen, onClose, onSave, onStartNew, onBackToDashboa
 
         } catch (err) {
             console.error("Error saving sketch:", err);
-            alert("Fehler beim Speichern der Skizze.");
-            setIsSaving(false);
+            // FALLBACK: If canvas capture fails (common on iPad Safari due to memory/taint), save the data anyway!
+            try {
+                await onSave({
+                    file: null,
+                    measurements,
+                    globalSettings,
+                    canvasImage: null,
+                    galleryPhotos: galleryPhotos || []
+                });
+                setIsSuccess(true);
+                setHasUnsavedChanges(false);
+                setTimeout(() => {
+                    setIsSuccess(false);
+                    setIsSaving(false);
+                    setMeasurements(prev => prev.map(m => ({ ...m, w_value: '', b_value: '' })));
+                    if (globalSettings) {
+                        setGlobalSettings(prev => ({ ...prev, temp: '', humidity: '' }));
+                    }
+                }, 1500);
+            } catch (fallbackErr) {
+                console.error("Fallback save also failed:", fallbackErr);
+                alert("Fehler beim Speichern der Messung.");
+                setIsSaving(false);
+            }
         }
     };
 
@@ -782,8 +805,8 @@ const MeasurementModal = ({ isOpen, onClose, onSave, onStartNew, onBackToDashboa
     if (!isOpen) return null;
 
     const S = { // shared micro-styles
-        label: { display: 'block', fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.07em', color: '#CBD5E1', fontWeight: 700, marginBottom: '0.35rem' },
-        input: { width: '100%', padding: '0.65rem 0.75rem', borderRadius: '8px', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.18)', color: '#FFFFFF', fontSize: '0.875rem', outline: 'none', minHeight: '44px', boxSizing: 'border-box', touchAction: 'manipulation' },
+        label: { display: 'block', fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.07em', color: '#64748B', fontWeight: 700, marginBottom: '0.35rem' },
+        input: { width: '100%', padding: '0.65rem 0.75rem', borderRadius: '8px', background: '#F8FAFC', border: '1px solid #CBD5E1', color: '#1E293B', fontSize: '0.875rem', outline: 'none', minHeight: '44px', boxSizing: 'border-box', touchAction: 'manipulation' },
     };
 
     const handleClose = () => {
@@ -797,21 +820,21 @@ const MeasurementModal = ({ isOpen, onClose, onSave, onStartNew, onBackToDashboa
     };
 
     return createPortal(
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.85)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0.75rem' }}>
-            <div ref={containerRef} style={{ backgroundColor: '#0F172A', borderRadius: '14px', width: '98vw', maxWidth: '1240px', height: '94vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', color: '#F1F5F9', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 30px 80px rgba(0,0,0,0.7)' }}>
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(4px)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0.75rem' }}>
+            <div ref={containerRef} style={{ backgroundColor: '#F8FAFC', borderRadius: '14px', width: '98vw', maxWidth: '1240px', height: '94vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', color: '#1E293B', border: '1px solid #E2E8F0', boxShadow: '0 30px 80px rgba(0,0,0,0.1)', boxShadow: '0 30px 80px rgba(0,0,0,0.7)' }}>
 
                 {/* ── HEADER ── */}
-                <div style={{ flexShrink: 0, padding: '0.7rem 1.1rem', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#1E293B' }}>
+                <div style={{ flexShrink: 0, padding: '0.7rem 1.1rem', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#FFFFFF' }}>
                     <div>
-                        <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#F1F5F9' }}>Messprotokoll</div>
+                        <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#1E293B' }}>Messprotokoll</div>
                         <div style={{ fontSize: '0.9rem', marginTop: '0.15rem', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.3rem' }}>
                             {(() => {
                                 const isId = (s) => s && (s.match(/-/g) || []).length >= 3 && !s.includes(' ');
                                 const title = !isId(projectTitle) ? projectTitle : null;
 
                                 const activeRoom = rooms && rooms.length > 0 ? rooms[0] : null;
-                                const aptName = activeRoom?.apartment || '';
-                                const roomName = activeRoom?.name || 'Ohne Namen';
+                                const aptName = isNewRoom ? (globalSettings.apartment || '') : (activeRoom?.apartment || '');
+                                const roomName = isNewRoom ? (globalSettings.room || 'Neuer Raum') : (activeRoom?.name || 'Ohne Namen');
 
                                 return (
                                     <>
@@ -830,11 +853,7 @@ const MeasurementModal = ({ isOpen, onClose, onSave, onStartNew, onBackToDashboa
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
 
-                        {historyRows.length > 0 && (
-                            <button onClick={() => setShowHistoryOverlay(true)} style={{ padding: '0.55rem 0.8rem', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.15)', color: '#E2E8F0', fontWeight: 600, fontSize: '0.875rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem', minHeight: '42px' }}>
-                                <RotateCcw size={16} /> <span className="hide-mobile">Messverlauf</span>
-                            </button>
-                        )}
+
                         <button onClick={handleSave} disabled={isSaving} style={{ padding: '0.55rem 1.2rem', borderRadius: '8px', background: isSuccess ? '#10B981' : '#2563EB', border: 'none', color: 'white', fontWeight: 700, fontSize: '0.875rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem', minHeight: '42px', boxShadow: isSuccess ? '0 0 0 3px rgba(16,185,129,0.25)' : '0 0 0 3px rgba(37,99,235,0.25)' }}>
                             {isSaving ? <Loader size={16} className="animate-spin" /> : isSuccess ? <Check size={16} /> : <Save size={16} />}
                             {isSaving ? 'Speichert…' : isSuccess ? 'Gespeichert!' : (readOnly ? 'Schliessen' : 'Speichern')}
@@ -844,10 +863,10 @@ const MeasurementModal = ({ isOpen, onClose, onSave, onStartNew, onBackToDashboa
                                 await handleSave();
                             }
                             if (onBackToDashboard) onBackToDashboard();
-                        }} style={{ padding: '0.55rem 0.8rem', borderRadius: '8px', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', color: '#94A3B8', cursor: 'pointer', minHeight: '42px', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        }} style={{ padding: '0.55rem 0.8rem', borderRadius: '8px', background: 'rgba(255,255,255,0.07)', border: '1px solid #E2E8F0', boxShadow: '0 30px 80px rgba(0,0,0,0.1)', color: '#94A3B8', cursor: 'pointer', minHeight: '42px', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                             <LayoutGrid size={16} /> <span className="hide-mobile">Kacheln</span>
                         </button>
-                        <button onClick={handleClose} style={{ padding: '0.55rem', borderRadius: '8px', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', color: '#94A3B8', cursor: 'pointer', minHeight: '42px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="Schließen"><X size={18} /></button>
+                        <button onClick={handleClose} style={{ padding: '0.55rem', borderRadius: '8px', background: 'rgba(255,255,255,0.07)', border: '1px solid #E2E8F0', boxShadow: '0 30px 80px rgba(0,0,0,0.1)', color: '#94A3B8', cursor: 'pointer', minHeight: '42px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="Schließen"><X size={18} /></button>
                     </div>
                 </div>
 
@@ -872,7 +891,7 @@ const MeasurementModal = ({ isOpen, onClose, onSave, onStartNew, onBackToDashboa
 
                             {/* --- HISTORY OVERLAY --- */}
                             {showHistoryOverlay && (
-                                <div style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(15,23,42,0.95)', zIndex: 9999, display: 'flex', flexDirection: 'column', padding: '2rem', overflow: 'hidden', backdropFilter: 'blur(8px)' }}>
+                                <div style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(255,255,255,0.95)', zIndex: 9999, display: 'flex', flexDirection: 'column', padding: '2rem', overflow: 'hidden', backdropFilter: 'blur(8px)' }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexShrink: 0 }}>
                                         <h3 style={{ color: '#60A5FA', margin: 0, fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                             <RotateCcw size={20} /> Bisherige Messverläufe
@@ -881,7 +900,7 @@ const MeasurementModal = ({ isOpen, onClose, onSave, onStartNew, onBackToDashboa
                                             <X size={18} /> Schliessen
                                         </button>
                                     </div>
-                                    <div style={{ background: '#1E293B', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', overflow: 'auto', flex: 1 }}>
+                                    <div style={{ background: '#1E293B', borderRadius: '12px', border: '1px solid #E2E8F0', boxShadow: '0 30px 80px rgba(0,0,0,0.1)', overflow: 'auto', flex: 1 }}>
                                         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
                                             <thead style={{ position: 'sticky', top: 0, background: '#1E293B', zIndex: 10, boxShadow: '0 1px 0 rgba(255,255,255,0.08)' }}>
                                                 <tr>
@@ -896,7 +915,7 @@ const MeasurementModal = ({ isOpen, onClose, onSave, onStartNew, onBackToDashboa
                                             <tbody>
                                                 {historyColumns.map(mpName => (
                                                     <tr key={mpName} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', height: '40px' }}>
-                                                        <td style={{ padding: '0.4rem 0.5rem', color: '#F1F5F9', whiteSpace: 'nowrap', fontWeight: 700 }}>
+                                                        <td style={{ padding: '0.4rem 0.5rem', color: '#1E293B', whiteSpace: 'nowrap', fontWeight: 700 }}>
                                                             {mpName} <span style={{ fontSize: '0.8em', fontWeight: 'normal', color: '#94A3B8' }}>(W/B)</span>
                                                         </td>
                                                         {[...historyRows].reverse().map(row => {
@@ -926,7 +945,7 @@ const MeasurementModal = ({ isOpen, onClose, onSave, onStartNew, onBackToDashboa
 
                         {/* Bottom Bar: Zoom + Skizze bearbeiten */}
                         {!readOnly && (
-                            <div style={{ flexShrink: 0, padding: '0.55rem 1rem', backgroundColor: '#1E293B', borderTop: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                            <div style={{ flexShrink: 0, padding: '0.55rem 1rem', backgroundColor: '#FFFFFF', borderTop: '1px solid #E2E8F0', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                                     <button onClick={() => setZoomScale(z => Math.max(0.3, +(z - 0.1).toFixed(1)))} style={{ width: 32, height: 32, borderRadius: 6, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', color: '#CBD5E1', cursor: 'pointer', fontSize: '1.2rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
                                     <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748B', minWidth: 38, textAlign: 'center' }}>{Math.round(zoomScale * 100)}%</span>
@@ -940,7 +959,7 @@ const MeasurementModal = ({ isOpen, onClose, onSave, onStartNew, onBackToDashboa
                     </div>
 
                     {/* ─── RIGHT: SIDEBAR ─── */}
-                    <div style={{ width: 340, flexShrink: 0, display: 'flex', flexDirection: 'column', backgroundColor: '#111827', position: 'relative' }}>
+                    <div style={{ width: 340, flexShrink: 0, display: 'flex', flexDirection: 'column', backgroundColor: '#FFFFFF', position: 'relative' }}>
                         <div style={{ flex: 1, overflowY: 'auto', padding: '1rem', paddingBottom: '40vh', display: 'flex', flexDirection: 'column', gap: '0.85rem', WebkitOverflowScrolling: 'touch' }}>
                             {!readOnly && (<>
                                 {/* Messmittel */}
@@ -957,14 +976,37 @@ const MeasurementModal = ({ isOpen, onClose, onSave, onStartNew, onBackToDashboa
                                 {isNewRoom && (
                                     <div>
                                         <label style={S.label}>Wohnung / Bereich</label>
-                                        <div style={{ position: 'relative' }}>
-                                            <select value={globalSettings.apartment || ''} onChange={e => setGlobalSettings({ ...globalSettings, apartment: e.target.value })} style={{ ...S.input, paddingRight: '2rem', appearance: 'none', backgroundColor: 'transparent' }}>
-                                                <option value="">Bitte wählen...</option>
-                                                <option value="Allgemeiner Bereich">Allgemeiner Bereich</option>
-                                                {(apartments || []).map((a, i) => <option key={i} value={a}>{a}</option>)}
+                                        <div style={{ position: 'relative', marginBottom: isCustomApartment ? '0.5rem' : '0' }}>
+                                            <select 
+                                                value={isCustomApartment ? 'Sonstiges' : (globalSettings.apartment || '')} 
+                                                onChange={e => {
+                                                    const val = e.target.value;
+                                                    if (val === 'Sonstiges') {
+                                                        setIsCustomApartment(true);
+                                                        setGlobalSettings({ ...globalSettings, apartment: '' });
+                                                    } else {
+                                                        setIsCustomApartment(false);
+                                                        setGlobalSettings({ ...globalSettings, apartment: val });
+                                                    }
+                                                }} 
+                                                style={{ ...S.input, paddingRight: '2rem', appearance: 'none', backgroundColor: 'transparent' }}
+                                            >
+                                                <option value="" style={{ background: '#FFFFFF', color: '#1E293B' }}>Bitte wählen...</option>
+                                                <option value="Sonstiges" style={{ background: '#FFFFFF', color: '#1E293B' }}>Sonstiges / Eigene Eingabe</option>
+                                                <option value="Allgemeiner Bereich" style={{ background: '#FFFFFF', color: '#1E293B' }}>Allgemeiner Bereich</option>
+                                                {(apartments || []).map((a, i) => <option key={i} value={a} style={{ background: '#FFFFFF', color: '#1E293B' }}>{a}</option>)}
                                             </select>
                                             <ChevronDown size={14} style={{ position: 'absolute', right: '0.7rem', top: '50%', transform: 'translateY(-50%)', color: '#475569', pointerEvents: 'none' }} />
                                         </div>
+                                        {isCustomApartment && (
+                                            <input
+                                                type="text"
+                                                value={globalSettings.apartment || ''}
+                                                onChange={e => setGlobalSettings({ ...globalSettings, apartment: e.target.value })}
+                                                style={S.input}
+                                                placeholder="z.B. Treppenhaus EG"
+                                            />
+                                        )}
                                     </div>
                                 )}
 
@@ -987,10 +1029,10 @@ const MeasurementModal = ({ isOpen, onClose, onSave, onStartNew, onBackToDashboa
                                                 }}
                                                 style={{ ...S.input, appearance: 'none', paddingRight: '2rem', backgroundColor: 'transparent' }}
                                             >
-                                                <option value="">Raum wählen...</option>
-                                                <option value="Ganze Wohnung">Ganze Wohnung</option>
-                                                {dynamicRoomOptions.map((opt, i) => <option key={i} value={opt}>{opt}</option>)}
-                                                <option value="Sonstiges">Sonstiges / Eigener Name</option>
+                                                <option value="" style={{ background: '#FFFFFF', color: '#1E293B' }}>Raum wählen...</option>
+                                                <option value="Sonstiges" style={{ background: '#FFFFFF', color: '#1E293B' }}>Sonstiges / Eigener Name</option>
+                                                <option value="Ganze Wohnung" style={{ background: '#FFFFFF', color: '#1E293B' }}>Ganze Wohnung</option>
+                                                {dynamicRoomOptions.map((opt, i) => <option key={i} value={opt} style={{ background: '#FFFFFF', color: '#1E293B' }}>{opt}</option>)}
                                             </select>
                                             <ChevronDown size={14} style={{ position: 'absolute', right: '0.7rem', top: '50%', transform: 'translateY(-50%)', color: '#475569', pointerEvents: 'none' }} />
                                         </div>
@@ -1012,43 +1054,60 @@ const MeasurementModal = ({ isOpen, onClose, onSave, onStartNew, onBackToDashboa
                                 <div style={{ display: 'grid', gridTemplateColumns: '1.25fr 0.85fr 0.85fr', gap: '0.4rem' }}>
                                     {[
                                         { lbl: 'Datum', type: 'date', key: 'date', ph: '' },
-                                        { lbl: 'Temp °C', type: 'number', key: 'temp', ph: '20' },
-                                        { lbl: 'Feuchte %', type: 'number', key: 'humidity', ph: '55' },
+                                        { lbl: 'Temp °C', type: 'text', key: 'temp', ph: '20', isNumeric: true },
+                                        { lbl: 'Feuchte %', type: 'text', key: 'humidity', ph: '55', isNumeric: true },
                                     ].map(f => (
                                         <div key={f.key}>
                                             <label style={{ ...S.label, fontSize: '0.65rem', whiteSpace: 'nowrap' }}>{f.lbl}</label>
-                                            {f.type === 'number' ? (
+                                            {f.isNumeric ? (
                                                 <div 
                                                     onClick={() => setActiveNumpadField({ field: f.key, value: globalSettings[f.key] || '' })}
-                                                    style={{ ...S.input, padding: '0.4rem 0.2rem', fontSize: '0.75rem', minHeight: 40, textAlign: 'center', background: activeNumpadField?.field === f.key ? '#3B82F6' : 'transparent', color: '#FFFFFF', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}
+                                                    style={{ ...S.input, padding: '0.4rem 0.2rem', fontSize: '1rem', minHeight: 40, textAlign: 'center', background: activeNumpadField?.field === f.key ? '#3B82F6' : '#F8FAFC', color: activeNumpadField?.field === f.key ? '#FFFFFF' : '#1E293B', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}
                                                 >
-                                                    {globalSettings[f.key] || <span style={{color:'rgba(255,255,255,0.3)'}}>{f.ph}</span>}
+                                                    {globalSettings[f.key] || <span style={{color:'#94A3B8'}}>{f.ph}</span>}
                                                 </div>
                                             ) : (
-                                                <input type={f.type} step="any" inputMode={f.type === 'number' ? 'decimal' : undefined} value={globalSettings[f.key] || ''} onChange={e => setGlobalSettings({ ...globalSettings, [f.key]: e.target.value })} style={{ ...S.input, padding: '0.4rem 0.2rem', fontSize: '0.75rem', minHeight: 40, textAlign: 'center' }} placeholder={f.ph} autoComplete="off" className={f.type === 'number' ? 'no-spinner' : undefined} />
+                                                <input
+                                                    type={f.type}
+                                                    value={globalSettings[f.key] || ''}
+                                                    onChange={e => setGlobalSettings({ ...globalSettings, [f.key]: e.target.value })}
+                                                    style={{ ...S.input, padding: '0.4rem 0.2rem', fontSize: '1rem', minHeight: 40, textAlign: 'center' }}
+                                                    placeholder={f.ph}
+                                                    autoComplete="off"
+                                                />
                                             )}
                                         </div>
                                     ))}
                                 </div>
 
-                                <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }} />
+                                <div style={{ borderTop: '1px solid #E2E8F0' }} />
 
                                 {/* MP Header */}
-                                <div style={{ display: 'grid', gridTemplateColumns: '52px 1fr 1fr 28px', alignItems: 'center', gap: '0.4rem', padding: '0.4rem 0.5rem', borderBottom: '1px solid rgba(255,255,255,0.07)', marginBottom: '0.4rem', position: 'sticky', top: 0, backgroundColor: '#0F172A', zIndex: 1 }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: '52px 1fr 1fr 28px', alignItems: 'center', gap: '0.4rem', padding: '0.4rem 0.5rem', borderBottom: '1px solid #E2E8F0', marginBottom: '0.4rem', position: 'sticky', top: 0, backgroundColor: '#F8FAFC', zIndex: 1 }}>
                                     <span style={{ ...S.label, marginBottom: 0 }}>MP</span>
-                                    <span style={{ ...S.label, marginBottom: 0, textAlign: 'center', color: '#94A3B8' }}>W</span>
-                                    <span style={{ ...S.label, marginBottom: 0, textAlign: 'center', color: '#94A3B8' }}>B</span>
-                                    <span style={{ fontSize: '0.7rem', color: '#E2E8F0', fontWeight: 700, textAlign: 'center' }}>{measurements.length}/10</span>
+                                    <span style={{ ...S.label, marginBottom: 0, textAlign: 'center', color: '#64748B' }}>W</span>
+                                    <span style={{ ...S.label, marginBottom: 0, textAlign: 'center', color: '#64748B' }}>B</span>
+                                    <span style={{ fontSize: '0.7rem', color: '#64748B', fontWeight: 700, textAlign: 'center' }}>{measurements.length}/10</span>
                                 </div>
 
                                 {/* MP List */}
                                 <div style={{ display: 'flex', flexDirection: 'column' }}>
                                     {measurements.map((row, idx) => (
-                                        <div key={row.id} style={{ display: 'grid', gridTemplateColumns: '52px 1fr 1fr 28px', alignItems: 'center', gap: '0.4rem', padding: '0.3rem 0.5rem', borderRadius: 8, marginBottom: 3, background: '#1A2744', minHeight: 44 }}>
-                                            <span style={{ color: '#E2E8F0', fontSize: '0.82rem', fontWeight: 700, userSelect: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.pointName || `MP ${idx + 1}`}</span>
-                                            <div onClick={() => setActiveNumpadField({ idx, field: 'w_value', value: row.w_value })} style={{ width: '100%', padding: '0.4rem 0.5rem', background: activeNumpadField?.idx === idx && activeNumpadField?.field === 'w_value' ? '#3B82F6' : '#243554', border: '1px solid rgba(255,255,255,0.15)', color: '#FFFFFF', fontSize: '1rem', fontWeight: 700, display:'flex', alignItems:'center', justifyContent:'center', height: 36, boxSizing: 'border-box', touchAction: 'manipulation', borderRadius: 6, cursor:'pointer' }}>{row.w_value || <span style={{color:'rgba(255,255,255,0.3)'}}>—</span>}</div>
-                                            <div onClick={() => setActiveNumpadField({ idx, field: 'b_value', value: row.b_value })} style={{ width: '100%', padding: '0.4rem 0.5rem', background: activeNumpadField?.idx === idx && activeNumpadField?.field === 'b_value' ? '#3B82F6' : '#243554', border: '1px solid rgba(255,255,255,0.15)', color: '#FFFFFF', fontSize: '1rem', fontWeight: 700, display:'flex', alignItems:'center', justifyContent:'center', height: 36, boxSizing: 'border-box', touchAction: 'manipulation', borderRadius: 6, cursor:'pointer' }}>{row.b_value || <span style={{color:'rgba(255,255,255,0.3)'}}>—</span>}</div>
-                                            <button onClick={() => removeMeasurement(idx)} style={{ background: 'transparent', border: 'none', color: '#64748B', cursor: 'pointer', padding: '0.25rem', height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Trash2 size={13} /></button>
+                                        <div key={row.id} style={{ display: 'grid', gridTemplateColumns: '52px 1fr 1fr 28px', alignItems: 'center', gap: '0.4rem', padding: '0.3rem 0.5rem', borderRadius: 8, marginBottom: 3, background: '#FFFFFF', border: '1px solid #E2E8F0', minHeight: 44 }}>
+                                            <span style={{ color: '#1E293B', fontSize: '0.82rem', fontWeight: 800, userSelect: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.pointName || `MP ${idx + 1}`}</span>
+                                            <div 
+                                                onClick={() => setActiveNumpadField({ idx, field: 'w_value', value: row.w_value || '' })}
+                                                style={{ width: '100%', padding: '0.4rem 0.5rem', background: (activeNumpadField?.idx === idx && activeNumpadField?.field === 'w_value') ? '#3B82F6' : '#F8FAFC', border: '1px solid #CBD5E1', color: (activeNumpadField?.idx === idx && activeNumpadField?.field === 'w_value') ? '#FFFFFF' : '#1E293B', fontSize: '1rem', fontWeight: 700, textAlign: 'center', height: 40, boxSizing: 'border-box', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                                            >
+                                                {row.w_value || ''}
+                                            </div>
+                                            <div 
+                                                onClick={() => setActiveNumpadField({ idx, field: 'b_value', value: row.b_value || '' })}
+                                                style={{ width: '100%', padding: '0.4rem 0.5rem', background: (activeNumpadField?.idx === idx && activeNumpadField?.field === 'b_value') ? '#3B82F6' : '#F8FAFC', border: '1px solid #CBD5E1', color: (activeNumpadField?.idx === idx && activeNumpadField?.field === 'b_value') ? '#FFFFFF' : '#1E293B', fontSize: '1rem', fontWeight: 700, textAlign: 'center', height: 40, boxSizing: 'border-box', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                                            >
+                                                {row.b_value || ''}
+                                            </div>
+                                            <button onClick={() => removeMeasurement(idx)} style={{ background: 'transparent', border: 'none', color: '#94A3B8', cursor: 'pointer', padding: '0.25rem', height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Trash2 size={13} /></button>
                                         </div>
                                     ))}
                                 </div>
@@ -1062,51 +1121,36 @@ const MeasurementModal = ({ isOpen, onClose, onSave, onStartNew, onBackToDashboa
 
                         </div>
 
-                        {/* Custom Numpad UI */}
-                        {activeNumpadField && createPortal(
-                            <div style={{ position: 'fixed', left: numpadPos.x, top: numpadPos.y, width: 280, backgroundColor: '#1E293B', border: '1px solid rgba(255,255,255,0.15)', padding: '0.75rem', zIndex: 100000, boxShadow: '0 10px 40px rgba(0,0,0,0.6)', borderRadius: 12 }}>
-                                <div 
-                                    style={{ display:'flex', justifyContent:'space-between', marginBottom:'0.5rem', alignItems:'center', cursor: 'grab', touchAction: 'none', paddingBottom: '0.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)' }}
-                                    onPointerDown={e => {
-                                        numpadDragRef.current = true;
-                                        numpadStartRef.current = { x: e.clientX - numpadPos.x, y: e.clientY - numpadPos.y };
-                                        e.target.setPointerCapture(e.pointerId);
-                                    }}
-                                    onPointerMove={e => {
-                                        if (!numpadDragRef.current) return;
-                                        setNumpadPos({ x: e.clientX - numpadStartRef.current.x, y: e.clientY - numpadStartRef.current.y });
-                                    }}
-                                    onPointerUp={e => {
-                                        numpadDragRef.current = false;
-                                        e.target.releasePointerCapture(e.pointerId);
-                                    }}
-                                    onPointerCancel={e => {
-                                        numpadDragRef.current = false;
-                                        e.target.releasePointerCapture(e.pointerId);
-                                    }}
-                                >
-                                    <div style={{ display:'flex', alignItems:'center', gap: '0.4rem', color:'#94A3B8', pointerEvents: 'none' }}>
-                                        <Move size={14} />
-                                        <span style={{ fontSize:'0.8rem', fontWeight:700 }}>
-                                            {activeNumpadField.field === 'w_value' ? 'Wand-Messung' : activeNumpadField.field === 'b_value' ? 'Boden-Messung' : activeNumpadField.field === 'temp' ? 'Temperatur (°C)' : 'Feuchtigkeit (%)'}
-                                        </span>
-                                    </div>
-                                    <button onClick={() => setActiveNumpadField(null)} style={{ background:'transparent', border:'none', color:'#E2E8F0', cursor:'pointer' }}><X size={16}/></button>
+                        {activeNumpadField && (
+                            <div style={{ marginTop: '1rem', background: '#FFFFFF', borderRadius: 12, padding: '0.75rem', border: '1px solid #E2E8F0', boxShadow: '0 30px 80px rgba(0,0,0,0.1)' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', padding: '0 0.2rem' }}>
+                                    <span style={{ color: '#64748B', fontSize: '0.75rem', fontWeight: 600 }}>Tastatur ({activeNumpadField.field})</span>
+                                    <button onClick={() => setActiveNumpadField(null)} style={{ background: 'transparent', border: 'none', color: '#1E6DB7', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 700, padding: 0 }}>Fertig</button>
                                 </div>
-                                <div style={{ backgroundColor:'#0F172A', padding:'0.5rem', borderRadius:'6px', marginBottom:'0.5rem', fontSize:'1.4rem', fontWeight:700, textAlign:'right', color:'#fff', minHeight:'36px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-                                    {activeNumpadField.value || '0'}
-                                </div>
-                                <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:'0.4rem' }}>
-                                    {['1','2','3','4','5','6','7','8','9',',', '0', 'DEL'].map(k => (
-                                        <button key={k} onClick={() => handleNumpadPress(k)} style={{ padding:'0.6rem', fontSize:'1.2rem', fontWeight:700, borderRadius:'8px', backgroundColor:'rgba(255,255,255,0.1)', border:'none', color:'#F1F5F9', cursor:'pointer', touchAction: 'manipulation', display:'flex', alignItems:'center', justifyContent:'center' }}>
-                                            {k === 'DEL' ? <Delete size={18} style={{ pointerEvents: 'none' }}/> : k}
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.4rem' }}>
+                                    {['7', '8', '9', '4', '5', '6', '1', '2', '3', '.', '0', 'DEL'].map(k => (
+                                        <button
+                                            key={k}
+                                            onClick={() => handleNumpadPress(k === '.' ? ',' : k)}
+                                            style={{
+                                                background: k === 'DEL' ? 'rgba(239,68,68,0.15)' : '#F1F5F9',
+                                                color: k === 'DEL' ? '#EF4444' : '#1E293B',
+                                                border: '1px solid #E2E8F0',
+                                                borderRadius: 8,
+                                                height: 48,
+                                                fontSize: '1.25rem',
+                                                fontWeight: 600,
+                                                cursor: 'pointer',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center'
+                                            }}
+                                        >
+                                            {k === 'DEL' ? <Delete size={20} /> : k}
                                         </button>
                                     ))}
                                 </div>
-                                <button onClick={() => setActiveNumpadField(null)} style={{ width:'100%', marginTop:'0.5rem', padding:'0.6rem', backgroundColor:'#3B82F6', color:'white', border:'none', borderRadius:'8px', fontWeight:700, fontSize:'1rem', cursor:'pointer', touchAction: 'manipulation' }}>
-                                    OK
-                                </button>
-                            </div>, document.body
+                            </div>
                         )}
                     </div>
                 </div>
@@ -1114,8 +1158,8 @@ const MeasurementModal = ({ isOpen, onClose, onSave, onStartNew, onBackToDashboa
 
             {/* ── FULLSCREEN SKETCH OVERLAY (unverändert) ── */}
             {isSketchFullscreen && createPortal(
-                <div style={{ position: 'fixed', inset: 0, zIndex: 99999, backgroundColor: '#0F172A', display: 'flex', flexDirection: 'column', touchAction: 'none' }}>
-                    <div style={{ flexShrink: 0, padding: '0.75rem 1rem', backgroundColor: '#1E293B', borderBottom: '1px solid rgba(255,255,255,0.1)', display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap', position: 'relative', zIndex: 100 }}>
+                <div style={{ position: 'fixed', inset: 0, zIndex: 99999, backgroundColor: '#F8FAFC', display: 'flex', flexDirection: 'column', touchAction: 'none' }}>
+                    <div style={{ flexShrink: 0, padding: '0.75rem 1rem', backgroundColor: '#FFFFFF', borderBottom: '1px solid #E2E8F0', display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap', position: 'relative', zIndex: 100 }}>
                         <button onClick={() => { activateTool('pen'); setColor('#000000'); setLineWidth(2); }} style={{ padding: '0.5rem 0.75rem', borderRadius: '6px', background: (activeTool === 'pen' && color === '#000000') ? 'var(--primary)' : 'rgba(255,255,255,0.05)', border: (activeTool === 'pen' && color === '#000000') ? '1px solid var(--primary)' : '1px solid rgba(255,255,255,0.15)', color: (activeTool === 'pen' && color === '#000000') ? 'white' : '#CBD5E1', display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Pen size={16} /><span style={{ fontSize: '0.8rem', fontWeight: 600 }}>Stift</span></button>
                         <button onClick={() => { activateTool('pen'); setColor('#ef4444'); setLineWidth(3); }} style={{ padding: '0.5rem', borderRadius: '6px', background: (activeTool === 'pen' && color === '#ef4444') ? 'rgba(239,68,68,0.2)' : 'rgba(255,255,255,0.05)', border: (activeTool === 'pen' && color === '#ef4444') ? '1px solid #ef4444' : '1px solid rgba(255,255,255,0.15)', color: '#ef4444' }}><Pen size={16} /></button>
                         <button onClick={() => { activateTool('pen'); setColor('#3b82f6'); setLineWidth(3); }} style={{ padding: '0.5rem', borderRadius: '6px', background: (activeTool === 'pen' && color === '#3b82f6') ? 'rgba(59,130,246,0.2)' : 'rgba(255,255,255,0.05)', border: (activeTool === 'pen' && color === '#3b82f6') ? '1px solid #3b82f6' : '1px solid rgba(255,255,255,0.15)', color: '#3b82f6' }}><Pen size={16} /></button>
