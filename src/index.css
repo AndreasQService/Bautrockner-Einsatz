@@ -104,6 +104,16 @@
   --glass-border:   rgba(255, 255, 255, 0.08);
 }
 
+/* ── Global Mobile Fixes ─────────────────────────────────────────────────── */
+html, body {
+  margin: 0;
+  padding: 0;
+  background-color: #0F172A !important; /* Verhindert weisse Balken auf iPad/iPhone */
+  color-scheme: dark;
+  min-height: 100%;
+}
+
+
 /* ══════════════════════════════════════════════════════════════════════════
    LIGHT MODE – VERBINDLICHE DESKTOP-SPEZIFIKATION
    Werte aus Design-Guide (Screenshot 2026-04-22)
