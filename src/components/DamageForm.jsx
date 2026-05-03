@@ -6535,7 +6535,7 @@ END:VCARD`;
                 </>
                 )}
                 {/* 4. Drying Equipment - Visible in all relevant modes */}
-                {(mode === 'technician' ? techTab === 'trocknung' : true) && (
+                {(mode === 'technician' ? techTab === 'trocknung' : false) && (
                     <div style={{ marginBottom: '2rem', borderTop: '1px solid var(--border)', paddingTop: '1.5rem', ...(mode === 'desktop' ? { display: 'flex', flexDirection: 'column' } : {}) }}>
                         <h2 style={{ fontSize: '1.25rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', color: 'var(--primary)' }}>
                             <Settings size={24} />
