@@ -6426,7 +6426,7 @@ END:VCARD`;
                                                     <div style={{ fontWeight: 700, fontSize: '1rem', color: 'white' }}>{room.name}</div>
                                                     <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 500 }}>{hasMeasurement ? `Letzte Messung: ${date}` : 'Keine Messdaten'}</div>
                                                 </div>
-                                                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                                {mode !== 'desktop' && <div style={{ display: 'flex', gap: '0.5rem' }}>
                                                     {room.measurementData ? (
                                                         <>
                                                             <button type="button" className="btn-glass" style={{ padding: '0.4rem 0.8rem', minHeight: '44px', fontSize: '0.75rem', borderRadius: '8px' }} onClick={() => { setActiveRoomForMeasurement(room); setIsNewMeasurement(true); setShowMeasurementModal(true); }}>Neue Messung</button>
@@ -6435,7 +6435,7 @@ END:VCARD`;
                                                     ) : (
                                                         <button type="button" className="btn-glass" style={{ padding: '0.4rem 0.8rem', minHeight: '44px', fontSize: '0.75rem', borderRadius: '8px', color: 'var(--success)' }} onClick={() => { setActiveRoomForMeasurement(room); setIsNewMeasurement(false); setShowMeasurementModal(true); }}>Messung starten</button>
                                                     )}
-                                                </div>
+                                                </div>}
                                             </div>
                                             {/* Skizzen 2-Spalten Grid (responsive) */}
                                             {mode !== 'desktop' && allImages.length > 0 && (
