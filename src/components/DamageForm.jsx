@@ -574,27 +574,6 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
     };
 
 
-        recognition.onresult = (event) => {
-            const transcript = event.results[0][0].transcript;
-            if (transcript) {
-                setFormData(prev => {
-                    if (fieldId === 'measures') {
-                        const current = prev.measures ? prev.measures + ' ' : '';
-                        return { ...prev, measures: current + transcript };
-                    } else if (fieldId.startsWith('note_') && contextItem) {
-                        const currentNotes = prev.measureNotes || {};
-                        const current = currentNotes[contextItem] ? currentNotes[contextItem] + ' ' : '';
-                        return { ...prev, measureNotes: { ...currentNotes, [contextItem]: current + transcript } };
-                    }
-                    return prev;
-                });
-            }
-        };
-
-        recognitionRef.current = recognition;
-        recognition.start();
-    };
-
     // Feststellungen Diktat
     const [isListeningFindings, setIsListeningFindings] = useState(false);
     const recognitionRefFindings = useRef(null);
