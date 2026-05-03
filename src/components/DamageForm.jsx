@@ -6035,7 +6035,7 @@ END:VCARD`;
                                             border: isChecked ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid rgba(226,232,240,0.8)',
                                             borderRadius: isChecked ? '16px 16px 0 0' : '16px',
                                             cursor: 'pointer',
-                                            backgroundColor: isChecked ? '#ECFDF5' : 'var(--surface)',
+                                            backgroundColor: isChecked ? 'rgba(16, 185, 129, 0.08)' : 'var(--surface)',
                                             boxShadow: isChecked ? '0 4px 12px rgba(16, 185, 129, 0.1)' : '0 2px 4px rgba(0,0,0,0.02)',
                                             transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
                                         }}>
@@ -6054,7 +6054,7 @@ END:VCARD`;
                                                 }}
                                                 style={{ width: '22px', height: '22px', accentColor: '#10B981', cursor: 'pointer' }}
                                             />
-                                            <span style={{ fontSize: '1.05rem', fontWeight: 700, color: isChecked ? '#047857' : '#475569' }}>{item}</span>
+                                            <span style={{ fontSize: '1.05rem', fontWeight: 700, color: isChecked ? '#10B981' : 'var(--text-main)' }}>{item}</span>
                                         </label>
                                         {/* Titel + Textarea — erscheint wenn angehakt */}
                                         {isChecked && (
@@ -6063,14 +6063,14 @@ END:VCARD`;
                                                 borderTop: 'none',
                                                 borderRadius: '0 0 16px 16px',
                                                 padding: '1.25rem',
-                                                backgroundColor: '#ECFDF5',
+                                                backgroundColor: 'rgba(16, 185, 129, 0.04)',
                                                 boxShadow: '0 8px 16px -4px rgba(16, 185, 129, 0.05)'
                                             }}>
                                                 {/* Titel — entspricht sectionTitle im PDF: 16pt, blau, bold */}
                                                 <div style={{
                                                     fontSize: '0.85rem',
                                                     fontWeight: 800,
-                                                    color: '#059669',
+                                                    color: '#10B981',
                                                     marginBottom: '0.75rem',
                                                     letterSpacing: '0.05em',
                                                     textTransform: 'uppercase',
@@ -6109,7 +6109,7 @@ END:VCARD`;
                                                         backgroundColor: 'var(--surface)',
                                                         border: '2px solid #1E6DB7',
                                                         borderRadius: '12px',
-                                                        color: '#0F172A',
+                                                        color: 'var(--text-main)',
                                                         fontSize: '0.95rem',
                                                         padding: '0.8rem 1rem',
                                                         resize: 'vertical',
@@ -6163,7 +6163,7 @@ END:VCARD`;
                                     border: '1px solid var(--border)',
                                     borderRadius: '16px',
                                     padding: '1rem',
-                                    color: '#0F172A',
+                                    color: 'var(--text-main)',
                                     boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)'
                                 }}
                             />
@@ -7584,11 +7584,11 @@ END:VCARD`;
                         }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', borderBottom: '4px solid #0F6EA3', paddingBottom: '1.5rem' }}>
                                 <div>
-                                    <h1 style={{ fontSize: '28pt', fontWeight: '800', margin: 0, color: '#0F172A' }}>Schadensbericht</h1>
+                                    <h1 style={{ fontSize: '28pt', fontWeight: '800', margin: 0, color: 'var(--text-main)' }}>Schadensbericht</h1>
                                     <div style={{ fontSize: '11pt', marginTop: '0.5rem', color: 'var(--text-muted)' }}>Erstellt am: {new Date().toLocaleDateString('de-CH')}</div>
                                 </div>
                                 <div style={{ textAlign: 'right' }}>
-                                    <div style={{ fontWeight: 'bold', fontSize: '16pt', color: '#0F172A' }}>Q-Service AG</div>
+                                    <div style={{ fontWeight: 'bold', fontSize: '16pt', color: 'var(--text-main)' }}>Q-Service AG</div>
                                     <div style={{ fontSize: '9pt', color: '#475569' }}>Kriesbachstrasse 30, 8600 Dübendorf</div>
                                 </div>
                             </div>
