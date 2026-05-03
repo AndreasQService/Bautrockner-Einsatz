@@ -1281,17 +1281,23 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
     }, [formData, onSave]);
 
 
-    // Auto-populate clientCity from clientZip
+    
+    // Aggressive Auto-populate clientCity from clientZip
     useEffect(() => {
-        if (!formData.clientZip) return;
-        const zipStr = String(formData.clientZip).trim();
-        if (zipStr.length >= 4) {
-            const match = swissPLZ.find(entry => String(entry.plz).trim() === zipStr);
-            if (match && match.city !== formData.clientCity) {
+        const zip = formData.clientZip;
+        if (!zip || String(zip).length < 4) return;
+        
+        const zipStr = String(zip).trim();
+        const match = (swissPLZ || []).find(entry => String(entry.plz).trim() === zipStr);
+        
+        if (match) {
+            console.log('PLZ Match found:', zipStr, '->', match.city);
+            if (match.city !== formData.clientCity) {
                 setFormData(prev => ({ ...prev, clientCity: match.city }));
             }
         }
-    }, [formData.clientZip, swissPLZ]);
+    }, [formData.clientZip]);
+
 
     // Save on Unmount
     useEffect(() => {
