@@ -664,6 +664,12 @@ select {
   padding: 6px 10px;
   font-size: var(--text-body);
   transition: border-color 0.10s ease;
+  color-scheme: dark !important;
+}
+
+select option {
+  background-color: #1e293b;
+  color: #e2e8f0;
 }
 .form-input:focus,
 input[type="text"]:focus,
