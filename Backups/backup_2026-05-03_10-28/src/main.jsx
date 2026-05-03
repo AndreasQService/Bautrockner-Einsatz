@@ -1,0 +1,26 @@
+import { StrictMode } from 'react'
+import { createRoot } from 'react-dom/client'
+import './tw.css'
+import './index.css'
+import ErrorBoundary from './ErrorBoundary.jsx'
+
+// ─── Variante C: Offline-Blobs → Supabase Storage synchen (kein MSAL) ───────
+// Startet beim App-Boot im Hintergrund, blockiert Render nicht.
+import('./lib/sync/supabaseSyncWorker.js')
+  .then(({ syncPendingToSupabase }) => syncPendingToSupabase())
+  .then(({ synced }) => { if (synced > 0) console.info(`[Boot] ☁️ ${synced} Fotos zu Supabase synchronisiert`); })
+  .catch((e) => console.warn('[Boot] Sync fehlgeschlagen:', e.message));
+
+// ─── App rendern (kein MSAL-Provider nötig) ──────────────────────────────────
+import('./App.jsx').then(({ default: App }) => {
+  const root = createRoot(document.getElementById('root'));
+  root.render(
+    <StrictMode>
+      <ErrorBoundary>
+        <App />
+      </ErrorBoundary>
+    </StrictMode>
+  );
+}).catch(err => {
+  console.error('[QTool] Ladefehler:', err);
+});

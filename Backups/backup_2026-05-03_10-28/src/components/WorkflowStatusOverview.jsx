@@ -401,19 +401,19 @@ export default function WorkflowStatusOverview({reports,onSelectReport,currentUs
             <thead>
               {/* Row 1: Column labels */}
               <tr style={{position:"sticky",top:0,zIndex:21,background:"var(--color-surface, #0F172A)",borderBottom:"1px solid var(--color-border, rgba(255,255,255,0.08))",boxShadow:"0 1px 3px rgba(0,0,0,0.2)"}}>
-                <th style={{padding:"0.6rem 8px",fontSize:"0.68rem",fontWeight:800,color:"var(--color-text-secondary, #94A3B8)",textTransform:"uppercase",letterSpacing:"0.05em",width:46,background:"var(--color-surface, #0F172A)"}}>Status</th>
-                <th style={{padding:"0.6rem 10px",textAlign:"left",fontSize:"0.68rem",fontWeight:800,color:"var(--color-text-secondary, #94A3B8)",textTransform:"uppercase",letterSpacing:"0.05em",width:170,background:"var(--color-surface, #0F172A)"}}>Objekt / Projekt</th>
-                <th style={{padding:"0.6rem 6px",textAlign:"center",fontSize:"0.68rem",fontWeight:800,color:"var(--color-text-secondary, #94A3B8)",textTransform:"uppercase",letterSpacing:"0.05em",width:56,background:"var(--color-surface, #0F172A)"}}>Start</th>
-                <th style={{padding:"0.6rem 8px",textAlign:"left",fontSize:"0.68rem",fontWeight:800,color:"var(--color-text-secondary, #94A3B8)",textTransform:"uppercase",letterSpacing:"0.05em",background:"var(--color-surface, #0F172A)"}}>
+                <th style={{padding:"0.6rem 8px",fontSize:"0.68rem",fontWeight:800,color:"#64748B",textTransform:"uppercase",letterSpacing:"0.05em",width:46}}>Status</th>
+                <th style={{padding:"0.6rem 10px",textAlign:"left",fontSize:"0.68rem",fontWeight:800,color:"#64748B",textTransform:"uppercase",letterSpacing:"0.05em",width:170}}>Objekt / Projekt</th>
+                <th style={{padding:"0.6rem 6px",textAlign:"center",fontSize:"0.68rem",fontWeight:800,color:"#64748B",textTransform:"uppercase",letterSpacing:"0.05em",width:56}}>Start</th>
+                <th style={{padding:"0.6rem 8px",textAlign:"left",fontSize:"0.68rem",fontWeight:800,color:"#64748B",textTransform:"uppercase",letterSpacing:"0.05em"}}>
                   Workflow <span style={{fontWeight:500,color:"#94A3B8",fontSize:"0.58rem",textTransform:"none"}}>— klicken zum setzen</span>
                 </th>
-                <th style={{padding:"0.6rem 10px",textAlign:"left",fontSize:"0.68rem",fontWeight:800,color:"var(--color-text-secondary, #94A3B8)",textTransform:"uppercase",letterSpacing:"0.05em",width:160,background:"var(--color-surface, #0F172A)"}}>Nächste Aktion</th>
-                <th style={{padding:"0.6rem 6px",textAlign:"center",fontSize:"0.68rem",fontWeight:800,color:"var(--color-text-secondary, #94A3B8)",textTransform:"uppercase",letterSpacing:"0.05em",width:56,background:"var(--color-surface, #0F172A)"}}>Tage</th>
+                <th style={{padding:"0.6rem 10px",textAlign:"left",fontSize:"0.68rem",fontWeight:800,color:"#64748B",textTransform:"uppercase",letterSpacing:"0.05em",width:160}}>Nächste Aktion</th>
+                <th style={{padding:"0.6rem 6px",textAlign:"center",fontSize:"0.68rem",fontWeight:800,color:"#64748B",textTransform:"uppercase",letterSpacing:"0.05em",width:56}}>Tage</th>
               </tr>
               {/* Row 2: Workflow step names aligned under timeline */}
               <tr style={{position:"sticky",top:31,zIndex:20,background:"var(--color-surface-alt, #1E293B)",borderBottom:"1px solid var(--color-border, rgba(255,255,255,0.08))"}}>
-                <td colSpan={3} style={{padding:"0.4rem 0 0.5rem 0",background:"var(--color-surface-alt, #1E293B)"}}/>
-                <td style={{padding:"0.4rem 8px 0.5rem",background:"var(--color-surface-alt, #1E293B)"}}>
+                <td colSpan={3} style={{padding:"0.4rem 0 0.5rem 0"}}/>
+                <td style={{padding:"0.4rem 8px 0.5rem"}}>
                   <div style={{display:"flex",alignItems:"center",width:"100%"}}>
                     {STEPS.map((step,i)=>(
                       <div key={step.id} style={{display:"flex",alignItems:"center",flex:i<STEPS.length-1?1:"0 0 auto"}}>
@@ -425,7 +425,7 @@ export default function WorkflowStatusOverview({reports,onSelectReport,currentUs
                     ))}
                   </div>
                 </td>
-                <td colSpan={2} style={{padding:"0.4rem 0 0.5rem 0",background:"var(--color-surface-alt, #1E293B)"}}/>
+                <td colSpan={2} style={{padding:"0.4rem 0 0.5rem 0"}}/>
               </tr>
             </thead>
             <tbody>

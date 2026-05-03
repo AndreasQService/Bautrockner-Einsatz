@@ -652,7 +652,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         try {
             const dataUrl = await QRCode.toDataURL(lines.join('\n'), {
                 width: 280, margin: 2,
-                color: { dark: '#0F172A', light: 'var(--surface)' }
+                color: { dark: '#0F172A', light: '#FFFFFF' }
             });
             setQrModal({ dataUrl });
         } catch (err) { console.error('QR-Fehler:', err); }
@@ -2658,7 +2658,7 @@ END:VCARD`;
             style={{
                 position: 'relative', width: '140px', height: '90px', borderRadius: '8px', overflow: 'hidden',
                 border: '1px solid var(--border)', cursor: 'pointer',
-                backgroundColor: 'var(--background)',
+                backgroundColor: 'rgba(255,255,255,0.03)',
                 display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                 padding: '0.5rem', transition: 'all 0.2s'
             }}
@@ -2671,7 +2671,7 @@ END:VCARD`;
                 <PdfIcon size={28} /> :
                 (img.name?.toLowerCase().endsWith('.msg') ? <Mail size={28} color="var(--primary)" /> : <FileText size={28} color="var(--primary)" />)
             }
-            <div style={{ fontSize: '0.7rem', marginTop: 6, width: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'center', color: 'white', fontWeight: 500 }}>
+            <div style={{ fontSize: '0.7rem', marginTop: 6, width: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'center', color: 'var(--text-main)', fontWeight: 500 }}>
                 {img.name}
             </div>
 
@@ -2711,10 +2711,10 @@ END:VCARD`;
         const adresse = [formData.street, [formData.zip, formData.city].filter(Boolean).join(' ')].filter(Boolean).join(', ');
         const sub = [formData.projectNumber, formData.damageCategory].filter(Boolean).join(' · ');
         return (
-            <div className="force-dark-mode" style={{ minHeight: '100vh', backgroundColor: 'var(--color-app-bg, #0F172A)', padding: '2rem 1.25rem 3rem', fontFamily: 'Inter,system-ui,sans-serif', color: 'var(--text-main, #E2E8F0)' }}>
+            <div style={{ minHeight: '100vh', backgroundColor: '#0F172A', padding: '2rem 1.25rem 3rem', fontFamily: 'Inter,system-ui,sans-serif', color: '#F1F5F9' }}>
                 <div style={{ marginBottom: '2.5rem' }}>
                     <div style={{ fontSize: '1.5rem', fontWeight: 800, lineHeight: 1.2 }}>{adresse || 'Schadenort'}</div>
-                    {sub && <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.4rem', fontWeight: 500 }}>{sub}</div>}
+                    {sub && <div style={{ fontSize: '0.85rem', color: '#64748B', marginTop: '0.4rem', fontWeight: 500 }}>{sub}</div>}
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                     {TECH_TILES.slice(0, 4).map(tile => (
@@ -2728,12 +2728,13 @@ END:VCARD`;
                                 setTechTab(tile.id); 
                             }
                         }} style={{
-                            background: 'var(--surface)', border: `2px solid ${tile.color}`,
+                            background: '#1E293B', border: `2px solid ${tile.color}`,
                             borderRadius: '16px', padding: '2.5rem 1rem', cursor: 'pointer',
                             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                            gap: '0.75rem', boxShadow: `0 4px 20px ${tile.color}33`, minHeight: '130px', transition: 'transform 0.15s'
+                            gap: '0.75rem', boxShadow: `0 4px 20px ${tile.glow}`, minHeight: '130px', transition: 'transform 0.15s'
                         }}>
-                            <span style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-main)' }}>{tile.label === 'Trocknung' ? 'Geräte' : tile.label}</span>
+
+                            <span style={{ fontSize: '1rem', fontWeight: 700, color: '#F1F5F9' }}>{tile.label === 'Trocknung' ? 'Geräte' : tile.label}</span>
                         </button>
                     ))}
                 </div>
@@ -2743,13 +2744,14 @@ END:VCARD`;
                         setTechRoomSelectorMode('messung');
                         setShowTechRoomSelector(true);
                     }} style={{
-                        background: 'var(--surface)', border: `2px solid ${TECH_TILES[4].color}`,
+                        background: '#1E293B', border: `2px solid ${TECH_TILES[4].color}`,
                         borderRadius: '16px', padding: '2.5rem 1rem', cursor: 'pointer',
                         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                        gap: '0.75rem', boxShadow: `0 4px 20px ${TECH_TILES[4].color}33`,
+                        gap: '0.75rem', boxShadow: `0 4px 20px ${TECH_TILES[4].glow}`,
                         width: 'calc(50% - 0.5rem)', minHeight: '130px'
                     }}>
-                        <span style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-main)' }}>{TECH_TILES[4].label}</span>
+
+                        <span style={{ fontSize: '1rem', fontWeight: 700, color: '#F1F5F9' }}>{TECH_TILES[4].label}</span>
                     </button>
                 </div>
 
@@ -2860,7 +2862,6 @@ END:VCARD`;
                 })()}
 
                 <MeasurementModal
-                    isTechnicianMode={mode === 'technician'}
                     key={activeRoomForMeasurement?.id || 'none'}
                     isOpen={showMeasurementModal}
                     onClose={() => {
@@ -3008,7 +3009,7 @@ END:VCARD`;
                                     <input
                                         type="text"
                                         className="form-input"
-                                        style={{ padding: '0.4rem 0.6rem', fontSize: '0.85rem', backgroundColor: 'var(--surface)', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)', fontWeight: 700, width: '100%', minWidth: 0 }}
+                                        style={{ padding: '0.4rem 0.6rem', fontSize: '0.85rem', backgroundColor: 'rgba(255,255,255,0.02)', fontWeight: 700, width: '100%', minWidth: 0 }}
                                         value={formData.projectNumber || ''}
                                         onChange={(e) => {
                                             const val = e.target.value;
@@ -3031,7 +3032,7 @@ END:VCARD`;
                                     <input
                                         type="text"
                                         className="form-input"
-                                        style={{ padding: '0.4rem 0.6rem', fontSize: '0.85rem', backgroundColor: 'var(--surface)', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)', width: '100%', minWidth: 0 }}
+                                        style={{ padding: '0.4rem 0.6rem', fontSize: '0.85rem', backgroundColor: 'rgba(255,255,255,0.02)', width: '100%', minWidth: 0 }}
                                         value={formData.orderNumber || ''}
                                         onChange={(e) => setFormData(prev => ({ ...prev, orderNumber: e.target.value }))}
                                         placeholder="Nr."
@@ -3045,7 +3046,7 @@ END:VCARD`;
                                     <input
                                         type="text"
                                         className="form-input"
-                                        style={{ padding: '0.4rem 0.6rem', fontSize: '0.85rem', backgroundColor: 'var(--surface)', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)', width: '100%', minWidth: 0 }}
+                                        style={{ padding: '0.4rem 0.6rem', fontSize: '0.85rem', backgroundColor: 'rgba(255,255,255,0.02)', width: '100%', minWidth: 0 }}
                                         value={formData.damageNumber || ''}
                                         onChange={(e) => setFormData(prev => ({ ...prev, damageNumber: e.target.value }))}
                                         placeholder="Versicherung Nr."
@@ -3058,7 +3059,7 @@ END:VCARD`;
                                 <input
                                     type="text"
                                     className="form-input"
-                                    style={{ padding: '0.4rem 0.6rem', fontSize: '0.85rem', backgroundColor: 'var(--surface)', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)', width: '100%', minWidth: 0 }}
+                                    style={{ padding: '0.4rem 0.6rem', fontSize: '0.85rem', backgroundColor: 'rgba(255,255,255,0.02)', width: '100%', minWidth: 0 }}
                                     value={formData.insurance || ''}
                                     onChange={(e) => setFormData(prev => ({ ...prev, insurance: e.target.value }))}
                                     placeholder="Gesellschaft"
@@ -3069,7 +3070,7 @@ END:VCARD`;
                                 <input
                                     type="date"
                                     className="form-input"
-                                    style={{ padding: '0.4rem 0.6rem', fontSize: '0.85rem', backgroundColor: 'var(--surface)', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)', width: '100%', minWidth: 0 }}
+                                    style={{ padding: '0.4rem 0.6rem', fontSize: '0.85rem', backgroundColor: 'rgba(255,255,255,0.02)', width: '100%', minWidth: 0 }}
                                     value={formData.damageReportDate || ''}
                                     onChange={(e) => setFormData(prev => ({ ...prev, damageReportDate: e.target.value }))}
                                 />
@@ -3088,7 +3089,7 @@ END:VCARD`;
                                 padding: mode === 'technician' ? '0 1rem' : '0',
                                 width: mode === 'technician' ? 'auto' : '42px',
                                 borderRadius: '12px',
-                                color: mode === 'technician' ? '#1E6DB7' : 'var(--text-main)',
+                                color: 'var(--text-main)',
                                 cursor: 'pointer',
                                 display: 'flex',
                                 alignItems: 'center',
@@ -3096,8 +3097,8 @@ END:VCARD`;
                                 gap: '0.4rem',
                                 fontWeight: 700,
                                 fontSize: '0.9rem',
-                                background: mode === 'technician' ? 'var(--surface)' : undefined,
-                                border: mode === 'technician' ? '2px solid #1E6DB7' : undefined,
+                                background: mode === 'technician' ? 'rgba(59,130,246,0.12)' : undefined,
+                                border: mode === 'technician' ? '1.5px solid rgba(59,130,246,0.3)' : undefined,
                             }}
                         >
                             <ArrowLeft size={22} />
@@ -3114,7 +3115,7 @@ END:VCARD`;
                                 fontWeight: 800,
                                 background: 'transparent',
                                 border: 'none',
-                                color: 'white',
+                                color: 'var(--text-main)',
                                 width: '100%',
                                 padding: '0.25rem 0',
                                 outline: 'none'
@@ -3213,7 +3214,7 @@ END:VCARD`;
                                         fontWeight: 700,
                                         border: `1.5px solid ${statusColors[formData.status || 'Pendent'] || '#94A3B8'}`,
                                         color: statusColors[formData.status || 'Pendent'] || '#94A3B8',
-                                        backgroundColor: 'var(--surface)', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)'
+                                        backgroundColor: 'rgba(255,255,255,0.02)'
                                     }}
                                     value={formData.status}
                                     onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value }))}
@@ -3298,7 +3299,7 @@ END:VCARD`;
                             <h3 className="section-header" style={{ marginBottom: 0, paddingBottom: 0, borderBottom: 'none' }}>
                                 <Briefcase size={18} /> Auftrag & Verwaltung
                             </h3>
-                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.75rem', color: 'white', cursor: 'pointer', backgroundColor: 'rgba(255,255,255,0.05)', padding: '0.3rem 0.6rem', borderRadius: '4px', minWidth: '400px' }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.75rem', color: 'var(--text-main)', cursor: 'pointer', backgroundColor: 'rgba(255,255,255,0.05)', padding: '0.3rem 0.6rem', borderRadius: '4px', minWidth: '400px' }}>
                                 <input 
                                     type="checkbox" 
                                     checked={formData.clientIsResident || false}
@@ -3448,7 +3449,7 @@ END:VCARD`;
                                 <label style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--primary)', display: 'block' }}>
                                     Eigentümer / Rechnungsdetails
                                 </label>
-                                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.75rem', color: 'white', cursor: 'pointer', backgroundColor: 'rgba(255,255,255,0.05)', padding: '0.3rem 0.6rem', borderRadius: '4px', minWidth: '400px' }}>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.75rem', color: 'var(--text-main)', cursor: 'pointer', backgroundColor: 'rgba(255,255,255,0.05)', padding: '0.3rem 0.6rem', borderRadius: '4px', minWidth: '400px' }}>
                                     <input 
                                         type="checkbox" 
                                         checked={formData.ownerIsResident || false}
@@ -3674,7 +3675,7 @@ END:VCARD`;
                         <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                             <FileText size={18} /> Schadenbeschreibung (KI / Meldung)
                         </h3>
-                        <div style={{ backgroundColor: 'var(--color-panel-bg)', padding: '1rem', borderRadius: '12px', border: '1px solid var(--border)', marginBottom: '1.5rem', position: 'relative' }}>
+                        <div style={{ backgroundColor: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: '12px', border: '1px solid var(--border)', marginBottom: '1.5rem', position: 'relative' }}>
                             <div style={{ position: 'absolute', top: '0.5rem', right: '0.5rem', zIndex: 10 }}>
                                 <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem', color: 'var(--text-muted)', cursor: 'pointer' }}>
                                     <input
@@ -3695,7 +3696,7 @@ END:VCARD`;
                                     width: '100%', minHeight: '120px',
                                     backgroundColor: 'transparent', border: 'none',
                                     resize: 'none',
-                                    fontFamily: 'inherit', color: 'white',
+                                    fontFamily: 'inherit', color: 'var(--text-main)',
                                     cursor: 'default',
                                     fontSize: '1rem',
                                     lineHeight: '1.5',
@@ -3903,9 +3904,8 @@ END:VCARD`;
                                 minHeight: '150px',
                                 padding: '1rem',
                                 borderRadius: '12px',
-                                border: '1px solid rgba(255,255,255,0.1)',
-                                backgroundColor: 'rgba(255,255,255,0.05)', 
-                                boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.2)',
+                                border: '1px solid var(--border)',
+                                backgroundColor: 'rgba(255,255,255,0.02)',
                                 color: 'var(--text-main)',
                                 resize: 'vertical',
                                 fontFamily: 'inherit',
@@ -3960,7 +3960,8 @@ END:VCARD`;
                                                 }}
                                                 style={{
                                                     position: 'absolute', top: 6, right: 6,
-                                                    background: 'rgba(239, 68, 68, 0.9)', color: 'white', border: 'none', borderRadius: '50%',
+                                                    background: 'rgba(239, 68, 68, 0.9)', color: 'white',
+                                                    border: 'none', borderRadius: '50%',
                                                     width: 24, height: 24,
                                                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                                                     cursor: 'pointer', padding: 0,
@@ -3987,7 +3988,7 @@ END:VCARD`;
 
                                         {/* Action Bar Below Image */}
                                         <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', padding: '0 2px', alignItems: 'center' }}>
-                                            <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', fontSize: '0.75rem', cursor: 'pointer', color: 'white' }}>
+                                            <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', fontSize: '0.75rem', cursor: 'pointer', color: 'var(--text-main)' }}>
                                                 <input
                                                     type="checkbox"
                                                     style={{ width: '20px', height: '20px', accentColor: 'var(--primary)' }}
@@ -4007,7 +4008,7 @@ END:VCARD`;
                                                 title="Bearbeiten"
                                                 style={{
                                                     border: '1px solid var(--border)',
-                                                    backgroundColor: 'var(--surface)',
+                                                    backgroundColor: '#1E293B',
                                                     color: 'white',
                                                     cursor: 'pointer',
                                                     padding: '8px',
@@ -4268,7 +4269,9 @@ END:VCARD`;
                                         top: '15px',
                                         right: '15px',
                                         backgroundColor: 'rgba(239, 68, 68, 0.9)',
-                                        color: 'white', border: 'none', borderRadius: '50%',
+                                        color: 'white',
+                                        border: 'none',
+                                        borderRadius: '50%',
                                         width: '36px',
                                         height: '36px',
                                         display: 'flex',
@@ -4291,7 +4294,9 @@ END:VCARD`;
                                         top: '15px',
                                         left: '15px',
                                         backgroundColor: 'rgba(15, 110, 163, 0.9)',
-                                        color: 'white', border: 'none', borderRadius: '50%',
+                                        color: 'white',
+                                        border: 'none',
+                                        borderRadius: '50%',
                                         width: '36px',
                                         height: '36px',
                                         display: 'flex',
@@ -4352,8 +4357,8 @@ END:VCARD`;
                                     if (contact.role === 'Auftraggeber' && !formData.clientIsResident) return null;
                                     if (contact.role === 'Eigentümer' && !formData.ownerIsResident) return null;
                                     
-                                    const roleColorMap = { 'Auftraggeber': '#3b82f6', 'Verwaltung': '#f59e0b', 'Eigentümer': '#8b5cf6', 'Handwerker': '#ef4444', 'Hauswart': '#94a3b8', 'Mieter': '#10b981', 'Sonstiges': 'var(--text-muted)' };
-                                    const rc = roleColorMap[contact.role] || 'var(--text-muted)';
+                                    const roleColorMap = { 'Auftraggeber': '#3b82f6', 'Verwaltung': '#f59e0b', 'Eigentümer': '#8b5cf6', 'Handwerker': '#ef4444', 'Hauswart': '#94a3b8', 'Mieter': '#10b981', 'Sonstiges': '#64748b' };
+                                    const rc = roleColorMap[contact.role] || '#64748b';
                                     return (
                                         <div key={idx} className="glass-card" style={{
                                             display: 'flex', flexDirection: 'column', gap: '0',
@@ -4812,7 +4817,7 @@ END:VCARD`;
                                 </button>
 
                                 {showAddRoomForm && (
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '0.5rem', backgroundColor: 'var(--background)', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '0.5rem', backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid var(--border)' }}>
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                                             <select
                                                 className="form-input"
@@ -4928,20 +4933,20 @@ END:VCARD`;
                     {formData.rooms.map(room => (
                         <div key={room.id} className="card" style={{ padding: 0, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)' }}>
                             <div style={{
-                                background: mode === 'technician' ? 'var(--background)' : 'rgba(255,255,255,0.05)',
+                                background: 'rgba(255,255,255,0.03)',
                                 padding: '1rem 1.25rem',
-                                borderBottom: mode === 'technician' ? '1px solid var(--border)' : '1px solid rgba(255,255,255,0.08)',
+                                borderBottom: '1px solid var(--border)',
                                 display: 'flex',
                                 justifyContent: 'space-between',
                                 alignItems: 'center'
                             }}>
                                 <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem', flex: 1, minWidth: 0, paddingRight: '1rem', flexWrap: 'wrap' }}>
-                                    <span style={{ fontWeight: 700, fontSize: '1rem', color: mode === 'technician' ? 'var(--text-main)' : 'var(--primary)', whiteSpace: 'nowrap' }}>{room.name}</span>
+                                    <span style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--primary)', whiteSpace: 'nowrap' }}>{room.name}</span>
                                     {room.stockwerk && (
-                                        <span style={{ fontWeight: 700, fontSize: '1rem', color: mode === 'technician' ? 'var(--text-muted)' : 'var(--primary)', opacity: 0.75, whiteSpace: 'nowrap' }}>• {room.stockwerk}</span>
+                                        <span style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--primary)', opacity: 0.75, whiteSpace: 'nowrap' }}>• {room.stockwerk}</span>
                                     )}
                                     {room.apartment && (
-                                        <span style={{ fontWeight: 700, fontSize: '1rem', color: mode === 'technician' ? 'var(--text-muted)' : 'var(--primary)', opacity: 0.75, whiteSpace: 'nowrap' }}>• Whg {room.apartment}</span>
+                                        <span style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--primary)', opacity: 0.75, whiteSpace: 'nowrap' }}>• Whg {room.apartment}</span>
                                     )}
                                 </div>
                                 <div style={{
@@ -5001,7 +5006,7 @@ END:VCARD`;
                                                             width: '100%',
                                                             padding: '8px',
                                                             marginBottom: '12px',
-                                                            backgroundColor: 'var(--surface)',
+                                                            backgroundColor: '#1E293B',
                                                             border: '1px solid var(--border)',
                                                             color: 'white',
                                                             borderRadius: '6px',
@@ -5111,7 +5116,7 @@ END:VCARD`;
                                                                             <div style={{ fontSize: '0.65rem', color: '#10B981', fontWeight: 'bold', textAlign: 'center' }}>Bitte Ziel wählen...</div>
                                                                         )}
                                                                         <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', padding: '0 2px', alignItems: 'center' }}>
-                                                                            <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', fontSize: '0.75rem', cursor: 'pointer', color: 'white' }}>
+                                                                            <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', fontSize: '0.75rem', cursor: 'pointer', color: 'var(--text-main)' }}>
                                                                                 <input
                                                                                     type="checkbox"
                                                                                     style={{ width: '20px', height: '20px', accentColor: 'var(--primary)' }}
@@ -5131,7 +5136,7 @@ END:VCARD`;
                                                                                 title="Bearbeiten"
                                                                                 style={{
                                                                                     border: '1px solid var(--border)',
-                                                                                    backgroundColor: 'var(--surface)',
+                                                                                    backgroundColor: '#1E293B',
                                                                                     color: 'white',
                                                                                     cursor: 'pointer',
                                                                                     padding: '8px',
@@ -5180,7 +5185,7 @@ END:VCARD`;
                                                                                 title={isRecording === img.preview ? "Aufnahme stoppen" : "Spracheingabe starten"}
                                                                                 style={{
                                                                                     border: isRecording === img.preview ? 'none' : '1px solid var(--border)',
-                                                                                    backgroundColor: isRecording === img.preview ? '#EF4444' : 'var(--text-main)',
+                                                                                    backgroundColor: isRecording === img.preview ? '#EF4444' : '#1E293B',
                                                                                     color: isRecording === img.preview ? 'white' : '#94A3B8',
                                                                                     width: '36px',
                                                                                     height: '36px',
@@ -5216,7 +5221,7 @@ END:VCARD`;
                                                                                 type="button"
                                                                                 className="btn btn-ghost"
                                                                                 title="Als Thermobild verknüpfen"
-                                                                                style={{ color: '#10B981', padding: '0', backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 2px rgba(0,0,0,0.1)', cursor: 'pointer' }}
+                                                                                style={{ color: '#10B981', padding: '0', backgroundColor: '#1E293B', border: '1px solid var(--border)', borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 2px rgba(0,0,0,0.1)', cursor: 'pointer' }}
                                                                                 onClick={() => setLinkingImageId(isLinkingThis ? null : img.id)}
                                                                             >
                                                                                 <Link size={16} />
@@ -5226,7 +5231,7 @@ END:VCARD`;
                                                                                 type="button"
                                                                                 className="btn btn-ghost"
                                                                                 title="Verknüpfung aufheben"
-                                                                                style={{ color: '#F59E0B', padding: '0', backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 2px rgba(0,0,0,0.1)', cursor: 'pointer' }}
+                                                                                style={{ color: '#F59E0B', padding: '0', backgroundColor: '#1E293B', border: '1px solid var(--border)', borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 2px rgba(0,0,0,0.1)', cursor: 'pointer' }}
                                                                                 onClick={() => {
                                                                                     setFormData(prev => ({
                                                                                         ...prev,
@@ -5245,7 +5250,7 @@ END:VCARD`;
                                                                             style={{
                                                                                 color: '#EF4444',
                                                                                 padding: mode === 'technician' ? '0 0.5rem' : '0',
-                                                                                backgroundColor: 'var(--surface)',
+                                                                                backgroundColor: '#1E293B',
                                                                                 border: '1px solid rgba(239,68,68,0.3)',
                                                                                 borderRadius: mode === 'technician' ? '8px' : '50%',
                                                                                 width: mode === 'technician' ? 'auto' : '36px',
@@ -5340,7 +5345,7 @@ END:VCARD`;
                                             gap: '0.5rem',
                                             flex: 1,
                                             padding: '0.75rem',
-                                            backgroundColor: 'var(--surface)',
+                                            backgroundColor: '#1E293B',
                                             border: '1px solid var(--border)',
                                             color: 'white',
                                             borderRadius: '8px',
@@ -5386,7 +5391,7 @@ END:VCARD`;
                     </button>
 
                     {showAddRoomForm && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '0.5rem', backgroundColor: 'var(--background)', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '0.5rem', backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid var(--border)' }}>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                                 <select
                                     className="form-input"
@@ -5565,12 +5570,12 @@ END:VCARD`;
                             </div>
 
                             <div>
-                                <h4 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '0.5rem', color: 'white' }}>Fotos zur Ursache</h4>
+                                <h4 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--text-main)' }}>Fotos zur Ursache</h4>
                                 <div
                                     style={{
                                         border: '2px dashed var(--border)', borderRadius: 'var(--radius)',
                                         padding: '2rem 1rem', textAlign: 'center', cursor: 'pointer',
-                                        backgroundColor: 'var(--surface)', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)', transition: 'all 0.2s',
+                                        backgroundColor: 'rgba(255,255,255,0.02)', transition: 'all 0.2s',
                                         marginBottom: '1rem', display: 'flex', flexDirection: 'column',
                                         alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)'
                                     }}
@@ -5592,7 +5597,7 @@ END:VCARD`;
                                                     <img src={item.preview} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: 'pointer' }} onClick={() => setEditingImage(item)} />
                                                 </div>
                                                 <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', padding: '0 2px', alignItems: 'center' }}>
-                                                    <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', fontSize: '0.75rem', cursor: 'pointer', color: 'white' }}>
+                                                    <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', fontSize: '0.75rem', cursor: 'pointer', color: 'var(--text-main)' }}>
                                                         <input
                                                             type="checkbox"
                                                             style={{ width: '16px', height: '16px', accentColor: 'var(--primary)', cursor: 'pointer' }}
@@ -5880,7 +5885,7 @@ END:VCARD`;
                                 padding: '1.5rem',
                                 textAlign: 'center',
                                 cursor: 'pointer',
-                                backgroundColor: 'var(--surface)', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)',
+                                backgroundColor: 'rgba(255,255,255,0.02)',
                                 transition: 'all 0.2s',
                                 marginBottom: '1rem',
                                 display: 'flex',
@@ -5932,7 +5937,7 @@ END:VCARD`;
                                     item.type === 'document';
 
                                 return (
-                                    <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px' }}>
+                                    <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem', backgroundColor: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', borderRadius: '8px' }}>
                                         {isDoc ? (
                                             <div style={{ color: item.name?.toLowerCase().endsWith('.pdf') ? '#ef4444' : '#3b82f6', display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1 }}>
                                                 {(item.name?.toLowerCase().endsWith('.msg')) ? <Mail size={18} /> : <FileText size={18} />}
@@ -5980,16 +5985,9 @@ END:VCARD`;
 
                 {/* 2b. Massnahmen (Measures) - Technician Only (Schadenaufnahme/Leckortung) */}
                 {mode === 'technician' && (formData.status === 'Schadenaufnahme' || formData.status === 'Leckortung') && (
-                    <div className="card" style={{
-                        marginBottom: '1.5rem',
-                        padding: '1.5rem',
-                        backgroundColor: 'var(--background)',
-                        borderRadius: '20px',
-                        boxShadow: '0 20px 40px -10px rgba(0,0,0,0.1), 0 10px 15px -5px rgba(0,0,0,0.05)',
-                        border: '1px solid rgba(255,255,255,0.8)'
-                    }}>
-                        <h3 className="section-header" style={{ color: 'white', fontWeight: 800, fontSize: '1.1rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                            <ClipboardList size={20} color="#10B981" /> Massnahmen
+                    <div className="card" style={{ marginBottom: '1.5rem', padding: '1.5rem' }}>
+                        <h3 className="section-header">
+                            <ClipboardList size={18} /> Massnahmen
                         </h3>
 
                         {/* Checkbox Liste */}
@@ -6006,13 +6004,14 @@ END:VCARD`;
                                         {/* Checkbox Row */}
                                         <label style={{
                                             display: 'flex', alignItems: 'center', gap: '1rem',
-                                            padding: '1.25rem',
-                                            border: isChecked ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid rgba(226,232,240,0.8)',
-                                            borderRadius: isChecked ? '16px 16px 0 0' : '16px',
+                                            padding: '1rem',
+                                            border: '1px solid var(--border)',
+                                            borderRadius: isChecked ? '12px 12px 0 0' : '12px',
                                             cursor: 'pointer',
-                                            backgroundColor: isChecked ? '#ECFDF5' : 'var(--surface)',
-                                            boxShadow: isChecked ? '0 4px 12px rgba(16, 185, 129, 0.1)' : '0 2px 4px rgba(0,0,0,0.02)',
-                                            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+                                            backgroundColor: isChecked ? 'rgba(14,165,233,0.15)' : 'rgba(255,255,255,0.02)',
+                                            borderColor: isChecked ? 'var(--primary)' : 'var(--border)',
+                                            borderBottom: isChecked ? 'none' : undefined,
+                                            transition: 'all 0.2s ease'
                                         }}>
                                             <input
                                                 type="checkbox"
@@ -6027,39 +6026,37 @@ END:VCARD`;
                                                         }
                                                     });
                                                 }}
-                                                style={{ width: '22px', height: '22px', accentColor: '#10B981', cursor: 'pointer' }}
+                                                style={{ width: '22px', height: '22px', accentColor: 'var(--primary)', cursor: 'pointer' }}
                                             />
-                                            <span style={{ fontSize: '1.05rem', fontWeight: 700, color: isChecked ? '#047857' : '#475569' }}>{item}</span>
+                                            <span style={{ fontSize: '1rem', fontWeight: 600, color: isChecked ? 'var(--text-main)' : 'var(--text-muted)' }}>{item}</span>
                                         </label>
                                         {/* Titel + Textarea — erscheint wenn angehakt */}
                                         {isChecked && (
                                             <div style={{
-                                                border: '1px solid rgba(16, 185, 129, 0.4)',
+                                                border: '1px solid var(--primary)',
                                                 borderTop: 'none',
-                                                borderRadius: '0 0 16px 16px',
-                                                padding: '1.25rem',
-                                                backgroundColor: '#ECFDF5',
-                                                boxShadow: '0 8px 16px -4px rgba(16, 185, 129, 0.05)'
+                                                borderRadius: '0 0 12px 12px',
+                                                padding: '1rem 1rem 1rem 1rem',
+                                                backgroundColor: 'rgba(14,165,233,0.05)',
                                             }}>
                                                 {/* Titel — entspricht sectionTitle im PDF: 16pt, blau, bold */}
                                                 <div style={{
-                                                    fontSize: '0.85rem',
-                                                    fontWeight: 800,
-                                                    color: '#059669',
-                                                    marginBottom: '0.75rem',
-                                                    letterSpacing: '0.05em',
-                                                    textTransform: 'uppercase',
+                                                    fontSize: '1.15rem',
+                                                    fontWeight: 700,
+                                                    color: '#0F6EA3',
+                                                    marginBottom: '0.6rem',
+                                                    letterSpacing: '0.01em',
                                                     display: 'flex',
                                                     alignItems: 'center',
                                                     justifyContent: 'space-between'
                                                 }}>
-                                                    Details zu {item}
+                                                    {item}
                                                     <button
                                                         type="button"
                                                         onClick={() => toggleDictation(`note_${item}`, item)}
                                                         style={{
                                                             background: 'none', border: 'none', cursor: 'pointer',
-                                                            color: listeningField === `note_${item}` ? '#EF4444' : '#059669',
+                                                            color: listeningField === `note_${item}` ? '#EF4444' : '#0F6EA3',
                                                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                                                             padding: '4px', borderRadius: '50%',
                                                             backgroundColor: listeningField === `note_${item}` ? 'rgba(239,68,68,0.1)' : 'transparent'
@@ -6081,18 +6078,16 @@ END:VCARD`;
                                                     onClick={e => e.stopPropagation()}
                                                     style={{
                                                         width: '100%',
-                                                        backgroundColor: 'var(--surface)',
-                                                        border: '2px solid #1E6DB7',
-                                                        borderRadius: '12px',
-                                                        color: '#0F172A',
+                                                        background: 'rgba(255,255,255,0.04)',
+                                                        border: '1px solid rgba(14,165,233,0.3)',
+                                                        borderRadius: '8px',
+                                                        color: 'var(--text-main)',
                                                         fontSize: '0.95rem',
-                                                        padding: '0.8rem 1rem',
+                                                        padding: '0.6rem 0.75rem',
                                                         resize: 'vertical',
                                                         outline: 'none',
-                                                        boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.02)',
                                                         fontFamily: 'inherit',
                                                         boxSizing: 'border-box',
-                                                        transition: 'border-color 0.2s'
                                                     }}
                                                 />
                                             </div>
@@ -6104,8 +6099,8 @@ END:VCARD`;
 
                         {/* Freitext & Mikrofon */}
                         <div style={{ position: 'relative' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                                <label style={{ fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 800 }}>Zusätzliche Massnahmen</label>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                                <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 700 }}>Eigener Text / Ergänzungen</label>
                                 <button
                                     type="button"
                                     className="btn-glass"
@@ -6117,9 +6112,9 @@ END:VCARD`;
                                         display: 'flex',
                                         alignItems: 'center',
                                         justifyContent: 'center',
-                                        color: listeningField === 'measures' ? '#EF4444' : 'var(--text-muted)',
-                                        border: `2px solid ${listeningField === 'measures' ? '#EF4444' : '#1E6DB7'}`,
-                                        backgroundColor: listeningField === 'measures' ? 'rgba(239,68,68,0.1)' : 'var(--surface)',
+                                        color: listeningField === 'measures' ? '#EF4444' : 'var(--primary)',
+                                        border: `1px solid ${listeningField === 'measures' ? '#EF4444' : 'var(--border)'}`,
+                                        backgroundColor: listeningField === 'measures' ? 'rgba(239,68,68,0.1)' : 'transparent',
                                         borderRadius: '50%',
                                         fontWeight: 700
                                     }}
@@ -6132,15 +6127,7 @@ END:VCARD`;
                                 value={formData.measures || ''}
                                 onChange={(e) => setFormData(prev => ({ ...prev, measures: e.target.value }))}
                                 placeholder="Zusätzliche Massnahmen beschreiben..."
-                                style={{ 
-                                    width: '100%', minHeight: '120px', fontFamily: 'inherit', lineHeight: '1.5',
-                                    backgroundColor: 'var(--surface)',
-                                    border: '1px solid var(--border)',
-                                    borderRadius: '16px',
-                                    padding: '1rem',
-                                    color: '#0F172A',
-                                    boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)'
-                                }}
+                                style={{ width: '100%', minHeight: '100px', fontFamily: 'inherit', lineHeight: '1.5' }}
                             />
                         </div>
                     </div>
@@ -6230,7 +6217,7 @@ END:VCARD`;
                             {formData.images.filter(img => img.assignedTo === 'Pläne').map((item, idx) => (
                                 <div key={idx} style={{
                                     display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem',
-                                    backgroundColor: 'var(--surface)', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)', border: '1px solid var(--border)',
+                                    backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid var(--border)',
                                     borderRadius: '12px'
                                 }}>
                                     {(item.file && item.file.type === 'application/pdf') || (item.name && item.name.toLowerCase().endsWith('.pdf')) ? (
@@ -6253,7 +6240,7 @@ END:VCARD`;
                                         <>
                                             <img src={item.preview} alt="Vorschau" className="hover-zoom" style={{ width: '44px', height: '44px', objectFit: 'cover', borderRadius: '8px' }} />
                                             <div style={{ flex: 1, overflow: 'hidden' }}>
-                                                <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'white' }}>{item.name || item.assignedTo}</div>
+                                                <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-main)' }}>{item.name || item.assignedTo}</div>
                                                 {item.description && (
                                                     <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{item.description.substring(0, 40)}...</div>
                                                 )}
@@ -6312,18 +6299,18 @@ END:VCARD`;
                             </div>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                                 {formData.images.filter(img => img.assignedTo === 'Arbeitsrappporte').map((item, idx) => (
-                                    <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem', backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
+                                    <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem', backgroundColor: '#1E293B', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
                                         {(item.file && item.file.type === 'application/pdf') || (item.name && item.name.toLowerCase().endsWith('.pdf')) ? (
                                             <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '1rem', cursor: 'pointer' }} onClick={() => { if (item.file) { const pdfUrl = URL.createObjectURL(item.file); window.open(pdfUrl, '_blank'); } else if (item.preview) { window.open(item.preview, '_blank'); } else { alert("PDF Vorschau nicht verfügbar."); } }}>
                                                 <div style={{ padding: '0.5rem', backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: '4px' }}><FileText size={24} color="var(--text-main)" /></div>
-                                                <div style={{ fontSize: '1rem', color: 'white', fontWeight: 500, textDecoration: 'underline' }}>{item.name}</div>
+                                                <div style={{ fontSize: '1rem', color: 'var(--text-main)', fontWeight: 500, textDecoration: 'underline' }}>{item.name}</div>
                                             </div>
                                         ) : (
                                             <div style={{ width: '80px', height: '80px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: '4px' }}>
                                                 <img src={item.preview} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '4px' }} />
                                             </div>
                                         )}
-                                        {!((item.file && item.file.type === 'application/pdf') || (item.name && item.name.toLowerCase().endsWith('.pdf'))) && <div style={{ flex: 1, fontWeight: 500, color: 'white' }}>{item.name}</div>}
+                                        {!((item.file && item.file.type === 'application/pdf') || (item.name && item.name.toLowerCase().endsWith('.pdf'))) && <div style={{ flex: 1, fontWeight: 500, color: 'var(--text-main)' }}>{item.name}</div>}
                                         <button type="button" className="btn btn-ghost" onClick={() => setFormData(prev => ({ ...prev, images: prev.images.filter(i => i !== item) }))} style={{ color: '#EF4444', padding: '0.5rem', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(239, 68, 68, 0.1)' }}><Trash size={18} /></button>
                                     </div>
                                 ))}
@@ -6381,18 +6368,18 @@ END:VCARD`;
                                 {formData.images.filter(img => img.assignedTo === 'Sonstiges').map((item, idx) => (
                                     <div key={idx} style={{
                                         display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem',
-                                        backgroundColor: 'var(--surface)', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)', border: '1px solid var(--border)',
+                                        backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid var(--border)',
                                         borderRadius: '12px'
                                     }}>
                                         {(item.file && item.file.type === 'application/pdf') || (item.name && item.name.toLowerCase().endsWith('.pdf')) ? (
                                             <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }} onClick={() => { if (item.file) { const pdfUrl = URL.createObjectURL(item.file); window.open(pdfUrl, '_blank'); } else if (item.preview) { window.open(item.preview, '_blank'); } }}>
                                                 <FileText size={18} color="var(--primary)" />
-                                                <div style={{ fontSize: '0.9rem', color: 'white', fontWeight: 600 }}>{item.name}</div>
+                                                <div style={{ fontSize: '0.9rem', color: 'var(--text-main)', fontWeight: 600 }}>{item.name}</div>
                                             </div>
                                         ) : (
                                             <>
                                                 <img src={item.preview} alt="" className="hover-zoom" style={{ width: '44px', height: '44px', objectFit: 'cover', borderRadius: '8px' }} />
-                                                <div style={{ flex: 1, fontWeight: 600, color: 'white', fontSize: '0.9rem' }}>{item.name}</div>
+                                                <div style={{ flex: 1, fontWeight: 600, color: 'var(--text-main)', fontSize: '0.9rem' }}>{item.name}</div>
                                             </>
                                         )}
                                         <button type="button" onClick={() => setFormData(prev => ({ ...prev, images: prev.images.filter(i => i !== item) }))} style={{ border: 'none', background: 'rgba(239, 68, 68, 0.1)', color: '#EF4444', cursor: 'pointer', padding: '6px', borderRadius: '50%', display: 'flex' }}><X size={14} /></button>
@@ -6423,7 +6410,7 @@ END:VCARD`;
                                             {/* Header: Raumname + Buttons */}
                                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
                                                 <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-                                                    <div style={{ fontWeight: 700, fontSize: '1rem', color: 'white' }}>{room.name}</div>
+                                                    <div style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--text-main)' }}>{room.name}</div>
                                                     <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 500 }}>{hasMeasurement ? `Letzte Messung: ${date}` : 'Keine Messdaten'}</div>
                                                 </div>
                                                 <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -6453,25 +6440,8 @@ END:VCARD`;
                                                             </div>
                                                             <button
                                                                 type="button"
-                                                                title="Skizze als PDF speichern"
-                                                                onClick={async (e) => {
-                                                                    e.stopPropagation();
-                                                                    try {
-                                                                        const { ExportService } = await import('../services/ExportService');
-                                                                        await ExportService.generateSketchPdf(formData, room, entry);
-                                                                    } catch(err) {
-                                                                        alert('Fehler beim PDF Export: ' + err.message);
-                                                                    }
-                                                                }}
-                                                                style={{ position: 'absolute', top: '6px', right: '44px', background: 'rgba(59,130,246,0.85)', color: 'white', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 2px 4px rgba(0,0,0,0.3)', zIndex: 10 }}
-                                                            >
-                                                                <Download size={14} />
-                                                            </button>
-                                                            <button
-                                                                type="button"
                                                                 title="Bild löschen"
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
+                                                                onClick={() => {
                                                                     if (!window.confirm('Dieses Messprotokoll-Bild wirklich löschen?')) return;
                                                                     setFormData(prev => ({
                                                                         ...prev,
@@ -6524,7 +6494,7 @@ END:VCARD`;
                                             alert("Fehler beim Erstellen des Excel-Protokolls.");
                                         }
                                     }}
-                                    style={{ fontSize: '0.85rem', padding: '0.6rem 1.25rem', color: '#10B981', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700, border: '2px solid #1E6DB7' }}
+                                    style={{ fontSize: '0.85rem', padding: '0.6rem 1.25rem', color: '#10B981', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700, border: '1px solid rgba(16, 185, 129, 0.2)' }}
                                 >
                                     <Table size={16} /> Excel Export
                                 </button>
@@ -6541,7 +6511,7 @@ END:VCARD`;
                             <Settings size={24} />
                             {(mode === 'technician' && techSelectedEquipmentRoom?.apartment)
                                 ? `Geräte, Wohnung ${techSelectedEquipmentRoom.apartment}`
-                                : 'Geräte'}
+                                : 'Trocknungsgeräte'}
                         </h2>
 
 
@@ -6549,7 +6519,7 @@ END:VCARD`;
 
 
                         {/* Add Device Form */}
-                        <div style={{ backgroundColor: 'var(--surface)', padding: '1rem', borderRadius: '8px', marginBottom: '1rem', border: '1px solid var(--border)', ...(mode === 'desktop' ? { order: 3, marginTop: '2rem' } : {}) }}>
+                        <div style={{ backgroundColor: '#1E293B', padding: '1rem', borderRadius: '8px', marginBottom: '1rem', border: '1px solid var(--border)', ...(mode === 'desktop' ? { order: 3, marginTop: '2rem' } : {}) }}>
                             {mode !== 'technician' && (
                                 <button
                                     type="button"
@@ -6776,8 +6746,8 @@ END:VCARD`;
                             )}
                             
                             {showAddDeviceForm && mode === 'technician' && (
-                                <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(4px)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-                                    <div style={{ backgroundColor: 'var(--surface)', borderRadius: '16px', width: '100%', maxWidth: '400px', padding: '1.5rem', color: 'var(--text-main)', border: '1px solid var(--border)', boxShadow: '0 10px 25px rgba(0,0,0,0.05)' }}>
+                                <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.85)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+                                    <div style={{ backgroundColor: '#1E293B', borderRadius: '16px', width: '100%', maxWidth: '400px', padding: '1.5rem', color: '#F1F5F9', border: '1px solid rgba(255,255,255,0.1)' }}>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                                             <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700 }}>Gerät hinzufügen</h3>
                                             <button onClick={() => setShowAddDeviceForm(false)} style={{ background: 'transparent', border: 'none', color: '#94A3B8', cursor: 'pointer' }}><X size={20} /></button>
@@ -6836,7 +6806,7 @@ END:VCARD`;
                                             <select
                                                 className="form-input"
                                                 value={newDevice.apartment || 'Allgemeiner Bereich'}
-                                                onChange={(e) => setNewDevice(prev => ({ ...prev, apartment: e.target.value, room: '' }))}
+                                                onChange={(e) => setNewDevice(prev => ({ ...prev, apartment: e.target.value }))}
                                                 style={{ fontSize: '1.1rem', padding: '1rem' }}
                                             >
                                                 <option value="Allgemeiner Bereich">Allgemeiner Bereich</option>
@@ -6845,20 +6815,6 @@ END:VCARD`;
                                                     ...(formData.contacts || []).map(c => c.name ? c.name.trim().split(/\s+/).pop() : '').filter(Boolean)
                                                 ])).sort().filter(a => a !== 'Allgemeiner Bereich').map(apt => (
                                                     <option key={apt} value={apt}>{apt}</option>
-                                                ))}
-                                            </select>
-                                            
-                                            <select
-                                                className="form-input"
-                                                value={newDevice.room || ''}
-                                                onChange={(e) => setNewDevice(prev => ({ ...prev, room: e.target.value }))}
-                                                style={{ fontSize: '1.1rem', padding: '1rem' }}
-                                            >
-                                                <option value="">Raum wählen... (Optional)</option>
-                                                {formData.rooms
-                                                    .filter(r => (r.apartment || 'Allgemeiner Bereich').trim() === (newDevice.apartment || 'Allgemeiner Bereich').trim())
-                                                    .map(r => (
-                                                    <option key={r.id} value={r.name}>{r.name || 'Ohne Namen'}</option>
                                                 ))}
                                             </select>
 
@@ -6916,7 +6872,7 @@ END:VCARD`;
                                     
                                     {/* Custom Numpad UI for Technician Add Device */}
                                     {activeNumpadField && createPortal(
-                                        <div style={{ position: 'fixed', left: numpadPos.x, top: numpadPos.y, width: 280, backgroundColor: 'var(--surface)', border: '1px solid var(--border)', boxShadow: '0 10px 25px rgba(0,0,0,0.05)', padding: '0.75rem', zIndex: 100000, boxShadow: '0 10px 40px rgba(0,0,0,0.6)', borderRadius: 12 }}>
+                                        <div style={{ position: 'fixed', left: numpadPos.x, top: numpadPos.y, width: 280, backgroundColor: '#1E293B', border: '1px solid rgba(255,255,255,0.15)', padding: '0.75rem', zIndex: 100000, boxShadow: '0 10px 40px rgba(0,0,0,0.6)', borderRadius: 12 }}>
                                             <div 
                                                 style={{ display:'flex', justifyContent:'space-between', marginBottom:'0.5rem', alignItems:'center', cursor: 'grab', touchAction: 'none', paddingBottom: '0.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)' }}
                                                 onPointerDown={e => {
@@ -6943,19 +6899,19 @@ END:VCARD`;
                                                         {activeNumpadField.field === 'counterStart' ? 'Zählerstand Start' : 'Laufzeit (Std.)'}
                                                     </span>
                                                 </div>
-                                                <button onClick={() => setActiveNumpadField(null)} style={{ background:'transparent', border:'none', color:'var(--border)', cursor:'pointer' }}><X size={16}/></button>
+                                                <button onClick={() => setActiveNumpadField(null)} style={{ background:'transparent', border:'none', color:'#E2E8F0', cursor:'pointer' }}><X size={16}/></button>
                                             </div>
-                                            <div style={{ backgroundColor: 'var(--background)', padding:'0.5rem', borderRadius:'6px', marginBottom:'0.5rem', fontSize:'1.4rem', fontWeight:700, textAlign:'right', color:'#fff', minHeight:'36px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                                            <div style={{ backgroundColor:'#0F172A', padding:'0.5rem', borderRadius:'6px', marginBottom:'0.5rem', fontSize:'1.4rem', fontWeight:700, textAlign:'right', color:'#fff', minHeight:'36px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
                                                 {activeNumpadField.value || '0'}
                                             </div>
                                             <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:'0.4rem' }}>
                                                 {['1','2','3','4','5','6','7','8','9',',', '0', 'DEL'].map(k => (
-                                                    <button key={k} onClick={() => handleNumpadPress(k)} style={{ padding:'0.6rem', fontSize:'1.2rem', fontWeight:700, borderRadius:'8px', backgroundColor:'rgba(255,255,255,0.1)', border:'none', color: 'white', cursor:'pointer', touchAction: 'manipulation', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                                                    <button key={k} onClick={() => handleNumpadPress(k)} style={{ padding:'0.6rem', fontSize:'1.2rem', fontWeight:700, borderRadius:'8px', backgroundColor:'rgba(255,255,255,0.1)', border:'none', color:'#F1F5F9', cursor:'pointer', touchAction: 'manipulation', display:'flex', alignItems:'center', justifyContent:'center' }}>
                                                         {k === 'DEL' ? <Delete size={18} style={{ pointerEvents: 'none' }}/> : k}
                                                     </button>
                                                 ))}
                                             </div>
-                                            <button onClick={() => setActiveNumpadField(null)} style={{ width:'100%', marginTop:'0.5rem', padding:'0.6rem', backgroundColor:'#3B82F6', color: 'white', border:'none', borderRadius:'8px', fontWeight:700, fontSize:'1rem', cursor:'pointer', touchAction: 'manipulation' }}>
+                                            <button onClick={() => setActiveNumpadField(null)} style={{ width:'100%', marginTop:'0.5rem', padding:'0.6rem', backgroundColor:'#3B82F6', color:'white', border:'none', borderRadius:'8px', fontWeight:700, fontSize:'1rem', cursor:'pointer', touchAction: 'manipulation' }}>
                                                 OK
                                             </button>
                                         </div>, document.body
@@ -6971,8 +6927,8 @@ END:VCARD`;
                                 if (!device) return null;
 
                                 return (
-                                    <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(4px)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-                                        <div style={{ backgroundColor: 'var(--surface)', borderRadius: '16px', width: '100%', maxWidth: '400px', padding: '1.5rem', color: 'var(--text-main)', border: '1px solid var(--border)', boxShadow: '0 10px 25px rgba(0,0,0,0.05)' }}>
+                                    <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.85)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+                                        <div style={{ backgroundColor: '#1E293B', borderRadius: '16px', width: '100%', maxWidth: '400px', padding: '1.5rem', color: '#F1F5F9', border: '1px solid rgba(255,255,255,0.1)' }}>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                                                 <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700 }}>Gerät abmelden</h3>
                                                 <button onClick={() => {
@@ -6986,7 +6942,7 @@ END:VCARD`;
                                             <div style={{ marginBottom: '1.5rem', padding: '1rem', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: '8px' }}>
                                                 <div style={{ fontWeight: 600, fontSize: '1.1rem', color: 'var(--primary)', marginBottom: '0.25rem' }}>#{device.deviceNumber} {device.model || device.type ? `- ${device.model || device.type}` : ''}</div>
                                                 <div style={{ fontSize: '0.9rem', color: '#94A3B8' }}>{device.room} {device.apartment ? `(${device.apartment})` : ''}</div>
-                                                <div style={{ fontSize: '0.85rem', color: '#94A3B8', marginTop: '0.5rem', borderTop: '1px solid var(--border)', boxShadow: '0 -4px 20px rgba(0,0,0,0.04)', paddingTop: '0.5rem' }}>Start: {device.startDate} • Zähler: {device.counterStart} kWh</div>
+                                                <div style={{ fontSize: '0.85rem', color: '#94A3B8', marginTop: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.5rem' }}>Start: {device.startDate} • Zähler: {device.counterStart} kWh</div>
                                             </div>
 
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -7099,7 +7055,7 @@ END:VCARD`;
                                 .map((device) => {
                                     const idx = device._originalIndex;
                                     return (
-                                        <div key={idx} style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '0.75rem', color: 'var(--text-main)' }}>
+                                        <div key={idx} style={{ backgroundColor: '#1E293B', border: '1px solid var(--border)', borderRadius: '8px', padding: '0.75rem', color: 'white' }}>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
                                                 <div style={{ minWidth: '40px', display: 'flex', flexDirection: 'column' }}>
                                                     <span style={{ fontWeight: 600, color: 'var(--primary)' }}>#{device.deviceNumber}</span>
@@ -7130,7 +7086,7 @@ END:VCARD`;
                                                 if (isAbgemeldet) {
                                                     // ALREADY DONE STATE
                                                     return (
-                                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '0.5rem', marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid var(--border)', boxShadow: '0 -4px 20px rgba(0,0,0,0.04)' }}>
+                                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '0.5rem', marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
                                                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
                                                                 <div>
                                                                     <label style={{ fontSize: '0.75rem', color: '#94A3B8', display: 'block', marginBottom: '0.2rem' }}>Zähler Ende</label>
@@ -7235,7 +7191,7 @@ END:VCARD`;
                                         }
                                         setShowAddDeviceForm(true);
                                     }}
-                                    style={{ width: '100%', background: 'var(--surface)', color: '#1E6DB7', border: '2px solid #1E6DB7', padding: '0.75rem', borderRadius: '8px', fontWeight: 700, cursor: 'pointer', fontSize: '0.9rem', textTransform: 'uppercase', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
+                                    style={{ width: '100%', background: 'rgba(16, 185, 129, 0.15)', color: '#10B981', border: '1px solid #10B981', padding: '0.75rem', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '0.9rem', textTransform: 'uppercase', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
                                 >
                                     <Plus size={18} /> Gerät hinzufügen
                                 </button>
@@ -7250,7 +7206,7 @@ END:VCARD`;
 
                 {/* Zusammenfassung Trocknung */}
                 {(mode === 'desktop' || true) && formData.equipment?.length > 0 && (
-                    <div style={{ marginBottom: '1.5rem', backgroundColor: 'var(--surface)', padding: '1.25rem', borderRadius: '12px', border: '2px solid #1E6DB7', color: 'var(--text-main)', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}>
+                    <div style={{ marginBottom: '1.5rem', backgroundColor: 'var(--surface)', padding: '1.25rem', borderRadius: '12px', border: '1px solid var(--border)', color: 'var(--text-main)', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}>
                         <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.6rem', color: 'var(--primary)' }}>
                             <Database size={18} /> Geräteliste
                         </h3>
@@ -7276,8 +7232,8 @@ END:VCARD`;
                                                 <div 
                                                     key={idx}
                                                     style={{ 
-                                                        backgroundColor: 'var(--surface)', 
-                                                        border: '2px solid #1E6DB7', 
+                                                        backgroundColor: '#1E293B', 
+                                                        border: '1px solid var(--border)', 
                                                         borderRadius: '8px', 
                                                         padding: '0.75rem', 
                                                         cursor: !isFinished ? 'pointer' : 'default',
@@ -7305,7 +7261,7 @@ END:VCARD`;
                                                     }}
                                                 >
                                                     <div style={{ flex: 1, paddingRight: '1rem' }}>
-                                                        <div style={{ fontWeight: 800, color: 'var(--text-main)' }}>
+                                                        <div style={{ fontWeight: 600, color: 'var(--text-main)' }}>
                                                             #{device.deviceNumber} {device.type && device.type !== 'Unbekannt' ? `- ${device.type}` : ''} {device.model && String(device.model).trim() !== '' ? `(${device.model})` : ''}
                                                         </div>
                                                         <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
@@ -7315,8 +7271,8 @@ END:VCARD`;
                                                     <div style={{ textAlign: 'right', minWidth: '80px' }}>
                                                         {isFinished ? (
                                                             <>
-                                                                <div style={{ fontWeight: 800, color: 'var(--text-main)' }}>{consumption.toFixed(2)} kWh</div>
-                                                                <div style={{ fontSize: '0.75rem', color: '#475569', marginTop: '0.2rem' }}>{device.hours} h • {getDaysDiff(device.startDate, device.endDate)} Tg.</div>
+                                                                <div style={{ fontWeight: 600, color: 'var(--text-main)' }}>{consumption.toFixed(2)} kWh</div>
+                                                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>{device.hours} h • {getDaysDiff(device.startDate, device.endDate)} Tg.</div>
                                                             </>
                                                         ) : (
                                                             <span style={{ fontSize: '0.7rem', color: '#10B981', backgroundColor: 'rgba(16, 185, 129, 0.15)', padding: '4px 8px', borderRadius: '4px', textTransform: 'uppercase', fontWeight: 700 }}>Aktiv</span>
@@ -7329,11 +7285,11 @@ END:VCARD`;
                                             <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>Keine Geräte vorhanden.</div>
                                         )}
                                         {formData.equipment.filter(device => !techSelectedEquipmentRoom?.apartment || (device.apartment || 'Allgemeiner Bereich').trim() === techSelectedEquipmentRoom.apartment).length > 0 && (
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem', backgroundColor: 'var(--surface)', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)', borderRadius: '8px', border: '2px solid #1E6DB7', marginTop: '0.5rem' }}>
-                                                <div style={{ fontWeight: 800, color: 'var(--text-main)' }}>Gesamt</div>
-                                                <div style={{ textAlign: 'right', fontWeight: 800, color: 'var(--text-main)' }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem', backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: '8px', border: '1px solid var(--border)', marginTop: '0.5rem' }}>
+                                                <div style={{ fontWeight: 700, color: 'var(--text-main)' }}>Gesamt</div>
+                                                <div style={{ textAlign: 'right', fontWeight: 700, color: 'var(--text-main)' }}>
                                                     <div>{totalDryingKwh.toFixed(2)} kWh</div>
-                                                    <div style={{ fontSize: '0.8rem', color: '#475569', fontWeight: 600 }}>{totalDryingHours.toFixed(1)} h</div>
+                                                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 400 }}>{totalDryingHours.toFixed(1)} h</div>
                                                 </div>
                                             </div>
                                         )}
@@ -7391,7 +7347,7 @@ END:VCARD`;
                                                 <td colSpan="4" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>Keine Geräte vorhanden.</td>
                                             </tr>
                                         )}
-                                        <tr style={{ fontWeight: 700, backgroundColor: 'var(--surface)', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)' }}>
+                                        <tr style={{ fontWeight: 700, backgroundColor: 'rgba(255,255,255,0.02)' }}>
                                             <td style={{ padding: '0.75rem' }}>Gesamt</td>
                                             <td style={{ textAlign: 'center', padding: '0.75rem' }}>-</td>
                                             <td style={{ textAlign: 'center', padding: '0.75rem' }}>{totalDryingHours.toFixed(1)} h</td>
@@ -7414,14 +7370,14 @@ END:VCARD`;
                     width: '100%',
                     maxWidth: '600px',
                     padding: '0.4rem 0.75rem',
-                    backgroundColor: mode === 'technician' ? 'var(--background)' : 'var(--text-main)',
-                    borderTop: mode === 'technician' ? '1px solid var(--border)' : '1px solid #0F172A',
+                    backgroundColor: '#0F172A',
+                    borderTop: '1px solid #334155',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
                     gap: '1rem',
                     zIndex: 100,
-                    boxShadow: mode === 'technician' ? '0 -4px 12px rgba(0,0,0,0.05)' : '0 -4px 12px rgba(0, 0, 0, 0.5)'
+                    boxShadow: '0 -4px 12px rgba(0, 0, 0, 0.5)'
                 }}>
                     {/* Status Indicator */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem', color: isSaving ? '#fbbf24' : '#10B981', transition: 'color 0.3s' }}>
@@ -7502,7 +7458,6 @@ END:VCARD`;
                 }
 
                 <MeasurementModal
-                    isTechnicianMode={mode === 'technician'}
                     key={activeRoomForMeasurement?.id || 'none'}
                     isOpen={showMeasurementModal}
                     onClose={() => {
@@ -7733,7 +7688,7 @@ END:VCARD`;
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', borderBottom: '4px solid #0F6EA3', paddingBottom: '1.5rem' }}>
                                 <div>
                                     <h1 style={{ fontSize: '28pt', fontWeight: '800', margin: 0, color: '#0F172A' }}>Schadensbericht</h1>
-                                    <div style={{ fontSize: '11pt', marginTop: '0.5rem', color: 'var(--text-muted)' }}>Erstellt am: {new Date().toLocaleDateString('de-CH')}</div>
+                                    <div style={{ fontSize: '11pt', marginTop: '0.5rem', color: '#64748B' }}>Erstellt am: {new Date().toLocaleDateString('de-CH')}</div>
                                 </div>
                                 <div style={{ textAlign: 'right' }}>
                                     <div style={{ fontWeight: 'bold', fontSize: '16pt', color: '#0F172A' }}>Q-Service AG</div>
@@ -7742,7 +7697,7 @@ END:VCARD`;
                             </div>
 
                             <div className="pdf-section" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', marginBottom: '2rem' }}>
-                                <div style={{ backgroundColor: 'var(--color-panel-bg)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                                <div style={{ backgroundColor: '#F8FAFC', padding: '1rem', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
                                     <h3 style={{ color: '#0F6EA3', fontSize: '12pt', fontWeight: 'bold', marginBottom: '0.5rem' }}>PROJEKTDATEN</h3>
                                     <div style={{ fontSize: '10pt', display: 'grid', gridTemplateColumns: '100px 1fr', gap: '0.5rem' }}>
                                         <strong>Projekt:</strong> <span>{formData.projectTitle}</span>
@@ -7750,7 +7705,7 @@ END:VCARD`;
                                         <strong>Ort:</strong> <span>{formData.zip} {formData.city}</span>
                                     </div>
                                 </div>
-                                <div style={{ backgroundColor: 'var(--color-panel-bg)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                                <div style={{ backgroundColor: '#F8FAFC', padding: '1rem', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
                                     <h3 style={{ color: '#0F6EA3', fontSize: '12pt', fontWeight: 'bold', marginBottom: '0.5rem' }}>DETAILS</h3>
                                     <div style={{ fontSize: '10pt', display: 'grid', gridTemplateColumns: '100px 1fr', gap: '0.5rem' }}>
                                         <strong>Status:</strong> <span>{formData.status}</span>
@@ -7767,7 +7722,7 @@ END:VCARD`;
                             {formData.cause && (
                                 <div className="pdf-section" style={{ marginBottom: '2rem' }}>
                                     <h3 style={{ borderLeft: '4px solid #0F6EA3', paddingLeft: '1rem', fontSize: '14pt', fontWeight: 'bold', marginBottom: '1rem' }}>Schadenursache</h3>
-                                    <div style={{ whiteSpace: 'pre-wrap', fontSize: '11pt', lineHeight: 1.5, backgroundColor: 'var(--color-panel-bg)', padding: '1rem', borderRadius: '8px' }}>{formData.cause}</div>
+                                    <div style={{ whiteSpace: 'pre-wrap', fontSize: '11pt', lineHeight: 1.5, backgroundColor: '#F1F5F9', padding: '1rem', borderRadius: '8px' }}>{formData.cause}</div>
                                 </div>
                             )}
 
@@ -7775,7 +7730,7 @@ END:VCARD`;
                                 <h3 style={{ backgroundColor: '#0F172A', color: 'white', padding: '0.5rem 1rem', fontSize: '14pt', borderRadius: '4px', marginBottom: '1.5rem' }}>Bilder & Dokumentation</h3>
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                                     {formData.images.filter(img => img.includeInReport !== false && img.assignedTo !== 'Emails' && img.assignedTo !== 'Pläne').map((img, idx) => (
-                                        <div key={idx} style={{ breakInside: 'avoid', border: '1px solid var(--border)', borderRadius: '8px', overflow: 'hidden' }}>
+                                        <div key={idx} style={{ breakInside: 'avoid', border: '1px solid #E2E8F0', borderRadius: '8px', overflow: 'hidden' }}>
                                             <img src={img.preview} alt="" style={{ width: '100%', height: '200px', objectFit: 'cover' }} />
                                             {img.description && <div style={{ padding: '0.5rem', fontSize: '9pt', fontStyle: 'italic' }}>{img.description}</div>}
                                         </div>
@@ -7793,7 +7748,7 @@ END:VCARD`;
                     onClick={() => setQrModal(null)}
                     style={{
                         position: 'fixed', inset: 0, zIndex: 99999,
-                        backgroundColor: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(4px)',
+                        backgroundColor: 'rgba(0,0,0,0.85)',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         padding: '1rem',
                     }}
@@ -7801,7 +7756,7 @@ END:VCARD`;
                     <div
                         onClick={e => e.stopPropagation()}
                         style={{
-                            background: 'var(--surface)',
+                            background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)',
                             borderRadius: '20px',
                             border: '1px solid rgba(16,185,129,0.3)',
                             boxShadow: '0 25px 60px rgba(0,0,0,0.6)',
@@ -7816,7 +7771,7 @@ END:VCARD`;
                         </div>
 
                         {/* QR-Code */}
-                        <div style={{ background: 'var(--surface)', borderRadius: '12px', padding: '0.6rem', boxShadow: '0 8px 24px rgba(0,0,0,0.4)', flexShrink: 0 }}>
+                        <div style={{ background: '#FFFFFF', borderRadius: '12px', padding: '0.6rem', boxShadow: '0 8px 24px rgba(0,0,0,0.4)', flexShrink: 0 }}>
                             <img src={qrModal.dataUrl} alt="QR-Code" style={{ display: 'block', width: '240px', height: '240px' }} />
                         </div>
 
@@ -7829,7 +7784,7 @@ END:VCARD`;
                                 { key: 'note', label: 'Notiz', placeholder: 'Etage, Hinweis...' },
                             ].map(({ key, label, placeholder }) => (
                                 <div key={key} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                    <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600, width: '52px', flexShrink: 0 }}>{label}</label>
+                                    <label style={{ fontSize: '0.7rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600, width: '52px', flexShrink: 0 }}>{label}</label>
                                     <input
                                         key={`qr-${key}-${qrSessionKey}`}
                                         defaultValue={qrEditFields[key] || ''}
@@ -7838,9 +7793,9 @@ END:VCARD`;
                                         style={{
                                             flex: 1, padding: '0.4rem 0.7rem',
                                             borderRadius: '8px', fontSize: '0.85rem',
-                                            border: '1px solid var(--border)', boxShadow: '0 10px 25px rgba(0,0,0,0.05)',
+                                            border: '1px solid rgba(255,255,255,0.1)',
                                             background: 'rgba(255,255,255,0.06)',
-                                            color: 'white', outline: 'none',
+                                            color: '#F1F5F9', outline: 'none',
                                         }}
                                     />
                                 </div>

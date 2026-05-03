@@ -2711,7 +2711,7 @@ END:VCARD`;
         const adresse = [formData.street, [formData.zip, formData.city].filter(Boolean).join(' ')].filter(Boolean).join(', ');
         const sub = [formData.projectNumber, formData.damageCategory].filter(Boolean).join(' · ');
         return (
-            <div className="force-dark-mode" style={{ minHeight: '100vh', backgroundColor: 'var(--color-app-bg, #0F172A)', padding: '2rem 1.25rem 3rem', fontFamily: 'Inter,system-ui,sans-serif', color: 'var(--text-main, #E2E8F0)' }}>
+            <div className="force-dark-mode" style={{ minHeight: '100vh', backgroundColor: 'var(--background)', padding: '2rem 1.25rem 3rem', fontFamily: 'Inter,system-ui,sans-serif', color: 'var(--text-main)' }}>
                 <div style={{ marginBottom: '2.5rem' }}>
                     <div style={{ fontSize: '1.5rem', fontWeight: 800, lineHeight: 1.2 }}>{adresse || 'Schadenort'}</div>
                     {sub && <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.4rem', fontWeight: 500 }}>{sub}</div>}
@@ -6776,7 +6776,7 @@ END:VCARD`;
                             )}
                             
                             {showAddDeviceForm && mode === 'technician' && (
-                                <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(4px)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+                                <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(4px)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
                                     <div style={{ backgroundColor: 'var(--surface)', borderRadius: '16px', width: '100%', maxWidth: '400px', padding: '1.5rem', color: 'var(--text-main)', border: '1px solid var(--border)', boxShadow: '0 10px 25px rgba(0,0,0,0.05)' }}>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                                             <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700 }}>Gerät hinzufügen</h3>
@@ -6971,7 +6971,7 @@ END:VCARD`;
                                 if (!device) return null;
 
                                 return (
-                                    <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(4px)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+                                    <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(4px)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
                                         <div style={{ backgroundColor: 'var(--surface)', borderRadius: '16px', width: '100%', maxWidth: '400px', padding: '1.5rem', color: 'var(--text-main)', border: '1px solid var(--border)', boxShadow: '0 10px 25px rgba(0,0,0,0.05)' }}>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                                                 <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700 }}>Gerät abmelden</h3>

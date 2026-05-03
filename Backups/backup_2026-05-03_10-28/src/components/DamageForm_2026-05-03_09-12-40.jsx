@@ -2711,7 +2711,7 @@ END:VCARD`;
         const adresse = [formData.street, [formData.zip, formData.city].filter(Boolean).join(' ')].filter(Boolean).join(', ');
         const sub = [formData.projectNumber, formData.damageCategory].filter(Boolean).join(' · ');
         return (
-            <div className="force-dark-mode" style={{ minHeight: '100vh', backgroundColor: 'var(--color-app-bg, #0F172A)', padding: '2rem 1.25rem 3rem', fontFamily: 'Inter,system-ui,sans-serif', color: 'var(--text-main, #E2E8F0)' }}>
+            <div style={{ minHeight: '100vh', backgroundColor: 'var(--background)', padding: '2rem 1.25rem 3rem', fontFamily: 'Inter,system-ui,sans-serif', color: 'var(--text-main)' }}>
                 <div style={{ marginBottom: '2.5rem' }}>
                     <div style={{ fontSize: '1.5rem', fontWeight: 800, lineHeight: 1.2 }}>{adresse || 'Schadenort'}</div>
                     {sub && <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.4rem', fontWeight: 500 }}>{sub}</div>}
@@ -2728,10 +2728,10 @@ END:VCARD`;
                                 setTechTab(tile.id); 
                             }
                         }} style={{
-                            background: 'var(--surface)', border: `2px solid ${tile.color}`,
+                            background: 'var(--surface)', border: '2px solid var(--q-primary)',
                             borderRadius: '16px', padding: '2.5rem 1rem', cursor: 'pointer',
                             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                            gap: '0.75rem', boxShadow: `0 4px 20px ${tile.color}33`, minHeight: '130px', transition: 'transform 0.15s'
+                            gap: '0.75rem', boxShadow: '0 4px 20px rgba(30, 109, 183, 0.15)', minHeight: '130px', transition: 'transform 0.15s'
                         }}>
                             <span style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-main)' }}>{tile.label === 'Trocknung' ? 'Geräte' : tile.label}</span>
                         </button>
@@ -2743,10 +2743,10 @@ END:VCARD`;
                         setTechRoomSelectorMode('messung');
                         setShowTechRoomSelector(true);
                     }} style={{
-                        background: 'var(--surface)', border: `2px solid ${TECH_TILES[4].color}`,
+                        background: 'var(--surface)', border: '2px solid var(--q-primary)',
                         borderRadius: '16px', padding: '2.5rem 1rem', cursor: 'pointer',
                         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                        gap: '0.75rem', boxShadow: `0 4px 20px ${TECH_TILES[4].color}33`,
+                        gap: '0.75rem', boxShadow: '0 4px 20px rgba(30, 109, 183, 0.15)',
                         width: 'calc(50% - 0.5rem)', minHeight: '130px'
                     }}>
                         <span style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-main)' }}>{TECH_TILES[4].label}</span>
@@ -2761,8 +2761,8 @@ END:VCARD`;
                     const activeApt = techSelectedApartment || (uniqueApartments.length === 1 ? uniqueApartments[0] : null);
 
                     return (
-                        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.85)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-                            <div style={{ backgroundColor: '#1E293B', borderRadius: '16px', width: '100%', maxWidth: '400px', padding: '1.5rem', color: '#F1F5F9', border: '1px solid rgba(255,255,255,0.1)' }}>
+                        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(4px)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+                            <div style={{ backgroundColor: 'var(--surface)', borderRadius: '16px', width: '100%', maxWidth: '400px', padding: '1.5rem', color: 'var(--text-main)', border: '1px solid var(--border)', boxShadow: '0 10px 25px rgba(0,0,0,0.05)' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                         {activeApt && uniqueApartments.length > 1 && techRoomSelectorMode === 'messung' && (
@@ -2796,9 +2796,9 @@ END:VCARD`;
                                                     } else {
                                                         setTechSelectedApartment(apt);
                                                     }
-                                                }} style={{ padding: '1.25rem 1rem', borderRadius: '8px', background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.2)', color: '#60A5FA', fontSize: '1.05rem', fontWeight: 700, textAlign: 'left', cursor: 'pointer', display: 'flex', justifyContent: 'space-between' }}>
+                                                }} style={{ padding: '1.25rem 1rem', borderRadius: '8px', background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-main)', fontSize: '1.05rem', fontWeight: 700, textAlign: 'left', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                                     <span>{apt}</span>
-                                                    <span style={{ fontSize: '0.8rem' }}>{btnLabel}</span>
+                                                    <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600 }}>{btnLabel}</span>
                                                 </button>
                                             );
                                         }) : (
@@ -2814,9 +2814,9 @@ END:VCARD`;
                                                 setShowTechRoomSelector(false);
                                                 setTechSelectedApartment(null);
                                                 setShowMeasurementModal(true);
-                                            }} style={{ padding: '1rem', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#F1F5F9', fontSize: '1rem', fontWeight: 600, textAlign: 'left', cursor: 'pointer', display: 'flex', justifyContent: 'space-between' }}>
+                                            }} style={{ padding: '1rem', borderRadius: '8px', background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', color: 'var(--text-main)', fontSize: '1rem', fontWeight: 600, textAlign: 'left', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                                 <span>{r.name || 'Ohne Namen'}</span>
-                                                <span style={{ color: '#94A3B8', fontSize: '0.8rem' }}>Öffnen ➔</span>
+                                                <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Öffnen ➔</span>
                                             </button>
                                         ))}
                                         {allRooms.filter(r => (r.apartment || 'Allgemeiner Bereich').trim() === activeApt).length === 0 && (
@@ -2825,7 +2825,7 @@ END:VCARD`;
                                     </div>
                                 )}
 
-                                <div style={{ marginTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '1.5rem' }}>
+                                <div style={{ marginTop: '1rem', borderTop: '1px solid var(--border)', boxShadow: '0 -4px 20px rgba(0,0,0,0.04)', paddingTop: '1.5rem' }}>
                                     <button onClick={() => {
                                         if (techRoomSelectorMode === 'geraete') {
                                             setTechSelectedEquipmentRoom({ apartment: '' });
@@ -2850,7 +2850,7 @@ END:VCARD`;
                                             setTechSelectedApartment(null);
                                             setShowMeasurementModal(true);
                                         }
-                                    }} style={{ width: '100%', background: 'rgba(16, 185, 129, 0.1)', color: '#10B981', border: '1px dashed #10B981', padding: '1rem', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '0.95rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                                    }} style={{ width: '100%', background: 'var(--surface)', color: 'var(--text-main)', border: '1px dashed #94A3B8', padding: '1rem', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '0.95rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
                                         <Plus size={18} /> {techRoomSelectorMode === 'geraete' ? 'Gerät hinzufügen' : 'Neuer Raum / Neue Messung'}
                                     </button>
                                 </div>
@@ -2860,7 +2860,6 @@ END:VCARD`;
                 })()}
 
                 <MeasurementModal
-                    isTechnicianMode={mode === 'technician'}
                     key={activeRoomForMeasurement?.id || 'none'}
                     isOpen={showMeasurementModal}
                     onClose={() => {
@@ -6445,7 +6444,7 @@ END:VCARD`;
                                                             <img
                                                                 src={entry.src}
                                                                 alt={entry.label}
-                                                                style={{ width: '100%', height: '160px', objectFit: 'contain', backgroundColor: '#fff', display: 'block', cursor: 'pointer' }}
+                                                                style={{ width: '100%', height: '160px', objectFit: 'contain', backgroundColor: 'var(--surface)', display: 'block', cursor: 'pointer' }}
                                                                 onClick={() => window.open(entry.src, '_blank')}
                                                             />
                                                             <div style={{ padding: '0.3rem 0.6rem', fontSize: '0.7rem', fontWeight: 600, color: entry.isCurrent ? 'var(--primary)' : 'var(--text-muted)', borderTop: '1px solid var(--border)' }}>
@@ -6453,25 +6452,8 @@ END:VCARD`;
                                                             </div>
                                                             <button
                                                                 type="button"
-                                                                title="Skizze als PDF speichern"
-                                                                onClick={async (e) => {
-                                                                    e.stopPropagation();
-                                                                    try {
-                                                                        const { ExportService } = await import('../services/ExportService');
-                                                                        await ExportService.generateSketchPdf(formData, room, entry);
-                                                                    } catch(err) {
-                                                                        alert('Fehler beim PDF Export: ' + err.message);
-                                                                    }
-                                                                }}
-                                                                style={{ position: 'absolute', top: '6px', right: '44px', background: 'rgba(59,130,246,0.85)', color: 'white', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 2px 4px rgba(0,0,0,0.3)', zIndex: 10 }}
-                                                            >
-                                                                <Download size={14} />
-                                                            </button>
-                                                            <button
-                                                                type="button"
                                                                 title="Bild löschen"
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
+                                                                onClick={() => {
                                                                     if (!window.confirm('Dieses Messprotokoll-Bild wirklich löschen?')) return;
                                                                     setFormData(prev => ({
                                                                         ...prev,
@@ -6776,7 +6758,7 @@ END:VCARD`;
                             )}
                             
                             {showAddDeviceForm && mode === 'technician' && (
-                                <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(4px)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+                                <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(4px)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
                                     <div style={{ backgroundColor: 'var(--surface)', borderRadius: '16px', width: '100%', maxWidth: '400px', padding: '1.5rem', color: 'var(--text-main)', border: '1px solid var(--border)', boxShadow: '0 10px 25px rgba(0,0,0,0.05)' }}>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                                             <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700 }}>Gerät hinzufügen</h3>
@@ -6971,7 +6953,7 @@ END:VCARD`;
                                 if (!device) return null;
 
                                 return (
-                                    <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(4px)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+                                    <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(4px)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
                                         <div style={{ backgroundColor: 'var(--surface)', borderRadius: '16px', width: '100%', maxWidth: '400px', padding: '1.5rem', color: 'var(--text-main)', border: '1px solid var(--border)', boxShadow: '0 10px 25px rgba(0,0,0,0.05)' }}>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                                                 <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700 }}>Gerät abmelden</h3>
@@ -7502,7 +7484,6 @@ END:VCARD`;
                 }
 
                 <MeasurementModal
-                    isTechnicianMode={mode === 'technician'}
                     key={activeRoomForMeasurement?.id || 'none'}
                     isOpen={showMeasurementModal}
                     onClose={() => {

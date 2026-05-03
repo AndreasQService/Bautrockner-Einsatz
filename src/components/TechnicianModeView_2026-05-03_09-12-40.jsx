@@ -11,11 +11,11 @@ const TABS = [
 ];
 
 const card = (extra={}) => ({
-  background:'var(--color-surface, rgba(255,255,255,0.03))',
-  border:'1px solid var(--color-border, rgba(255,255,255,0.08))',
+  background:'rgba(255,255,255,0.03)',
+  border:'1px solid rgba(255,255,255,0.08)',
   borderRadius:'14px', padding:'1rem', ...extra
 });
-const label = { fontSize:'0.62rem', textTransform:'uppercase', letterSpacing:'0.08em', color:'var(--color-text-secondary, #94A3B8)', fontWeight:700, marginBottom:'0.5rem', display:'block' };
+const label = { fontSize:'0.62rem', textTransform:'uppercase', letterSpacing:'0.08em', color:'#475569', fontWeight:700, marginBottom:'0.5rem', display:'block' };
 const field = { width:'100%', minHeight:'90px', fontFamily:'inherit', lineHeight:'1.5', fontSize:'0.95rem', background:'transparent', border:'none', color: 'var(--text-main)', resize:'vertical', outline:'none' };
 const bigBtn = (color) => ({ background:`rgba(${color},0.12)`, border:`1px solid rgba(${color},0.3)`, borderRadius:'12px', padding:'0.85rem 0.5rem', display:'flex', flexDirection:'column', alignItems:'center', gap:'0.4rem', color:`rgb(${color})`, fontSize:'0.7rem', fontWeight:700, cursor:'pointer', minHeight:'70px' });
 
@@ -41,13 +41,13 @@ export default function TechnicianModeView({
   };
 
   return (
-    <div className="force-dark-mode" style={{minHeight:'100dvh', backgroundColor: 'var(--color-app-bg, #0F172A)', color: 'var(--text-main, #E2E8F0)', fontFamily:'inherit'}}>
+    <div style={{minHeight:'100dvh', backgroundColor: 'var(--background)', color: 'var(--text-main)', fontFamily:'inherit'}}>
 
       {/* STICKY HEADER */}
       <div style={{position:'sticky',top:0,zIndex:100,backgroundColor:'rgba(15,23,42,0.97)',backdropFilter:'blur(12px)',borderBottom:'1px solid rgba(255,255,255,0.08)'}}>
         {/* Row 1 */}
         <div style={{display:'flex',alignItems:'center',gap:'0.75rem',padding:'0.65rem 1rem 0.4rem'}}>
-          <button type="button" onClick={onCancel} style={{background:'rgba(255,255,255,0.07)',border: '1px solid var(--color-border, rgba(255,255,255,0.1))', boxShadow: '0 10px 30px rgba(0,0,0,0.3)',color:'var(--color-text-secondary, #94A3B8)',borderRadius:'10px',padding:'0.45rem 0.7rem',display:'flex',alignItems:'center',gap:'0.35rem',fontSize:'0.8rem',fontWeight:700,cursor:'pointer',minHeight:'40px',flexShrink:0}}>
+          <button type="button" onClick={onCancel} style={{background:'rgba(255,255,255,0.07)',border: '1px solid #E2E8F0', boxShadow: '0 10px 30px rgba(0,0,0,0.1)',color:'#94A3B8',borderRadius:'10px',padding:'0.45rem 0.7rem',display:'flex',alignItems:'center',gap:'0.35rem',fontSize:'0.8rem',fontWeight:700,cursor:'pointer',minHeight:'40px',flexShrink:0}}>
             <ArrowLeft size={15}/> Zurück
           </button>
           <div style={{flex:1,minWidth:0}}>
@@ -109,7 +109,7 @@ export default function TechnicianModeView({
                   onMouseLeave={e=>{e.currentTarget.style.background=done?`rgba(${c},0.1)`:'rgba(255,255,255,0.02)';e.currentTarget.style.border=`1px solid rgba(${c},${done?'0.3':'0.08'})`;}}
                 >
                   <div style={{fontSize:'1.1rem',marginBottom:'0.2rem'}}>{icon}</div>
-                  <div style={{fontSize:'0.78rem',fontWeight:700,color:done?`rgb(${c})`:'var(--text-main, #E2E8F0)'}}>{s}</div>
+                  <div style={{fontSize:'0.78rem',fontWeight:700,color:done?`rgb(${c})`:'#94A3B8'}}>{s}</div>
                   <div style={{fontSize:'0.62rem',fontWeight:600,color:done?'#22C55E':active?'#F97316':'#475569',display:'flex',alignItems:'center',gap:'0.3rem'}}>
                     {done?'✓ Erledigt':active?'● Aktiv':'○ Offen'}
                   </div>

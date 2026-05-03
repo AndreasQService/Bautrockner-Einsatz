@@ -1,0 +1,62 @@
+import React from 'react';
+import { View, Image, Text } from '@react-pdf/renderer';
+import { styles } from '../PDFStyles';
+
+const ImageGrid = ({ images, showName = false, imageStyle = styles.image, containerStyle = styles.imageContainer }) => {
+    if (!images || images.length === 0) return null;
+
+    // Flatten: expand thermalImage pairs into single list including thermal entries
+    const flatImages = [];
+    images.forEach(img => {
+        flatImages.push(img);
+        // Only show thermal if it exists AND has a different preview (not the same image)
+        if (img.thermalImage && img.thermalImage.preview && img.thermalImage.preview !== img.preview) {
+            flatImages.push({
+                ...img.thermalImage,
+                _isThermal: true,
+                _parentDescription: img.description,
+            });
+        }
+    });
+
+    // Group into pairs for 2-column layout
+    // react-pdf can't paginate flexWrap:'wrap' rows, so we use explicit row Views
+    const pairs = [];
+    for (let i = 0; i < flatImages.length; i += 2) {
+        pairs.push(flatImages.slice(i, i + 2));
+    }
+
+    return (
+        <View>
+            {pairs.map((pair, pairIndex) => (
+                // Each row pair uses wrap={false} to keep 2 images together on same page
+                <View key={pairIndex} style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 }} wrap={false} minPresenceAhead={30}>
+                    {pair.map((img, i) => (
+                        <View key={i} style={[containerStyle, { marginBottom: 0 }]}>
+                            {img.preview ? (
+                                <Image src={img.preview} style={imageStyle} />
+                            ) : (
+                                <View style={[imageStyle, { alignItems: 'center', justifyContent: 'center', backgroundColor: '#f1f5f9' }]}>
+                                    <Text style={{ fontSize: 8, color: '#ef4444' }}>[ BILD NICHT VERFÜGBAR ]</Text>
+                                </View>
+                            )}
+                            {img._isThermal ? (
+                                <Text style={[styles.imageDescription, { color: '#ef4444', fontWeight: 'bold' }]}>
+                                    [Thermobild] {img.description || img._parentDescription || ''}
+                                </Text>
+                            ) : showName ? (
+                                img.name && <Text style={styles.imageDescription}>{img.name}</Text>
+                            ) : (
+                                img.description && <Text style={styles.imageDescription}>{img.description}</Text>
+                            )}
+                        </View>
+                    ))}
+                    {/* Fill empty slot if odd number */}
+                    {pair.length === 1 && <View style={[containerStyle, { marginBottom: 0 }]} />}
+                </View>
+            ))}
+        </View>
+    );
+};
+
+export default ImageGrid;
