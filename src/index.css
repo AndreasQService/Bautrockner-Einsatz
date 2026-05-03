@@ -812,7 +812,7 @@ input:-webkit-autofill:active {
   width: 100%;
 }
 @media (min-width: 820px)  { .tech-projects-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; } }
-@media (min-width: 1024px) { .tech-projects-grid { grid-template-columns: repeat(3, 1fr); gap: 12px; } }
+@media (min-width: 1024px) { .tech-projects-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; } }
 
 .tech-project-card {
   background-color: var(--surface);
@@ -922,3 +922,5 @@ input[data-lpignore='false'] + div[id^='__lpform_'] { display: none !important; 
   --text-muted: #94A3B8;
   --color-panel-bg: rgba(255,255,255,0.03);
 }
+
+@media (max-width: 1200px) { .tech-project-card { padding: 8px 10px; } }
