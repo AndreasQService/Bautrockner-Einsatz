@@ -3359,12 +3359,26 @@ END:VCARD`;
                                 <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 600, marginBottom: '0.5rem', display: 'block' }}>PLZ (AG)</label>
                                 <input
                                     type="text"
+                                    list="plz-list-ag"
                                     className="form-input"
                                     value={formData.clientZip || ''}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, clientZip: e.target.value }))}
+                                    onChange={(e) => {
+                                        const val = e.target.value;
+                                        const match = swissPLZ.find(entry => entry.plz === val.trim());
+                                        if (match) {
+                                            setFormData(prev => ({ ...prev, clientZip: val, clientCity: match.city }));
+                                        } else {
+                                            setFormData(prev => ({ ...prev, clientZip: val }));
+                                        }
+                                    }}
                                     placeholder="PLZ"
                                     style={{ width: '100%' }}
                                 />
+                                <datalist id="plz-list-ag">
+                                    {swissPLZ.map((entry, idx) => (
+                                        <option key={idx} value={entry.plz}>{entry.city}</option>
+                                    ))}
+                                </datalist>
                             </div>
                             <div style={{ flex: '1 1 150px' }}>
                                 <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 600, marginBottom: '0.5rem', display: 'block' }}>Ort (AG)</label>
