@@ -7058,164 +7058,8 @@ END:VCARD`;
                         </div>
 
 
-                        {/* Energy Report Button (Inserted between form and list) */}
-                        {mode === 'desktop' && (
-                            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem', position: 'relative', zIndex: 10, ...(mode === 'desktop' ? { order: 2 } : {}) }}>
-                                <button
-                                    type="button"
-                                    onClick={generateEnergyReport}
-                                    className="btn btn-outline"
-                                    style={{
-                                        borderColor: 'var(--success)',
-                                        color: 'var(--success)',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '6px'
-                                    }}
-                                    title="Energieprotokoll erstellen"
-                                >
-                                    <PdfIcon size={18} />
-                                    <span>Energieprotokoll (PDF)</span>
-                                </button>
-                            </div>
-                        )}
+                        {/* Redundante Liste entfernt */}
 
-
-                        {mode === 'desktop' && (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', order: 1 }}>
-                            {formData.equipment
-                                .map((d, i) => ({ ...d, _originalIndex: i }))
-                                .filter(device => {
-                                    if (mode !== 'technician') return true;
-                                    if (techFocusDeviceIndex !== null) return device._originalIndex === techFocusDeviceIndex;
-                                    return !techSelectedEquipmentRoom?.apartment || (device.apartment || 'Allgemeiner Bereich').trim() === techSelectedEquipmentRoom.apartment;
-                                })
-                                .sort((a, b) => {
-                                    const aDone = !!a.endDate;
-                                    const bDone = !!b.endDate;
-                                    if (aDone === bDone) return 0;
-                                    return aDone ? 1 : -1;
-                                })
-                                .map((device) => {
-                                    const idx = device._originalIndex;
-                                    return (
-                                        <div key={idx} style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '0.75rem', color: 'var(--text-main)' }}>
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
-                                                <div style={{ minWidth: '40px', display: 'flex', flexDirection: 'column' }}>
-                                                    <span style={{ fontWeight: 600, color: 'var(--primary)' }}>#{device.deviceNumber}</span>
-                                                    {(device.model || (device.type && device.type !== 'Unbekannt')) && (
-                                                        <span style={{ fontSize: '0.65rem', color: '#94A3B8', fontWeight: 600 }}>{device.model || device.type}</span>
-                                                    )}
-                                                </div>
-                                                <div style={{ flex: 1, textAlign: 'center' }}>
-                                                    <div style={{ fontSize: '1.2rem', fontWeight: 700 }}>
-                                                        {device.room}
-                                                        {device.apartment && <span style={{ fontSize: '0.8rem', color: '#94A3B8', fontWeight: 400, marginLeft: '4px' }}>({device.apartment})</span>}
-                                                    </div>
-                                                </div>
-                                                <div style={{ minWidth: '40px' }}></div> {/* Spacer for balance */}
-                                            </div>
-
-                                            <div style={{ fontSize: '0.9rem', color: '#94A3B8', display: 'flex', justifyContent: 'space-between', marginTop: '0.5rem', borderTop: '1px solid var(--border)', paddingTop: '0.5rem', marginBottom: '0.5rem' }}>
-                                                <span>Start: {device.startDate}</span>
-                                                <span>Start-Zähler: {device.counterStart} kWh</span>
-                                            </div>
-
-                                            {/* Logic for Unsubscribe */}
-                                            {(() => {
-                                                const isUnsubscribing = !!unsubscribeStates[idx];
-                                                const isAbgemeldet = !!device.endDate;
-                                                const draft = unsubscribeStates[idx] || {};
-
-                                                if (isAbgemeldet) {
-                                                    // ALREADY DONE STATE
-                                                    return (
-                                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '0.5rem', marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid var(--border)', boxShadow: '0 -4px 20px rgba(0,0,0,0.04)' }}>
-                                                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-                                                                <div>
-                                                                    <label style={{ fontSize: '0.75rem', color: '#94A3B8', display: 'block', marginBottom: '0.2rem' }}>Zähler Ende</label>
-                                                                    <input
-                                                                        type="number"
-                                                                        className="form-input"
-                                                                        style={{ fontSize: '0.9rem', padding: '0.4rem', width: '100%' }}
-                                                                        value={device.counterEnd || ''}
-                                                                        onChange={(e) => {
-                                                                            const newEquipment = [...formData.equipment];
-                                                                            newEquipment[idx].counterEnd = e.target.value;
-                                                                            setFormData(prev => ({ ...prev, equipment: newEquipment }));
-                                                                        }}
-                                                                    />
-                                                                </div>
-                                                                <div>
-                                                                    <label style={{ fontSize: '0.75rem', color: '#94A3B8', display: 'block', marginBottom: '0.2rem' }}>Laufzeit/Std.</label>
-                                                                    <input
-                                                                        type="number"
-                                                                        className="form-input"
-                                                                        style={{ fontSize: '0.9rem', padding: '0.4rem', width: '100%' }}
-                                                                        value={device.hours || ''}
-                                                                        onChange={(e) => {
-                                                                            const newEquipment = [...formData.equipment];
-                                                                            newEquipment[idx].hours = e.target.value;
-                                                                            setFormData(prev => ({ ...prev, equipment: newEquipment }));
-                                                                        }}
-                                                                    />
-                                                                </div>
-                                                            </div>
-                                                            <button
-                                                                type="button"
-                                                                style={{
-                                                                    flex: 1, fontSize: '0.9rem', padding: '0.5rem', fontWeight: 600,
-                                                                    color: '#10B981', backgroundColor: 'rgba(16, 185, 129, 0.15)',
-                                                                    border: '1px solid #10B981', borderRadius: '4px',
-                                                                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', cursor: 'pointer', textTransform: 'uppercase'
-                                                                }}
-                                                                onClick={() => {
-                                                                    if (window.confirm("Abmeldung rückgängig machen?")) {
-                                                                        const newEquipment = [...formData.equipment];
-                                                                        newEquipment[idx].endDate = '';
-                                                                        newEquipment[idx].counterEnd = '';
-                                                                        newEquipment[idx].hours = '';
-                                                                        setFormData(prev => ({ ...prev, equipment: newEquipment }));
-                                                                    }
-                                                                }}
-                                                            >
-                                                                <Check size={16} /> Abgemeldet
-                                                            </button>
-                                                        </div>
-                                                    );
-
-                                                } else {
-                                                    // IDLE STATE (Active)
-                                                    return null;
-                                                }
-                                            })()}
-                                        </div>
-                                    );
-                                })}
-                            {formData.equipment.filter(device => mode !== 'technician' || !techSelectedEquipmentRoom?.apartment || (device.apartment || 'Allgemeiner Bereich').trim() === techSelectedEquipmentRoom.apartment).length === 0 && (
-                                <div style={{ textAlign: 'center', color: '#9CA3AF', fontSize: '0.9rem' }}>Keine Geräte installiert.</div>
-                            )}
-                        </div>
-                        )}
-
-                        {false && mode === 'technician' && (
-                            <div style={{ marginTop: '1.5rem', padding: '0 0.75rem' }}>
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        // Find first available apartment if not set
-                                        if (!techSelectedEquipmentRoom?.apartment) {
-                                            const apts = [...new Set(formData.equipment.map(e => e.apartment).filter(Boolean))];
-                                            if (apts.length > 0) setTechSelectedEquipmentRoom({ apartment: apts[0] });
-                                        }
-                                        setShowAddDeviceForm(true);
-                                    }}
-                                    style={{ width: '100%', background: 'var(--surface)', color: '#1E6DB7', border: '2px solid #1E6DB7', padding: '0.75rem', borderRadius: '8px', fontWeight: 700, cursor: 'pointer', fontSize: '0.9rem', textTransform: 'uppercase', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
-                                >
-                                    <Plus size={18} /> Gerät hinzufügen
-                                </button>
-                            </div>
-                        )}
 
 
 
@@ -7226,9 +7070,32 @@ END:VCARD`;
                 {/* Zusammenfassung Trocknung */}
                 {(mode === 'desktop' || true) && formData.equipment?.length > 0 && (
                     <div style={{ marginBottom: '1.5rem', backgroundColor: 'var(--surface)', padding: '1.25rem', borderRadius: '12px', border: '2px solid #1E6DB7', color: 'var(--text-main)', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}>
-                        <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.6rem', color: 'var(--primary)' }}>
-                            <Database size={18} /> Geräteliste
-                        </h3>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+                            <h3 style={{ fontSize: '1rem', fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: '0.6rem', color: 'var(--primary)' }}>
+                                <Database size={18} /> Geräteliste
+                            </h3>
+                            <button
+                                type="button"
+                                onClick={generateEnergyReport}
+                                style={{
+                                    background: 'rgba(16, 185, 129, 0.1)',
+                                    color: '#10B981',
+                                    border: '1px solid rgba(16, 185, 129, 0.3)',
+                                    padding: '4px 12px',
+                                    borderRadius: '6px',
+                                    fontSize: '0.75rem',
+                                    fontWeight: 700,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                    cursor: 'pointer',
+                                    textTransform: 'uppercase'
+                                }}
+                            >
+                                <PdfIcon size={14} />
+                                Export
+                            </button>
+                        </div>
                         <div style={{ overflowX: 'auto' }}>
                             {mode === 'technician' ? (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
