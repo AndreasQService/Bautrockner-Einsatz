@@ -198,7 +198,7 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
     const [isCustomApartment, setIsCustomApartment] = useState(false);
     const [availableDevices, setAvailableDevices] = useState([]);
     const [activeNumpadField, setActiveNumpadField] = useState(null);
-    const [numpadPos, setNumpadPos] = useState({ x: typeof window !== 'undefined' ? window.innerWidth - 350 : 100, y: typeof window !== 'undefined' ? window.innerHeight - 450 : 100 });
+    const [numpadPos, setNumpadPos] = useState({ x: typeof window !== 'undefined' ? window.innerWidth - 350 : 100, y: typeof window !== 'undefined' ? 80 : 100 });
     const numpadDragRef = useRef(false);
     const numpadStartRef = useRef({ x: 0, y: 0 });
 
