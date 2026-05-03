@@ -27,23 +27,23 @@ export default defineConfig({
         lang: 'de',
         icons: [
           {
-            src: 'logo.png',
+            src: 'app-icon.png',
             sizes: '192x192',
             type: 'image/png'
           },
           {
-            src: 'logo.png',
+            src: 'app-icon.png',
             sizes: '512x512',
             type: 'image/png'
           },
           {
-            src: 'logo.png',
+            src: 'app-icon.png',
             sizes: '180x180',
             type: 'image/png',
             purpose: 'apple touch icon'
           },
           {
-            src: 'logo.png',
+            src: 'app-icon.png',
             sizes: '512x512',
             type: 'image/png',
             purpose: 'any maskable'
