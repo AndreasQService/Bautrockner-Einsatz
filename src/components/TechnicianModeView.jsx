@@ -16,7 +16,7 @@ const card = (extra={}) => ({
   borderRadius:'14px', padding:'1rem', ...extra
 });
 const label = { fontSize:'0.62rem', textTransform:'uppercase', letterSpacing:'0.08em', color:'#475569', fontWeight:700, marginBottom:'0.5rem', display:'block' };
-const field = { width:'100%', minHeight:'90px', fontFamily:'inherit', lineHeight:'1.5', fontSize:'0.95rem', background:'transparent', border:'none', color: '#1E293B', resize:'vertical', outline:'none' };
+const field = { width:'100%', minHeight:'90px', fontFamily:'inherit', lineHeight:'1.5', fontSize:'0.95rem', background:'transparent', border:'none', color: 'var(--text-main)', resize:'vertical', outline:'none' };
 const bigBtn = (color) => ({ background:`rgba(${color},0.12)`, border:`1px solid rgba(${color},0.3)`, borderRadius:'12px', padding:'0.85rem 0.5rem', display:'flex', flexDirection:'column', alignItems:'center', gap:'0.4rem', color:`rgb(${color})`, fontSize:'0.7rem', fontWeight:700, cursor:'pointer', minHeight:'70px' });
 
 export default function TechnicianModeView({
@@ -41,7 +41,7 @@ export default function TechnicianModeView({
   };
 
   return (
-    <div style={{minHeight:'100dvh', backgroundColor: '#F8FAFC', color: '#1E293B', fontFamily:'inherit'}}>
+    <div style={{minHeight:'100dvh', backgroundColor: 'var(--background)', color: 'var(--text-main)', fontFamily:'inherit'}}>
 
       {/* STICKY HEADER */}
       <div style={{position:'sticky',top:0,zIndex:100,backgroundColor:'rgba(15,23,42,0.97)',backdropFilter:'blur(12px)',borderBottom:'1px solid rgba(255,255,255,0.08)'}}>
@@ -180,7 +180,7 @@ export default function TechnicianModeView({
                 {contact.phone && <div style={{fontSize:'0.82rem',color:'#64748B'}}>{contact.phone}</div>}
               </div>
               {contact.phone && (
-                <a href={`tel:${contact.phone}`} style={{display:'flex',alignItems:'center',gap:'0.5rem',background:'#22C55E',color: '#1E293B',borderRadius:'12px',padding:'0.7rem 1rem',fontSize:'0.82rem',fontWeight:700,textDecoration:'none',flexShrink:0,minHeight:'48px'}}>
+                <a href={`tel:${contact.phone}`} style={{display:'flex',alignItems:'center',gap:'0.5rem',background:'#22C55E',color: '#FFFFFF',borderRadius:'12px',padding:'0.7rem 1rem',fontSize:'0.82rem',fontWeight:700,textDecoration:'none',flexShrink:0,minHeight:'48px'}}>
                   <Phone size={15}/> Anrufen
                 </a>
               )}
@@ -364,7 +364,7 @@ export default function TechnicianModeView({
                   </div>
                 </div>
                 {hasMeasurement && room.measurementData.canvasImage && (
-                  <img src={room.measurementData.canvasImage} alt="Messprotokoll" onClick={()=>window.open(room.measurementData.canvasImage,'_blank')} style={{width:'100%',borderRadius:'10px',border:'1px solid rgba(168,85,247,0.25)',cursor:'pointer',maxHeight:160,objectFit:'contain',background:'#fff'}}/>
+                  <img src={room.measurementData.canvasImage} alt="Messprotokoll" onClick={()=>window.open(room.measurementData.canvasImage,'_blank')} style={{width:'100%',borderRadius:'10px',border:'1px solid rgba(168,85,247,0.25)',cursor:'pointer',maxHeight:160,objectFit:'contain',background:'var(--surface)'}}/>
                 )}
                 {(room.measurementHistory||[]).length>0 && (
                   <div style={{marginTop:'0.5rem',fontSize:'0.72rem',color:'#475569'}}>
@@ -383,7 +383,7 @@ export default function TechnicianModeView({
 
       {/* FLOATING SAVE */}
       <div style={{position:'fixed',bottom:0,left:0,right:0,padding:'0.85rem',paddingBottom:'calc(0.85rem + env(safe-area-inset-bottom))',background:'rgba(15,23,42,0.95)',backdropFilter:'blur(12px)',borderTop:'1px solid rgba(255,255,255,0.06)',zIndex:99}}>
-        <button type="button" onClick={()=>onSave&&onSave(formData)} style={{width:'100%',background:'linear-gradient(135deg,#0F6EA3,#1d8fd4)',color: '#1E293B',border:'none',borderRadius:'14px',padding:'0.9rem',fontSize:'1rem',fontWeight:800,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:'0.6rem',boxShadow:'0 4px 20px rgba(15,110,163,0.4)',minHeight:'52px'}}>
+        <button type="button" onClick={()=>onSave&&onSave(formData)} style={{width:'100%',background:'linear-gradient(135deg,#0F6EA3,#1d8fd4)',color: '#FFFFFF',border:'none',borderRadius:'14px',padding:'0.9rem',fontSize:'1rem',fontWeight:800,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:'0.6rem',boxShadow:'0 4px 20px rgba(15,110,163,0.4)',minHeight:'52px'}}>
           <Save size={18}/> Speichern
         </button>
       </div>

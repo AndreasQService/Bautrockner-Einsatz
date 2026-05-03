@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Filter, MapPin, Calendar, ArrowRight, Search, Trash2, FileText } from 'lucide-react'
+import { Filter, MapPin, Calendar, ArrowRight, Search, Trash2, FileText, RotateCcw, LogOut } from 'lucide-react'
 import InboxTodo from './InboxTodo'
 import WorkflowStatusOverview from './WorkflowStatusOverview'
 import RightSidebar from './RightSidebar'
@@ -327,7 +327,7 @@ const MeasurementControlOverview = ({ reports, onSelectReport }) => {
     );
 };
 
-export default function Dashboard({ reports, onSelectReport, onDeleteReport, mode, supabase, currentUser, users, onReportsChanged, lockedProjectIds }) {
+export default function Dashboard({ reports, onSelectReport, onDeleteReport, mode, supabase, currentUser, users, onReportsChanged, lockedProjectIds, onLogout }) {
     const [searchTerm, setSearchTerm] = useState('')
     const [currentPage, setCurrentPage] = useState(1);
     const [selectedSidebarReport, setSelectedSidebarReport] = useState(null);
@@ -774,6 +774,41 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
                             </button>
                         </div>
                     )}
+
+                    {/* App neu laden / Programm beenden */}
+                    <div style={{ marginTop: '3rem', paddingBottom: '5rem', display: 'flex', flexDirection: 'column', gap: '1rem', alignItems: 'center' }}>
+                        <button 
+                            className="btn btn-outline" 
+                            onClick={() => window.location.reload()} 
+                            style={{ padding: '0.75rem 2rem', borderRadius: '12px', fontSize: '0.9rem', width: '100%', maxWidth: '300px' }}
+                        >
+                            <RotateCcw size={16} /> Dashboard neu laden
+                        </button>
+                        
+                        {onLogout && (
+                            <button 
+                                onClick={onLogout} 
+                                style={{ 
+                                    padding: '0.75rem 2rem', 
+                                    borderRadius: '12px', 
+                                    fontSize: '0.9rem', 
+                                    width: '100%', 
+                                    maxWidth: '300px',
+                                    background: 'rgba(239, 68, 68, 0.1)',
+                                    border: '1px solid rgba(239, 68, 68, 0.3)',
+                                    color: '#EF4444',
+                                    fontWeight: 700,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '0.5rem',
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                <LogOut size={16} /> Programm beenden
+                            </button>
+                        )}
+                    </div>
                 </div>
             )}
         </div>

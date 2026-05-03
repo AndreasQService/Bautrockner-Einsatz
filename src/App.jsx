@@ -1028,6 +1028,7 @@ function App() {
           currentUser={currentUser}
           users={users}
           lockedProjectIds={lockedProjectIds}
+          onLogout={handleLogout}
           onReportsChanged={async () => {
             // Reload from Supabase after a status change
             const { data } = await supabase.from('damage_reports').select('report_data, updated_at').order('created_at', { ascending: false });

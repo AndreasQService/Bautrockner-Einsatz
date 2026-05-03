@@ -7,6 +7,8 @@
 
 /* ── Desktop-Typografie-Skala (CSS Custom Properties) ───────────────────── */
 :root {
+  color-scheme: dark;
+  
   /* Font */
   --font-desktop: "Segoe UI", Tahoma, Arial, sans-serif;
 
@@ -72,6 +74,7 @@
 
   --color-border:              rgba(255, 255, 255, 0.08);
   --color-border-strong:       rgba(255, 255, 255, 0.14);
+  --color-panel-bg:            rgba(255, 255, 255, 0.03);
 
   --color-text-primary:        #E2E8F0;
   --color-text-secondary:      #94A3B8;
@@ -141,6 +144,7 @@
   --color-app-bg:              #F2F4F6;
   --color-surface:             #FFFFFF;
   --color-surface-alt:         #F4F6F9;
+  --color-panel-bg:            #F1F5F9;
 
   --color-border:              #D5D9E0;
   --color-border-strong:       #C3C7D0;
@@ -635,7 +639,13 @@ body {
 }
 
 /* ── INPUTS ──────────────────────────────────────────────────────────────── */
-.form-input {
+.form-input,
+input[type="text"],
+input[type="number"],
+input[type="password"],
+input[type="email"],
+textarea,
+select {
   font-family: var(--font-desktop);
   background: var(--color-input-bg) !important;
   border: 1px solid var(--color-input-border);
@@ -645,7 +655,13 @@ body {
   font-size: var(--text-body);
   transition: border-color 0.10s ease;
 }
-.form-input:focus {
+.form-input:focus,
+input[type="text"]:focus,
+input[type="number"]:focus,
+input[type="password"]:focus,
+input[type="email"]:focus,
+textarea:focus,
+select:focus {
   outline: none;
   border-color: var(--color-input-focus);
   background: var(--color-input-bg) !important;
@@ -878,4 +894,15 @@ input[data-lpignore='false'] + div[id^='__lpform_'] { display: none !important; 
   .container {
     padding: 16px 24px;
   }
+}
+
+.force-dark-mode {
+  color-scheme: dark;
+  --background: #0F172A;
+  --surface: #1E293B;
+  --surface-opaque: #1E293B;
+  --border: rgba(255, 255, 255, 0.08);
+  --text-main: #E2E8F0;
+  --text-muted: #94A3B8;
+  --color-panel-bg: rgba(255,255,255,0.03);
 }

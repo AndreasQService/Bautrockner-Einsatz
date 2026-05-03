@@ -82,7 +82,7 @@ const DataLoggerUploader = ({ images = [], onChange }) => {
                                             width: '100%',
                                             height: '200px',
                                             objectFit: 'contain',
-                                            backgroundColor: '#fff',
+                                            backgroundColor: 'var(--surface)',
                                             display: 'block',
                                             cursor: 'pointer',
                                         }}

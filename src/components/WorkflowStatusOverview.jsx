@@ -277,7 +277,7 @@ function ProjectRow({rep,store,onSave,onSelect,openKey,onOpen}) {
       {/* Projekt/Objekt */}
       <td style={{padding:"6px 10px",verticalAlign:"middle",minWidth:170,maxWidth:200}}>
         {rep.projectNumber&&<div style={{fontSize:"1rem",color:"#1E6DB7",fontWeight:900,fontFamily:"monospace",letterSpacing:"0.04em",lineHeight:1.25,marginBottom:2}}>{rep.projectNumber}</div>}
-        <div style={{fontWeight:800,fontSize:"0.9rem",color:"#1E293B",lineHeight:1.25,marginBottom:2}}>{street}{city ? `, ${city}` : ''}</div>
+        <div style={{fontWeight:800,fontSize:"0.9rem",color:"var(--text-main, #E2E8F0)",lineHeight:1.25,marginBottom:2}}>{street}{city ? `, ${city}` : ''}</div>
         {rep.description&&<div style={{fontSize:"0.72rem",color:"#64748B",marginTop:3,lineHeight:1.3,overflow:"hidden",display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical"}}>{rep.description}</div>}
       </td>
 
@@ -400,7 +400,7 @@ export default function WorkflowStatusOverview({reports,onSelectReport,currentUs
           <table style={{minWidth:900,borderCollapse:"collapse",width:"100%"}}>
             <thead>
               {/* Row 1: Column labels */}
-              <tr style={{position:"sticky",top:0,zIndex:21,background:"#FFFFFF",boxShadow:"0 1px 3px rgba(0,0,0,0.05)"}}>
+              <tr style={{position:"sticky",top:0,zIndex:21,background:"var(--color-surface, #0F172A)",borderBottom:"1px solid var(--color-border, rgba(255,255,255,0.08))",boxShadow:"0 1px 3px rgba(0,0,0,0.2)"}}>
                 <th style={{padding:"0.6rem 8px",fontSize:"0.68rem",fontWeight:800,color:"#64748B",textTransform:"uppercase",letterSpacing:"0.05em",width:46}}>Status</th>
                 <th style={{padding:"0.6rem 10px",textAlign:"left",fontSize:"0.68rem",fontWeight:800,color:"#64748B",textTransform:"uppercase",letterSpacing:"0.05em",width:170}}>Objekt / Projekt</th>
                 <th style={{padding:"0.6rem 6px",textAlign:"center",fontSize:"0.68rem",fontWeight:800,color:"#64748B",textTransform:"uppercase",letterSpacing:"0.05em",width:56}}>Start</th>
@@ -411,14 +411,14 @@ export default function WorkflowStatusOverview({reports,onSelectReport,currentUs
                 <th style={{padding:"0.6rem 6px",textAlign:"center",fontSize:"0.68rem",fontWeight:800,color:"#64748B",textTransform:"uppercase",letterSpacing:"0.05em",width:56}}>Tage</th>
               </tr>
               {/* Row 2: Workflow step names aligned under timeline */}
-              <tr style={{position:"sticky",top:31,zIndex:20,background:"#F8FAFC",borderBottom:"1px solid #E2E8F0"}}>
+              <tr style={{position:"sticky",top:31,zIndex:20,background:"var(--color-surface-alt, #1E293B)",borderBottom:"1px solid var(--color-border, rgba(255,255,255,0.08))"}}>
                 <td colSpan={3} style={{padding:"0.4rem 0 0.5rem 0"}}/>
                 <td style={{padding:"0.4rem 8px 0.5rem"}}>
                   <div style={{display:"flex",alignItems:"center",width:"100%"}}>
                     {STEPS.map((step,i)=>(
                       <div key={step.id} style={{display:"flex",alignItems:"center",flex:i<STEPS.length-1?1:"0 0 auto"}}>
                         <div style={{display:"flex",flexDirection:"column",alignItems:"center",minWidth:0}}>
-                          <span style={{fontSize:"0.6rem",fontWeight:700,color:"#64748B",textTransform:"uppercase",letterSpacing:"0.02em",whiteSpace:"nowrap",textAlign:"center",lineHeight:1}}>{step.label}</span>
+                          <span style={{fontSize:"0.6rem",fontWeight:700,color:"#94A3B8",textTransform:"uppercase",letterSpacing:"0.02em",whiteSpace:"nowrap",textAlign:"center",lineHeight:1}}>{step.label}</span>
                         </div>
                         {i<STEPS.length-1&&<div style={{flex:1,minWidth:4}}/>}
                       </div>

@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Save, Eraser, Pen, Undo, Trash2, FileText, Loader, Check, Hand, ChevronUp, ChevronDown, Plus, Edit3, RotateCcw, PenOff, Camera, Image, Move, LayoutGrid, Delete } from 'lucide-react';
+import { X, Save, Eraser, Pen, Undo, Trash2, FileText, Loader, Check, Hand, ChevronUp, ChevronDown, Plus, Edit3, RotateCcw, PenOff, Camera, Image, Move, LayoutGrid, Delete, Download } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import CameraCaptureModal from './CameraCaptureModal';
@@ -154,7 +154,7 @@ const DraggablePhoto = ({ photo, index, selected, onSelect, onDeselect, onDelete
     );
 };
 
-const MeasurementModal = ({ isOpen, onClose, onSave, onStartNew, onBackToDashboard, rooms, allRooms = [], projectTitle, address, apartments = [], initialData, readOnly, measurementHistory }) => {
+const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNew, onBackToDashboard, rooms, allRooms = [], projectTitle, address, apartments = [], initialData, readOnly, measurementHistory }) => {
 
     const dynamicRoomOptions = Array.from(new Set([
         ...(ROOM_OPTIONS || []),
@@ -805,8 +805,8 @@ const MeasurementModal = ({ isOpen, onClose, onSave, onStartNew, onBackToDashboa
     if (!isOpen) return null;
 
     const S = { // shared micro-styles
-        label: { display: 'block', fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.07em', color: '#64748B', fontWeight: 700, marginBottom: '0.35rem' },
-        input: { width: '100%', padding: '0.65rem 0.75rem', borderRadius: '8px', background: '#F8FAFC', border: '1px solid #CBD5E1', color: '#1E293B', fontSize: '0.875rem', outline: 'none', minHeight: '44px', boxSizing: 'border-box', touchAction: 'manipulation' },
+        label: { display: 'block', fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-muted)', fontWeight: 700, marginBottom: '0.35rem' },
+        input: { width: '100%', padding: '0.65rem 0.75rem', borderRadius: '8px', background: 'var(--background)', border: '1px solid var(--border)', color: 'var(--text-main)', fontSize: '0.875rem', outline: 'none', minHeight: '44px', boxSizing: 'border-box', touchAction: 'manipulation' },
     };
 
     const handleClose = () => {
@@ -820,13 +820,13 @@ const MeasurementModal = ({ isOpen, onClose, onSave, onStartNew, onBackToDashboa
     };
 
     return createPortal(
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(4px)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0.75rem' }}>
-            <div ref={containerRef} style={{ backgroundColor: '#F8FAFC', borderRadius: '14px', width: '98vw', maxWidth: '1240px', height: '94vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', color: '#1E293B', border: '1px solid #E2E8F0', boxShadow: '0 30px 80px rgba(0,0,0,0.1)', boxShadow: '0 30px 80px rgba(0,0,0,0.7)' }}>
+        <div className={isTechnicianMode ? 'force-dark-mode' : ''} style={{ position: 'fixed', inset: 0, backgroundColor: isTechnicianMode ? 'rgba(0,0,0,0.85)' : 'rgba(255,255,255,0.85)', backdropFilter: 'blur(4px)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0.75rem' }}>
+            <div ref={containerRef} style={{ backgroundColor: 'var(--background)', borderRadius: '14px', width: '98vw', maxWidth: '1240px', height: '94vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', color: 'var(--text-main)', border: '1px solid var(--border)', boxShadow: '0 30px 80px rgba(0,0,0,0.1)', boxShadow: '0 30px 80px rgba(0,0,0,0.7)' }}>
 
                 {/* ── HEADER ── */}
-                <div style={{ flexShrink: 0, padding: '0.7rem 1.1rem', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#FFFFFF' }}>
+                <div style={{ flexShrink: 0, padding: '0.7rem 1.1rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'var(--surface)' }}>
                     <div>
-                        <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#1E293B' }}>Messprotokoll</div>
+                        <div style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-main)' }}>Messprotokoll</div>
                         <div style={{ fontSize: '0.9rem', marginTop: '0.15rem', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.3rem' }}>
                             {(() => {
                                 const isId = (s) => s && (s.match(/-/g) || []).length >= 3 && !s.includes(' ');
@@ -843,8 +843,8 @@ const MeasurementModal = ({ isOpen, onClose, onSave, onStartNew, onBackToDashboa
                                                 {aptName ? `${aptName} — ` : ''}{roomName}
                                             </span>
                                         )}
-                                        {activeRoom && (title || address) && <span style={{ color: '#64748B' }}>|</span>}
-                                        {title && <span style={{ color: '#E2E8F0', fontWeight: 600 }}>{title}</span>}
+                                        {activeRoom && (title || address) && <span style={{ color: 'var(--text-muted)' }}>|</span>}
+                                        {title && <span style={{ color: 'var(--border)', fontWeight: 600 }}>{title}</span>}
                                         {address && <span style={{ color: '#94A3B8', fontWeight: 500 }}>{title ? '·' : ''} {address}</span>}
                                     </>
                                 );
@@ -863,10 +863,10 @@ const MeasurementModal = ({ isOpen, onClose, onSave, onStartNew, onBackToDashboa
                                 await handleSave();
                             }
                             if (onBackToDashboard) onBackToDashboard();
-                        }} style={{ padding: '0.55rem 0.8rem', borderRadius: '8px', background: 'rgba(255,255,255,0.07)', border: '1px solid #E2E8F0', boxShadow: '0 30px 80px rgba(0,0,0,0.1)', color: '#94A3B8', cursor: 'pointer', minHeight: '42px', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        }} style={{ padding: '0.55rem 0.8rem', borderRadius: '8px', background: 'rgba(255,255,255,0.07)', border: '1px solid var(--border)', boxShadow: '0 30px 80px rgba(0,0,0,0.1)', color: '#94A3B8', cursor: 'pointer', minHeight: '42px', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                             <LayoutGrid size={16} /> <span className="hide-mobile">Kacheln</span>
                         </button>
-                        <button onClick={handleClose} style={{ padding: '0.55rem', borderRadius: '8px', background: 'rgba(255,255,255,0.07)', border: '1px solid #E2E8F0', boxShadow: '0 30px 80px rgba(0,0,0,0.1)', color: '#94A3B8', cursor: 'pointer', minHeight: '42px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="Schließen"><X size={18} /></button>
+                        <button onClick={handleClose} style={{ padding: '0.55rem', borderRadius: '8px', background: 'rgba(255,255,255,0.07)', border: '1px solid var(--border)', boxShadow: '0 30px 80px rgba(0,0,0,0.1)', color: '#94A3B8', cursor: 'pointer', minHeight: '42px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="Schließen"><X size={18} /></button>
                     </div>
                 </div>
 
@@ -883,9 +883,9 @@ const MeasurementModal = ({ isOpen, onClose, onSave, onStartNew, onBackToDashboa
                             {previewSnapshot ? (
                                 <img src={previewSnapshot} alt="Skizze" style={{ maxWidth: `${zoomScale * 100}%`, maxHeight: `${zoomScale * 100}%`, objectFit: 'contain', display: 'block', transition: 'max-width 0.2s, max-height 0.2s', borderRadius: 4, boxShadow: '0 4px 24px rgba(0,0,0,0.18)' }} />
                             ) : (
-                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem', color: '#94A3B8' }}>
-                                    <div style={{ width: '75%', maxWidth: 380, height: 200, backgroundImage: 'linear-gradient(to right,#e0e0e0 1px,transparent 1px),linear-gradient(to bottom,#e0e0e0 1px,transparent 1px)', backgroundSize: '40px 40px', backgroundColor: 'white', borderRadius: 8, border: '1px solid #dde1e7' }} />
-                                    <span style={{ fontSize: '0.85rem' }}>Noch keine Skizze vorhanden</span>
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem', color: '#64748B' }}>
+                                    <div style={{ width: '75%', maxWidth: 380, height: 200, backgroundImage: 'linear-gradient(to right,rgba(0,0,0,0.05) 1px,transparent 1px),linear-gradient(to bottom,rgba(0,0,0,0.05) 1px,transparent 1px)', backgroundSize: '40px 40px', backgroundColor: '#ffffff', borderRadius: 8, border: '1px solid #cbd5e1', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }} />
+                                    <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>Noch keine Skizze vorhanden</span>
                                 </div>
                             )}
 
@@ -900,9 +900,9 @@ const MeasurementModal = ({ isOpen, onClose, onSave, onStartNew, onBackToDashboa
                                             <X size={18} /> Schliessen
                                         </button>
                                     </div>
-                                    <div style={{ background: '#1E293B', borderRadius: '12px', border: '1px solid #E2E8F0', boxShadow: '0 30px 80px rgba(0,0,0,0.1)', overflow: 'auto', flex: 1 }}>
+                                    <div style={{ background: 'var(--text-main)', borderRadius: '12px', border: '1px solid var(--border)', boxShadow: '0 30px 80px rgba(0,0,0,0.1)', overflow: 'auto', flex: 1 }}>
                                         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
-                                            <thead style={{ position: 'sticky', top: 0, background: '#1E293B', zIndex: 10, boxShadow: '0 1px 0 rgba(255,255,255,0.08)' }}>
+                                            <thead style={{ position: 'sticky', top: 0, background: 'var(--text-main)', zIndex: 10, boxShadow: '0 1px 0 rgba(255,255,255,0.08)' }}>
                                                 <tr>
                                                     <th style={{ padding: '0.75rem 1rem', textAlign: 'left', color: '#94A3B8', whiteSpace: 'nowrap', width: '100px' }}>Messpunkt</th>
                                                     {[...historyRows].reverse().map(row => (
@@ -915,7 +915,7 @@ const MeasurementModal = ({ isOpen, onClose, onSave, onStartNew, onBackToDashboa
                                             <tbody>
                                                 {historyColumns.map(mpName => (
                                                     <tr key={mpName} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', height: '40px' }}>
-                                                        <td style={{ padding: '0.4rem 0.5rem', color: '#1E293B', whiteSpace: 'nowrap', fontWeight: 700 }}>
+                                                        <td style={{ padding: '0.4rem 0.5rem', color: 'var(--text-main)', whiteSpace: 'nowrap', fontWeight: 700 }}>
                                                             {mpName} <span style={{ fontSize: '0.8em', fontWeight: 'normal', color: '#94A3B8' }}>(W/B)</span>
                                                         </td>
                                                         {[...historyRows].reverse().map(row => {
@@ -929,7 +929,7 @@ const MeasurementModal = ({ isOpen, onClose, onSave, onStartNew, onBackToDashboa
                                                                             <span style={{ color: cell.b_color, fontWeight: 700 }}>{cell.b_value || '-'}</span>
                                                                         </span>
                                                                     ) : (
-                                                                        <span style={{ color: '#64748B' }}>-</span>
+                                                                        <span style={{ color: 'var(--text-muted)' }}>-</span>
                                                                     )}
                                                                 </td>
                                                             );
@@ -945,21 +945,34 @@ const MeasurementModal = ({ isOpen, onClose, onSave, onStartNew, onBackToDashboa
 
                         {/* Bottom Bar: Zoom + Skizze bearbeiten */}
                         {!readOnly && (
-                            <div style={{ flexShrink: 0, padding: '0.55rem 1rem', backgroundColor: '#FFFFFF', borderTop: '1px solid #E2E8F0', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                            <div style={{ flexShrink: 0, padding: '0.55rem 1rem', backgroundColor: 'var(--surface)', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                                    <button onClick={() => setZoomScale(z => Math.max(0.3, +(z - 0.1).toFixed(1)))} style={{ width: 32, height: 32, borderRadius: 6, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', color: '#CBD5E1', cursor: 'pointer', fontSize: '1.2rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
-                                    <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748B', minWidth: 38, textAlign: 'center' }}>{Math.round(zoomScale * 100)}%</span>
-                                    <button onClick={() => setZoomScale(z => Math.min(2, +(z + 0.1).toFixed(1)))} style={{ width: 32, height: 32, borderRadius: 6, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', color: '#CBD5E1', cursor: 'pointer', fontSize: '1.2rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
+                                    <button onClick={() => setZoomScale(z => Math.max(0.3, +(z - 0.1).toFixed(1)))} style={{ width: 32, height: 32, borderRadius: 6, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', color: 'var(--border)', cursor: 'pointer', fontSize: '1.2rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
+                                    <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', minWidth: 38, textAlign: 'center' }}>{Math.round(zoomScale * 100)}%</span>
+                                    <button onClick={() => setZoomScale(z => Math.min(2, +(z + 0.1).toFixed(1)))} style={{ width: 32, height: 32, borderRadius: 6, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', color: 'var(--border)', cursor: 'pointer', fontSize: '1.2rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
                                 </div>
                                 <button onClick={() => { setTimeout(() => { drawGridLayer(gridCanvasRef.current); const fc = canvasRef.current, hc = hiddenCanvasRef.current; if (fc && hc) { fc.width = hc.width; fc.height = hc.height; const fCtx = fc.getContext('2d'); fCtx.clearRect(0, 0, fc.width, fc.height); fCtx.drawImage(stripWhiteBackground(hc, hc.width, hc.height), 0, 0); } }, 100); setIsSketchLocked(false); setIsSketchFullscreen(true); }} style={{ marginLeft: 'auto', padding: '0.5rem 1.1rem', borderRadius: 8, background: 'rgba(37,99,235,0.15)', border: '1px solid rgba(37,99,235,0.35)', color: '#60A5FA', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem', minHeight: 36 }}>
                                     <Edit3 size={15} /> Skizze bearbeiten
+                                </button>
+                                <button onClick={async () => {
+                                    if (!previewSnapshot) return alert('Keine Skizze vorhanden.');
+                                    try {
+                                        const { ExportService } = await import('../services/ExportService');
+                                        const dummyData = { projectNumber: projectTitle, street: address, zip: '', city: '' };
+                                        const rName = globalSettings?.room || initialData?.name || 'Unbekannt';
+                                        await ExportService.generateSketchPdf(dummyData, { name: rName }, { src: previewSnapshot, label: 'Messprotokoll-Skizze' });
+                                    } catch(err) {
+                                        alert('Fehler beim PDF Export: ' + err.message);
+                                    }
+                                }} style={{ padding: '0.5rem 1.1rem', borderRadius: 8, background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.35)', color: '#34D399', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem', minHeight: 36, marginLeft: '0.5rem' }}>
+                                    <Download size={15} /> PDF Export
                                 </button>
                             </div>
                         )}
                     </div>
 
                     {/* ─── RIGHT: SIDEBAR ─── */}
-                    <div style={{ width: 340, flexShrink: 0, display: 'flex', flexDirection: 'column', backgroundColor: '#FFFFFF', position: 'relative' }}>
+                    <div style={{ width: 340, flexShrink: 0, display: 'flex', flexDirection: 'column', backgroundColor: 'var(--surface)', position: 'relative' }}>
                         <div style={{ flex: 1, overflowY: 'auto', padding: '1rem', paddingBottom: '40vh', display: 'flex', flexDirection: 'column', gap: '0.85rem', WebkitOverflowScrolling: 'touch' }}>
                             {!readOnly && (<>
                                 {/* Messmittel */}
@@ -991,10 +1004,10 @@ const MeasurementModal = ({ isOpen, onClose, onSave, onStartNew, onBackToDashboa
                                                 }} 
                                                 style={{ ...S.input, paddingRight: '2rem', appearance: 'none', backgroundColor: 'transparent' }}
                                             >
-                                                <option value="" style={{ background: '#FFFFFF', color: '#1E293B' }}>Bitte wählen...</option>
-                                                <option value="Sonstiges" style={{ background: '#FFFFFF', color: '#1E293B' }}>Sonstiges / Eigene Eingabe</option>
-                                                <option value="Allgemeiner Bereich" style={{ background: '#FFFFFF', color: '#1E293B' }}>Allgemeiner Bereich</option>
-                                                {(apartments || []).map((a, i) => <option key={i} value={a} style={{ background: '#FFFFFF', color: '#1E293B' }}>{a}</option>)}
+                                                <option value="" style={{ background: 'var(--surface)', color: 'var(--text-main)' }}>Bitte wählen...</option>
+                                                <option value="Sonstiges" style={{ background: 'var(--surface)', color: 'var(--text-main)' }}>Sonstiges / Eigene Eingabe</option>
+                                                <option value="Allgemeiner Bereich" style={{ background: 'var(--surface)', color: 'var(--text-main)' }}>Allgemeiner Bereich</option>
+                                                {(apartments || []).map((a, i) => <option key={i} value={a} style={{ background: 'var(--surface)', color: 'var(--text-main)' }}>{a}</option>)}
                                             </select>
                                             <ChevronDown size={14} style={{ position: 'absolute', right: '0.7rem', top: '50%', transform: 'translateY(-50%)', color: '#475569', pointerEvents: 'none' }} />
                                         </div>
@@ -1029,10 +1042,10 @@ const MeasurementModal = ({ isOpen, onClose, onSave, onStartNew, onBackToDashboa
                                                 }}
                                                 style={{ ...S.input, appearance: 'none', paddingRight: '2rem', backgroundColor: 'transparent' }}
                                             >
-                                                <option value="" style={{ background: '#FFFFFF', color: '#1E293B' }}>Raum wählen...</option>
-                                                <option value="Sonstiges" style={{ background: '#FFFFFF', color: '#1E293B' }}>Sonstiges / Eigener Name</option>
-                                                <option value="Ganze Wohnung" style={{ background: '#FFFFFF', color: '#1E293B' }}>Ganze Wohnung</option>
-                                                {dynamicRoomOptions.map((opt, i) => <option key={i} value={opt} style={{ background: '#FFFFFF', color: '#1E293B' }}>{opt}</option>)}
+                                                <option value="" style={{ background: 'var(--surface)', color: 'var(--text-main)' }}>Raum wählen...</option>
+                                                <option value="Sonstiges" style={{ background: 'var(--surface)', color: 'var(--text-main)' }}>Sonstiges / Eigener Name</option>
+                                                <option value="Ganze Wohnung" style={{ background: 'var(--surface)', color: 'var(--text-main)' }}>Ganze Wohnung</option>
+                                                {dynamicRoomOptions.map((opt, i) => <option key={i} value={opt} style={{ background: 'var(--surface)', color: 'var(--text-main)' }}>{opt}</option>)}
                                             </select>
                                             <ChevronDown size={14} style={{ position: 'absolute', right: '0.7rem', top: '50%', transform: 'translateY(-50%)', color: '#475569', pointerEvents: 'none' }} />
                                         </div>
@@ -1062,7 +1075,7 @@ const MeasurementModal = ({ isOpen, onClose, onSave, onStartNew, onBackToDashboa
                                             {f.isNumeric ? (
                                                 <div 
                                                     onClick={() => setActiveNumpadField({ field: f.key, value: globalSettings[f.key] || '' })}
-                                                    style={{ ...S.input, padding: '0.4rem 0.2rem', fontSize: '1rem', minHeight: 40, textAlign: 'center', background: activeNumpadField?.field === f.key ? '#3B82F6' : '#F8FAFC', color: activeNumpadField?.field === f.key ? '#FFFFFF' : '#1E293B', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}
+                                                    style={{ ...S.input, padding: '0.4rem 0.2rem', fontSize: '1rem', minHeight: 40, textAlign: 'center', background: activeNumpadField?.field === f.key ? '#3B82F6' : 'var(--background)', color: activeNumpadField?.field === f.key ? '#FFFFFF' : 'var(--text-main)', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}
                                                 >
                                                     {globalSettings[f.key] || <span style={{color:'#94A3B8'}}>{f.ph}</span>}
                                                 </div>
@@ -1080,30 +1093,30 @@ const MeasurementModal = ({ isOpen, onClose, onSave, onStartNew, onBackToDashboa
                                     ))}
                                 </div>
 
-                                <div style={{ borderTop: '1px solid #E2E8F0' }} />
+                                <div style={{ borderTop: '1px solid var(--border)' }} />
 
                                 {/* MP Header */}
-                                <div style={{ display: 'grid', gridTemplateColumns: '52px 1fr 1fr 28px', alignItems: 'center', gap: '0.4rem', padding: '0.4rem 0.5rem', borderBottom: '1px solid #E2E8F0', marginBottom: '0.4rem', position: 'sticky', top: 0, backgroundColor: '#F8FAFC', zIndex: 1 }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: '52px 1fr 1fr 28px', alignItems: 'center', gap: '0.4rem', padding: '0.4rem 0.5rem', borderBottom: '1px solid var(--border)', marginBottom: '0.4rem', position: 'sticky', top: 0, backgroundColor: 'var(--background)', zIndex: 1 }}>
                                     <span style={{ ...S.label, marginBottom: 0 }}>MP</span>
-                                    <span style={{ ...S.label, marginBottom: 0, textAlign: 'center', color: '#64748B' }}>W</span>
-                                    <span style={{ ...S.label, marginBottom: 0, textAlign: 'center', color: '#64748B' }}>B</span>
-                                    <span style={{ fontSize: '0.7rem', color: '#64748B', fontWeight: 700, textAlign: 'center' }}>{measurements.length}/10</span>
+                                    <span style={{ ...S.label, marginBottom: 0, textAlign: 'center', color: 'var(--text-muted)' }}>W</span>
+                                    <span style={{ ...S.label, marginBottom: 0, textAlign: 'center', color: 'var(--text-muted)' }}>B</span>
+                                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 700, textAlign: 'center' }}>{measurements.length}/10</span>
                                 </div>
 
                                 {/* MP List */}
                                 <div style={{ display: 'flex', flexDirection: 'column' }}>
                                     {measurements.map((row, idx) => (
-                                        <div key={row.id} style={{ display: 'grid', gridTemplateColumns: '52px 1fr 1fr 28px', alignItems: 'center', gap: '0.4rem', padding: '0.3rem 0.5rem', borderRadius: 8, marginBottom: 3, background: '#FFFFFF', border: '1px solid #E2E8F0', minHeight: 44 }}>
-                                            <span style={{ color: '#1E293B', fontSize: '0.82rem', fontWeight: 800, userSelect: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.pointName || `MP ${idx + 1}`}</span>
+                                        <div key={row.id} style={{ display: 'grid', gridTemplateColumns: '52px 1fr 1fr 28px', alignItems: 'center', gap: '0.4rem', padding: '0.3rem 0.5rem', borderRadius: 8, marginBottom: 3, background: 'var(--surface)', border: '1px solid var(--border)', minHeight: 44 }}>
+                                            <span style={{ color: 'var(--text-main)', fontSize: '0.82rem', fontWeight: 800, userSelect: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.pointName || `MP ${idx + 1}`}</span>
                                             <div 
                                                 onClick={() => setActiveNumpadField({ idx, field: 'w_value', value: row.w_value || '' })}
-                                                style={{ width: '100%', padding: '0.4rem 0.5rem', background: (activeNumpadField?.idx === idx && activeNumpadField?.field === 'w_value') ? '#3B82F6' : '#F8FAFC', border: '1px solid #CBD5E1', color: (activeNumpadField?.idx === idx && activeNumpadField?.field === 'w_value') ? '#FFFFFF' : '#1E293B', fontSize: '1rem', fontWeight: 700, textAlign: 'center', height: 40, boxSizing: 'border-box', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                                                style={{ width: '100%', padding: '0.4rem 0.5rem', background: (activeNumpadField?.idx === idx && activeNumpadField?.field === 'w_value') ? '#3B82F6' : 'var(--background)', border: '1px solid var(--border)', color: (activeNumpadField?.idx === idx && activeNumpadField?.field === 'w_value') ? '#FFFFFF' : 'var(--text-main)', fontSize: '1rem', fontWeight: 700, textAlign: 'center', height: 40, boxSizing: 'border-box', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
                                             >
                                                 {row.w_value || ''}
                                             </div>
                                             <div 
                                                 onClick={() => setActiveNumpadField({ idx, field: 'b_value', value: row.b_value || '' })}
-                                                style={{ width: '100%', padding: '0.4rem 0.5rem', background: (activeNumpadField?.idx === idx && activeNumpadField?.field === 'b_value') ? '#3B82F6' : '#F8FAFC', border: '1px solid #CBD5E1', color: (activeNumpadField?.idx === idx && activeNumpadField?.field === 'b_value') ? '#FFFFFF' : '#1E293B', fontSize: '1rem', fontWeight: 700, textAlign: 'center', height: 40, boxSizing: 'border-box', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                                                style={{ width: '100%', padding: '0.4rem 0.5rem', background: (activeNumpadField?.idx === idx && activeNumpadField?.field === 'b_value') ? '#3B82F6' : 'var(--background)', border: '1px solid var(--border)', color: (activeNumpadField?.idx === idx && activeNumpadField?.field === 'b_value') ? '#FFFFFF' : 'var(--text-main)', fontSize: '1rem', fontWeight: 700, textAlign: 'center', height: 40, boxSizing: 'border-box', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
                                             >
                                                 {row.b_value || ''}
                                             </div>
@@ -1122,9 +1135,9 @@ const MeasurementModal = ({ isOpen, onClose, onSave, onStartNew, onBackToDashboa
                         </div>
 
                         {activeNumpadField && (
-                            <div style={{ marginTop: '1rem', background: '#FFFFFF', borderRadius: 12, padding: '0.75rem', border: '1px solid #E2E8F0', boxShadow: '0 30px 80px rgba(0,0,0,0.1)' }}>
+                            <div style={{ marginTop: '1rem', background: 'var(--surface)', borderRadius: 12, padding: '0.75rem', border: '1px solid var(--border)', boxShadow: '0 30px 80px rgba(0,0,0,0.1)' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', padding: '0 0.2rem' }}>
-                                    <span style={{ color: '#64748B', fontSize: '0.75rem', fontWeight: 600 }}>Tastatur ({activeNumpadField.field})</span>
+                                    <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem', fontWeight: 600 }}>Tastatur ({activeNumpadField.field})</span>
                                     <button onClick={() => setActiveNumpadField(null)} style={{ background: 'transparent', border: 'none', color: '#1E6DB7', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 700, padding: 0 }}>Fertig</button>
                                 </div>
                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.4rem' }}>
@@ -1133,9 +1146,9 @@ const MeasurementModal = ({ isOpen, onClose, onSave, onStartNew, onBackToDashboa
                                             key={k}
                                             onClick={() => handleNumpadPress(k === '.' ? ',' : k)}
                                             style={{
-                                                background: k === 'DEL' ? 'rgba(239,68,68,0.15)' : '#F1F5F9',
-                                                color: k === 'DEL' ? '#EF4444' : '#1E293B',
-                                                border: '1px solid #E2E8F0',
+                                                background: k === 'DEL' ? 'rgba(239,68,68,0.15)' : 'var(--background)',
+                                                color: k === 'DEL' ? '#EF4444' : 'var(--text-main)',
+                                                border: '1px solid var(--border)',
                                                 borderRadius: 8,
                                                 height: 48,
                                                 fontSize: '1.25rem',
@@ -1158,15 +1171,15 @@ const MeasurementModal = ({ isOpen, onClose, onSave, onStartNew, onBackToDashboa
 
             {/* ── FULLSCREEN SKETCH OVERLAY (unverändert) ── */}
             {isSketchFullscreen && createPortal(
-                <div style={{ position: 'fixed', inset: 0, zIndex: 99999, backgroundColor: '#F8FAFC', display: 'flex', flexDirection: 'column', touchAction: 'none' }}>
-                    <div style={{ flexShrink: 0, padding: '0.75rem 1rem', backgroundColor: '#FFFFFF', borderBottom: '1px solid #E2E8F0', display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap', position: 'relative', zIndex: 100 }}>
-                        <button onClick={() => { activateTool('pen'); setColor('#000000'); setLineWidth(2); }} style={{ padding: '0.5rem 0.75rem', borderRadius: '6px', background: (activeTool === 'pen' && color === '#000000') ? 'var(--primary)' : 'rgba(255,255,255,0.05)', border: (activeTool === 'pen' && color === '#000000') ? '1px solid var(--primary)' : '1px solid rgba(255,255,255,0.15)', color: (activeTool === 'pen' && color === '#000000') ? 'white' : '#CBD5E1', display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Pen size={16} /><span style={{ fontSize: '0.8rem', fontWeight: 600 }}>Stift</span></button>
+                <div style={{ position: 'fixed', inset: 0, zIndex: 99999, backgroundColor: 'var(--background)', display: 'flex', flexDirection: 'column', touchAction: 'none' }}>
+                    <div style={{ flexShrink: 0, padding: '0.75rem 1rem', backgroundColor: 'var(--surface)', borderBottom: '1px solid var(--border)', display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap', position: 'relative', zIndex: 100 }}>
+                        <button onClick={() => { activateTool('pen'); setColor('#000000'); setLineWidth(2); }} style={{ padding: '0.5rem 0.75rem', borderRadius: '6px', background: (activeTool === 'pen' && color === '#000000') ? 'var(--primary)' : 'rgba(255,255,255,0.05)', border: (activeTool === 'pen' && color === '#000000') ? '1px solid var(--primary)' : '1px solid rgba(255,255,255,0.15)', color: (activeTool === 'pen' && color === '#000000') ? 'white' : '#94A3B8', display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Pen size={16} /><span style={{ fontSize: '0.8rem', fontWeight: 600 }}>Stift</span></button>
                         <button onClick={() => { activateTool('pen'); setColor('#ef4444'); setLineWidth(3); }} style={{ padding: '0.5rem', borderRadius: '6px', background: (activeTool === 'pen' && color === '#ef4444') ? 'rgba(239,68,68,0.2)' : 'rgba(255,255,255,0.05)', border: (activeTool === 'pen' && color === '#ef4444') ? '1px solid #ef4444' : '1px solid rgba(255,255,255,0.15)', color: '#ef4444' }}><Pen size={16} /></button>
                         <button onClick={() => { activateTool('pen'); setColor('#3b82f6'); setLineWidth(3); }} style={{ padding: '0.5rem', borderRadius: '6px', background: (activeTool === 'pen' && color === '#3b82f6') ? 'rgba(59,130,246,0.2)' : 'rgba(255,255,255,0.05)', border: (activeTool === 'pen' && color === '#3b82f6') ? '1px solid #3b82f6' : '1px solid rgba(255,255,255,0.15)', color: '#3b82f6' }}><Pen size={16} /></button>
-                        <button onClick={() => activateTool('eraser')} style={{ padding: '0.5rem 0.75rem', borderRadius: '6px', background: (activeTool === 'eraser') ? '#f1f5f9' : 'rgba(255,255,255,0.05)', border: (activeTool === 'eraser') ? '1px solid #cbd5e1' : '1px solid rgba(255,255,255,0.15)', color: '#94A3B8', display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Eraser size={16} /><span style={{ fontSize: '0.8rem', fontWeight: 600 }}>Radierer</span></button>
-                        <button onClick={() => document.getElementById('sketch-photo-upload-fs').click()} style={{ padding: '0.5rem', borderRadius: '6px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.15)', color: '#CBD5E1', display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Image size={16} /><span style={{ fontSize: '0.8rem', fontWeight: 600 }}>Bilder</span></button>
+                        <button onClick={() => activateTool('eraser')} style={{ padding: '0.5rem 0.75rem', borderRadius: '6px', background: (activeTool === 'eraser') ? 'var(--color-panel-bg)' : 'rgba(255,255,255,0.05)', border: (activeTool === 'eraser') ? '1px solid var(--border)' : '1px solid rgba(255,255,255,0.15)', color: '#94A3B8', display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Eraser size={16} /><span style={{ fontSize: '0.8rem', fontWeight: 600 }}>Radierer</span></button>
+                        <button onClick={() => document.getElementById('sketch-photo-upload-fs').click()} style={{ padding: '0.5rem', borderRadius: '6px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.15)', color: '#94A3B8', display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Image size={16} /><span style={{ fontSize: '0.8rem', fontWeight: 600 }}>Bilder</span></button>
                         <input id="sketch-photo-upload-fs" type="file" accept="image/*,.heic,.heif" multiple style={{ display: 'none' }} onChange={(e) => { const files = Array.from(e.target.files || []); files.forEach(file => { const reader = new FileReader(); reader.onload = (ev) => { setGalleryPhotos(prev => [...prev, { id: Date.now() + Math.random(), src: ev.target.result }]); activateTool('photo'); }; reader.readAsDataURL(file); }); e.target.value = ''; }} />
-                        <button onClick={handleUndo} disabled={historyStep <= 0} style={{ padding: '0.5rem', borderRadius: '4px', background: 'transparent', border: '1px solid rgba(255,255,255,0.15)', color: historyStep <= 0 ? 'rgba(255,255,255,0.2)' : '#CBD5E1', opacity: historyStep <= 0 ? 0.5 : 1 }}><Undo size={16} /></button>
+                        <button onClick={handleUndo} disabled={historyStep <= 0} style={{ padding: '0.5rem', borderRadius: '4px', background: 'transparent', border: '1px solid rgba(255,255,255,0.15)', color: historyStep <= 0 ? 'rgba(255,255,255,0.2)' : '#94A3B8', opacity: historyStep <= 0 ? 0.5 : 1 }}><Undo size={16} /></button>
 
                         <button onClick={() => { if (window.confirm('Möchten Sie die Skizze und alle Bilder komplett löschen?')) { clearCanvas(); setGalleryPhotos([]); } }} style={{ padding: '0.5rem 0.75rem', borderRadius: '6px', background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444', display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem', fontWeight: 600 }}><Trash2 size={16} />Löschen</button>
                         <button onClick={() => { if (canvasRef.current && hiddenCanvasRef.current) { const fc = canvasRef.current, hc = hiddenCanvasRef.current; hc.width = fc.width; hc.height = fc.height; const hCtx = hc.getContext('2d'); hCtx.clearRect(0, 0, hc.width, hc.height); hCtx.drawImage(fc, 0, 0); const previewC = document.createElement('canvas'); previewC.width = fc.width; previewC.height = fc.height; const pCtx = previewC.getContext('2d'); pCtx.fillStyle = '#ffffff'; pCtx.fillRect(0, 0, previewC.width, previewC.height); pCtx.strokeStyle = '#e0e0e0'; pCtx.lineWidth = 1; for (let x = 0; x <= previewC.width; x += 40) { pCtx.beginPath(); pCtx.moveTo(x, 0); pCtx.lineTo(x, previewC.height); pCtx.stroke(); } for (let y = 0; y <= previewC.height; y += 40) { pCtx.beginPath(); pCtx.moveTo(0, y); pCtx.lineTo(previewC.width, y); pCtx.stroke(); } galleryPhotos.forEach(photo => { const img = document.querySelector(`img[data-id="${photo.id}"]`); if (img && img.parentElement) { const parent = img.parentElement; const px = parseFloat(parent.style.left) / 100 * fc.width; const py = parseFloat(parent.style.top) / 100 * fc.height; const pw = parseFloat(parent.style.width) / 100 * fc.width; const ph = parseFloat(parent.style.height) / 100 * fc.height; pCtx.drawImage(img, px, py, pw, ph); } }); pCtx.drawImage(fc, 0, 0); setPreviewSnapshot(previewC.toDataURL()); } setIsSketchFullscreen(false); setIsSketchLocked(true); }} style={{ marginLeft: 'auto', padding: '0.5rem 1.25rem', borderRadius: '8px', background: '#10B981', border: 'none', color: 'white', fontWeight: 700, fontSize: '0.9rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem' }}><PenOff size={16} />Fertig</button>
