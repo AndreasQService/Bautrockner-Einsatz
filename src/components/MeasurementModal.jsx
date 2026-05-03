@@ -16,7 +16,7 @@ const DEFAULT_POSITIONS = [
    - Tap photo â†’ selected (shows handles, draggable/resizable)
    - Tap canvas empty area â†’ deselects, pen works everywhere
    - No global mode toggle needed */
-const DraggablePhoto = ({ photo, index, selected, onSelect, onDeselect, onDelete, onUpdate, activeTool, onDrawStart, onDraw, onDrawEnd }) => {
+const DraggablePhoto = ({ photo, index, selected, onSelect, onDeselect, onDelete, onUpdate, activeTool, onDrawStart, onDraw, onDrawEnd, stylusOnlyMode }) => {
     // Photo-interne Logik: activeTool entscheidet Draw vs Drag
     const isDrawMode = activeTool === 'pen' || activeTool === 'eraser';
     const [pos, setPos] = useState(photo.pos || DEFAULT_POSITIONS[index] || { x: 5, y: 5 });
@@ -1197,7 +1197,7 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
                             onPointerCancel={(e) => { if (e.pointerType === 'pen') stopDrawing(e); }}
                         />
                         {galleryPhotos.slice(0, 4).map((photo, index) => (
-                            <DraggablePhoto key={photo.id} photo={photo} index={index} selected={selectedPhotoId === photo.id} activeTool={activeTool} onDrawStart={startDrawing} onDraw={draw} onDrawEnd={stopDrawing} onSelect={() => setSelectedPhotoId(photo.id)} onDeselect={() => setSelectedPhotoId(null)} onDelete={() => { setGalleryPhotos(prev => prev.filter(p => p.id !== photo.id)); setSelectedPhotoId(null); }} onUpdate={(id, updates) => setGalleryPhotos(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p))} />
+                            <DraggablePhoto key={photo.id} photo={photo} index={index} selected={selectedPhotoId === photo.id} activeTool={activeTool} onDrawStart={startDrawing} onDraw={draw} onDrawEnd={stopDrawing} onSelect={() => setSelectedPhotoId(photo.id)} onDeselect={() => setSelectedPhotoId(null)} onDelete={() => { setGalleryPhotos(prev => prev.filter(p => p.id !== photo.id)); setSelectedPhotoId(null); }} onUpdate={(id, updates) => setGalleryPhotos(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p))} stylusOnlyMode={stylusOnlyMode} />
                         ))}
                     </div>
                 </div>,
