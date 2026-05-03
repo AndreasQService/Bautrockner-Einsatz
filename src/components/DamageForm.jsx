@@ -6275,7 +6275,7 @@ END:VCARD`;
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', marginBottom: '1.5rem' }}>
                         <div className="card" style={{ padding: '1.5rem' }}>
                             <h3 className="section-header">
-                                <FileText size={18} /> Berichte & Arbeitsrapporte
+                                <FileText size={18} /> Schadensberichte
                             </h3>
                             {/* Generierte Berichte & Protokolle */}
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1.5rem' }}>
@@ -6301,17 +6301,17 @@ END:VCARD`;
                                     justifyContent: 'center',
                                     color: 'var(--text-muted)'
                                 }}
-                                onClick={() => document.getElementById('file-upload-Arbeitsrappporte-desktop').click()}
+                                onClick={() => document.getElementById('file-upload-Schadensberichte-desktop').click()}
                                 onDragOver={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.background = 'rgba(14, 165, 233, 0.08)'; }}
                                 onDragLeave={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.background = 'none'; }}
-                                onDrop={(e) => handleCategoryDrop(e, 'Arbeitsrappporte')}
+                                onDrop={(e) => handleCategoryDrop(e, 'Schadensberichte')}
                             >
                                 <Plus size={24} style={{ marginBottom: '0.5rem', opacity: 0.5 }} />
-                                <span style={{ fontSize: '0.85rem' }}>Arbeitsrapport hochladen / Drop</span>
-                                <input id="file-upload-Arbeitsrappporte-desktop" type="file" multiple accept="image/*,application/pdf" style={{ display: 'none' }} onChange={(e) => handleCategorySelect(e, 'Arbeitsrappporte')} />
+                                <span style={{ fontSize: '0.85rem' }}>Schadensbericht hochladen / Drop</span>
+                                <input id="file-upload-Schadensberichte-desktop" type="file" multiple accept="image/*,application/pdf" style={{ display: 'none' }} onChange={(e) => handleCategorySelect(e, 'Schadensberichte')} />
                             </div>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                                {formData.images.filter(img => img.assignedTo === 'Arbeitsrappporte').map((item, idx) => (
+                                {formData.images.filter(img => img.assignedTo === 'Schadensberichte').map((item, idx) => (
                                     <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem', backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
                                         {(item.file && item.file.type === 'application/pdf') || (item.name && item.name.toLowerCase().endsWith('.pdf')) ? (
                                             <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '1rem', cursor: 'pointer' }} onClick={() => { if (item.file) { const pdfUrl = URL.createObjectURL(item.file); window.open(pdfUrl, '_blank'); } else if (item.preview) { window.open(item.preview, '_blank'); } else { alert("PDF Vorschau nicht verfügbar."); } }}>
@@ -6327,7 +6327,7 @@ END:VCARD`;
                                         <button type="button" className="btn btn-ghost" onClick={() => setFormData(prev => ({ ...prev, images: prev.images.filter(i => i !== item) }))} style={{ color: '#EF4444', padding: '0.5rem', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(239, 68, 68, 0.1)' }}><Trash size={18} /></button>
                                     </div>
                                 ))}
-                                {formData.images.filter(img => img.assignedTo === 'Arbeitsrappporte').length === 0 && <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.9rem', fontStyle: 'italic' }}>Keine Arbeitsrapporte vorhanden.</div>}
+                                {formData.images.filter(img => img.assignedTo === 'Schadensberichte').length === 0 && <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.9rem', fontStyle: 'italic' }}>Keine Schadensberichte vorhanden.</div>}
                             </div>
                         </div>
                         {formData.images?.some(img => img.assignedTo === 'Sonstiges') && (
