@@ -7186,32 +7186,7 @@ END:VCARD`;
 
                                                 } else {
                                                     // IDLE STATE (Active)
-                                                    return (
-                                                        <div style={{ marginTop: '0.75rem' }}>
-                                                            <button
-                                                                type="button"
-                                                                style={{
-                                                                    width: '100%', fontSize: '0.9rem', padding: '0.75rem', fontWeight: 600,
-                                                                    color: '#F59E0B', backgroundColor: 'rgba(245, 158, 11, 0.15)',
-                                                                    border: '1px solid #F59E0B', borderRadius: '8px',
-                                                                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', cursor: 'pointer', textTransform: 'uppercase'
-                                                                }}
-                                                                onClick={() => {
-                                                                    // Start Unsubscribing
-                                                                    setUnsubscribeStates(prev => ({
-                                                                        ...prev,
-                                                                        [idx]: {
-                                                                            endDate: new Date().toISOString().split('T')[0],
-                                                                            counterEnd: '',
-                                                                            hours: ''
-                                                                        }
-                                                                    }));
-                                                                }}
-                                                            >
-                                                                Abmelden
-                                                            </button>
-                                                        </div>
-                                                    );
+                                                    return null;
                                                 }
                                             })()}
                                         </div>
@@ -7223,7 +7198,7 @@ END:VCARD`;
                         </div>
                         )}
 
-                        {mode === 'technician' && (
+                        {false && mode === 'technician' && (
                             <div style={{ marginTop: '1.5rem', padding: '0 0.75rem' }}>
                                 <button
                                     type="button"
@@ -7280,28 +7255,13 @@ END:VCARD`;
                                                         border: '2px solid #1E6DB7', 
                                                         borderRadius: '8px', 
                                                         padding: '0.75rem', 
-                                                        cursor: !isFinished ? 'pointer' : 'default',
                                                         display: 'flex',
                                                         justifyContent: 'space-between',
                                                         alignItems: 'center'
                                                     }}
                                                     onClick={() => {
-                                                        if (!isFinished) {
-                                                            if (techSelectedEquipmentRoom && techSelectedEquipmentRoom.apartment) {
-                                                                if ((device.apartment || 'Allgemeiner Bereich').trim() !== techSelectedEquipmentRoom.apartment) {
-                                                                    setTechSelectedEquipmentRoom(null);
-                                                                }
-                                                            }
-                                                            setUnsubscribeStates(prev => ({
-                                                                ...prev,
-                                                                [idx]: {
-                                                                    endDate: new Date().toISOString().split('T')[0],
-                                                                    counterEnd: '',
-                                                                    hours: ''
-                                                                }
-                                                            }));
                                                             setTechFocusDeviceIndex(idx);
-                                                        }
+
                                                     }}
                                                 >
                                                     <div style={{ flex: 1, paddingRight: '1rem' }}>
