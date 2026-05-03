@@ -6438,7 +6438,7 @@ END:VCARD`;
                                                 </div>
                                             </div>
                                             {/* Skizzen 2-Spalten Grid (responsive) */}
-                                            {allImages.length > 0 && (
+                                            {mode !== 'desktop' && allImages.length > 0 && (
                                                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', borderTop: '1px solid var(--border)', paddingTop: '0.75rem' }}>
                                                     {allImages.map((entry) => (
                                                         <div key={entry.id} style={{ position: 'relative', borderRadius: '8px', overflow: 'hidden', border: `1px solid ${entry.isCurrent ? 'var(--primary)' : 'var(--border)'}`, width: 'calc(50% - 0.375rem)', flexShrink: 0 }}>
