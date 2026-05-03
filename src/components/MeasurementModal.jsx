@@ -687,18 +687,43 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
 
             // Capture canvas state as DataURL for restoration
             const toggleCanvas = hiddenCanvasRef.current;
-            const canvasDataUrl = previewSnapshot || (() => {
-                if (!toggleCanvas) return null;
-                const comp = document.createElement('canvas');
-                comp.width = toggleCanvas.width; comp.height = toggleCanvas.height;
-                const cCtx = comp.getContext('2d');
-                cCtx.fillStyle = '#ffffff'; cCtx.fillRect(0, 0, comp.width, comp.height);
-                cCtx.strokeStyle = '#e0e0e0'; cCtx.lineWidth = 1;
-                for (let x = 0; x <= comp.width; x += 40) { cCtx.beginPath(); cCtx.moveTo(x, 0); cCtx.lineTo(x, comp.height); cCtx.stroke(); }
-                for (let y = 0; y <= comp.height; y += 40) { cCtx.beginPath(); cCtx.moveTo(0, y); cCtx.lineTo(comp.width, y); cCtx.stroke(); }
-                cCtx.drawImage(toggleCanvas, 0, 0);
-                return comp.toDataURL();
+            
+            const canvasDataUrl = await (async () => {
+                // If we are currently in the sketch editor, we should capture the latest state
+                if (isSketchFullscreen && canvasRef.current) {
+                    const fc = canvasRef.current;
+                    const comp = document.createElement('canvas');
+                    comp.width = fc.width; comp.height = fc.height;
+                    const cCtx = comp.getContext('2d');
+                    
+                    // 1. Background White + Grid
+                    cCtx.fillStyle = '#ffffff';
+                    cCtx.fillRect(0, 0, comp.width, comp.height);
+                    cCtx.strokeStyle = '#e0e0e0';
+                    cCtx.lineWidth = 1;
+                    for (let x = 0; x <= comp.width; x += 40) { cCtx.beginPath(); cCtx.moveTo(x, 0); cCtx.lineTo(x, comp.height); cCtx.stroke(); }
+                    for (let y = 0; y <= comp.height; y += 40) { cCtx.beginPath(); cCtx.moveTo(0, y); cCtx.lineTo(comp.width, y); cCtx.stroke(); }
+                    
+                    // 2. Photos
+                    galleryPhotos.forEach(photo => {
+                        const img = document.querySelector(`img[data-id="${photo.id}"]`);
+                        if (img && img.parentElement) {
+                            const parent = img.parentElement;
+                            const px = parseFloat(parent.style.left) / 100 * comp.width;
+                            const py = parseFloat(parent.style.top) / 100 * comp.height;
+                            const pw = parseFloat(parent.style.width) / 100 * comp.width;
+                            const ph = parseFloat(parent.style.height) / 100 * comp.height;
+                            cCtx.drawImage(img, px, py, pw, ph);
+                        }
+                    });
+                    
+                    // 3. Drawing Layer
+                    cCtx.drawImage(fc, 0, 0);
+                    return comp.toDataURL();
+                }
+                return previewSnapshot;
             })();
+
 
             if (saveAsPdf) {
                 // Generate PDF
@@ -730,8 +755,7 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
                             file,
                             measurements,
                             globalSettings,
-                            canvasImage: canvasDataUrl
-                        });
+                            canvasImage: canvasDataUrl, galleryPhotos });
                         resolve();
                     }, 'image/png');
                 });
