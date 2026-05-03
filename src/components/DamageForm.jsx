@@ -501,9 +501,12 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
     const [listeningField, setListeningField] = useState(null);
     const recognitionRef = useRef(null);
 
+    
     const toggleDictation = (fieldId, contextItem = null) => {
         if (listeningField === fieldId) {
-            recognitionRef.current?.stop();
+            if (recognitionRef.current) {
+                try { recognitionRef.current.stop(); } catch(e) {}
+            }
             setListeningField(null);
             return;
         }
@@ -514,21 +517,62 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
 
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (!SpeechRecognition) {
-            alert("Ihr Browser unterstützt keine Spracherkennung.");
+            alert("Ihr Browser unterstützt keine Spracherkennung (SpeechRecognition).");
             return;
         }
 
-        const recognition = new SpeechRecognition();
-        recognition.lang = 'de-DE';
-        recognition.interimResults = false;
-        recognition.continuous = false;
+        try {
+            const recognition = new SpeechRecognition();
+            recognition.lang = 'de-DE';
+            recognition.interimResults = false;
+            recognition.continuous = false;
 
-        recognition.onstart = () => setListeningField(fieldId);
-        recognition.onend = () => setListeningField(null);
-        recognition.onerror = (event) => {
-            console.error("Speech error", event.error);
+            recognition.onstart = () => {
+                setListeningField(fieldId);
+                console.log('Speech recognition started for:', fieldId);
+            };
+            
+            recognition.onend = () => {
+                setListeningField(null);
+                console.log('Speech recognition ended');
+            };
+
+            recognition.onerror = (event) => {
+                console.error("Speech recognition error:", event.error);
+                setListeningField(null);
+                if (event.error === 'not-allowed') {
+                    alert("Mikrofon-Zugriff wurde verweigert. Bitte in den Browsereinstellungen erlauben.");
+                } else if (event.error === 'network') {
+                    alert("Netzwerkfehler bei der Spracherkennung.");
+                }
+            };
+
+            recognition.onresult = (event) => {
+                const transcript = event.results[0][0].transcript;
+                if (transcript) {
+                    setFormData(prev => {
+                        if (fieldId === 'measures') {
+                            const current = prev.measures ? prev.measures + ' ' : '';
+                            return { ...prev, measures: current + transcript };
+                        } else if (fieldId.startsWith('note_') && contextItem) {
+                            const currentNotes = prev.measureNotes || {};
+                            const current = currentNotes[contextItem] ? currentNotes[contextItem] + ' ' : '';
+                            return { ...prev, measureNotes: { ...currentNotes, [contextItem]: current + transcript } };
+                        }
+                        return prev;
+                    });
+                }
+            };
+
+            recognitionRef.current = recognition;
+            recognition.start();
+        } catch (err) {
+            console.error("Failed to start speech recognition:", err);
+            alert("Fehler beim Starten der Spracherkennung.");
             setListeningField(null);
-        };
+        }
+    };
+
 
         recognition.onresult = (event) => {
             const transcript = event.results[0][0].transcript;
