@@ -132,7 +132,7 @@ const DraggablePhoto = ({ photo, index, selected, onSelect, onDeselect, onDelete
                     <X size={12} />
                 </button>
                 {/* Resize -- bottom-right */}
-                <div data-resize="true" onPointerDown={startResize}
+                <div data-resize="true" onPointerDown={(e) => { if (stylusOnlyMode && e.pointerType === 'touch') return; startResize(e); }}
                     style={{ position: 'absolute', bottom: -12, right: -12, width: 26, height: 26, background: '#3B82F6', cursor: 'se-resize', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 25, borderRadius: '50%', border: '2px solid white', boxShadow: '0 2px 6px rgba(0,0,0,0.35)', touchAction: 'none' }}>
                     <Move size={12} color="white" />
                 </div>
@@ -144,7 +144,7 @@ const DraggablePhoto = ({ photo, index, selected, onSelect, onDeselect, onDelete
             {/* Auswahl-Tab -- nur im Foto-Modus sichtbar */}
             {!selected && (
                 <div
-                    onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); onSelect(); }}
+                    onPointerDown={(e) => { if (stylusOnlyMode && e.pointerType === 'touch') return; e.preventDefault(); e.stopPropagation(); onSelect(); }}
                     style={{ position: 'absolute', top: -1, left: -1, width: 28, height: 28, background: 'rgba(59,130,246,0.75)', borderRadius: '3px 0 6px 0', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: 25, pointerEvents: 'auto', touchAction: 'none', boxShadow: '0 2px 4px rgba(0,0,0,0.3)' }}
                     title="Foto auswählen">
                     <Move size={13} color="white" />
