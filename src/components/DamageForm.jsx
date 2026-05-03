@@ -1280,6 +1280,19 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         return () => clearTimeout(timeoutId);
     }, [formData, onSave]);
 
+
+    // Auto-populate clientCity from clientZip
+    useEffect(() => {
+        if (!formData.clientZip) return;
+        const zipStr = String(formData.clientZip).trim();
+        if (zipStr.length >= 4) {
+            const match = swissPLZ.find(entry => String(entry.plz).trim() === zipStr);
+            if (match && match.city !== formData.clientCity) {
+                setFormData(prev => ({ ...prev, clientCity: match.city }));
+            }
+        }
+    }, [formData.clientZip, swissPLZ]);
+
     // Save on Unmount
     useEffect(() => {
         return () => {
@@ -3362,15 +3375,7 @@ END:VCARD`;
                                     list="plz-list-ag"
                                     className="form-input"
                                     value={formData.clientZip || ''}
-                                    onChange={(e) => {
-                                        const val = e.target.value;
-                                        const match = swissPLZ.find(entry => entry.plz === val.trim());
-                                        if (match) {
-                                            setFormData(prev => ({ ...prev, clientZip: val, clientCity: match.city }));
-                                        } else {
-                                            setFormData(prev => ({ ...prev, clientZip: val }));
-                                        }
-                                    }}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, clientZip: e.target.value }))}
                                     placeholder="PLZ"
                                     style={{ width: '100%' }}
                                 />
