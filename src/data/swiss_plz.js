@@ -232,5 +232,6 @@ export const swissPLZ = [
     { plz: "8626", city: "Ottikon (Gossau ZH)" },
     { plz: "8340", city: "Hinwil" },
     { plz: "8342", city: "Wernetshausen" },
+    { plz: "8280", city: "Kreuzlingen" },
     // more entries could be added here
 ];
