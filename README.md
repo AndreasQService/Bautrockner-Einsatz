@@ -1,54 +1,29 @@
-# Bautrockner-Einsatz Dashboard
+# QTool – ERP-Plattform für Bautrocknung
 
-Eine React-Anwendung zur Verwaltung von Bautrockner-Einsätzen und Schadensberichten.
+## Projektbeschreibung
+QTool ist eine spezialisierte ERP-Anwendung für die Q-Service AG zur Verwaltung von Wasserschadensanierungen, Bautrocknungen und Leckortungen. Die App ist für den Einsatz auf dem iPad (Feldarbeit) und Desktop (Büro) optimiert.
 
-## Voraussetzungen
+## Setup
+1.  `npm install` – Abhängigkeiten installieren.
+2.  `cp .env.example .env.local` – Umgebungsvariablen konfigurieren.
+3.  `npm run dev` – Lokalen Entwicklungsserver starten.
 
-Stellen Sie sicher, dass folgende Software auf Ihrem Computer installiert ist:
-- [Node.js](https://nodejs.org/) (Version 18 oder höher empfohlen)
-- [Git](https://git-scm.com/)
+## Speicherstrategie
+*   **GitHub**: Quellcode, Migrationen und Dokumentation.
+*   **Supabase**: Strukturierte Projektdaten, Benutzermanagement und Sync-Warteschlange.
+*   **OneDrive**: Primärer Speicher für Fotos, PDF-Berichte und Projektdokumente.
+*   **IndexedDB**: Lokaler Offline-Zwischenspeicher für Fotos und Projektänderungen (Sync-Queue).
 
-## Installation auf einem anderen Rechner
+## Branch-Strategie
+*   **main**: Stabiler Release-Zweig (Produktion).
+*   **dev**: Integrationszweig für getestete Features.
+*   **feature/***: Arbeit an einzelnen Aufgaben (z.B. `feature/sync-fix`).
 
-Follow these steps to set up the project on a new machine:
+## Sicherheitsregeln (ULTRA-STRICT)
+*   **Keine .env**: Credentials niemals einchecken!
+*   **Keine Kundendaten**: Testdaten in `tests/` verwenden.
+*   **Keine Medien**: Fotos (*.jpg, *.png) und Dokumente (*.pdf) gehören auf OneDrive, nicht ins Git.
+*   **Keine API Keys**: Hardcodierte Schlüssel sind untersagt.
 
-1.  **Repository klonen**
-    Öffnen Sie ein Terminal (Eingabeaufforderung, PowerShell oder Git Bash) und führen Sie folgenden Befehl aus:
-    ```bash
-    git clone https://github.com/AndreasQService/Bautrockner-Einsatz.git
-    ```
-
-2.  **In das Projektverzeichnis wechseln**
-    ```bash
-    cd Bautrockner-Einsatz
-    ```
-
-3.  **Abhängigkeiten installieren**
-    Installieren Sie alle notwendigen Pakete mit npm:
-    ```bash
-    npm install
-    ```
-
-4.  **Umgebungsvariablen konfigurieren**
-    Erstellen Sie eine neue Datei namens `.env` im Hauptverzeichnis des Projekts und fügen Sie Ihre Supabase-Zugangsdaten hinzu:
-    
-    ```env
-    VITE_SUPABASE_URL=Ihre_Supabase_URL
-    VITE_SUPABASE_ANON_KEY=Ihr_Supabase_Anon_Key
-    ```
-    *(Diese Daten finden Sie in Ihrem Supabase Dashboard unter Project Settings > API)*
-
-5.  **Anwendung starten**
-    Starten Sie den Entwicklungsserver:
-    ```bash
-    npm run dev
-    ```
-    Die Anwendung ist nun unter `http://localhost:5173` (oder einem ähnlichen Port) erreichbar.
-
-## Build für Produktion
-
-Um eine optimierte Version für die Veröffentlichung zu erstellen:
-```bash
-npm run build
-```
-Die Dateien befinden sich anschließend im `dist`-Ordner.
+---
+© 2026 Q-Service AG
