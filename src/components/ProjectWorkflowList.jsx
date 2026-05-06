@@ -17,6 +17,7 @@ const STEPS = [
   { key: 'leckortung',      label: 'Leckortung',    short: 'LEK' },
   { key: 'bericht',         label: 'Bericht',       short: 'BER' },
   { key: 'trocknung',       label: 'Trocknung',     short: 'TRO' },
+  { key: 'kontrolle',       label: 'Kontrolle*',    short: 'KTR' },
   { key: 'instandstellung', label: 'Instandst.',    short: 'INS' },
   { key: 'rechnung',        label: 'Rechnung',      short: 'REC' },
   { key: 'abschluss',       label: 'Abschluss',     short: 'ABS' },

@@ -66,12 +66,13 @@ const CalendarIcon = ({ size = 24, style = {} }) => (
     </svg>
 );
 
-const STEPS = ['Schadenaufnahme', 'Leckortung', 'Trocknung', 'Instandsetzung', 'Abgeschlossen']
+const STEPS = ['Schadenaufnahme', 'Leckortung', 'Trocknung', 'Kontrolle*', 'Instandsetzung', 'Abgeschlossen']
 
 const statusColors = {
     'Schadenaufnahme': 'bg-gray-100',
     'Leckortung': 'bg-blue-100',
     'Trocknung': 'bg-yellow-100',
+    'Kontrolle*': 'bg-orange-100',
     'Instandsetzung': 'bg-green-100',
     'Abgeschlossen': 'bg-gray-200'
 }
@@ -3168,13 +3169,15 @@ END:VCARD`;
                         const tabStatusMap = {
                             aufnahme: 'Leckortung',
                             leck: 'Trocknung',
-                            trocknung: 'Instandsetzung',
+                            trocknung: 'Kontrolle*',
+                            kontrolle: 'Instandsetzung',
                             messung: 'Abgeschlossen',
                         };
                         const tabLabelMap = {
                             aufnahme: 'Schadenaufnahme abgeschlossen',
                             leck: 'Leckortung abgeschlossen',
                             trocknung: 'Trocknung abgeschlossen',
+                            kontrolle: 'Kontrolle abgeschlossen',
                             messung: 'Messung abgeschlossen',
                         };
                         const nextStatus = tabStatusMap[techTab];
