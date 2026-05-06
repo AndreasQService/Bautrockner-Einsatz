@@ -44,9 +44,8 @@ function openDB() {
  */
 const isStaleSyncing = (item) => {
   if (item.status !== 'syncing') return false;
-  if (!item.updatedAt) return false;
-  const lastUpdate = new Date(item.updatedAt).getTime();
-  return (Date.now() - lastUpdate) > STALE_SYNCING_MS;
+  if (!item.updatedAt) return true;
+  return (Date.now() - new Date(item.updatedAt).getTime()) > STALE_SYNCING_MS;
 };
 
 /**
@@ -107,7 +106,7 @@ export async function getPendingProjectCount() {
 /**
  * Hilfsfunktion: Berechnet die Größe des Payloads in KB
  */
-const getPayloadSizeKB = (data) => JSON.stringify(data).length / 1024;
+const getPayloadSizeKB = (data) => JSON.stringify(data || {}).length / 1024;
 
 /**
  * Hilfsfunktion: Entfernt gezielt nur Bilddaten aus dem Payload
@@ -192,59 +191,68 @@ export async function processProjectQueue() {
 
     if (!all || all.length === 0) return;
 
-    // 1. Alle Queue-Items beim Start loggen
-    console.log(`[ProjectSync] Start Queue-Verarbeitung. Gesamt: ${all.length} Items.`);
-    for (const item of all) {
-      const sizeKB = getPayloadSizeKB(item.data);
-      console.log(`[ProjectSync] Inventory: ${item.projectId} | status: ${item.status} | attempts: ${item.attempts} | error: ${item.lastError || 'none'} | size: ${sizeKB.toFixed(2)} KB`);
-    }
+    // 1. Detaillierte console.table beim Start
+    console.log('[ProjectSync] --- START QUEUE INVENTORY ---');
+    const inventory = all.map(item => ({
+      id: item.id,
+      projectId: item.projectId,
+      status: item.status,
+      attempts: item.attempts,
+      lastError: item.lastError || 'none',
+      updatedAt: item.updatedAt || 'missing',
+      payloadSizeKB: getPayloadSizeKB(item.data).toFixed(2)
+    }));
+    console.table(inventory);
 
     for (const item of all) {
-      // 6. Kein Item darf den Loop stoppen -> try-catch pro Item
       try {
-        // Überspringe bereits synchronisierte
         if (item.status === 'synced') continue;
 
-        // 5. Stale Recovery (hängendes Syncing > 2 Min)
+        // 5. Stale Recovery inkl. missing updatedAt
         if (isStaleSyncing(item)) {
-          console.log(`[ProjectSync] stale_syncing_reset: ${item.projectId}`);
+          console.log(`[ProjectSync] --- CONTINUE REASON: stale_syncing_reset (${item.projectId}) ---`);
           item.status = 'pending';
           item.lastError = 'stale_syncing_reset';
           item.attempts = (item.attempts || 0) + 1;
           await updateItemStatus(item);
+          // Wir machen hier kein continue, sondern versuchen das Item direkt zu verarbeiten
         }
 
         // 3. Error Retry Begrenzung
         if (item.status === 'error' && item.attempts >= MAX_ATTEMPTS) {
-          console.log(`[ProjectSync] skipped max attempts: ${item.projectId}`);
+          console.log(`[ProjectSync] --- CONTINUE REASON: skipped_max_attempts (${item.projectId}) ---`);
           continue;
         }
 
         // 4. Payload Too Large Check
         if (item.lastError === 'payload_too_large') {
-          console.log(`[ProjectSync] skipped payload_too_large: ${item.projectId}`);
+          console.log(`[ProjectSync] --- CONTINUE REASON: skipped_payload_too_large (${item.projectId}) ---`);
           continue;
         }
 
-        // Nur pending oder error verarbeiten
-        if (item.status !== 'pending' && item.status !== 'error') continue;
+        // Nur pending, error oder blocked_by_session verarbeiten
+        if (item.status !== 'pending' && item.status !== 'error' && item.status !== 'blocked_by_session') {
+          continue;
+        }
 
-        if (!supabase) throw new Error('Supabase client ist nicht initialisiert.');
+        if (!supabase) {
+          throw new Error('Supabase client ist nicht initialisiert.');
+        }
 
         const originalSizeKB = getPayloadSizeKB(item.data);
         let finalPayload = item.data;
         let finalSizeKB = originalSizeKB;
 
-        // Schritt 1: Falls zu groß (>1MB), gezielt Bilder strippen
+        // Strip Bilder falls > 1MB
         if (originalSizeKB > 1024) {
           finalPayload = safeStripImagePayload(item.data);
           finalSizeKB = getPayloadSizeKB(finalPayload);
           console.log(`[ProjectSync] ${item.projectId} strip: ${originalSizeKB.toFixed(2)}KB -> ${finalSizeKB.toFixed(2)}KB`);
         }
 
-        // Schritt 2: Falls immer noch zu groß (>2MB), Versuch abbrechen
+        // Abbruch falls immer noch > 2MB
         if (finalSizeKB > 2048) {
-          console.warn(`[ProjectSync] ${item.projectId} skipped payload_too_large (${finalSizeKB.toFixed(2)}KB)`);
+          console.warn(`[ProjectSync] --- CONTINUE REASON: skipped_payload_too_large_after_strip (${item.projectId}: ${finalSizeKB.toFixed(2)}KB) ---`);
           item.status = 'error';
           item.lastError = 'payload_too_large';
           item.attempts = (item.attempts || 0) + 1;
@@ -253,12 +261,38 @@ export async function processProjectQueue() {
         }
 
         console.log(`[ProjectSync] ${item.projectId} upsert started (attempts: ${item.attempts}, size: ${finalSizeKB.toFixed(2)}KB)`);
+        
+        // ── SESSION GUARD ──────────────────────────────────────────
+        // Prüfen ob diese Session noch Owner ist
+        const myToken = sessionStorage.getItem('qtool_session_token');
+        if (myToken) {
+          const { data: sessions } = await supabase
+            .from('project_sessions')
+            .select('session_token, started_at')
+            .eq('open_project_id', item.projectId);
+            
+          if (sessions && sessions.length > 0) {
+            const sorted = sessions.sort((a, b) => new Date(a.started_at) - new Date(b.started_at));
+            const owner = sorted[0];
+            if (owner.session_token !== myToken) {
+              console.warn(`[QSync] session blocked: ${item.projectId} (not owner)`);
+              item.status = 'blocked_by_session';
+              item.lastError = 'blocked_by_session';
+              await updateItemStatus(item);
+              continue;
+            }
+          }
+        }
+        // ───────────────────────────────────────────────────────────
+
         item.status = 'syncing';
         await updateItemStatus(item);
 
         const { error } = await upsertWithTimeout(supabase, finalPayload, item.projectId, item.attempts || 0);
 
-        if (error) throw error;
+        if (error) {
+          throw error;
+        }
 
         console.log(`[ProjectSync] ${item.projectId} upsert success`);
         item.status = 'synced';
@@ -266,15 +300,14 @@ export async function processProjectQueue() {
         await updateItemStatus(item);
 
       } catch (err) {
-        // 2. Fehlerbehandlung pro Item -> status=error, log, continue
         const isTimeout = err.message === 'timeout';
-        console.warn(`[ProjectSync] ${item.projectId} ${isTimeout ? 'timeout' : 'failed'}: ${err.message}`);
+        console.warn(`[ProjectSync] --- CONTINUE REASON: ${isTimeout ? 'timeout' : 'upsert_failed'} (${item.projectId}): ${err.message} ---`);
         
         item.status = 'error';
         item.lastError = isTimeout ? 'timeout' : err.message;
         item.attempts = (item.attempts || 0) + 1;
         await updateItemStatus(item);
-        // Zwingend continue (durch Ende des try-catch Blocks)
+        // Continue erfolgt automatisch durch Ende des Blocks
       }
     }
   } catch (e) {

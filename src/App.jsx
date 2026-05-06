@@ -11,6 +11,7 @@ import LoginScreen from './components/LoginScreen'
 import EmailImportModalV2 from './components/EmailImportModalV2'
 import i18n from './i18n'
 import { buildProjectFolderName, uploadProjectJson } from "./services/OneDriveService";
+import { queueProjectBackup, getPendingProjectCount, processProjectQueue } from './services/ProjectSyncService';
 
 
 function App() {
@@ -70,13 +71,91 @@ function App() {
 
   // ── Dark / Light Mode ────────────────────────────────────────────────────
   const [isDarkMode, setIsDarkMode] = useState(() => {
-    const saved = localStorage.getItem('qtool_dark_mode');
-    return saved !== null ? saved === 'true' : true; // Default: Dark
-  });
+    return localStorage.getItem('qtool_dark_mode') === 'true';
+  }); 
 
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', isDarkMode ? 'dark' : 'light');
-    localStorage.setItem('qtool_dark_mode', String(isDarkMode));
+    // ── Cleanup Storage (Prevent QuotaExceededError) ─────────────────────────
+    const cleanupStorage = () => {
+      try {
+        // RADIKALER RESET: Einmalig alles löschen, was nicht kritisch ist, wenn Quota erreicht
+        const criticalKeys = ['qtool_session_token', 'qservice_auth', 'qtool_dark_mode', 'qtool_selected_mic'];
+        let used = 0;
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          used += (localStorage.getItem(key) || '').length;
+        }
+
+        if (used > 3 * 1024 * 1024) { // > 3MB belegt
+          console.warn('[App] LocalStorage fast voll. Starte Radikal-Reinigung...');
+          for (let i = localStorage.length - 1; i >= 0; i--) {
+            const key = localStorage.key(i);
+            if (!criticalKeys.includes(key)) {
+              localStorage.removeItem(key);
+            }
+          }
+        }
+      } catch (e) {
+        console.error('[App] Failed to cleanup storage:', e);
+      }
+    };
+    cleanupStorage();
+
+    // ── Sync-Queue Bereinigung (Dubletten & Zombies) ──────────
+    const cleanupSyncQueue = () => {
+      const req = indexedDB.open('qtool-sync-queue', 1);
+      req.onsuccess = (e) => {
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains('projects')) return;
+        const tx = db.transaction('projects', 'readwrite');
+        const store = tx.objectStore('projects');
+        const getAll = store.getAll();
+        getAll.onsuccess = () => {
+          const all = getAll.result || [];
+          const seenIds = new Set();
+          const sorted = all.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+          
+          sorted.forEach(item => {
+            if (seenIds.has(item.projectId)) {
+              // Dublette -> Löschen
+              store.delete(item.id);
+            } else {
+              seenIds.add(item.projectId);
+              // Zombie-Reset falls nötig
+              if (item.status === 'syncing' || item.status === 'uploaded') {
+                item.status = 'pending';
+                store.put(item);
+              }
+            }
+          });
+        };
+      };
+    };
+    cleanupSyncQueue();
+
+    const theme = isDarkMode ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', theme);
+    document.body.style.backgroundColor = '';
+    
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+    
+    try {
+      localStorage.setItem('qtool_dark_mode', isDarkMode ? 'true' : 'false');
+    } catch (e) {
+      if (e.name === 'QuotaExceededError') {
+        console.warn('[App] Storage full! Emergency clearing reports cache to save theme.');
+        localStorage.removeItem('qservice_reports_prod');
+        try {
+          localStorage.setItem('qtool_dark_mode', isDarkMode ? 'true' : 'false');
+        } catch (innerE) {
+          // If still failing, we have a serious storage issue
+        }
+      }
+    }
   }, [isDarkMode]);
 
   // Projektspezifischer Modus: 'desktop' | 'technician' (Mutex – nie beides gleichzeitig)
@@ -96,8 +175,9 @@ function App() {
   // Zählt ausstehende lokale Fotos direkt aus IndexedDB (qtool-photos)
   const [syncStatus, setSyncStatus] = useState('idle'); // 'idle' | 'syncing' | 'error'
   const [syncPending, setSyncPending] = useState(0);
+  const [odSyncPending, setOdSyncPending] = useState(0);
 
-  // Ausstehende lokale Bilder zählen – alle 10s aktualisieren
+  // Ausstehende lokale Bilder + Projektdaten zählen – alle 10s aktualisieren
   // Fällt automatisch auf 0 nach erfolgreichem Supabase-Upload
   useEffect(() => {
     const countPending = () => new Promise((resolve) => {
@@ -118,10 +198,21 @@ function App() {
       req.onupgradeneeded = () => resolve(0);
     });
 
-    countPending().then(setSyncPending).catch(() => {});
-    const interval = setInterval(() => {
-      countPending().then(setSyncPending).catch(() => {});
-    }, 10_000);
+    const updateCounts = async () => {
+      const imgCount = await countPending();
+      setSyncPending(imgCount);
+      const odCount = await getPendingProjectCount();
+      setOdSyncPending(odCount);
+      
+      // Automatisch Queue verarbeiten wenn online
+      if (navigator.onLine) {
+        processProjectQueue().catch(() => {});
+      }
+    };
+
+    updateCounts().catch(() => {});
+    const interval = setInterval(updateCounts, 10_000);
+
     return () => clearInterval(interval);
   }, []);
 
@@ -300,7 +391,7 @@ function App() {
       try {
         const { data, error } = await supabase
           .from('damage_reports')
-          .select('report_data, updated_at');
+          .select('report_data, updated_at, version');
           // HINWEIS: Client-seitige Sortierung um Statement Timeout bei großen JSONs zu verhindern
 
         if (error) {
@@ -308,16 +399,20 @@ function App() {
           setSupabaseStatus({ ok: false, count: 0, error: `${error.code}: ${error.message}` });
         } else if (data) {
           const loadedReports = data
-            // Sortierung auf dem Client um DB Statement Timeouts zu vermeiden
-            .sort((a, b) => new Date(b.report_data?.date || b.updated_at).getTime() - new Date(a.report_data?.date || a.updated_at).getTime())
-            .map(row => ({
-            ...row.report_data,
-            _supabase_updated_at: row.updated_at,
-            images: (row.report_data.images || []).map(img => ({
-              ...img,
-              includeInReport: img.includeInReport !== false
-            }))
-          })).filter(r => !r._isSession && !r.deleted_at); // Session + soft-deleted ausblenden
+            .map(row => {
+              if (!row.report_data) return null;
+              return {
+                ...row.report_data,
+                _supabase_updated_at: row.updated_at,
+                _supabase_version: row.version || 1,
+                images: (row.report_data.images || []).map(img => ({
+                  ...img,
+                  includeInReport: img.includeInReport !== false
+                }))
+              };
+            })
+            .filter(r => r && !r._isSession && !r.deleted_at)
+            .sort((a, b) => new Date(b.date || b._supabase_updated_at).getTime() - new Date(a.date || a._supabase_updated_at).getTime());
 
           console.log(`[Supabase] ${loadedReports.length} Projekte geladen (${data.length} DB-Einträge gesamt).`);
           setSupabaseStatus({ ok: true, count: loadedReports.length, total: data.length, error: null });
@@ -359,18 +454,12 @@ function App() {
       ? savedMode
       : (isTechnicianMode ? 'technician' : 'desktop');
     setProjectMode(initialMode);
-    // Presence mit korrektem Modus starten
-    setupPresenceForProject(report.id, initialMode);
   }
 
   const handleCancelEntry = () => {
     setView('dashboard');
     setSelectedReport(null);
     setIsSessionActive(true);
-    // Presence freigeben
-    if (presenceChannelRef.current?.releaseSession) {
-      presenceChannelRef.current.releaseSession();
-    }
   }
 
   const handleSaveReport = useCallback(async (updatedReport, silent = false) => {
@@ -460,46 +549,64 @@ function App() {
             finalReport.projectNumber || finalReport.id || 'Unbekannt',
             finalReport
           );
-          uploadProjectJson(odFolder, finalReport).catch(e =>
-            console.warn('[OneDrive] JSON-Backup fehlgeschlagen:', e.message)
-          );
+          // NEU: In die Warteschlange schreiben statt direkt hochladen
+          queueProjectBackup(finalReport.id, odFolder, finalReport)
+            .then(() => {
+              setOdSyncPending(prev => prev + 1);
+              // Sofortigen Sync-Versuch triggern
+              processProjectQueue().catch(() => {});
+            })
+            .catch(e => console.warn('[ProjectSync] Queueing failed:', e.message));
         } catch (e) {
-          console.warn('[OneDrive] JSON-Backup fehlgeschlagen:', e.message);
+          console.warn('[ProjectSync] Backup-Vorbereitung fehlgeschlagen:', e.message);
         }
       };
 
-      // ─── Konfliktschutz: Nur speichern wenn kein neueres Update existiert ───────
-      if (loadedAt && finalReport.id && !finalReport.id.startsWith('TMP-')) {
+      // ─── Konfliktschutz: Atomares Update mit Versions-Check (Ultra-Strict) ───────
+      const loadedVersion = finalReport._supabase_version || 1;
+      
+      if (finalReport.id && !finalReport.id.startsWith('TMP-')) {
+        console.log('[QSync] save attempt', { id: finalReport.id, version: loadedVersion });
+        
+        // _supabase_version und _supabase_updated_at entfernen für report_data
+        const { _supabase_updated_at, _supabase_version, ...cleanData } = reportForStorage;
+        
+        const rowDataWithVersion = {
+          ...rowData,
+          report_data: cleanData,
+          version: loadedVersion + 1
+        };
+
         const { data: updateResult, error } = await supabase
           .from('damage_reports')
-          .update(rowData)
-          .eq('id', finalReport.id)
-          .lte('updated_at', loadedAt)  // Nur wenn DB-Version ≤ geladene Version
-          .select('id');
+          .update(rowDataWithVersion)
+          .match({ id: finalReport.id, version: loadedVersion })
+          .select('version');
 
         if (error) {
-          console.error('Error saving to Supabase:', error);
-          showToast(`⚠️ Speicherfehler: ${error.message || error.code || 'Supabase-Fehler'}. Daten nur lokal gesichert!`, 'error');
+          console.error('[QSync] error saving:', error);
+          showToast(`⚠️ Speicherfehler: ${error.message || error.code}. Daten nur lokal gesichert!`, 'error');
         } else if (!updateResult || updateResult.length === 0) {
-          // Konflikt: Ein anderes Gerät hat neuere Daten → NICHT überschreiben
-          console.warn('[Sync-Konflikt] Neuere Version in Supabase – abgebrochen:', finalReport.id);
-          showToast('⚠️ Neuere Version auf anderem Gerät! Seite neu laden.', 'warning');
+          // Konflikt: Version auf dem Server ist anders (Race Condition oder Drift)
+          console.error('[QSync] version mismatch - conflict detected');
+          showToast('⚠️ Konflikt: Jemand anderes hat dieses Projekt bereits aktualisiert! Bitte Seite neu laden.', 'error');
         } else {
-          // Erfolgreich: _supabase_updated_at aktualisieren damit nächster Save erlaubt ist
-          setReports(prev => prev.map(r => r.id === finalReport.id ? { ...r, _supabase_updated_at: now } : r));
+          console.log('[QSync] save success', { newVersion: updateResult[0].version });
+          setReports(prev => prev.map(r => r.id === finalReport.id ? { ...r, _supabase_updated_at: now, _supabase_version: updateResult[0].version } : r));
           oneDriveBackup();
         }
       } else {
-        // Neues Projekt oder kein bekannter Zeitstempel → einfaches Upsert
-        supabase.from('damage_reports').upsert(rowData).then(({ error }) => {
-          if (error) {
-            console.error('Error saving to Supabase:', error);
-            showToast(`⚠️ Speicherfehler: ${error.message || error.code || 'Supabase-Fehler'}. Daten nur lokal gesichert!`, 'error');
-          } else {
-            setReports(prev => prev.map(r => r.id === finalReport.id ? { ...r, _supabase_updated_at: now } : r));
-            oneDriveBackup();
-          }
-        });
+        // Neues Projekt -> Insert
+        const rowDataNew = { ...rowData, version: 1 };
+        const { error } = await supabase.from('damage_reports').insert(rowDataNew);
+        if (error) {
+          console.error('[QSync] insert error:', error);
+          showToast(`⚠️ Speicherfehler: ${error.message}`, 'error');
+        } else {
+          console.log('[QSync] save success (new project)');
+          setReports(prev => prev.map(r => r.id === finalReport.id ? { ...r, _supabase_updated_at: now, _supabase_version: 1 } : r));
+          oneDriveBackup();
+        }
       }
     }
 
@@ -838,12 +945,11 @@ function App() {
                       <span className="hide-mobile">Import</span>
                     </button>
 
-                    {/* Sync-Status Badge (Variante C: kein OneDrive-Login) */}
                     <div
                       id="sync-status-badge"
                       title={syncPending > 0
                         ? `${syncPending} Fotos ausstehend – werden synchronisiert sobald Netz verfügbar`
-                        : 'Alle Daten synchronisiert'}
+                        : 'Lokale Daten gesichert'}
                       style={{
                         display: 'flex', alignItems: 'center', gap: '0.35rem',
                         padding: '0.3rem 0.65rem',
@@ -851,7 +957,7 @@ function App() {
                         border: `1px solid ${syncPending > 0 ? 'rgba(251,191,36,0.4)' : 'var(--border)'}`,
                         backgroundColor: syncPending > 0 ? 'rgba(251,191,36,0.06)' : 'var(--surface)',
                         fontSize: '0.78rem',
-                        color: syncPending > 0 ? '#FBBF24' : 'var(--text-muted)',
+                        color: 'var(--text-main)',
                         whiteSpace: 'nowrap',
                         userSelect: 'none',
                         transition: 'all 0.3s ease',
@@ -863,7 +969,34 @@ function App() {
                         flexShrink: 0,
                       }} />
                       <span className="hide-mobile">
-                        {syncPending > 0 ? `${syncPending} ausstehend` : 'Synchronisiert'}
+                        {syncPending > 0 ? `${syncPending} Fotos` : 'Lokal gesichert'}
+                      </span>
+                    </div>
+
+                    {/* Supabase Sync Badge */}
+                    <div
+                      title={odSyncPending > 0
+                        ? `${odSyncPending} Projektänderungen warten auf zentrale Sicherung (Supabase)`
+                        : 'Alle Projektdaten in der Cloud (Supabase) gesichert'}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '0.35rem',
+                        padding: '0.3rem 0.65rem',
+                        borderRadius: '6px',
+                        border: `1px solid ${odSyncPending > 0 ? 'var(--primary)' : 'var(--border)'}`,
+                        backgroundColor: odSyncPending > 0 ? 'rgba(59,130,246,0.06)' : 'var(--surface)',
+                        fontSize: '0.78rem',
+                        color: 'var(--text-main)',
+                        whiteSpace: 'nowrap',
+                        transition: 'all 0.3s ease',
+                      }}
+                    >
+                      <span style={{
+                        width: '7px', height: '7px', borderRadius: '50%',
+                        backgroundColor: odSyncPending > 0 ? 'var(--primary)' : '#10B981',
+                        flexShrink: 0,
+                      }} />
+                      <span className="hide-mobile">
+                        {odSyncPending > 0 ? `${odSyncPending} Zentraler Sync` : 'Zentral OK'}
                       </span>
                     </div>
                   </>
@@ -969,8 +1102,8 @@ function App() {
               marginLeft: '4px'
             }}>
               <div style={{ lineHeight: 1.25 }}>
-                <div style={{ fontWeight: 600, fontSize: '13px', color: isDarkMode ? 'var(--text-main)' : '#1F2937' }}>{currentUser.name}</div>
-                <div style={{ color: isDarkMode ? '#64748B' : '#6B7280', fontSize: '11px', fontWeight: 400, textTransform: 'uppercase' }}>{currentUser.role}</div>
+                <div style={{ fontWeight: 800, fontSize: '13px', color: '#111827' }}>{currentUser.name}</div>
+                <div style={{ color: '#374151', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase' }}>{currentUser.role}</div>
               </div>
               <button
                 onClick={handleLogout}

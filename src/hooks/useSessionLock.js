@@ -47,6 +47,7 @@ export function useSessionLock(supabase, sessionToken, selectedReportId, view, r
         mode:             modeRef.current,
         device:           /iPad|iPhone|Android/i.test(navigator.userAgent) ? 'Mobil' : 'Desktop',
         last_seen:        new Date().toISOString(),
+        started_at:       new Date(sessionStartedAt).toISOString(),
       }, { onConflict: 'session_token' });
 
     if (error) {
@@ -96,8 +97,7 @@ export function useSessionLock(supabase, sessionToken, selectedReportId, view, r
     const mySessionData = (data || []).find(s => s.session_token === myToken);
     const conflicting = (data || []).filter(
       s => s.session_token !== myToken &&
-           s.open_project_id === myProjectId &&
-           s.mode !== myMode
+           s.open_project_id === myProjectId
     );
 
     if (conflicting.length === 0) {
@@ -105,28 +105,27 @@ export function useSessionLock(supabase, sessionToken, selectedReportId, view, r
       return;
     }
 
-    // First-wins: älteste Session (kleinster last_seen = nicht korrekt, nutze sessionStartedAt)
-    // Stattdessen: nutzen wir die created_at des session_token als Proxy über last_seen
-    // Einfachste Implementierung: My token alphabetisch vs. conflicting tokens vergleichen
-    //   → deterministisch, aber nicht zeitbasiert
-    // Besser: session_started_at mitschicken (last_seen enthält nicht die Startzeit)
-    const myStarted = sessionStartedAt;
-    const earliest = conflicting.reduce((min, s) => {
-      return (new Date(s.last_seen) < new Date(min.last_seen)) ? s : min;
-    }, conflicting[0]);
+    // Owner = Session mit kleinstem started_at
+    // Wir sortieren alle Sessions für dieses Projekt nach started_at
+    const allSessionsInProject = (data || [])
+      .filter(s => s.open_project_id === myProjectId)
+      .sort((a, b) => new Date(a.started_at || a.created_at) - new Date(b.started_at || b.created_at));
 
-    // Vergleich: Wer ist länger aktiv?
-    // Falls meine Session älter als der früheste Konflikt → ich bin Owner
-    const mySessionStart = mySessionData?.last_seen ?? new Date().toISOString();
-    // Wir verwenden sessionStartedAt (ms seit Epoch) das wir mitgespeichert haben
-    // Da wir es noch nicht speichern, nutzen wir Token-Vergleich als deterministischen Tiebreaker
-    const amIOwner = myToken < earliest.session_token; // lexikografisch deterministisch
+    const ownerSession = allSessionsInProject[0];
+    const amIOwner = ownerSession?.session_token === myToken;
+
+    // Zusätzlich Modus-Konflikt prüfen
+    const modeConflict = conflicting.some(s => s.mode !== myMode);
 
     if (amIOwner) {
-      console.log('[SessionLock] ✅ Owner (kein Konflikt)');
+      console.log('[SessionLock] ✅ session owner');
       setIsSessionActive(true);
     } else {
-      console.warn('[SessionLock] 🔒 Gesperrt – anderer Modus hat Vorrang');
+      if (modeConflict) {
+        console.warn('[SessionLock] 🔒 session blocked (mode conflict)');
+      } else {
+        console.warn('[SessionLock] 🔒 conflict detected (not owner)');
+      }
       setIsSessionActive(false);
     }
   }, [supabase, sessionStartedAt]);
