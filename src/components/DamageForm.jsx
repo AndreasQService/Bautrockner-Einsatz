@@ -6964,7 +6964,7 @@ END:VCARD`;
                                     
                                     {/* Custom Numpad UI for Technician Add Device */}
                                     {activeNumpadField && createPortal(
-                                        <div style={{ position: 'fixed', left: numpadPos.x, top: numpadPos.y, width: 280, backgroundColor: 'var(--surface)', border: '1px solid var(--border)', boxShadow: '0 10px 25px rgba(0,0,0,0.05)', padding: '0.75rem', zIndex: 100000, boxShadow: '0 10px 40px rgba(0,0,0,0.6)', borderRadius: 12 }}>
+                                        <div style={{ position: 'fixed', left: numpadPos.x, top: numpadPos.y, width: 280, backgroundColor: 'var(--surface)', border: '1px solid var(--border)', padding: '0.75rem', zIndex: 100000, boxShadow: '0 10px 40px rgba(0,0,0,0.6)', borderRadius: 12 }}>
                                             <div 
                                                 style={{ display:'flex', justifyContent:'space-between', marginBottom:'0.5rem', alignItems:'center', cursor: 'grab', touchAction: 'none', paddingBottom: '0.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)' }}
                                                 onPointerDown={e => {
