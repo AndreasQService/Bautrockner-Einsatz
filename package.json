@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host --open chrome",
+    "autosave": "node scripts/autosave-watch.cjs",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
