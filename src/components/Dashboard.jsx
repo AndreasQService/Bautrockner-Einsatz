@@ -466,7 +466,7 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
             {/* Pass Filtered Reports to Monitors (only when not in Archive OR Technician Mode) */}
             {!showArchive && mode !== 'technician' && (
                 <div>
-                    <WorkflowStatusOverview reports={reports} onSelectReport={onSelectReport} currentUser={currentUser} users={users||[]} />
+                    <WorkflowStatusOverview reports={reports} onSelectReport={onSelectReport} currentUser={currentUser} users={users || []} />
                     <MeasurementControlOverview reports={filteredReports} onSelectReport={onSelectReport} />
                     <DryingMonitor reports={filteredReports} onSelectReport={onSelectReport} />
                 </div>
@@ -519,7 +519,7 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
 
                                     <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginLeft: '1.25rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                         {(() => {
-                                            const isId = (s) => typeof s === 'string' && (s.match(/-/g)||[]).length >= 3 && !s.includes(' ');
+                                            const isId = (s) => typeof s === 'string' && (s.match(/-/g) || []).length >= 3 && !s.includes(' ');
                                             const parts = [report.projectNumber, report.projectTitle].filter(s => s && s.trim() && !isId(s));
                                             return parts.length > 0 ? parts.join(' - ') : '-';
                                         })()}
@@ -778,22 +778,22 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
 
                     {/* App neu laden / Programm beenden */}
                     <div style={{ marginTop: '3rem', paddingBottom: '5rem', display: 'flex', flexDirection: 'column', gap: '1rem', alignItems: 'center' }}>
-                        <button 
-                            className="btn btn-outline" 
-                            onClick={() => window.location.reload()} 
+                        <button
+                            className="btn btn-outline"
+                            onClick={() => window.location.reload()}
                             style={{ padding: '0.75rem 2rem', borderRadius: '12px', fontSize: '0.9rem', width: '100%', maxWidth: '300px' }}
                         >
                             <RotateCcw size={16} /> Dashboard neu laden
                         </button>
-                        
+
                         {onLogout && (
-                            <button 
-                                onClick={onLogout} 
-                                style={{ 
-                                    padding: '0.75rem 2rem', 
-                                    borderRadius: '12px', 
-                                    fontSize: '0.9rem', 
-                                    width: '100%', 
+                            <button
+                                onClick={onLogout}
+                                style={{
+                                    padding: '0.75rem 2rem',
+                                    borderRadius: '12px',
+                                    fontSize: '0.9rem',
+                                    width: '100%',
                                     maxWidth: '300px',
                                     background: 'rgba(239, 68, 68, 0.1)',
                                     border: '1px solid rgba(239, 68, 68, 0.3)',

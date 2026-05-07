@@ -305,11 +305,18 @@ function DeadlineBadge({ days, slaDays }) {
 // ─── NextActionCell ───────────────────────────────────────────────────────────
 function NextActionCell({ rep, store }) {
   const next = getNextAction(rep, store)
-  if (!next) return <span style={{ color: "#334155", fontSize: "0.78rem" }}>—</span>
+  if (!next) return <span style={{ color: "#9CA3AF", fontSize: "0.78rem" }}>—</span>
   const { step, deadline, days } = next
+  
+  const nextStepIndex = STEPS.findIndex(s => s.id === step.id)
   const ai = getActiveIdx(rep, store)
-  const state = getStepState(store, rep, step, ai, ai)
-  const color = state === "overdue" ? "#EF4444" : state === "warning" ? "#F59E0B" : state === "ok" ? "#3B82F6" : "#64748B"
+  const state = getStepState(store, rep, step, nextStepIndex, ai)
+  
+  const color = (state === "done" || state === "ok") ? "#10B981" 
+              : state === "warning" ? "#F59E0B" 
+              : state === "overdue" ? "#EF4444" 
+              : "#64748B"
+
   const actions = {
     meldung: "Eingang erfassen", kontakt: "Kontakt aufnehmen", schadenaufnahme: "Aufnahme durchführen",
     bericht: "Bericht erstellen", leckortung: "Leckortung planen", trocknung: "Trocknung starten",
@@ -319,8 +326,17 @@ function NextActionCell({ rep, store }) {
   const label = actions[step.id] || step.label
   return (
     <div>
-      <div style={{ fontSize: "0.82rem", fontWeight: 700, color, lineHeight: 1.3, marginBottom: 3 }}>{label}</div>
-      {deadline && <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: "0.68rem", color: "#64748B" }}><CalendarDays size={10} />Fällig: {fmt(deadline)}</div>}
+      <div style={{ 
+        fontSize: "13px", 
+        fontWeight: 700, 
+        color, 
+        fontFamily: '"Segoe UI", Roboto, Arial, sans-serif',
+        opacity: 1,
+        letterSpacing: "0.01em",
+        lineHeight: 1.3, 
+        marginBottom: 3 
+      }}>{label}</div>
+      {deadline && <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: "12px", color: "#6B7280" }}><CalendarDays size={10} />Fällig: {fmt(deadline)}</div>}
       <DeadlineBadge days={days} slaDays={step.slaDays} />
     </div>
   )
@@ -343,42 +359,42 @@ function ProjectRow({ rep, store, onSave, onSelect, openKey, onOpen }) {
   return (
     <tr
       onClick={() => onSelect(rep)}
-      style={{ cursor: "pointer", borderBottom: "1px solid rgba(255,255,255,0.05)", transition: "background 0.1s", minHeight: 80 }}
+      style={{ cursor: "pointer", borderBottom: "1px solid #E5E7EB", transition: "background 0.1s", minHeight: 80 }}
       onMouseEnter={e => e.currentTarget.style.background = "var(--color-row-hover)"}
       onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
       {/* Status/Priorität */}
-      <td style={{ padding: "6px 8px", textAlign: "center", verticalAlign: "middle", width: 46 }}>
+      <td style={{ padding: "16px 12px", textAlign: "center", verticalAlign: "middle", width: 46 }}>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
           <div style={{ width: 30, height: 30, borderRadius: "50%", background: `${priColor}18`, border: `2px solid ${priColor}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
             <span style={{ color: priColor, fontWeight: 900, fontSize: pri === "green" ? "0.65rem" : "0.8rem" }}>{priIcon}</span>
           </div>
-          <span style={{ fontSize: "0.58rem", fontWeight: 700, color: priColor, textTransform: "uppercase", letterSpacing: "0.04em" }}>{pri === "red" ? "Offen" : pri === "orange" ? "Offen" : "Aktiv"}</span>
+          <span style={{ fontSize: "11px", fontWeight: 600, color: "#6B7280", textTransform: "uppercase", letterSpacing: "0.04em" }}>{pri === "red" ? "Offen" : pri === "orange" ? "Offen" : "Aktiv"}</span>
         </div>
       </td>
       {/* Projekt/Objekt */}
-      <td style={{ padding: "6px 10px", verticalAlign: "middle", minWidth: 170, maxWidth: 200 }}>
-        {rep.projectNumber && <div style={{ fontSize: "1rem", color: "#1E6DB7", fontWeight: 900, fontFamily: "monospace", letterSpacing: "0.04em", lineHeight: 1.25, marginBottom: 2 }}>{rep.projectNumber}</div>}
-        <div style={{ fontWeight: 800, fontSize: "0.9rem", color: "var(--text-main, #E2E8F0)", lineHeight: 1.25, marginBottom: 2 }}>{street}{city ? `, ${city}` : ''}</div>
-        {rep.description && <div style={{ fontSize: "0.72rem", color: "#64748B", marginTop: 3, lineHeight: 1.3, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{rep.description}</div>}
+      <td style={{ padding: "16px 12px", verticalAlign: "middle", minWidth: 170, maxWidth: 200 }}>
+        {rep.projectNumber && <div style={{ fontSize: "15px", color: "#111827", fontWeight: 700, letterSpacing: "0.04em", lineHeight: 1.25, marginBottom: 2 }}>{rep.projectNumber}</div>}
+        <div style={{ fontWeight: 700, fontSize: "15px", color: "#111827", lineHeight: 1.25, marginBottom: 2 }}>{street}{city ? `, ${city}` : ''}</div>
+        {rep.description && <div style={{ fontSize: "14px", color: "#374151", marginTop: 3, lineHeight: 1.3, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{rep.description}</div>}
       </td>
 
       {/* Start */}
-      <td style={{ padding: "6px 6px", verticalAlign: "middle", width: 60, textAlign: "center" }}>
+      <td style={{ padding: "16px 12px", verticalAlign: "middle", width: 60, textAlign: "center" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 3, justifyContent: "center" }}>
           <CalendarDays size={10} color="#475569" />
-          <span style={{ fontSize: "0.72rem", color: "#64748B", fontWeight: 600 }}>{fmt(rep.date) || "—"}</span>
+          <span style={{ fontSize: "12px", color: "#6B7280", fontWeight: 400 }}>{fmt(rep.date) || "—"}</span>
         </div>
       </td>
       {/* Workflow Timeline */}
-      <td style={{ padding: "2px 8px", verticalAlign: "middle" }} onClick={e => e.stopPropagation()}>
+      <td style={{ padding: "16px 12px", verticalAlign: "middle" }} onClick={e => e.stopPropagation()}>
         <WorkflowTimeline rep={rep} store={store} openKey={openKey} onOpen={onOpen} />
       </td>
       {/* Nächste Aktion */}
-      <td style={{ padding: "6px 10px", verticalAlign: "middle", width: 170 }}>
+      <td style={{ padding: "16px 12px", verticalAlign: "middle", width: 170 }}>
         <NextActionCell rep={rep} store={store} />
       </td>
       {/* Tage offen */}
-      <td style={{ padding: "6px 8px", textAlign: "center", verticalAlign: "middle", width: 68 }}>
+      <td style={{ padding: "16px 12px", textAlign: "center", verticalAlign: "middle", width: 68 }}>
         {(() => {
           const na = getNextAction(rep, store)
           if (!na || na.days === null) return <span style={{ color: "#334155", fontSize: "0.75rem" }}>—</span>
@@ -388,7 +404,7 @@ function ProjectRow({ rep, store, onSave, onSelect, openKey, onOpen }) {
           const sign = d < 0 ? "+" : ""
           return <div style={{ textAlign: "center" }}>
             <div style={{ fontSize: "1.15rem", fontWeight: 800, color, lineHeight: 1 }}>{sign}{d < 0 ? Math.abs(d) : d}</div>
-            <div style={{ fontSize: "0.58rem", color: "#475569", marginTop: 2, whiteSpace: "nowrap" }}>{label}</div>
+            <div style={{ fontSize: "12px", color: "#6B7280", marginTop: 2, whiteSpace: "nowrap" }}>{label}</div>
           </div>
         })()}
       </td>
@@ -444,7 +460,7 @@ export default function WorkflowStatusOverview({ reports, onSelectReport, curren
   if (reports.length === 0) return null
 
   return (
-    <div style={{ fontFamily: '"Segoe UI", "Roboto", Arial, sans-serif', marginBottom: "1.5rem", background: "var(--color-surface,#0F172A)", borderRadius: 12, border: "1px solid var(--color-border,rgba(255,255,255,0.08))", overflow: "hidden" }}>
+    <div style={{ fontFamily: '"Segoe UI", "Roboto", Arial, sans-serif', marginBottom: "1.5rem", background: "#FFFFFF", borderRadius: 12, border: "1px solid var(--color-border,rgba(255,255,255,0.08))", overflow: "hidden" }}>
 
       {/* Header */}
       <div style={{ padding: "0.75rem 1rem 0", borderBottom: "1px solid var(--color-border,rgba(255,255,255,0.08))" }}>
@@ -484,14 +500,13 @@ export default function WorkflowStatusOverview({ reports, onSelectReport, curren
             <thead>
               {/* Row 1: Column labels */}
               <tr style={{ position: "sticky", top: 0, zIndex: 21, background: "#F8FAFC", borderBottom: "1px solid var(--color-border, rgba(255,255,255,0.08))", boxShadow: "0 1px 3px rgba(0,0,0,0.2)" }}>
-                <th style={{ padding: "0.6rem 8px", fontSize: "13px", fontWeight: 700, color: "#334155", textTransform: "uppercase", letterSpacing: "0.05em", width: 46, background: "#F8FAFC", opacity: 1 }}>Status</th>
-                <th style={{ padding: "0.6rem 10px", textAlign: "left", fontSize: "13px", fontWeight: 700, color: "#334155", textTransform: "uppercase", letterSpacing: "0.05em", width: 170, background: "#F8FAFC", opacity: 1 }}>Objekt / Projekt</th>
-                <th style={{ padding: "0.6rem 6px", textAlign: "center", fontSize: "13px", fontWeight: 700, color: "#334155", textTransform: "uppercase", letterSpacing: "0.05em", width: 56, background: "#F8FAFC", opacity: 1 }}>Start</th>
-                <th style={{ padding: "0.6rem 8px", textAlign: "left", fontSize: "13px", fontWeight: 700, color: "#334155", textTransform: "uppercase", letterSpacing: "0.05em", background: "#F8FAFC", opacity: 1 }}>
+                <th style={{ padding: "0.6rem 12px", fontSize: "11px", fontWeight: 600, color: "#6B7280", textTransform: "uppercase", letterSpacing: "0.05em", width: 46, background: "#F8FAFC", opacity: 1 }}>Status</th>
+                <th style={{ padding: "0.6rem 12px", textAlign: "left", fontSize: "11px", fontWeight: 600, color: "#6B7280", textTransform: "uppercase", letterSpacing: "0.05em", width: 170, background: "#F8FAFC", opacity: 1 }}>Objekt / Projekt</th>
+                <th style={{ padding: "0.6rem 12px", textAlign: "center", fontSize: "11px", fontWeight: 600, color: "#6B7280", textTransform: "uppercase", letterSpacing: "0.05em", width: 56, background: "#F8FAFC", opacity: 1 }}>Start</th>
+                <th style={{ padding: "0.6rem 12px", textAlign: "left", fontSize: "11px", fontWeight: 600, color: "#6B7280", textTransform: "uppercase", letterSpacing: "0.05em", background: "#F8FAFC", opacity: 1 }}>
                   Workflow <span style={{ fontWeight: 500, color: "#475569", fontSize: "11px", textTransform: "none", opacity: 1 }}>— klicken zum setzen</span>
                 </th>
-                <th style={{ padding: "0.6rem 10px", textAlign: "left", fontSize: "13px", fontWeight: 700, color: "#334155", textTransform: "uppercase", letterSpacing: "0.05em", width: 160, background: "#F8FAFC", opacity: 1 }}>Nächste Aktion</th>
-                <th style={{ padding: "0.6rem 6px", textAlign: "center", fontSize: "13px", fontWeight: 700, color: "#334155", textTransform: "uppercase", letterSpacing: "0.05em", width: 56, background: "#F8FAFC", opacity: 1 }}>Tage</th>
+                <th colSpan={2} style={{ padding: "0.6rem 12px", background: "#F8FAFC", borderBottom: "none" }} />
               </tr>
               {/* Row 2: Workflow step names aligned under timeline */}
               <tr style={{ position: "sticky", top: 31, zIndex: 20, background: "#F1F5F9", borderBottom: "1px solid var(--color-border, rgba(255,255,255,0.08))" }}>
@@ -508,7 +523,8 @@ export default function WorkflowStatusOverview({ reports, onSelectReport, curren
                     ))}
                   </div>
                 </td>
-                <td colSpan={2} style={{ padding: "0.4rem 0 0.5rem 0", background: "#F1F5F9" }} />
+                <th style={{ padding: "0.4rem 12px 0.5rem", textAlign: "left", fontSize: "11px", fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: "0.02em", width: 160, background: "#F1F5F9" }}>Nächste Aktion</th>
+                <th style={{ padding: "0.4rem 12px 0.5rem", textAlign: "center", fontSize: "11px", fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: "0.02em", width: 56, background: "#F1F5F9" }}>Tage</th>
               </tr>
             </thead>
             <tbody>

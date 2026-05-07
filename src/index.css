@@ -108,8 +108,6 @@
 html, body {
   margin: 0;
   padding: 0;
-  background-color: #0F172A !important; /* Verhindert weisse Balken auf iPad/iPhone */
-  color-scheme: dark;
   min-height: 100%;
 }
 
@@ -128,12 +126,12 @@ html, body {
 
   --primary:        #1E6DB7;
   --primary-hover:  #175394;
-  --background:     #F2F4F6;
+  --background:     #F8FAFC;
   --surface:        #FFFFFF;
   --surface-opaque: #FFFFFF;
-  --border:         #D5D9E0;
-  --text-main:      #1F2937;
-  --text-muted:     #6B7280;
+  --border:         #E2E8F0;
+  --text-main:      #0F172A;
+  --text-muted:     #64748B;
   --glass-bg:       #FFFFFF;
   --glass-border:   #D5D9E0;
   --glass-blur:     none;
@@ -178,6 +176,19 @@ html, body {
   --color-warning-bg:  #FFF4C6;  /* Status Warning */
   --color-danger-bg:   #FCE4E6;  /* Status Critical */
   --color-info-bg:     #E0EEFF;  /* Status Info */
+}
+
+/* ── Theme Specific Body Overrides ─────────────────────────────────────── */
+[data-theme="dark"] body, 
+.dark body,
+.force-dark-mode {
+  background-color: #0F172A !important;
+  color-scheme: dark;
+}
+
+[data-theme="light"] body {
+  background-color: var(--background) !important;
+  color-scheme: light;
 }
 
 /* ── Body Light ─────────────────────────────────────────────────────────── */
@@ -664,7 +675,6 @@ select {
   padding: 6px 10px;
   font-size: var(--text-body);
   transition: border-color 0.10s ease;
-  color-scheme: dark !important;
 }
 
 select option {
