@@ -193,7 +193,7 @@ function Popover({ rid, step, sd, onSave, onClose, rect }) {
   }, [])
   const st = { position: "fixed", zIndex: 9999, background: "#1A2332", border: "1px solid rgba(255,255,255,0.14)", borderRadius: 14, padding: "1rem", width: 240, boxShadow: "0 24px 56px rgba(0,0,0,0.55)", animation: "wfFade 0.12s ease", fontFamily: '"Segoe UI", "Roboto", Arial, sans-serif' }
   if (rect) { const wh = window.innerHeight, ww = window.innerWidth, ph = 320, pw = 248, lp = Math.min(Math.max(4, rect.left), ww - pw - 4); st[rect.bottom + ph + 8 < wh ? "top" : "top"] = rect.bottom + ph + 8 < wh ? rect.bottom + 6 : Math.max(8, rect.top - ph - 6); st.left = lp }
-  const btn = (a, c) => ({ flex: 1, padding: "0.4rem", borderRadius: 8, border: `1.5px solid ${a ? c : "rgba(255,255,255,0.08)"}`, background: a ? `${c}22` : "rgba(255,255,255,0.03)", color: a ? c : "#64748B", fontWeight: a ? 700 : 500, fontSize: "0.72rem", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 4 })
+  const btn = (a, c) => ({ flex: 1, padding: "0.4rem", borderRadius: 8, border: `1.5px solid ${a ? c : "rgba(255,255,255,0.08)"}`, background: a ? `${c}22` : "rgba(255,255,255,0.03)", color: a ? c : "var(--text-muted, #64748B)", fontWeight: a ? 700 : 500, fontSize: "0.72rem", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 4 })
   return createPortal(
     <div ref={ref} style={st} onClick={e => e.stopPropagation()}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem" }}>
@@ -202,12 +202,12 @@ function Popover({ rid, step, sd, onSave, onClose, rect }) {
       </div>
       <div style={{ display: "flex", gap: "0.35rem", marginBottom: "0.75rem" }}>
         <button style={btn(mode === "done", "#10B981")} onClick={() => setMode("done")}><Check size={12} />Erledigt</button>
-        <button style={btn(mode === "skip", "#64748B")} onClick={() => setMode("skip")}><Minus size={12} />Entfällt</button>
+        <button style={btn(mode === "skip", "var(--text-muted, #64748B)")} onClick={() => setMode("skip")}><Minus size={12} />Entfällt</button>
         <button style={btn(mode === "date", "#3B82F6")} onClick={() => setMode("date")}><CalendarDays size={12} />Datum</button>
       </div>
-      {mode === "date" && <div style={{ marginBottom: "0.65rem" }}><label style={{ fontSize: "0.68rem", color: "#64748B", display: "block", marginBottom: "0.25rem", fontWeight: 600 }}>Fälligkeit</label><input type="date" value={date} onChange={e => setDate(e.target.value)} autoFocus style={{ width: "100%", padding: "0.4rem 0.55rem", borderRadius: 8, border: `1px solid ${date ? "rgba(59,130,246,0.5)" : "rgba(255,255,255,0.1)"}`, background: "#0F1929", color: "white", fontSize: "0.82rem", boxSizing: "border-box", outline: "none" }} /></div>}
-      {mode === "date" && step.id === "trocknung" && <div style={{ marginBottom: "0.65rem" }}><label style={{ fontSize: "0.68rem", color: "#64748B", display: "block", marginBottom: "0.25rem", fontWeight: 600 }}>Installiert am</label><input type="date" value={installedAt} onChange={e => setInstalledAt(e.target.value)} style={{ width: "100%", padding: "0.4rem 0.55rem", borderRadius: 8, border: `1px solid ${installedAt ? "rgba(16,185,129,0.5)" : "rgba(255,255,255,0.1)"}`, background: "#0F1929", color: "white", fontSize: "0.82rem", boxSizing: "border-box", outline: "none" }} /></div>}
-      <div style={{ marginBottom: "0.75rem" }}><label style={{ fontSize: "0.68rem", color: "#64748B", display: "block", marginBottom: "0.25rem", fontWeight: 600 }}>Notiz</label><textarea value={note} onChange={e => setNote(e.target.value)} placeholder="Kurze Notiz…" rows={2} style={{ width: "100%", padding: "0.35rem 0.55rem", borderRadius: 8, border: "1px solid rgba(255,255,255,0.08)", background: "#0F1929", color: "#CBD5E1", fontSize: "0.75rem", resize: "none", boxSizing: "border-box", outline: "none", fontFamily: "inherit" }} /></div>
+      {mode === "date" && <div style={{ marginBottom: "0.65rem" }}><label style={{ fontSize: "0.68rem", color: "var(--text-muted, #64748B)", display: "block", marginBottom: "0.25rem", fontWeight: 600 }}>Fälligkeit</label><input type="date" value={date} onChange={e => setDate(e.target.value)} autoFocus style={{ width: "100%", padding: "0.4rem 0.55rem", borderRadius: 8, border: `1px solid ${date ? "rgba(59,130,246,0.5)" : "rgba(255,255,255,0.1)"}`, background: "#0F1929", color: "white", fontSize: "0.82rem", boxSizing: "border-box", outline: "none" }} /></div>}
+      {mode === "date" && step.id === "trocknung" && <div style={{ marginBottom: "0.65rem" }}><label style={{ fontSize: "0.68rem", color: "var(--text-muted, #64748B)", display: "block", marginBottom: "0.25rem", fontWeight: 600 }}>Installiert am</label><input type="date" value={installedAt} onChange={e => setInstalledAt(e.target.value)} style={{ width: "100%", padding: "0.4rem 0.55rem", borderRadius: 8, border: `1px solid ${installedAt ? "rgba(16,185,129,0.5)" : "rgba(255,255,255,0.1)"}`, background: "#0F1929", color: "white", fontSize: "0.82rem", boxSizing: "border-box", outline: "none" }} /></div>}
+      <div style={{ marginBottom: "0.75rem" }}><label style={{ fontSize: "0.68rem", color: "var(--text-muted, #64748B)", display: "block", marginBottom: "0.25rem", fontWeight: 600 }}>Notiz</label><textarea value={note} onChange={e => setNote(e.target.value)} placeholder="Kurze Notiz…" rows={2} style={{ width: "100%", padding: "0.35rem 0.55rem", borderRadius: 8, border: "1px solid rgba(255,255,255,0.08)", background: "#0F1929", color: "#CBD5E1", fontSize: "0.75rem", resize: "none", boxSizing: "border-box", outline: "none", fontFamily: "inherit" }} /></div>
       <div style={{ display: "flex", gap: "0.35rem" }}>
         <button onClick={() => { onSave({ status: mode, date: mode === "date" ? date : null, note, installedAt: mode === "date" ? installedAt : null }); onClose() }} style={{ flex: 1, padding: "0.4rem", borderRadius: 8, border: "none", background: mode === "done" ? "#10B981" : mode === "skip" ? "#475569" : "#3B82F6", color: "white", fontWeight: 700, fontSize: "0.75rem", cursor: "pointer" }}>Speichern</button>
         {sd.status && <button onClick={() => { onSave({ status: null, date: null, note: "", installedAt: null }); onClose() }} style={{ padding: "0.4rem 0.6rem", borderRadius: 8, border: "1px solid rgba(239,68,68,0.3)", background: "rgba(239,68,68,0.08)", color: "#EF4444", fontSize: "0.75rem", cursor: "pointer" }}>×</button>}
@@ -227,7 +227,7 @@ function StepDot({ rep, store, step, i, ai, openKey, onOpen }) {
   // Spezialfarbe für Kontrolle* ok = grün
   const isKontrolleOk = step.id === "kontrolle" && state === "ok"
   const dotColor = (state === "done" || isKontrolleOk) ? "#10B981" : state === "ok" ? "#3B82F6" : state === "warning" ? "#F59E0B" : state === "overdue" ? "#EF4444" : state === "skip" ? "#94A3B8" : "#BAE6FD"
-  const dotBg = (state === "done" || isKontrolleOk) ? "#10B981" : state === "ok" ? "rgba(59,130,246,0.15)" : state === "warning" ? "#F59E0B" : state === "overdue" ? "#EF4444" : state === "skip" ? "#E2E8F0" : "#F0F9FF"
+  const dotBg = (state === "done" || isKontrolleOk) ? "#10B981" : state === "ok" ? "rgba(59,130,246,0.15)" : state === "warning" ? "#F59E0B" : state === "overdue" ? "#EF4444" : state === "skip" ? "var(--border, #E2E8F0)" : "#F0F9FF"
   return (
     <div style={{ display: "flex", alignItems: "center", flex: i < STEPS.length - 1 ? 1 : "0 0 auto" }}>
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", position: "relative" }}>
@@ -250,26 +250,26 @@ function StepDot({ rep, store, step, i, ai, openKey, onOpen }) {
             position: "relative",
           }}>
           {state === "done" && <Check size={14} color="white" strokeWidth={3} />}
-          {state === "skip" && <Minus size={13} color="#64748B" strokeWidth={2.5} />}
+          {state === "skip" && <Minus size={13} color="var(--text-muted, #64748B)" strokeWidth={2.5} />}
           {(state === "warning" || state === "overdue") && <span style={{ fontSize: "0.8rem", fontWeight: 900, color: "white" }}>!</span>}
           {state === "ok" && <div style={{ width: 9, height: 9, borderRadius: "50%", background: isKontrolleOk ? "#10B981" : "#3B82F6", boxShadow: isKontrolleOk ? `0 0 7px #10B981` : "0 0 7px #3B82F6", animation: "wfPulse 2s ease-in-out infinite" }} />}
         </button>
         <span style={{ fontSize: "0.6rem", color: state === "pending" ? "#94A3B8" : state === "done" ? "#10B981" : dotColor, fontWeight: state === "pending" ? 500 : 700, marginTop: 3, whiteSpace: "nowrap", lineHeight: 1, textAlign: "center" }}>{step.label}</span>
-        {hasNote && <span style={{ fontSize: "0.6rem", color: "#6B7280", marginTop: 2, whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 2 }}>📝 Notiz</span>}
+        {hasNote && <span style={{ fontSize: "0.6rem", color: "var(--text-muted, #6B7280)", marginTop: 2, whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 2 }}>📝 Notiz</span>}
       </div>
       {i < STEPS.length - 1 && (
         (() => {
           const nextStep = STEPS[i + 1]
           const nextState = getStepState(store, rep, nextStep, i + 1, ai)
-          let bg = i < ai ? "#10B981" : "#E2E8F0"
+          let bg = i < ai ? "#10B981" : "var(--border, #E2E8F0)"
 
           if (nextStep.id === "kontrolle" && i < ai) {
             if (nextState === "warning") bg = "#F59E0B"
             else if (nextState === "overdue") bg = "#EF4444"
             else if (nextState === "ok") bg = "#10B981"
-            else if (nextState === "pending") bg = "#E2E8F0"
+            else if (nextState === "pending") bg = "var(--border, #E2E8F0)"
           } else if (i === ai - 1) {
-            bg = "linear-gradient(90deg,#10B981,#E2E8F0)"
+            bg = "linear-gradient(90deg,#10B981,var(--border, #E2E8F0))"
           }
 
           return <div style={{ flex: 1, height: 2, background: bg, margin: "0 2px", marginBottom: 14, minWidth: 4 }} />
@@ -315,7 +315,7 @@ function NextActionCell({ rep, store }) {
   const color = (state === "done" || state === "ok") ? "#10B981" 
               : state === "warning" ? "#F59E0B" 
               : state === "overdue" ? "#EF4444" 
-              : "#64748B"
+              : "var(--text-muted, #64748B)"
 
   const actions = {
     meldung: "Eingang erfassen", kontakt: "Kontakt aufnehmen", schadenaufnahme: "Aufnahme durchführen",
@@ -336,7 +336,7 @@ function NextActionCell({ rep, store }) {
         lineHeight: 1.3, 
         marginBottom: 3 
       }}>{label}</div>
-      {deadline && <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: "12px", color: "#6B7280" }}><CalendarDays size={10} />Fällig: {fmt(deadline)}</div>}
+      {deadline && <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: "12px", color: "var(--text-muted, #6B7280)" }}><CalendarDays size={10} />Fällig: {fmt(deadline)}</div>}
       <DeadlineBadge days={days} slaDays={step.slaDays} />
     </div>
   )
@@ -359,7 +359,7 @@ function ProjectRow({ rep, store, onSave, onSelect, openKey, onOpen }) {
   return (
     <tr
       onClick={() => onSelect(rep)}
-      style={{ cursor: "pointer", borderBottom: "1px solid #E5E7EB", transition: "background 0.1s", minHeight: 80 }}
+      style={{ cursor: "pointer", borderBottom: "1px solid var(--border, #E5E7EB)", transition: "background 0.1s", minHeight: 80 }}
       onMouseEnter={e => e.currentTarget.style.background = "var(--color-row-hover)"}
       onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
       {/* Status/Priorität */}
@@ -368,21 +368,21 @@ function ProjectRow({ rep, store, onSave, onSelect, openKey, onOpen }) {
           <div style={{ width: 30, height: 30, borderRadius: "50%", background: `${priColor}18`, border: `2px solid ${priColor}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
             <span style={{ color: priColor, fontWeight: 900, fontSize: pri === "green" ? "0.65rem" : "0.8rem" }}>{priIcon}</span>
           </div>
-          <span style={{ fontSize: "11px", fontWeight: 600, color: "#6B7280", textTransform: "uppercase", letterSpacing: "0.04em" }}>{pri === "red" ? "Offen" : pri === "orange" ? "Offen" : "Aktiv"}</span>
+          <span style={{ fontSize: "11px", fontWeight: 600, color: "var(--text-muted, #6B7280)", textTransform: "uppercase", letterSpacing: "0.04em" }}>{pri === "red" ? "Offen" : pri === "orange" ? "Offen" : "Aktiv"}</span>
         </div>
       </td>
       {/* Projekt/Objekt */}
       <td style={{ padding: "16px 12px", verticalAlign: "middle", minWidth: 170, maxWidth: 200 }}>
-        {rep.projectNumber && <div style={{ fontSize: "15px", color: "#111827", fontWeight: 700, letterSpacing: "0.04em", lineHeight: 1.25, marginBottom: 2 }}>{rep.projectNumber}</div>}
-        <div style={{ fontWeight: 700, fontSize: "15px", color: "#111827", lineHeight: 1.25, marginBottom: 2 }}>{street}{city ? `, ${city}` : ''}</div>
-        {rep.description && <div style={{ fontSize: "14px", color: "#374151", marginTop: 3, lineHeight: 1.3, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{rep.description}</div>}
+        {rep.projectNumber && <div style={{ fontSize: "15px", color: "var(--text-main, #111827)", fontWeight: 700, letterSpacing: "0.04em", lineHeight: 1.25, marginBottom: 2 }}>{rep.projectNumber}</div>}
+        <div style={{ fontWeight: 700, fontSize: "15px", color: "var(--text-main, #111827)", lineHeight: 1.25, marginBottom: 2 }}>{street}{city ? `, ${city}` : ''}</div>
+        {rep.description && <div style={{ fontSize: "14px", color: "var(--text-main, #374151)", marginTop: 3, lineHeight: 1.3, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{rep.description}</div>}
       </td>
 
       {/* Start */}
       <td style={{ padding: "16px 12px", verticalAlign: "middle", width: 60, textAlign: "center" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 3, justifyContent: "center" }}>
           <CalendarDays size={10} color="#475569" />
-          <span style={{ fontSize: "12px", color: "#6B7280", fontWeight: 400 }}>{fmt(rep.date) || "—"}</span>
+          <span style={{ fontSize: "12px", color: "var(--text-muted, #6B7280)", fontWeight: 400 }}>{fmt(rep.date) || "—"}</span>
         </div>
       </td>
       {/* Workflow Timeline */}
@@ -404,7 +404,7 @@ function ProjectRow({ rep, store, onSave, onSelect, openKey, onOpen }) {
           const sign = d < 0 ? "+" : ""
           return <div style={{ textAlign: "center" }}>
             <div style={{ fontSize: "1.15rem", fontWeight: 800, color, lineHeight: 1 }}>{sign}{d < 0 ? Math.abs(d) : d}</div>
-            <div style={{ fontSize: "12px", color: "#6B7280", marginTop: 2, whiteSpace: "nowrap" }}>{label}</div>
+            <div style={{ fontSize: "12px", color: "var(--text-muted, #6B7280)", marginTop: 2, whiteSpace: "nowrap" }}>{label}</div>
           </div>
         })()}
       </td>
@@ -450,7 +450,7 @@ export default function WorkflowStatusOverview({ reports, onSelectReport, curren
     { id: "ueberfaellig", label: "Überfällig", count: overdue.length, color: "#EF4444" },
     { id: "trocknung", label: "Trocknung", count: trocknungList.length, color: "#3B82F6" },
     { id: "aktiv", label: "Aktiv", count: aktiv.length, color: "#10B981" },
-    { id: "archiv", label: "Archiv", count: archived.length, color: "#64748B" },
+    { id: "archiv", label: "Archiv", count: archived.length, color: "var(--text-muted, #64748B)" },
   ]
 
   const openKey = popover ? `${popover.rid}__${popover.sid}` : null
@@ -460,14 +460,14 @@ export default function WorkflowStatusOverview({ reports, onSelectReport, curren
   if (reports.length === 0) return null
 
   return (
-    <div style={{ fontFamily: '"Segoe UI", "Roboto", Arial, sans-serif', marginBottom: "1.5rem", background: "#FFFFFF", borderRadius: 12, border: "1px solid var(--color-border,rgba(255,255,255,0.08))", overflow: "hidden" }}>
+    <div style={{ fontFamily: '"Segoe UI", "Roboto", Arial, sans-serif', marginBottom: "1.5rem", background: "var(--color-surface, #FFFFFF)", borderRadius: 12, border: "1px solid var(--color-border,rgba(255,255,255,0.08))", overflow: "hidden" }}>
 
       {/* Header */}
       <div style={{ padding: "0.75rem 1rem 0", borderBottom: "1px solid var(--color-border,rgba(255,255,255,0.08))" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.6rem" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", cursor: "pointer" }} onClick={() => setCollapsed(c => !c)}>
-            <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#3B82F6", flexShrink: 0 }} />
-            <h2 style={{ margin: 0, fontSize: "1rem", fontWeight: 700, color: "var(--text-main)" }}>Workflow-Übersicht</h2>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1rem" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer" }} onClick={() => setCollapsed(c => !c)}>
+            <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#10B981", flexShrink: 0 }} />
+            <h2 style={{ margin: 0, fontSize: "1.25rem", fontWeight: 700, color: "var(--text-main)" }}>Workflow-Übersicht</h2>
             <span style={{ fontSize: "0.72rem", color: "#475569", fontWeight: 400 }}>{allActive.length} aktive Projekte</span>
             {overdue.length > 0 && <span style={{ display: "inline-flex", alignItems: "center", gap: 3, padding: "1px 7px", borderRadius: 8, background: "rgba(239,68,68,0.12)", color: "#EF4444", fontSize: "0.68rem", fontWeight: 700, border: "1px solid rgba(239,68,68,0.2)" }}><AlertTriangle size={10} />{overdue.length} überfällig</span>}
           </div>
@@ -485,7 +485,7 @@ export default function WorkflowStatusOverview({ reports, onSelectReport, curren
         </div>
         <div style={{ display: "flex", gap: "0.2rem" }}>
           {tabs.map(t => (
-            <button key={t.id} onClick={() => setTab(t.id)} style={{ padding: "0.35rem 0.65rem", borderRadius: "6px 6px 0 0", border: "1px solid var(--color-border,rgba(255,255,255,0.08))", borderBottom: tab === t.id ? "1px solid var(--color-surface,#0F172A)" : "1px solid var(--color-border,rgba(255,255,255,0.08))", background: tab === t.id ? "var(--color-surface,#0F172A)" : "var(--color-surface-alt,#1E293B)", color: tab === t.id ? "var(--text-main)" : "#64748B", fontWeight: tab === t.id ? 700 : 400, fontSize: "0.72rem", cursor: "pointer", transition: "all 0.1s" }}>
+            <button key={t.id} onClick={() => setTab(t.id)} style={{ padding: "0.35rem 0.65rem", borderRadius: "6px 6px 0 0", border: "1px solid var(--color-border,rgba(255,255,255,0.08))", borderBottom: tab === t.id ? "1px solid var(--color-surface,#0F172A)" : "1px solid var(--color-border,rgba(255,255,255,0.08))", background: tab === t.id ? "var(--color-surface,#0F172A)" : "var(--color-surface-alt,#1E293B)", color: tab === t.id ? "var(--text-main)" : "var(--text-muted, #64748B)", fontWeight: tab === t.id ? 700 : 400, fontSize: "0.72rem", cursor: "pointer", transition: "all 0.1s" }}>
               {t.label}{" "}
               <span style={{ padding: "0px 5px", borderRadius: 8, background: tab === t.id ? (t.color || "#3B82F6") + "22" : "rgba(255,255,255,0.05)", color: tab === t.id ? (t.color || "#94A3B8") : "#475569", fontSize: "0.68rem", fontWeight: 700 }}>{t.count}</span>
             </button>
@@ -499,19 +499,19 @@ export default function WorkflowStatusOverview({ reports, onSelectReport, curren
           <table style={{ minWidth: 900, borderCollapse: "collapse", width: "100%" }}>
             <thead>
               {/* Row 1: Column labels */}
-              <tr style={{ position: "sticky", top: 0, zIndex: 21, background: "#F8FAFC", borderBottom: "1px solid var(--color-border, rgba(255,255,255,0.08))", boxShadow: "0 1px 3px rgba(0,0,0,0.2)" }}>
-                <th style={{ padding: "0.6rem 12px", fontSize: "11px", fontWeight: 600, color: "#6B7280", textTransform: "uppercase", letterSpacing: "0.05em", width: 46, background: "#F8FAFC", opacity: 1 }}>Status</th>
-                <th style={{ padding: "0.6rem 12px", textAlign: "left", fontSize: "11px", fontWeight: 600, color: "#6B7280", textTransform: "uppercase", letterSpacing: "0.05em", width: 170, background: "#F8FAFC", opacity: 1 }}>Objekt / Projekt</th>
-                <th style={{ padding: "0.6rem 12px", textAlign: "center", fontSize: "11px", fontWeight: 600, color: "#6B7280", textTransform: "uppercase", letterSpacing: "0.05em", width: 56, background: "#F8FAFC", opacity: 1 }}>Start</th>
-                <th style={{ padding: "0.6rem 12px", textAlign: "left", fontSize: "11px", fontWeight: 600, color: "#6B7280", textTransform: "uppercase", letterSpacing: "0.05em", background: "#F8FAFC", opacity: 1 }}>
+              <tr style={{ position: "sticky", top: 0, zIndex: 21, background: "var(--background, #F8FAFC)", borderBottom: "1px solid var(--color-border, rgba(255,255,255,0.08))", boxShadow: "0 1px 3px rgba(0,0,0,0.2)" }}>
+                <th style={{ padding: "0.6rem 12px", fontSize: "11px", fontWeight: 600, color: "var(--text-muted, #6B7280)", textTransform: "uppercase", letterSpacing: "0.05em", width: 46, background: "var(--background, #F8FAFC)", opacity: 1 }}>Status</th>
+                <th style={{ padding: "0.6rem 12px", textAlign: "left", fontSize: "11px", fontWeight: 600, color: "var(--text-muted, #6B7280)", textTransform: "uppercase", letterSpacing: "0.05em", width: 170, background: "var(--background, #F8FAFC)", opacity: 1 }}>Objekt / Projekt</th>
+                <th style={{ padding: "0.6rem 12px", textAlign: "center", fontSize: "11px", fontWeight: 600, color: "var(--text-muted, #6B7280)", textTransform: "uppercase", letterSpacing: "0.05em", width: 56, background: "var(--background, #F8FAFC)", opacity: 1 }}>Start</th>
+                <th style={{ padding: "0.6rem 12px", textAlign: "left", fontSize: "11px", fontWeight: 600, color: "var(--text-muted, #6B7280)", textTransform: "uppercase", letterSpacing: "0.05em", background: "var(--background, #F8FAFC)", opacity: 1 }}>
                   Workflow <span style={{ fontWeight: 500, color: "#475569", fontSize: "11px", textTransform: "none", opacity: 1 }}>— klicken zum setzen</span>
                 </th>
-                <th colSpan={2} style={{ padding: "0.6rem 12px", background: "#F8FAFC", borderBottom: "none" }} />
+                <th colSpan={2} style={{ padding: "0.6rem 12px", background: "var(--background, #F8FAFC)", borderBottom: "none" }} />
               </tr>
               {/* Row 2: Workflow step names aligned under timeline */}
-              <tr style={{ position: "sticky", top: 31, zIndex: 20, background: "#F1F5F9", borderBottom: "1px solid var(--color-border, rgba(255,255,255,0.08))" }}>
-                <td colSpan={3} style={{ padding: "0.4rem 0 0.5rem 0", background: "#F1F5F9" }} />
-                <td style={{ padding: "0.4rem 8px 0.5rem", background: "#F1F5F9" }}>
+              <tr style={{ position: "sticky", top: 31, zIndex: 20, background: "var(--color-surface-alt, #F1F5F9)", borderBottom: "1px solid var(--color-border, rgba(255,255,255,0.08))" }}>
+                <td colSpan={3} style={{ padding: "0.4rem 0 0.5rem 0", background: "var(--color-surface-alt, #F1F5F9)" }} />
+                <td style={{ padding: "0.4rem 8px 0.5rem", background: "var(--color-surface-alt, #F1F5F9)" }}>
                   <div style={{ display: "flex", alignItems: "center", width: "100%" }}>
                     {STEPS.map((step, i) => (
                       <div key={step.id} style={{ display: "flex", alignItems: "center", flex: i < STEPS.length - 1 ? 1 : "0 0 auto" }}>
@@ -523,8 +523,8 @@ export default function WorkflowStatusOverview({ reports, onSelectReport, curren
                     ))}
                   </div>
                 </td>
-                <th style={{ padding: "0.4rem 12px 0.5rem", textAlign: "left", fontSize: "11px", fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: "0.02em", width: 160, background: "#F1F5F9" }}>Nächste Aktion</th>
-                <th style={{ padding: "0.4rem 12px 0.5rem", textAlign: "center", fontSize: "11px", fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: "0.02em", width: 56, background: "#F1F5F9" }}>Tage</th>
+                <th style={{ padding: "0.4rem 12px 0.5rem", textAlign: "left", fontSize: "11px", fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: "0.02em", width: 160, background: "var(--color-surface-alt, #F1F5F9)" }}>Nächste Aktion</th>
+                <th style={{ padding: "0.4rem 12px 0.5rem", textAlign: "center", fontSize: "11px", fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: "0.02em", width: 56, background: "var(--color-surface-alt, #F1F5F9)" }}>Tage</th>
               </tr>
             </thead>
             <tbody>
