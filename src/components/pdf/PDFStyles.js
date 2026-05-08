@@ -17,8 +17,8 @@ export const styles = StyleSheet.create({
         alignItems: 'flex-start',
     },
     logo: {
-        width: 100,
-        height: 40,
+        width: 120,
+        height: 45,
         objectFit: 'contain',
     },
     companyInfo: {

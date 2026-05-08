@@ -1927,6 +1927,7 @@ END:VCARD`;
         const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
         const fileName = `Messprotokoll_${formData.projectTitle || 'Projekt'}.xlsx`;
 
+            console.log('FINAL PDF FILENAME:', fileName);
         saveAs(blob, fileName);
 
         // 27.05.2024: Keep history. Do not clear previous protocols.
@@ -2084,20 +2085,6 @@ END:VCARD`;
         };
 
         try {
-            // Load Logo - High Quality Original
-            let logoData = null;
-            try {
-                const logoResp = await fetch(window.location.origin + '/logo.png');
-                if (logoResp.ok) {
-                    const blob = await logoResp.blob();
-                    logoData = await new Promise((resolve) => {
-                        const reader = new FileReader();
-                        reader.onloadend = () => resolve(reader.result);
-                        reader.readAsDataURL(blob);
-                    });
-                }
-            } catch (e) { console.error("Logo load error", e); }
-
             // Build Static Map via Google Static Maps API
             let staticMapUrl = null;
             try {
@@ -2207,7 +2194,6 @@ END:VCARD`;
                 damageTypeImages: processedHeroImages,
                 damageTypeImage: processedHeroImages[0] || null,
                 exteriorPhoto: processedExteriorPhoto,
-                logo: logoData,
                 staticMapUrl: staticMapUrl || null,
             };
 
@@ -2226,6 +2212,7 @@ END:VCARD`;
             const fileName = `${projNum}_${location}_${dateStr}_${timeStr}.pdf`;
 
             // 1. Download File
+            console.log('FINAL PDF FILENAME:', fileName);
             saveAs(blob, fileName);
 
 
