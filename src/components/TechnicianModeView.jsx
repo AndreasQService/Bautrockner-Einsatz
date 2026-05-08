@@ -41,7 +41,7 @@ export default function TechnicianModeView({
   };
 
   return (
-    <div className="force-dark-mode" style={{minHeight:'100dvh', backgroundColor: 'var(--color-app-bg, #0F172A)', color: 'var(--text-main, #E2E8F0)', fontFamily:'inherit'}}>
+    <div style={{minHeight:'100dvh', backgroundColor: 'var(--color-app-bg)', color: 'var(--text-main)', fontFamily:'inherit'}}>
 
       {/* STICKY HEADER */}
       <div style={{position:'sticky',top:0,zIndex:100,backgroundColor:'rgba(15,23,42,0.97)',backdropFilter:'blur(12px)',borderBottom:'1px solid rgba(255,255,255,0.08)'}}>

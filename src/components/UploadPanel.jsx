@@ -251,7 +251,7 @@ ${textContext}`;
         try {
           priorityModel = JSON.parse(cachedRaw);
           console.log("Gecachtes Modell vorgezogen:", priorityModel.model);
-        } catch(e) { sessionStorage.removeItem('gemini_working_model'); }
+        } catch (e) { sessionStorage.removeItem('gemini_working_model'); }
       }
 
       const orderedModels = priorityModel
@@ -687,12 +687,12 @@ ${textContext}`;
 
           {/* PDF Drop Zone */}
           <div
-            onDragOver={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = '#2563eb'; e.currentTarget.style.backgroundColor = 'rgba(37,99,235,0.08)'; }}
-            onDragLeave={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'; e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.03)'; }}
+            onDragOver={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.backgroundColor = 'var(--primary-light, rgba(37,99,235,0.08))'; }}
+            onDragLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.backgroundColor = 'var(--color-app-bg)'; }}
             onDrop={async (e) => {
               e.preventDefault();
-              e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)';
-              e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.03)';
+              e.currentTarget.style.borderColor = 'var(--border)';
+              e.currentTarget.style.backgroundColor = 'var(--color-app-bg)';
               const file = e.dataTransfer.files[0];
               if (!file || !file.name.toLowerCase().endsWith('.pdf')) return;
               setStatus('⏳ PDF wird gelesen...');
@@ -706,11 +706,11 @@ ${textContext}`;
             }}
             onClick={() => document.getElementById('pdf-text-input').click()}
             style={{
-              border: '1.5px dashed rgba(255,255,255,0.12)',
+              border: '1.5px dashed var(--border)',
               borderRadius: '8px',
               padding: '0.6rem 1rem',
               display: 'flex', alignItems: 'center', gap: '0.6rem',
-              backgroundColor: 'rgba(255,255,255,0.03)',
+              backgroundColor: 'var(--color-app-bg)',
               cursor: 'pointer', marginBottom: '0.75rem',
               fontSize: '0.8rem', color: 'var(--text-muted)',
               transition: 'all 0.2s',

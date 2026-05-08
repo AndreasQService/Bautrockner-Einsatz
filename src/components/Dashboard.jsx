@@ -473,7 +473,7 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
             )}
 
             {mode === 'technician' ? (
-                <div data-testid="techniker-list" style={{ paddingBottom: '4rem', width: '100%' }}>
+                <div data-testid="techniker-list" className="technician-mode" style={{ paddingBottom: '4rem', width: '100%', minHeight: '100vh' }}>
                     <div style={{ marginBottom: '0.75rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
                         {paginatedReports.length} Projekte gefunden
                     </div>

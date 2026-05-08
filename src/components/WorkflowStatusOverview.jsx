@@ -321,7 +321,7 @@ function NextActionCell({ rep, store }) {
     meldung: "Eingang erfassen", kontakt: "Kontakt aufnehmen", schadenaufnahme: "Aufnahme durchführen",
     bericht: "Bericht erstellen", leckortung: "Leckortung planen", trocknung: "Trocknung starten",
     kontrolle: "Messung durchführen",
-    instandstellung: "Instandstellung beauftragen", rechnung: "Rechnung erstellen", abschluss: "Abschluss",
+    instandstellung: "Instandstellung", rechnung: "Rechnung erstellen", abschluss: "Abschluss",
   }
   const label = actions[step.id] || step.label
   return (
@@ -419,7 +419,7 @@ export default function WorkflowStatusOverview({ reports, onSelectReport, curren
   const [search, setSearch] = useState("")
   const [collapsed, setCollapsed] = useState(false)
   const [popover, setPopover] = useState(null)
-  const [userFilter, setUserFilter] = useState(currentUser?.name || "")
+  const [userFilter, setUserFilter] = useState("alle")
 
   const allUsers = useMemo(() => {
     const names = users.map(u => u.name).filter(Boolean)
@@ -473,7 +473,26 @@ export default function WorkflowStatusOverview({ reports, onSelectReport, curren
           </div>
           <div style={{ display: "flex", gap: "0.4rem", alignItems: "center" }}>
             {/* User Filter Dropdown */}
-            <select value={userFilter} onChange={e => setUserFilter(e.target.value)} onClick={e => e.stopPropagation()} style={{ padding: "0.3rem 0.5rem", borderRadius: 8, border: "1px solid var(--color-border,rgba(255,255,255,0.08))", background: "var(--color-surface-alt,#1E293B)", color: "var(--text-main)", fontSize: "0.75rem", outline: "none", cursor: "pointer", maxWidth: 160 }}>
+            <select 
+              value={userFilter} 
+              onChange={e => setUserFilter(e.target.value)} 
+              onClick={e => e.stopPropagation()} 
+              style={{ 
+                padding: "8px 12px", 
+                borderRadius: 8, 
+                border: "1px solid #CBD5E1", 
+                background: "#FFFFFF", 
+                color: "#475569", 
+                fontSize: "14px", 
+                fontWeight: 700,
+                fontFamily: '"Segoe UI", Roboto, Arial, sans-serif',
+                letterSpacing: "0.01em",
+                outline: "none", 
+                cursor: "pointer", 
+                minHeight: "38px",
+                maxWidth: 200,
+                colorScheme: "light"
+              }}>
               {allUsers.map(u => <option key={u} value={u}>{u === "alle" ? "Alle Mitarbeiter" : u}</option>)}
             </select>
             {/* Suche */}

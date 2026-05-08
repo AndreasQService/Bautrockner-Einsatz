@@ -844,8 +844,8 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
     };
 
     return createPortal(
-        <div className={isTechnicianMode ? 'force-dark-mode' : ''} style={{ position: 'fixed', inset: 0, backgroundColor: isTechnicianMode ? 'rgba(0,0,0,0.85)' : 'rgba(255,255,255,0.85)', backdropFilter: 'blur(4px)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0.75rem' }}>
-            <div ref={containerRef} style={{ backgroundColor: 'var(--background)', borderRadius: '14px', width: '98vw', maxWidth: '1240px', height: '94vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', color: 'var(--text-main)', border: '1px solid var(--border)', boxShadow: isTechnicianMode ? '0 30px 80px rgba(0,0,0,0.7)' : '0 30px 80px rgba(0,0,0,0.1)' }}>
+        <div className="technician-mode" style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0.75rem' }}>
+            <div ref={containerRef} className="technician-mode-container" style={{ backgroundColor: 'var(--background)', borderRadius: '14px', width: '98vw', maxWidth: '1240px', height: '94vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', color: 'var(--text-main)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-premium)' }}>
 
                 {/* ── HEADER ── */}
                 <div style={{ flexShrink: 0, padding: '0.7rem 1.1rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'var(--surface)' }}>
@@ -1140,7 +1140,7 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
                                             </div>
                                             <div 
                                                 onClick={() => setActiveNumpadField({ idx, field: 'b_value', value: row.b_value || '' })}
-                                                style={{ width: '100%', padding: '0.4rem 0.5rem', background: (activeNumpadField?.idx === idx && activeNumpadField?.field === 'b_value') ? '#3B82F6' : 'var(--background)', border: '1px solid var(--border)', color: (activeNumpadField?.idx === idx && activeNumpadField?.field === 'b_value') ? '#FFFFFF' : 'var(--text-main)', fontSize: '1rem', fontWeight: 700, textAlign: 'center', height: 40, boxSizing: 'border-box', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                                                style={{ width: '100%', padding: '0.4rem 0.5rem', background: (activeNumpadField?.idx === idx && activeNumpadField?.field === 'b_value') ? '#2563EB' : 'var(--background)', border: '1px solid var(--border)', color: (activeNumpadField?.idx === idx && activeNumpadField?.field === 'b_value') ? '#FFFFFF' : 'var(--text-main)', fontSize: '1rem', fontWeight: 700, textAlign: 'center', height: 40, boxSizing: 'border-box', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
                                             >
                                                 {row.b_value || ''}
                                             </div>
@@ -1159,7 +1159,7 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
                         </div>
 
                         {activeNumpadField && (
-                            <div style={{ marginTop: '1rem', background: 'var(--surface)', borderRadius: 12, padding: '0.75rem', border: '1px solid var(--border)', boxShadow: '0 30px 80px rgba(0,0,0,0.1)' }}>
+                            <div className="tech-section" style={{ marginTop: '1rem', padding: '0.75rem', boxShadow: '0 30px 80px rgba(0,0,0,0.1)' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', padding: '0 0.2rem' }}>
                                     <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem', fontWeight: 600 }}>Tastatur ({activeNumpadField.field})</span>
                                     <button onClick={() => setActiveNumpadField(null)} style={{ background: 'transparent', border: 'none', color: '#1E6DB7', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 700, padding: 0 }}>Fertig</button>

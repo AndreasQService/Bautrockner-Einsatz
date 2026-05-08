@@ -33,6 +33,7 @@ import CameraCaptureModal from './CameraCaptureModal';
 import MeasurementModal from './MeasurementModal';
 import { applyDryingCheck } from '../features/projects/dryingCheckService';
 import { generateMeasurementExcel } from '../utils/MeasurementExcelExporter';
+import logoAsset from '../assets/logo.png';
 
 /* Custom PDF Icon */
 const PdfIcon = ({ size = 24, style = {} }) => (
@@ -1334,6 +1335,22 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         };
     }, [onSave]);
 
+    // Pre-load logo for PDF generation
+    useEffect(() => {
+        const loadLogo = async () => {
+            try {
+                // Ensure logo is loaded and decoded
+                const img = new window.Image();
+                img.src = logoAsset;
+                await img.decode();
+                console.log("PDF Logo preloaded and decoded successfully");
+            } catch (e) {
+                console.error("Logo preload failed", e);
+            }
+        };
+        loadLogo();
+    }, []);
+
     const [newDevice, setNewDevice] = useState({
         deviceNumber: '', // Will be populated from selection
         apartment: '',
@@ -1732,7 +1749,7 @@ END:VCARD`;
         // Load Logo
         let logoId = null;
         try {
-            const logoResponse = await fetch('/logo.png');
+            const logoResponse = await fetch(logoAsset);
             if (logoResponse.ok) {
                 const logoBuffer = await logoResponse.arrayBuffer();
                 logoId = workbook.addImage({
@@ -2087,7 +2104,7 @@ END:VCARD`;
             // Load Logo - High Quality Original
             let logoData = null;
             try {
-                const logoResp = await fetch(window.location.origin + '/logo.png');
+                const logoResp = await fetch(logoAsset);
                 if (logoResp.ok) {
                     const blob = await logoResp.blob();
                     logoData = await new Promise((resolve) => {
@@ -2367,9 +2384,21 @@ END:VCARD`;
 
 
 
+
     const generatePDFContent = async () => {
         setIsGeneratingPDF(true);
-        // Allow time for render
+
+        // Ensure logo is loaded and decoded before starting to ensure it's in browser cache
+        const logoImg = new window.Image();
+        logoImg.src = logoAsset;
+        try {
+            await logoImg.decode();
+            console.log("Logo decoded successfully before capture");
+        } catch (e) {
+            console.warn("Logo decode failed", e);
+        }
+
+        // Allow time for React to render the hidden print-report container
         setTimeout(async () => {
             try {
                 const doc = new jsPDF('p', 'mm', 'a4');
@@ -2402,6 +2431,7 @@ END:VCARD`;
                     const canvas = await html2canvas(section, {
                         scale: 2,
                         useCORS: true,
+                        allowTaint: false,
                         logging: false,
                         backgroundColor: null // Transparent
                     });
@@ -2754,7 +2784,7 @@ END:VCARD`;
         const adresse = [formData.street, [formData.zip, formData.city].filter(Boolean).join(' ')].filter(Boolean).join(', ');
         const sub = [formData.projectNumber, formData.damageCategory].filter(Boolean).join(' · ');
         return (
-            <div className="force-dark-mode" style={{ minHeight: '100vh', backgroundColor: 'var(--color-app-bg, #0F172A)', padding: '2rem 1.25rem 3rem', fontFamily: 'Inter,system-ui,sans-serif', color: 'var(--text-main, #E2E8F0)' }}>
+            <div className="technician-mode technician-mode-container" style={{ padding: '2rem 1.25rem 3rem', fontFamily: 'Inter,system-ui,sans-serif' }}>
                 <div style={{ marginBottom: '2.5rem' }}>
                     <div style={{ fontSize: '1.5rem', fontWeight: 800, lineHeight: 1.2 }}>{adresse || 'Schadenort'}</div>
                     {sub && <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.4rem', fontWeight: 500 }}>{sub}</div>}
@@ -2770,11 +2800,13 @@ END:VCARD`;
                             } else {
                                 setTechTab(tile.id); 
                             }
-                        }} style={{
-                            background: 'var(--surface)', border: `2px solid ${tile.color}`,
-                            borderRadius: '16px', padding: '2.5rem 1rem', cursor: 'pointer',
+                        }} 
+                        className="tech-card"
+                        style={{
+                            background: 'var(--surface)', border: '1.5px solid var(--tech-border)',
+                            borderRadius: '12px', padding: '2.5rem 1rem', cursor: 'pointer',
                             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                            gap: '0.75rem', boxShadow: `0 4px 20px ${tile.color}33`, minHeight: '130px', transition: 'transform 0.15s'
+                            gap: '0.75rem', boxShadow: 'var(--shadow-sm)', minHeight: '130px', transition: 'transform 0.15s'
                         }}>
                             <span style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-main)' }}>{tile.label === 'Trocknung' ? 'Geräte' : tile.label}</span>
                         </button>
@@ -2785,11 +2817,13 @@ END:VCARD`;
                         if (TECH_TILES[4].status) setFormData(prev => ({ ...prev, status: TECH_TILES[4].status }));
                         setTechRoomSelectorMode('messung');
                         setShowTechRoomSelector(true);
-                    }} style={{
-                        background: 'var(--surface)', border: `2px solid ${TECH_TILES[4].color}`,
-                        borderRadius: '16px', padding: '2.5rem 1rem', cursor: 'pointer',
+                    }} 
+                    className="tech-card"
+                    style={{
+                        background: 'var(--surface)', border: '1.5px solid var(--tech-border)',
+                        borderRadius: '12px', padding: '2.5rem 1rem', cursor: 'pointer',
                         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                        gap: '0.75rem', boxShadow: `0 4px 20px ${TECH_TILES[4].color}33`,
+                        gap: '0.75rem', boxShadow: 'var(--shadow-sm)',
                         width: 'calc(50% - 0.5rem)', minHeight: '130px'
                     }}>
                         <span style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-main)' }}>{TECH_TILES[4].label}</span>
@@ -2804,8 +2838,8 @@ END:VCARD`;
                     const activeApt = techSelectedApartment || (uniqueApartments.length === 1 ? uniqueApartments[0] : null);
 
                     return (
-                        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.85)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-                            <div style={{ backgroundColor: '#1E293B', borderRadius: '16px', width: '100%', maxWidth: '400px', padding: '1.5rem', color: '#F1F5F9', border: '1px solid rgba(255,255,255,0.1)' }}>
+                        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+                            <div className="tech-section" style={{ width: '100%', maxWidth: '400px', padding: '1.5rem', color: 'var(--text-main)', boxShadow: 'var(--shadow-premium)' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                         {activeApt && uniqueApartments.length > 1 && techRoomSelectorMode === 'messung' && (
@@ -2857,9 +2891,9 @@ END:VCARD`;
                                                 setShowTechRoomSelector(false);
                                                 setTechSelectedApartment(null);
                                                 setShowMeasurementModal(true);
-                                            }} style={{ padding: '1rem', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#F1F5F9', fontSize: '1rem', fontWeight: 600, textAlign: 'left', cursor: 'pointer', display: 'flex', justifyContent: 'space-between' }}>
+                                            }} style={{ padding: '1rem', borderRadius: '8px', background: 'var(--color-app-bg)', border: '1px solid var(--color-border)', color: 'var(--text-main)', fontSize: '1rem', fontWeight: 600, textAlign: 'left', cursor: 'pointer', display: 'flex', justifyContent: 'space-between' }}>
                                                 <span>{r.name || 'Ohne Namen'}</span>
-                                                <span style={{ color: '#94A3B8', fontSize: '0.8rem' }}>Öffnen ➔</span>
+                                                <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Öffnen ➔</span>
                                             </button>
                                         ))}
                                         {allRooms.filter(r => (r.apartment || 'Allgemeiner Bereich').trim() === activeApt).length === 0 && (
@@ -2868,7 +2902,7 @@ END:VCARD`;
                                     </div>
                                 )}
 
-                                <div style={{ marginTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '1.5rem' }}>
+                                <div style={{ marginTop: '1rem', borderTop: '1px solid var(--color-border)', paddingTop: '1.5rem' }}>
                                     <button onClick={() => {
                                         if (techRoomSelectorMode === 'geraete') {
                                             setTechSelectedEquipmentRoom({ apartment: '' });
@@ -3151,13 +3185,12 @@ END:VCARD`;
                             value={(formData.projectTitle && !formData.projectTitle.startsWith('TMP-')) ? formData.projectTitle : (formData.projectNumber || '')}
                             onChange={(e) => setFormData(prev => ({ ...prev, projectTitle: e.target.value }))}
                             placeholder={formData.projectNumber || "Projekttitel eingeben..."}
-                            className="text-gradient"
                             style={{
                                 fontSize: '1.5rem',
                                 fontWeight: 800,
                                 background: 'transparent',
                                 border: 'none',
-                                color: 'white',
+                                color: 'var(--text-main)',
                                 width: '100%',
                                 padding: '0.25rem 0',
                                 outline: 'none'
@@ -3187,8 +3220,8 @@ END:VCARD`;
                             <label style={{
                                 display: 'flex', alignItems: 'center', gap: '0.5rem',
                                 cursor: 'pointer', userSelect: 'none',
-                                background: isChecked ? 'rgba(16,185,129,0.12)' : 'rgba(255,255,255,0.04)',
-                                border: `1.5px solid ${isChecked ? '#10B981' : 'rgba(255,255,255,0.1)'}`,
+                                background: isChecked ? 'rgba(16,185,129,0.12)' : 'var(--color-app-bg)',
+                                border: `1.5px solid ${isChecked ? '#10B981' : 'var(--color-border)'}`,
                                 borderRadius: 12, padding: '0.5rem 1rem',
                                 transition: 'all 0.15s', whiteSpace: 'nowrap'
                             }}>
@@ -3725,7 +3758,7 @@ END:VCARD`;
                         <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                             <FileText size={18} /> Schadenbeschreibung (KI / Meldung)
                         </h3>
-                        <div style={{ backgroundColor: 'var(--color-panel-bg)', padding: '1rem', borderRadius: '12px', border: '1px solid var(--border)', marginBottom: '1.5rem', position: 'relative' }}>
+                        <div className="tech-section" style={{ padding: '1rem', marginBottom: '1.5rem', position: 'relative' }}>
                             <div style={{ position: 'absolute', top: '0.5rem', right: '0.5rem', zIndex: 10 }}>
                                 <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem', color: 'var(--text-muted)', cursor: 'pointer' }}>
                                     <input
@@ -3758,7 +3791,7 @@ END:VCARD`;
                         <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                             <Image size={18} /> Schadensbilder (Meldung)
                         </h3>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', backgroundColor: 'var(--surface)', padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                        <div className="tech-section" style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', padding: '0.5rem' }}>
                             {formData.images && formData.images.filter(img => {
                                 const isDoc = img.type === 'document' ||
                                     img.name?.toLowerCase().endsWith('.msg') ||
@@ -5071,7 +5104,7 @@ END:VCARD`;
                                                 )}
 
                                                 {isVisible && (
-                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1rem' }}
+                                                    <div className="tech-photo-group-outer" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1rem' }}
                                                         onDragOver={(e) => e.preventDefault()}
                                                     >
                                                         {roomImages.filter(img => !img.linkedToOriginal).map((img, idx, filteredArray) => {
@@ -6031,13 +6064,9 @@ END:VCARD`;
 
                 {/* 2b. Massnahmen (Measures) - Technician Only (Schadenaufnahme/Leckortung) */}
                 {mode === 'technician' && (formData.status === 'Schadenaufnahme' || formData.status === 'Leckortung') && (
-                    <div className="card" style={{
+                    <div className="tech-section" style={{
                         marginBottom: '1.5rem',
-                        padding: '1.5rem',
-                        backgroundColor: 'var(--background)',
-                        borderRadius: '20px',
-                        boxShadow: '0 20px 40px -10px rgba(0,0,0,0.1), 0 10px 15px -5px rgba(0,0,0,0.05)',
-                        border: '1px solid rgba(255,255,255,0.8)'
+                        padding: '1.5rem'
                     }}>
                         <h3 className="section-header" style={{ color: 'white', fontWeight: 800, fontSize: '1.1rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                             <ClipboardList size={20} color="#10B981" /> Massnahmen
@@ -6600,7 +6629,7 @@ END:VCARD`;
 
 
                         {/* Add Device Form */}
-                        <div style={{ backgroundColor: 'var(--surface)', padding: '1rem', borderRadius: '8px', marginBottom: '1rem', border: '1px solid var(--border)', ...(mode === 'desktop' ? { order: 3, marginTop: '2rem' } : {}) }}>
+                        <div className="tech-section" style={{ padding: '1rem', marginBottom: '1rem', ...(mode === 'desktop' ? { order: 3, marginTop: '2rem' } : {}) }}>
                             {mode !== 'technician' && (
                                 <button
                                     type="button"
@@ -6967,7 +6996,7 @@ END:VCARD`;
                                     
                                     {/* Custom Numpad UI for Technician Add Device */}
                                     {activeNumpadField && createPortal(
-                                        <div style={{ position: 'fixed', left: numpadPos.x, top: numpadPos.y, width: 280, backgroundColor: 'var(--surface)', border: '1px solid var(--border)', padding: '0.75rem', zIndex: 100000, boxShadow: '0 10px 40px rgba(0,0,0,0.6)', borderRadius: 12 }}>
+                                        <div style={{ position: 'fixed', left: numpadPos.x, top: numpadPos.y, width: 280, backgroundColor: 'var(--surface)', border: '1px solid var(--color-border-strong)', padding: '0.75rem', zIndex: 100000, boxShadow: 'var(--shadow-premium)', borderRadius: 12 }}>
                                             <div 
                                                 style={{ display:'flex', justifyContent:'space-between', marginBottom:'0.5rem', alignItems:'center', cursor: 'grab', touchAction: 'none', paddingBottom: '0.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)' }}
                                                 onPointerDown={e => {
@@ -6996,12 +7025,12 @@ END:VCARD`;
                                                 </div>
                                                 <button onClick={() => setActiveNumpadField(null)} style={{ background:'transparent', border:'none', color:'var(--border)', cursor:'pointer' }}><X size={16}/></button>
                                             </div>
-                                            <div style={{ backgroundColor: 'var(--background)', padding:'0.5rem', borderRadius:'6px', marginBottom:'0.5rem', fontSize:'1.4rem', fontWeight:700, textAlign:'right', color:'#fff', minHeight:'36px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                                            <div style={{ backgroundColor: 'var(--background)', padding:'0.5rem', borderRadius:'6px', marginBottom:'0.5rem', fontSize:'1.4rem', fontWeight:700, textAlign:'right', color: 'var(--text-main)', minHeight:'36px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
                                                 {activeNumpadField.value || '0'}
                                             </div>
                                             <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:'0.4rem' }}>
                                                 {['1','2','3','4','5','6','7','8','9',',', '0', 'DEL'].map(k => (
-                                                    <button key={k} onClick={() => handleNumpadPress(k)} style={{ padding:'0.6rem', fontSize:'1.2rem', fontWeight:700, borderRadius:'8px', backgroundColor:'rgba(255,255,255,0.1)', border:'none', color: 'white', cursor:'pointer', touchAction: 'manipulation', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                                                    <button key={k} onClick={() => handleNumpadPress(k)} style={{ padding:'0.6rem', fontSize:'1.2rem', fontWeight:700, borderRadius:'8px', backgroundColor:'var(--color-app-bg)', border:'1px solid var(--border)', color: 'var(--text-main)', cursor:'pointer', touchAction: 'manipulation', display:'flex', alignItems:'center', justifyContent:'center' }}>
                                                         {k === 'DEL' ? <Delete size={18} style={{ pointerEvents: 'none' }}/> : k}
                                                     </button>
                                                 ))}
@@ -7023,7 +7052,7 @@ END:VCARD`;
 
                                 return (
                                     <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(4px)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-                                        <div style={{ backgroundColor: 'var(--surface)', borderRadius: '16px', width: '100%', maxWidth: '400px', padding: '1.5rem', color: 'var(--text-main)', border: '1px solid var(--border)', boxShadow: '0 10px 25px rgba(0,0,0,0.05)' }}>
+                                        <div className="tech-section" style={{ width: '100%', maxWidth: '400px', padding: '1.5rem', color: 'var(--text-main)', boxShadow: '0 10px 25px rgba(0,0,0,0.05)' }}>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                                                 <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700 }}>Gerät abmelden</h3>
                                                 <button onClick={() => {
@@ -7608,8 +7637,19 @@ END:VCARD`;
                             color: 'black',
                             fontFamily: 'Arial, sans-serif'
                         }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', borderBottom: '4px solid #0F6EA3', paddingBottom: '1.5rem' }}>
+                            <div className="pdf-section" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2rem', borderBottom: '4px solid #0F6EA3', paddingBottom: '1.5rem' }}>
                                 <div>
+                                    <img 
+                                        src={logoAsset} 
+                                        alt="Q-Service AG" 
+                                        onLoad={() => console.log("Logo image loaded in DOM")}
+                                        style={{ 
+                                            width: '140px', 
+                                            height: 'auto', 
+                                            display: 'block', 
+                                            marginBottom: '10px' 
+                                        }} 
+                                    />
                                     <h1 style={{ fontSize: '28pt', fontWeight: '800', margin: 0, color: 'var(--text-main)' }}>Schadensbericht</h1>
                                     <div style={{ fontSize: '11pt', marginTop: '0.5rem', color: 'var(--text-muted)' }}>Erstellt am: {new Date().toLocaleDateString('de-CH')}</div>
                                 </div>
