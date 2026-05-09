@@ -34,6 +34,7 @@ import MeasurementModal from './MeasurementModal';
 import { applyDryingCheck } from '../features/projects/dryingCheckService';
 import { generateMeasurementExcel } from '../utils/MeasurementExcelExporter';
 import { PDFService } from '../services/PDFService';
+import { RoomService } from '../services/RoomService';
 
 /* Custom PDF Icon */
 const PdfIcon = ({ size = 24, style = {} }) => (
@@ -1967,29 +1968,28 @@ END:VCARD`;
     };
 
     const handleAddRoom = () => {
-        let finalRoomName = newRoom.name;
-
-        // Handle custom room name
+        // Validation (UI level)
         if (newRoom.name === "Sonstiges / Eigener Name") {
             if (!newRoom.customName || newRoom.customName.trim() === "") {
                 alert("Bitte geben Sie einen Namen für den Raum ein.");
                 return;
             }
-            finalRoomName = newRoom.customName.trim();
         }
 
-        if (!finalRoomName) return;
+        const rawName = newRoom.name === "Sonstiges / Eigener Name" ? newRoom.customName : newRoom.name;
+        const finalRoomName = RoomService.normalizeRoomName(rawName);
+
+        if (!finalRoomName || (finalRoomName === 'Unbenannter Raum' && !rawName)) return;
 
         const finalApartment = (newRoom.apartment === '__neue__' || newRoom.apartment === 'Sonstiges')
             ? (newRoom.apartmentCustom || '').trim()
             : newRoom.apartment;
 
-        const roomEntry = {
-            id: Date.now(),
+        const roomEntry = RoomService.createRoom({
             name: finalRoomName,
             apartment: finalApartment,
             stockwerk: newRoom.stockwerk
-        };
+        });
 
         setFormData(prev => ({
             ...prev,
@@ -2665,14 +2665,15 @@ END:VCARD`;
                                             setShowAddDeviceForm(true);
                                         } else {
                                             const aptValue = activeApt === 'Allgemeiner Bereich' ? '' : (activeApt || '');
-                                            const tempRoom = {
-                                                id: `temp_${Date.now()}`,
+                                            const baseTemp = RoomService.createRoom({
                                                 name: '',
-                                                apartment: aptValue,
+                                                apartment: aptValue
+                                            });
+                                            const tempRoom = {
+                                                ...baseTemp,
+                                                id: `temp_${Date.now()}`,
                                                 width: '', length: '', height: '',
-                                                dryingData: { equipment: [], dailyLogs: [] },
-                                                measurementData: { measurements: [], globalSettings: {} },
-                                                measurementHistory: []
+                                                dryingData: { equipment: [], dailyLogs: [] }
                                             };
                                             setActiveRoomForMeasurement(tempRoom);
                                             setIsNewMeasurement(true);
@@ -2763,6 +2764,15 @@ END:VCARD`;
                             setFormData(prev => {
                                 let updatedRooms;
                                 if (String(activeRoomForMeasurement.id).startsWith('temp_')) {
+                                    const finalRoomName = RoomService.normalizeRoomName(globalSettings.room);
+                                    
+                                    // Create standard room via service
+                                    const baseRoom = RoomService.createRoom({
+                                        name: finalRoomName,
+                                        apartment: globalSettings.apartment || '',
+                                        stockwerk: activeRoomForMeasurement.stockwerk
+                                    });
+
                                     const history = [{
                                         id: `hist_${Date.now()}`,
                                         date: globalSettings.date || new Date().toISOString(),
@@ -2772,11 +2782,11 @@ END:VCARD`;
                                         protocolUrl: protocolUrl,
                                         galleryPhotos: galleryPhotos || []
                                     }];
+
                                     const newRoom = {
                                         ...activeRoomForMeasurement,
+                                        ...baseRoom,
                                         id: `room_${Date.now()}`,
-                                        name: globalSettings.room || 'Unbenannter Raum',
-                                        apartment: globalSettings.apartment || '',
                                         measurementData: { measurements, globalSettings, canvasImage, protocolUrl, galleryPhotos: galleryPhotos || [] },
                                         measurementHistory: history
                                     };
