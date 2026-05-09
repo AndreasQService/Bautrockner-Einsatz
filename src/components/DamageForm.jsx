@@ -2038,9 +2038,7 @@ END:VCARD`;
         } finally {
             setIsGeneratingPDF(false);
         }
-
     };
-
 
     const handleGeneratePDF = async () => {
         setIsGeneratingPDF(true);
@@ -2049,34 +2047,6 @@ END:VCARD`;
         } catch (error) {
             console.error("PDF Export failed", error);
             alert("Fehler beim Erstellen des PDFs");
-        } finally {
-            setIsGeneratingPDF(false);
-        }
-    };
-
-    const testGeneratePDFViaService = async () => {
-        setIsGeneratingPDF(true);
-        try {
-            console.log("[TEST] Starte Test-Export via PDFService Master-Pfad...");
-            const result = await PDFService.generateCompleteDamageReport(formData, {
-                supabase,
-                uploadToOneDrive: false,
-                uploadToApp: false,
-                getPhotoDownloadUrl,
-                uploadReport,
-                handleImageUpload,
-                buildProjectFolderName,
-                onProgress: (msg) => console.log(`[TEST Progress] ${msg}`)
-            });
-
-            if (result && result.blob) {
-                const testFileName = `TEST_SERVICE_${result.fileName}`;
-                PDFService.downloadBlob(result.blob, testFileName);
-                console.log("[TEST] Test-PDF erfolgreich erstellt:", testFileName);
-            }
-        } catch (error) {
-            console.error("[TEST] PDF Service Master Test failed", error);
-            alert("Test fehlgeschlagen: " + error.message);
         } finally {
             setIsGeneratingPDF(false);
         }
@@ -5811,26 +5781,6 @@ END:VCARD`;
                             <PdfIcon size={28} />
                             <span>{isGeneratingPDF ? 'Wird erstellt...' : 'Schadensbericht PDF'}</span>
                         </button>
-                        
-                        <button
-                            type="button"
-                            onClick={testGeneratePDFViaService}
-                            disabled={isGeneratingPDF}
-                            style={{
-                                display: 'none', // Versteckt
-                                padding: '0.8rem 1.5rem',
-                                fontSize: '0.9rem',
-                                fontWeight: 700,
-                                borderRadius: '12px',
-                                backgroundColor: '#6B7280',
-                                color: 'white',
-                                border: '2px dashed rgba(255,255,255,0.4)',
-                                cursor: isGeneratingPDF ? 'not-allowed' : 'pointer',
-                                marginLeft: '10px'
-                            }}
-                        >
-                            <span>TEST PDF SERVICE</span>
-                        </button>
                     </div>
                 )}
 
@@ -6154,28 +6104,6 @@ END:VCARD`;
                         >
                             <PdfIcon size={26} />
                             <span>{isGeneratingPDF ? 'Wird erstellt...' : 'Schadensbericht PDF'}</span>
-                        </button>
-
-                        <button
-                            type="button"
-                            onClick={testGeneratePDFViaService}
-                            disabled={isGeneratingPDF}
-                            style={{
-                                display: 'none', // Versteckt
-                                padding: '0.8rem 1.5rem',
-                                fontSize: '0.9rem',
-                                fontWeight: 700,
-                                borderRadius: '12px',
-                                backgroundColor: '#6B7280',
-                                color: 'white',
-                                border: '2px dashed rgba(255,255,255,0.4)',
-                                cursor: isGeneratingPDF ? 'not-allowed' : 'pointer',
-                                marginTop: '10px',
-                                width: '100%',
-                                maxWidth: '480px'
-                            }}
-                        >
-                            <span>[TEST] ZENTRALER PDF SERVICE</span>
                         </button>
                     </div>
                 )}

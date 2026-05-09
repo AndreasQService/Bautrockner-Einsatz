@@ -319,12 +319,11 @@ export const PDFService = {
                         }
                     }
                 }
-                console.log(`[PDFService Master DEBUG] Google Map erfolgreich Base64? ${!!staticMapUrl && String(staticMapUrl).startsWith('data:')}`);
             }
         } catch (e) { 
             const errorMsg = e.message || '';
             const maskedMsg = errorMsg.replace(/key=AIza[^&]*/g, 'key=AIza...REDACTED');
-            console.error('[PDFService Master DEBUG] Google Static Map error', maskedMsg); 
+            console.error('[PDFService Master] Google Static Map error', maskedMsg); 
         }
 
         // 2. Pre-process images - Filter out PDFs and non-renderable documents
@@ -375,31 +374,27 @@ export const PDFService = {
         let processedExteriorPhoto = dataToUse.exteriorPhoto;
         if (processedExteriorPhoto) {
             try {
-                console.log("[PDFService Master DEBUG] Verarbeite Aussenaufnahme...");
                 const photoUrl = typeof processedExteriorPhoto === 'string' ? processedExteriorPhoto : processedExteriorPhoto.preview;
                 const photoObj = typeof processedExteriorPhoto === 'object' ? processedExteriorPhoto : null;
                 const base64Exterior = await internalUrlToDataUrl(photoUrl, photoObj);
                 if (base64Exterior) processedExteriorPhoto = base64Exterior;
             } catch (e) { 
-                console.warn("[PDFService Master DEBUG] Failed to convert exterior photo:", e); 
+                console.warn("[PDFService Master] Failed to convert exterior photo:", e); 
             }
         }
-        console.log(`[PDFService Master DEBUG] exteriorPhoto erfolgreich Base64? ${!!processedExteriorPhoto && String(processedExteriorPhoto).startsWith('data:')}`);
 
         // 5. Process Custom Map Image
         let processedCustomMapImage = dataToUse.customMapImage;
         if (processedCustomMapImage) {
             try {
-                console.log("[PDFService Master DEBUG] Verarbeite Custom Map...");
                 const photoUrl = typeof processedCustomMapImage === 'string' ? processedCustomMapImage : processedCustomMapImage.preview;
                 const photoObj = typeof processedCustomMapImage === 'object' ? processedCustomMapImage : null;
                 const base64CustomMap = await internalUrlToDataUrl(photoUrl, photoObj);
                 if (base64CustomMap) processedCustomMapImage = base64CustomMap;
             } catch (e) { 
-                console.warn("[PDFService Master DEBUG] Failed to convert custom map image:", e); 
+                console.warn("[PDFService Master] Failed to convert custom map image:", e); 
             }
         }
-        console.log(`[PDFService Master DEBUG] customMapImage erfolgreich Base64? ${!!processedCustomMapImage && String(processedCustomMapImage).startsWith('data:')}`);
 
         // 6. Etagen-Anreicherung (Rooms)
         const liveContacts = dataToUse.contacts || [];
@@ -426,11 +421,6 @@ export const PDFService = {
             staticMapUrl: processedCustomMapImage || staticMapUrl || null,
             customMapImage: null,
         };
-
-        console.log("[PDFService Master DEBUG] --- FINAL DOCDATA ---");
-        console.log("[PDFService Master DEBUG] staticMapUrl Type:", typeof docData.staticMapUrl, "Start:", docData.staticMapUrl?.slice(0, 80));
-        console.log("[PDFService Master DEBUG] customMapImage Type:", typeof docData.customMapImage, "Start:", docData.customMapImage?.slice(0, 80));
-        console.log("[PDFService Master DEBUG] exteriorPhoto Type:", typeof docData.exteriorPhoto, "Start:", docData.exteriorPhoto?.slice(0, 80));
 
         console.log("[PDFService Master] Generiere PDF-Blob...");
         onProgress("Generiere PDF-Dokument...");
