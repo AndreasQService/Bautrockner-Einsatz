@@ -31,8 +31,10 @@ const DescriptionSection = ({ data }) => {
             {/* Description + optional images */}
             {hasDescription && (
                 <View style={{ marginBottom: 15 }}>
-                    <View style={styles.divider} />
-                    <Text style={styles.sectionTitle}>Schadenbeschreibung</Text>
+                    <View wrap={false}>
+                        <View style={styles.divider} />
+                        <Text style={styles.sectionTitle}>Schadenbeschreibung</Text>
+                    </View>
                     <Text style={styles.textBlock}>{data.description.trim()}</Text>
                     {hasUnassignedImages && (
                         <View style={{ marginTop: 10 }}>

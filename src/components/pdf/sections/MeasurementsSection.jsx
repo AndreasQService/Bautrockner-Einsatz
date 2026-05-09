@@ -21,8 +21,10 @@ const MeasurementsSection = ({ data }) => {
 
     return (
         <View style={{ marginBottom: 20 }}>
-            <View style={styles.divider} />
-            <Text style={styles.sectionTitle}>MESSPROTOKOLLE</Text>
+            <View wrap={false}>
+                <View style={styles.divider} />
+                <Text style={styles.sectionTitle}>MESSPROTOKOLLE</Text>
+            </View>
 
             {rows.map((row, rowIdx) => {
                 const isSingle = row.length === 1;

@@ -2209,6 +2209,15 @@ END:VCARD`;
                 } catch (e) { console.warn("Failed to convert exterior photo:", e); }
             }
 
+            // Process Custom Map Image
+            let processedCustomMapImage = dataToUse.customMapImage;
+            if (processedCustomMapImage) {
+                try {
+                    const base64CustomMap = await urlToDataUrl(processedCustomMapImage);
+                    if (base64CustomMap) processedCustomMapImage = base64CustomMap;
+                } catch (e) { console.warn("Failed to convert custom map image:", e); }
+            }
+
             // Prepare Data for Document Component
             // Räume: Kontakt-Etage überschreibt altes room.stockwerk aus DB
             const liveContacts = dataToUse.contacts || [];
@@ -2230,6 +2239,7 @@ END:VCARD`;
                 damageTypeImages: processedHeroImages,
                 damageTypeImage: processedHeroImages[0] || null,
                 exteriorPhoto: processedExteriorPhoto,
+                customMapImage: processedCustomMapImage,
                 staticMapUrl: staticMapUrl || null,
             };
 

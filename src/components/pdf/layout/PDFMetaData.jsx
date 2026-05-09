@@ -52,18 +52,8 @@ const PDFMetaData = ({ data }) => {
                     </View>
                 )}
 
-                {data.street && (
-                    <View style={styles.metaRow}>
-                        <Text style={styles.metaLabel}>Strasse:</Text>
-                        <Text style={styles.metaValue}>{data.street}</Text>
-                    </View>
-                )}
-                {(data.zip || data.city) && (
-                    <View style={styles.metaRow}>
-                        <Text style={styles.metaLabel}>Ort:</Text>
-                        <Text style={styles.metaValue}>{`${data.zip || ''} ${data.city || ''}`.trim()}</Text>
-                    </View>
-                )}
+
+
                 {/* Lage / Details */}
                 {data.locationDetails && String(data.locationDetails).trim() !== '' && (
                     <View style={styles.metaRow}>

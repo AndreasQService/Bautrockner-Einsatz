@@ -9,8 +9,10 @@ const MeasuresSection = ({ data }) => {
 
     return (
         <View style={{ marginBottom: 15 }}>
-            <View style={styles.divider} />
-            <Text style={styles.sectionTitle}>MASSNAHMEN</Text>
+            <View wrap={false}>
+                <View style={styles.divider} />
+                <Text style={styles.sectionTitle}>MASSNAHMEN</Text>
+            </View>
             {data.selectedMeasures && data.selectedMeasures.length > 0 && (
                 <View style={{ marginBottom: data.measures ? 10 : 0 }}>
                     {data.selectedMeasures.map((measure, idx) => (

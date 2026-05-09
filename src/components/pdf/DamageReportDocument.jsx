@@ -89,28 +89,59 @@ const DamageReportDocument = ({ data }) => {
                 <PDFMetaData data={data} />
 
                 {/* Karte und/oder Aussenbild unter den Projektinfos */}
-                {(data.staticMapUrl || (data.exteriorPhoto && data.exteriorPhoto.startsWith('data:'))) && (
+                {(data.staticMapUrl || data.customMapImage || (data.exteriorPhoto && data.exteriorPhoto.startsWith('data:'))) && (
                     <View>
                         <View style={styles.divider} />
-                        <View style={{ flexDirection: 'row', gap: 6, marginBottom: 6, marginTop: 6 }}>
-                            {data.staticMapUrl && (
-                                <Image
-                                    src={data.staticMapUrl}
-                                    style={{
-                                        flex: (data.exteriorPhoto && data.exteriorPhoto.startsWith('data:')) ? 1 : undefined,
-                                        width: (data.exteriorPhoto && data.exteriorPhoto.startsWith('data:')) ? undefined : '100%',
-                                        height: 160,
-                                        objectFit: 'cover',
-                                        borderRadius: 4,
-                                    }}
-                                />
+                        <View style={{ gap: 6, marginBottom: 6, marginTop: 6 }}>
+                            {/* Row 1: Google Map and/or Custom Map */}
+                            {(data.staticMapUrl || data.customMapImage) && (
+                                <View style={{ flexDirection: 'row', gap: 6 }}>
+                                    {data.staticMapUrl && (
+                                        <Image
+                                            src={data.staticMapUrl}
+                                            style={{
+                                                flex: (data.customMapImage || (data.exteriorPhoto && !data.customMapImage)) ? 1 : undefined,
+                                                width: (data.customMapImage || (data.exteriorPhoto && !data.customMapImage)) ? undefined : '100%',
+                                                height: 160,
+                                                objectFit: 'cover',
+                                                borderRadius: 4,
+                                            }}
+                                        />
+                                    )}
+                                    {data.customMapImage && (
+                                        <Image
+                                            src={data.customMapImage}
+                                            style={{
+                                                flex: data.staticMapUrl ? 1 : undefined,
+                                                width: data.staticMapUrl ? undefined : '100%',
+                                                height: 160,
+                                                objectFit: 'cover',
+                                                borderRadius: 4,
+                                            }}
+                                        />
+                                    )}
+                                    {/* Show exterior photo here ONLY if no customMapImage is present (legacy behavior) */}
+                                    {!data.customMapImage && data.exteriorPhoto && data.exteriorPhoto.startsWith('data:') && (
+                                        <Image
+                                            src={data.exteriorPhoto}
+                                            style={{
+                                                flex: data.staticMapUrl ? 1 : undefined,
+                                                width: data.staticMapUrl ? undefined : '100%',
+                                                height: 160,
+                                                objectFit: 'cover',
+                                                borderRadius: 4,
+                                            }}
+                                        />
+                                    )}
+                                </View>
                             )}
-                            {data.exteriorPhoto && data.exteriorPhoto.startsWith('data:') && (
+
+                            {/* Row 2: Exterior Photo (Full width if customMapImage is present) */}
+                            {data.customMapImage && data.exteriorPhoto && data.exteriorPhoto.startsWith('data:') && (
                                 <Image
                                     src={data.exteriorPhoto}
                                     style={{
-                                        flex: data.staticMapUrl ? 1 : undefined,
-                                        width: data.staticMapUrl ? undefined : '100%',
+                                        width: '100%',
                                         height: 160,
                                         objectFit: 'cover',
                                         borderRadius: 4,

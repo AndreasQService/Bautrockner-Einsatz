@@ -10,8 +10,10 @@ const PlansSection = ({ data }) => {
 
     return (
         <View style={{ marginBottom: 20 }}>
-            <View style={styles.divider} />
-            <Text style={styles.sectionTitle}>PLÄNE &amp; GRUNDRISSE</Text>
+            <View wrap={false}>
+                <View style={styles.divider} />
+                <Text style={styles.sectionTitle}>PLÄNE &amp; GRUNDRISSE</Text>
+            </View>
             <ImageGrid images={plansImages} showName={true} />
         </View>
     );
