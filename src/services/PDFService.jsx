@@ -168,5 +168,121 @@ export const PDFService = {
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
         }, 500);
+    },
+
+    /**
+     * MASTER-PFAD: Erzeugt einen vollständigen Schadensbericht inkl. Bildverarbeitung,
+     * Map-Integration und optionalen Uploads. Basiert auf der bewährten DamageForm-Logik.
+     * 
+     * @param {Object} formData - Die Projektdaten
+     * @param {Object} options - Instanzen, Callbacks und Flags
+     */
+    generateCompleteDamageReport: async (formData, options = {}) => {
+        console.log("[PDFService Master] Starte vollständigen PDF-Export...");
+        const {
+            supabase,
+            uploadToOneDrive = false,
+            uploadToApp = false,
+            getPhotoDownloadUrl,
+            uploadReport,
+            handleImageUpload,
+            buildProjectFolderName,
+            onProgress = () => {},
+            fileName: customFileName
+        } = options;
+
+        const dataToUse = formData;
+
+        // --- INTERNE HELPER AUS DAMAGEFORM (MASTER-LOGIK) ---
+        
+        const internalUrlToDataUrl = async (url, imgObj = null) => {
+            if (!url) return null;
+
+            const resizeImage = async (dataUrl) => {
+                if (!dataUrl) return null;
+                return new Promise((resolve) => {
+                    const img = new window.Image();
+                    img.crossOrigin = "anonymous";
+                    img.onload = () => {
+                        const MAX_SIZE = 1200; 
+                        let width = img.width;
+                        let height = img.height;
+                        if (width > height) {
+                            if (width > MAX_SIZE) { height *= MAX_SIZE / width; width = MAX_SIZE; }
+                        } else {
+                            if (height > MAX_SIZE) { width *= MAX_SIZE / height; height = MAX_SIZE; }
+                        }
+                        const canvas = document.createElement('canvas');
+                        canvas.width = width;
+                        canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, width, height);
+                        resolve(canvas.toDataURL('image/jpeg', 0.85));
+                    };
+                    img.onerror = () => resolve(dataUrl.startsWith('data:') ? dataUrl : null);
+                    img.src = dataUrl;
+                });
+            };
+
+            if (url.startsWith('data:')) return await resizeImage(url);
+
+            // Method A: Supabase
+            if (supabase && (url.includes('supabase.co') || imgObj?.storagePath)) {
+                try {
+                    let path = imgObj?.storagePath || (url.includes('case-files/') ? url.split('case-files/').pop()?.split('?')[0] : null);
+                    if (path) {
+                        const { data, error } = await supabase.storage.from('case-files').download(path);
+                        if (data && !error) {
+                            const raw = await new Promise((resolve) => {
+                                const reader = new FileReader();
+                                reader.onloadend = () => resolve(reader.result);
+                                reader.readAsDataURL(data);
+                            });
+                            return await resizeImage(raw);
+                        }
+                    }
+                } catch (e) { console.warn("[PDFService Master] Supabase error", e); }
+            }
+
+            // Method B: Fetch
+            try {
+                const response = await fetch(url, { cache: 'no-cache' });
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const raw = await new Promise((resolve) => {
+                        const reader = new FileReader();
+                        reader.onloadend = () => resolve(reader.result);
+                        reader.readAsDataURL(blob);
+                    });
+                    return await resizeImage(raw);
+                }
+            } catch (err) { }
+
+            // Method C: Canvas Backup
+            try {
+                const raw = await new Promise((resolve) => {
+                    const img = new window.Image();
+                    img.crossOrigin = "anonymous";
+                    img.onload = () => {
+                        try {
+                            const canvas = document.createElement('canvas');
+                            canvas.width = img.width;
+                            canvas.height = img.height;
+                            const ctx = canvas.getContext('2d');
+                            ctx.drawImage(img, 0, 0);
+                            resolve(canvas.toDataURL('image/jpeg', 0.9));
+                        } catch (e) { resolve(null); }
+                    };
+                    img.onerror = () => resolve(null);
+                    img.src = url;
+                });
+                if (raw) return await resizeImage(raw);
+            } catch (err) { }
+            return await resizeImage(url);
+        };
+
+        // --- STRUKTURELLER CONTAINER ENDE ---
+        console.log("[PDFService Master] Struktur bereit. Logik wird in Schritt 2 implementiert.");
+        return null;
     }
 };
