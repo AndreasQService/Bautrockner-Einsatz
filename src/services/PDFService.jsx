@@ -193,96 +193,94 @@ export const PDFService = {
 
         const dataToUse = formData;
 
-        // --- INTERNE HELPER AUS DAMAGEFORM (MASTER-LOGIK) ---
-        
-        const internalUrlToDataUrl = async (url, imgObj = null) => {
-            if (!url) return null;
+        // --- SCHRITT 2: MAP & BILD-FILTERUNG (1:1 AUS MASTER) ---
 
-            const resizeImage = async (dataUrl) => {
-                if (!dataUrl) return null;
-                return new Promise((resolve) => {
-                    const img = new window.Image();
-                    img.crossOrigin = "anonymous";
-                    img.onload = () => {
-                        const MAX_SIZE = 1200; 
-                        let width = img.width;
-                        let height = img.height;
-                        if (width > height) {
-                            if (width > MAX_SIZE) { height *= MAX_SIZE / width; width = MAX_SIZE; }
-                        } else {
-                            if (height > MAX_SIZE) { width *= MAX_SIZE / height; height = MAX_SIZE; }
-                        }
-                        const canvas = document.createElement('canvas');
-                        canvas.width = width;
-                        canvas.height = height;
-                        const ctx = canvas.getContext('2d');
-                        ctx.drawImage(img, 0, 0, width, height);
-                        resolve(canvas.toDataURL('image/jpeg', 0.85));
-                    };
-                    img.onerror = () => resolve(dataUrl.startsWith('data:') ? dataUrl : null);
-                    img.src = dataUrl;
-                });
-            };
-
-            if (url.startsWith('data:')) return await resizeImage(url);
-
-            // Method A: Supabase
-            if (supabase && (url.includes('supabase.co') || imgObj?.storagePath)) {
-                try {
-                    let path = imgObj?.storagePath || (url.includes('case-files/') ? url.split('case-files/').pop()?.split('?')[0] : null);
-                    if (path) {
-                        const { data, error } = await supabase.storage.from('case-files').download(path);
-                        if (data && !error) {
-                            const raw = await new Promise((resolve) => {
+        // 1. Map Processing
+        let staticMapUrl = null;
+        try {
+            if (dataToUse.customMapImage) {
+                staticMapUrl = dataToUse.customMapImage;
+            } else {
+                let mapAddress = dataToUse.street
+                    ? `${dataToUse.street}, ${dataToUse.zip || ''} ${dataToUse.city || ''}`
+                    : dataToUse.address;
+                
+                // Clean up address (remove leading/trailing commas, extra spaces)
+                mapAddress = (mapAddress || '').trim().replace(/^,+/, '').replace(/,+$/, '').trim();
+                if (mapAddress) {
+                    const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+                    const params = new URLSearchParams({
+                        center: mapAddress,
+                        zoom: '15',
+                        size: '640x300',
+                        scale: '2',
+                        maptype: 'roadmap',
+                        markers: `color:red|${mapAddress}`,
+                        key: apiKey,
+                        language: 'de',
+                    });
+                    const googleMapUrl = `/google-staticmap?${params.toString()}`;
+                    const resp = await fetch(googleMapUrl);
+                    if (resp.ok) {
+                        const blob = await resp.blob();
+                        
+                        if (blob.type.startsWith('image/')) {
+                            staticMapUrl = await new Promise((resolve) => {
                                 const reader = new FileReader();
                                 reader.onloadend = () => resolve(reader.result);
-                                reader.readAsDataURL(data);
+                                reader.readAsDataURL(blob);
                             });
-                            return await resizeImage(raw);
                         }
                     }
-                } catch (e) { console.warn("[PDFService Master] Supabase error", e); }
-            }
-
-            // Method B: Fetch
-            try {
-                const response = await fetch(url, { cache: 'no-cache' });
-                if (response.ok) {
-                    const blob = await response.blob();
-                    const raw = await new Promise((resolve) => {
-                        const reader = new FileReader();
-                        reader.onloadend = () => resolve(reader.result);
-                        reader.readAsDataURL(blob);
-                    });
-                    return await resizeImage(raw);
                 }
-            } catch (err) { }
+            }
+        } catch (e) { 
+            const errorMsg = e.message || '';
+            const maskedMsg = errorMsg.replace(/key=AIza[^&]*/g, 'key=AIza...REDACTED');
+            console.error('[PDFService Master] Google Static Map error', maskedMsg); 
+        }
 
-            // Method C: Canvas Backup
-            try {
-                const raw = await new Promise((resolve) => {
-                    const img = new window.Image();
-                    img.crossOrigin = "anonymous";
-                    img.onload = () => {
-                        try {
-                            const canvas = document.createElement('canvas');
-                            canvas.width = img.width;
-                            canvas.height = img.height;
-                            const ctx = canvas.getContext('2d');
-                            ctx.drawImage(img, 0, 0);
-                            resolve(canvas.toDataURL('image/jpeg', 0.9));
-                        } catch (e) { resolve(null); }
-                    };
-                    img.onerror = () => resolve(null);
-                    img.src = url;
-                });
-                if (raw) return await resizeImage(raw);
-            } catch (err) { }
-            return await resizeImage(url);
-        };
+        // 2. Pre-process images - Filter out PDFs and non-renderable documents
+        console.log("[PDFService Master] Starte Bild-Filterung...");
+        const tempProcessedImages = await Promise.all(
+            (dataToUse.images || []).map(async (img) => {
+                const category = String(img.assignedTo || '').trim().toLowerCase();
+                const isDocCategory = ['schadensbericht', 'arbeitsrapporte', 'messprotokolle', 'sonstiges', 'pläne', 'lieferantenrechnungen'].includes(category);
+                const isProbablyPDF = img.preview?.toLowerCase().includes('.pdf') || img.type?.includes('pdf');
 
-        // --- STRUKTURELLER CONTAINER ENDE ---
-        console.log("[PDFService Master] Struktur bereit. Logik wird in Schritt 2 implementiert.");
+                const isImageFile = img.preview && /\.(jpg|jpeg|png|gif|webp|heic|heif)/i.test(img.preview);
+
+                if (img.includeInReport === false || isProbablyPDF || (isDocCategory && !isImageFile)) {
+                    return { ...img, isRenderable: false };
+                }
+
+                try {
+                    // OneDrive-Bild: frische URL holen falls getPhotoDownloadUrl vorhanden
+                    let previewUrl = img.preview;
+                    if (img.oneDriveItemId && getPhotoDownloadUrl) {
+                        const freshUrl = await getPhotoDownloadUrl(img.oneDriveItemId).catch(() => null);
+                        if (freshUrl) previewUrl = freshUrl;
+                    }
+
+                    // --- INTERNE HELPER AUS DAMAGEFORM (MASTER-LOGIK) ---
+                    // (Bereits in Schritt 1 definiert)
+                    const base64 = await internalUrlToDataUrl(previewUrl, img);
+                    if (base64) {
+                        return { ...img, preview: base64, isRenderable: true };
+                    } else {
+                        return { ...img, isRenderable: false };
+                    }
+                } catch (e) {
+                    return { ...img, isRenderable: false };
+                }
+            })
+        );
+
+        // Final list for the PDF Document (only images)
+        const processedImages = tempProcessedImages.filter(img => img.isRenderable);
+        console.log(`[PDFService Master] Bild-Filterung abgeschlossen: ${processedImages.length} Bilder renderbar.`);
+
+        // --- SCHRITT 2 ENDE ---
         return null;
     }
 };
