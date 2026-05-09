@@ -16,11 +16,21 @@ const MeasuresSection = ({ data }) => {
             {data.selectedMeasures && data.selectedMeasures.length > 0 && (
                 <View style={{ marginBottom: data.measures ? 10 : 0 }}>
                     {data.selectedMeasures.map((measure, idx) => (
-                        <Text key={idx} style={[styles.textBlock, { marginBottom: 2 }]}>• {measure}</Text>
+                        <View key={idx} style={{ marginBottom: 8 }} wrap={false}>
+                            <Text style={styles.roomHeader}>{measure.toUpperCase()}</Text>
+                            {data.measureNotes && data.measureNotes[measure] && (
+                                <Text style={styles.textBlock}>{data.measureNotes[measure]}</Text>
+                            )}
+                        </View>
                     ))}
                 </View>
             )}
-            {data.measures && <Text style={styles.textBlock}>{data.measures}</Text>}
+            {data.measures && (
+                <View style={{ marginTop: 5 }} wrap={false}>
+                    <Text style={styles.roomHeader}>ZUSÄTZLICHE MASSNAHMEN</Text>
+                    <Text style={styles.textBlock}>{data.measures}</Text>
+                </View>
+            )}
         </View>
     );
 };

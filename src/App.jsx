@@ -786,7 +786,7 @@ function App() {
           <div className="logo-area" style={{ flexShrink: 0 }}>
             <div className="logo-img-container">
               <img
-                src="/logo.png"
+                src="/1080p.jpg"
                 alt="QService"
                 style={{ height: '40px', width: 'auto' }}
                 onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}

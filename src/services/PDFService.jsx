@@ -18,7 +18,7 @@ export const PDFService = {
         // Load Logo
         let logoData = null;
         try {
-            const logoResp = await fetch(window.location.origin + '/logo.png');
+            const logoResp = await fetch(window.location.origin + '/1080p.jpg');
             if (logoResp.ok) {
                 const blob = await logoResp.blob();
                 logoData = await new Promise((resolve) => {

@@ -50,7 +50,7 @@ const LoginScreen = ({ users, onLogin }) => {
                 {/* Logo Area */}
                 <div style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'center' }}>
                     <img
-                        src="/logo.png"
+                        src="/1080p.jpg"
                         alt="QService"
                         style={{ width: 'auto', height: '80px', objectFit: 'contain' }}
                     />

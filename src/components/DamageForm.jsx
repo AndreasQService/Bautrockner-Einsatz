@@ -1754,12 +1754,12 @@ END:VCARD`;
         // Load Logo
         let logoId = null;
         try {
-            const logoResponse = await fetch('/logo.png');
+            const logoResponse = await fetch('/1080p.jpg');
             if (logoResponse.ok) {
                 const logoBuffer = await logoResponse.arrayBuffer();
                 logoId = workbook.addImage({
                     buffer: new Uint8Array(logoBuffer), // ExcelJS expects Buffer or Uint8Array
-                    extension: 'png',
+                    extension: 'jpeg',
                 });
             }
         } catch (err) {
@@ -4269,8 +4269,8 @@ END:VCARD`;
 
                 {/* Container for Map & Exterior Photo (Side-by-Side) */}
                 <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap', alignItems: 'stretch', marginBottom: '1.5rem' }}>
-                    {/* Map Card – nur im Techniker-Modus */}
-                    {mode === 'desktop' && (
+                    {/* Map Card – Anzeige in Desktop und Techniker-Übersicht */}
+                    {(mode === 'desktop' || (mode === 'technician' && techTab === 'uebersicht')) && (
                         <div className="card" style={{ flex: '1 1 350px', padding: '1.5rem', display: 'flex', flexDirection: 'column' }}>
                             <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.6rem', color: 'var(--primary)', borderBottom: '1px solid var(--border)', paddingBottom: '0.75rem' }}>
                                 <MapPin size={18} /> Standort Karte
@@ -4299,31 +4299,33 @@ END:VCARD`;
                                             title="Standort Karte"
                                         ></iframe>
 
-                                        {/* Overlay-Buttons für Uploads (nur wenn Bild noch nicht split ist oder Platz da ist) */}
+                                        {/* Overlay-Buttons für Uploads */}
                                         {!formData.customMapImage && (
                                             <label
                                                 style={{
                                                     position: 'absolute',
                                                     top: '15px',
                                                     right: '15px',
-                                                    backgroundColor: 'var(--surface)',
+                                                    backgroundColor: 'rgba(255, 255, 255, 0.95)',
                                                     color: 'var(--primary)',
-                                                    padding: '0.5rem 1rem',
-                                                    borderRadius: '8px',
+                                                    padding: '0.6rem 1.1rem',
+                                                    borderRadius: '99px',
                                                     display: 'flex',
                                                     alignItems: 'center',
                                                     gap: '0.5rem',
                                                     cursor: 'pointer',
-                                                    boxShadow: '0 4px 6px -1px rgba(0,0,0,0.3)',
-                                                    fontSize: '0.75rem',
+                                                    boxShadow: '0 8px 16px rgba(0,0,0,0.15)',
+                                                    fontSize: '0.8rem',
                                                     fontWeight: 700,
                                                     zIndex: 15,
-                                                    border: '1px solid var(--primary)'
+                                                    border: '1px solid var(--primary)',
+                                                    backdropFilter: 'blur(4px)',
+                                                    transition: 'all 0.2s'
                                                 }}
                                                 title="Eigene Karte/Bild hinzufügen"
                                             >
                                                 <Camera size={16} />
-                                                <span>Bild hinzufügen</span>
+                                                <span>Eigene Karte</span>
                                                 <input
                                                     type="file"
                                                     accept="image/*"
@@ -4341,14 +4343,14 @@ END:VCARD`;
                                                     right: '15px',
                                                     backgroundColor: 'var(--primary)',
                                                     color: 'white',
-                                                    padding: '0.6rem 1.2rem',
+                                                    padding: '0.7rem 1.4rem',
                                                     borderRadius: '99px',
                                                     display: 'flex',
                                                     alignItems: 'center',
                                                     gap: '0.6rem',
                                                     cursor: 'pointer',
-                                                    boxShadow: '0 10px 15px -3px rgba(14, 165, 233, 0.4)',
-                                                    fontSize: '0.85rem',
+                                                    boxShadow: '0 10px 20px rgba(15, 110, 163, 0.4)',
+                                                    fontSize: '0.9rem',
                                                     fontWeight: 700,
                                                     zIndex: 10,
                                                     transition: 'all 0.2s'
@@ -4381,12 +4383,26 @@ END:VCARD`;
                                                 onClick={removeCustomMapImage}
                                                 style={{
                                                     position: 'absolute', top: '10px', right: '10px',
-                                                    backgroundColor: 'rgba(239, 68, 68, 0.9)', color: 'white', border: 'none', borderRadius: '50%',
-                                                    width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                                    cursor: 'pointer', zIndex: 20
+                                                    backgroundColor: 'rgba(239, 68, 68, 0.95)', color: 'white', border: 'none', borderRadius: '50%',
+                                                    width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                    cursor: 'pointer', zIndex: 20, boxShadow: '0 4px 10px rgba(0,0,0,0.3)', backdropFilter: 'blur(4px)'
                                                 }}
+                                                title="Karte entfernen"
                                             >
-                                                <X size={18} />
+                                                <X size={20} />
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setEditingImage({ preview: formData.customMapImage, id: 'customMap', isCustomMap: true })}
+                                                style={{
+                                                    position: 'absolute', top: '10px', left: '10px',
+                                                    backgroundColor: 'rgba(15, 110, 163, 0.95)', color: 'white', border: 'none', borderRadius: '50%',
+                                                    width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                    cursor: 'pointer', zIndex: 20, boxShadow: '0 4px 10px rgba(0,0,0,0.3)', backdropFilter: 'blur(4px)'
+                                                }}
+                                                title="Karte bearbeiten"
+                                            >
+                                                <Edit3 size={18} />
                                             </button>
                                         </div>
                                     )}
@@ -7441,6 +7457,9 @@ END:VCARD`;
                                     // 1. Check if it's the Aussenaufnahme (Special case)
                                     if (editingImage.isExterior) {
                                         return { ...prev, exteriorPhoto: newPreview };
+                                    }
+                                    if (editingImage.isCustomMap) {
+                                        return { ...prev, customMapImage: newPreview };
                                     }
 
                                     // 2. Standard Case: List of Images
