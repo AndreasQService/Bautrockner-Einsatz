@@ -2007,284 +2007,38 @@ END:VCARD`;
         }));
     }
 
-    const handleInputChange = (e) => {
-        const { name, value } = e.target
-        setFormData(prev => ({ ...prev, [name]: value }))
-    }
-
-
-    // --- PDF Export (Unified Vector Report) ---
-    // --- PDF Export (Unified Vector Report) ---
-    // --- PDF Export (Unified Vector Report - @react-pdf) ---
     const generatePDFExport = async (customFormData = null) => {
         const dataToUse = customFormData || formData;
         setIsGeneratingPDF(true);
 
-        const urlToDataUrl = async (url, imgObj = null) => {
-            if (!url) return null;
-
-            const resizeImage = async (dataUrl) => {
-                if (!dataUrl) return null;
-                return new Promise((resolve) => {
-                    const img = new window.Image();
-                    img.crossOrigin = "anonymous";
-                    img.onload = () => {
-                        const MAX_SIZE = 1200; // Increased from 800 for better detail visibility
-                        let width = img.width;
-                        let height = img.height;
-                        if (width > height) {
-                            if (width > MAX_SIZE) { height *= MAX_SIZE / width; width = MAX_SIZE; }
-                        } else {
-                            if (height > MAX_SIZE) { width *= MAX_SIZE / height; height = MAX_SIZE; }
-                        }
-                        const canvas = document.createElement('canvas');
-                        canvas.width = width;
-                        canvas.height = height;
-                        const ctx = canvas.getContext('2d');
-                        ctx.drawImage(img, 0, 0, width, height);
-                        resolve(canvas.toDataURL('image/jpeg', 0.85)); // Higher quality for PDF
-                    };
-                    img.onerror = () => resolve(dataUrl.startsWith('data:') ? dataUrl : null);
-                    img.src = dataUrl;
-                });
-            };
-
-            // Force resize even for data URLs to prevent memory issues
-            if (url.startsWith('data:')) return await resizeImage(url);
-
-            // Method A: Supabase
-            if (supabase && (url.includes('supabase.co') || imgObj?.storagePath)) {
-                try {
-                    let path = imgObj?.storagePath || (url.includes('case-files/') ? url.split('case-files/').pop()?.split('?')[0] : null);
-                    if (path) {
-                        const { data, error } = await supabase.storage.from('case-files').download(path);
-                        if (data && !error) {
-                            const raw = await new Promise((resolve) => {
-                                const reader = new FileReader();
-                                reader.onloadend = () => resolve(reader.result);
-                                reader.readAsDataURL(data);
-                            });
-                            return await resizeImage(raw);
-                        }
-                    }
-                } catch (e) { console.warn("PDF GEN: Supabase error", e); }
-            }
-
-            // Method B: Fetch (Standard)
-            try {
-                const response = await fetch(url, { cache: 'no-cache' });
-                if (response.ok) {
-                    const blob = await response.blob();
-                    const raw = await new Promise((resolve) => {
-                        const reader = new FileReader();
-                        reader.onloadend = () => resolve(reader.result);
-                        reader.readAsDataURL(blob);
-                    });
-                    return await resizeImage(raw);
-                }
-            } catch (err) { /* silent fail, try next */ }
-
-            // Method C: Canvas Backup (CORS fallback)
-            try {
-                const raw = await new Promise((resolve) => {
-                    const img = new window.Image();
-                    img.crossOrigin = "anonymous";
-                    img.onload = () => {
-                        try {
-                            const canvas = document.createElement('canvas');
-                            canvas.width = img.width;
-                            canvas.height = img.height;
-                            const ctx = canvas.getContext('2d');
-                            ctx.drawImage(img, 0, 0);
-                            resolve(canvas.toDataURL('image/jpeg', 0.9));
-                        } catch (e) { resolve(null); }
-                    };
-                    img.onerror = () => resolve(null);
-                    img.src = url;
-                });
-                if (raw) return await resizeImage(raw);
-            } catch (err) { }
-            return await resizeImage(url);
-        };
-
         try {
-            // Map Processing
-            let staticMapUrl = null;
-            try {
-                if (dataToUse.customMapImage) {
-                    staticMapUrl = dataToUse.customMapImage;
-                } else {
-                    let mapAddress = dataToUse.street
-                        ? `${dataToUse.street}, ${dataToUse.zip || ''} ${dataToUse.city || ''}`
-                        : dataToUse.address;
-                    
-                    // Clean up address (remove leading/trailing commas, extra spaces)
-                    mapAddress = (mapAddress || '').trim().replace(/^,+/, '').replace(/,+$/, '').trim();
-                    if (mapAddress) {
-                        const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-                        const params = new URLSearchParams({
-                            center: mapAddress,
-                            zoom: '15',
-                            size: '640x300',
-                            scale: '2',
-                            maptype: 'roadmap',
-                            markers: `color:red|${mapAddress}`,
-                            key: apiKey,
-                            language: 'de',
-                        });
-                        const googleMapUrl = `/google-staticmap?${params.toString()}`;
-                        const resp = await fetch(googleMapUrl);
-                        if (resp.ok) {
-                            const blob = await resp.blob();
-                            
-                            if (blob.type.startsWith('image/')) {
-                                staticMapUrl = await new Promise((resolve) => {
-                                    const reader = new FileReader();
-                                    reader.onloadend = () => resolve(reader.result);
-                                    reader.readAsDataURL(blob);
-                                });
-                            }
-                        }
-                    }
-                }
-            } catch (e) { 
-                const errorMsg = e.message || '';
-                const maskedMsg = errorMsg.replace(/key=AIza[^&]*/g, 'key=AIza...REDACTED');
-                console.error('PDF GEN: Google Static Map error', maskedMsg); 
-            }
-
-            // Pre-process images - Filter out PDFs and non-renderable documents
-            console.log("PDF GEN: Starting image processing...");
-            const tempProcessedImages = await Promise.all(
-                (dataToUse.images || []).map(async (img) => {
-                    const category = String(img.assignedTo || '').trim().toLowerCase();
-                    const isDocCategory = ['schadensbericht', 'arbeitsrapporte', 'messprotokolle', 'sonstiges', 'pläne', 'lieferantenrechnungen'].includes(category);
-                    const isProbablyPDF = img.preview?.toLowerCase().includes('.pdf') || img.type?.includes('pdf');
-
-                    const isImageFile = img.preview && /\.(jpg|jpeg|png|gif|webp|heic|heif)/i.test(img.preview);
-
-                    if (img.includeInReport === false || isProbablyPDF || (isDocCategory && !isImageFile)) {
-                        return { ...img, isRenderable: false };
-                    }
-
-                    try {
-                        // OneDrive-Bild: frische URL holen bevor wir Base64 konvertieren
-                        let previewUrl = img.preview;
-                        if (img.oneDriveItemId) {
-                            const freshUrl = await getPhotoDownloadUrl(img.oneDriveItemId).catch(() => null);
-                            if (freshUrl) previewUrl = freshUrl;
-                        }
-
-                        const base64 = await urlToDataUrl(previewUrl, img);
-                        if (base64) {
-                            return { ...img, preview: base64, isRenderable: true };
-                        } else {
-                            return { ...img, isRenderable: false };
-                        }
-                    } catch (e) {
-                        return { ...img, isRenderable: false };
-                    }
-                })
-            );
-
-            // Final list for the PDF Document (only images)
-            const processedImages = tempProcessedImages.filter(img => img.isRenderable);
-
-            console.log("PDF GEN: Image processing phase complete.");
-            console.table(processedImages.map(img => ({
-                id: img.id,
-                category: img.assignedTo,
-                dataLength: img.preview?.startsWith('data:') ? img.preview.length : 'URL'
-            })));
-
-            // Process Hero Images (Cause Photos marked for report)
-            const causePhotos = processedImages.filter(img => img.assignedTo === 'Schadenfotos' && img.includeInReport !== false);
-            const processedHeroImages = causePhotos.map(img => img.preview);
-
-            // Process Exterior Photo
-            let processedExteriorPhoto = dataToUse.exteriorPhoto;
-            if (processedExteriorPhoto) {
-                try {
-                    const base64Exterior = await urlToDataUrl(processedExteriorPhoto);
-                    if (base64Exterior) processedExteriorPhoto = base64Exterior;
-                } catch (e) { console.warn("Failed to convert exterior photo:", e); }
-            }
-
-            // Process Custom Map Image
-            let processedCustomMapImage = dataToUse.customMapImage;
-            if (processedCustomMapImage) {
-                try {
-                    const base64CustomMap = await urlToDataUrl(processedCustomMapImage);
-                    if (base64CustomMap) processedCustomMapImage = base64CustomMap;
-                } catch (e) { console.warn("Failed to convert custom map image:", e); }
-            }
-
-            // Prepare Data for Document Component
-            // Räume: Kontakt-Etage überschreibt altes room.stockwerk aus DB
-            const liveContacts = dataToUse.contacts || [];
-            const enrichedRooms = (dataToUse.rooms || []).map(room => {
-                const apt = (room.apartment || '').toLowerCase().trim();
-                const match = liveContacts.find(c => {
-                    const cn = (c.name || '').toLowerCase().trim();
-                    return cn && apt && (cn.includes(apt) || apt.includes(cn));
-                });
-                const floor = (match?.floor || '').trim();
-                return floor ? { ...room, stockwerk: floor } : room;
+            console.log("[PDF Master] Nutze zentralen PDFService für Export...");
+            const result = await PDFService.generateCompleteDamageReport(dataToUse, {
+                supabase,
+                uploadToOneDrive: true,
+                uploadToApp: true,
+                getPhotoDownloadUrl,
+                uploadReport,
+                handleImageUpload,
+                buildProjectFolderName,
+                onProgress: (msg) => console.log(`[PDF Progress] ${msg}`)
             });
 
-            const docData = {
-                ...dataToUse,
-                rooms: enrichedRooms,
-                damageType: dataToUse.damageCategory || '-',
-                images: processedImages,
-                damageTypeImages: processedHeroImages,
-                damageTypeImage: processedHeroImages[0] || null,
-                exteriorPhoto: processedExteriorPhoto,
-                customMapImage: processedCustomMapImage,
-                staticMapUrl: staticMapUrl || null,
-            };
-
-            // Generate Blob using @react-pdf
-            const rawBlob = await pdf(<DamageReportDocument key={Math.random()} data={docData} />).toBlob();
-            if (!rawBlob || rawBlob.size === 0) {
-                throw new Error('PDF Blob ist leer - Layout-Fehler in react-pdf');
+            if (result && result.blob) {
+                // Finaler Download für den User
+                PDFService.downloadBlob(result.blob, result.fileName);
+                console.log("[PDF Master] Export erfolgreich abgeschlossen:", result.fileName);
+            } else {
+                throw new Error("PDF konnte nicht generiert werden.");
             }
-            const blob = new Blob([rawBlob], { type: 'application/pdf' });
-            const now = new Date();
-            const timeStr = `${String(now.getHours()).padStart(2, '0')}-${String(now.getMinutes()).padStart(2, '0')}`;
-            const dateStr = now.toLocaleDateString('de-CH').replace(/\./g, '-');
-            const projNum = dataToUse.projectNumber || dataToUse.projectTitle || 'Project';
-            const location = dataToUse.locationDetails || dataToUse.city || 'Schadenort';
-            let fileName = `${projNum}_${location}_${dateStr}_${timeStr}.pdf`;
-
-            // 1. Download File
-            if (!fileName.toLowerCase().endsWith('.pdf')) {
-              fileName = `${fileName}.pdf`;
-            }
-            saveAs(blob, fileName);
-
-
-            // 2. Upload to OneDrive (silent - no error if not logged in)
-            try {
-                const odFolder = buildProjectFolderName(
-                    dataToUse.projectNumber || dataToUse.id || 'Unbekannt',
-                    dataToUse
-                );
-                await uploadReport(odFolder, 'Schadensbericht', blob);
-            } catch (odErr) {
-                console.warn('[OneDrive] PDF-Upload fehlgeschlagen:', odErr.message);
-            }
-
-            // 3. Upload to Supabase / App State
-            const file = new File([blob], fileName, { type: 'application/pdf' });
-            await handleImageUpload([file], { assignedTo: 'Schadensbericht' });
 
         } catch (error) {
-            console.error("PDF Export failed", error);
+            console.error("PDF Export Master-Pfad fehlgeschlagen", error);
             alert("Fehler beim Erstellen des PDFs: " + error.message);
         } finally {
             setIsGeneratingPDF(false);
         }
+
     };
 
 
@@ -6063,6 +5817,7 @@ END:VCARD`;
                             onClick={testGeneratePDFViaService}
                             disabled={isGeneratingPDF}
                             style={{
+                                display: 'none', // Versteckt
                                 padding: '0.8rem 1.5rem',
                                 fontSize: '0.9rem',
                                 fontWeight: 700,
@@ -6406,6 +6161,7 @@ END:VCARD`;
                             onClick={testGeneratePDFViaService}
                             disabled={isGeneratingPDF}
                             style={{
+                                display: 'none', // Versteckt
                                 padding: '0.8rem 1.5rem',
                                 fontSize: '0.9rem',
                                 fontWeight: 700,
