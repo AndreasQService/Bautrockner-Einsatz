@@ -280,7 +280,77 @@ export const PDFService = {
         const processedImages = tempProcessedImages.filter(img => img.isRenderable);
         console.log(`[PDFService Master] Bild-Filterung abgeschlossen: ${processedImages.length} Bilder renderbar.`);
 
-        // --- SCHRITT 2 ENDE ---
-        return null;
+        // 3. Process Hero Images (Cause Photos marked for report)
+        const causePhotos = processedImages.filter(img => img.assignedTo === 'Schadenfotos' && img.includeInReport !== false);
+        const processedHeroImages = causePhotos.map(img => img.preview);
+
+        // 4. Process Exterior Photo
+        let processedExteriorPhoto = dataToUse.exteriorPhoto;
+        if (processedExteriorPhoto) {
+            try {
+                const base64Exterior = await internalUrlToDataUrl(processedExteriorPhoto);
+                if (base64Exterior) processedExteriorPhoto = base64Exterior;
+            } catch (e) { console.warn("[PDFService Master] Failed to convert exterior photo:", e); }
+        }
+
+        // 5. Process Custom Map Image
+        let processedCustomMapImage = dataToUse.customMapImage;
+        if (processedCustomMapImage) {
+            try {
+                const base64CustomMap = await internalUrlToDataUrl(processedCustomMapImage);
+                if (base64CustomMap) processedCustomMapImage = base64CustomMap;
+            } catch (e) { console.warn("[PDFService Master] Failed to convert custom map image:", e); }
+        }
+
+        // 6. Etagen-Anreicherung (Rooms)
+        const liveContacts = dataToUse.contacts || [];
+        const enrichedRooms = (dataToUse.rooms || []).map(room => {
+            const apt = (room.apartment || '').toLowerCase().trim();
+            const match = liveContacts.find(c => {
+                const cn = (c.name || '').toLowerCase().trim();
+                return cn && apt && (cn.includes(apt) || apt.includes(cn));
+            });
+            const floor = (match?.floor || '').trim();
+            return floor ? { ...room, stockwerk: floor } : room;
+        });
+
+        // 7. Prepare Data for Document Component
+        const docData = {
+            ...dataToUse,
+            rooms: enrichedRooms,
+            damageType: dataToUse.damageCategory || '-',
+            images: processedImages,
+            damageTypeImages: processedHeroImages,
+            damageTypeImage: processedHeroImages[0] || null,
+            exteriorPhoto: processedExteriorPhoto,
+            customMapImage: processedCustomMapImage,
+            staticMapUrl: staticMapUrl || null,
+        };
+
+        console.log("[PDFService Master] Generiere PDF-Blob...");
+        onProgress("Generiere PDF-Dokument...");
+
+        // 8. Generate Blob using @react-pdf
+        const rawBlob = await pdf(<DamageReportDocument key={Math.random()} data={docData} />).toBlob();
+        if (!rawBlob || rawBlob.size === 0) {
+            throw new Error('PDF Blob ist leer - Layout-Fehler in react-pdf');
+        }
+
+        const blob = new Blob([rawBlob], { type: 'application/pdf' });
+        
+        // 9. Filename Logic
+        const now = new Date();
+        const timeStr = `${String(now.getHours()).padStart(2, '0')}-${String(now.getMinutes()).padStart(2, '0')}`;
+        const dateStr = now.toLocaleDateString('de-CH').replace(/\./g, '-');
+        const projNum = dataToUse.projectNumber || dataToUse.projectTitle || 'Project';
+        const location = dataToUse.locationDetails || dataToUse.city || 'Schadenort';
+        let fileName = customFileName || `${projNum}_${location}_${dateStr}_${timeStr}.pdf`;
+        if (!fileName.toLowerCase().endsWith('.pdf')) {
+            fileName = `${fileName}.pdf`;
+        }
+
+        console.log(`[PDFService Master] PDF erfolgreich generiert: ${fileName} (${(blob.size / 1024 / 1024).toFixed(2)} MB)`);
+        
+        return { blob, fileName, docData };
     }
 };
