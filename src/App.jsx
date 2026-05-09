@@ -359,18 +359,12 @@ function App() {
       ? savedMode
       : (isTechnicianMode ? 'technician' : 'desktop');
     setProjectMode(initialMode);
-    // Presence mit korrektem Modus starten
-    setupPresenceForProject(report.id, initialMode);
   }
 
   const handleCancelEntry = () => {
     setView('dashboard');
     setSelectedReport(null);
     setIsSessionActive(true);
-    // Presence freigeben
-    if (presenceChannelRef.current?.releaseSession) {
-      presenceChannelRef.current.releaseSession();
-    }
   }
 
   const handleSaveReport = useCallback(async (updatedReport, silent = false) => {

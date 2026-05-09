@@ -419,7 +419,7 @@ export default function WorkflowStatusOverview({ reports, onSelectReport, curren
   const [search, setSearch] = useState("")
   const [collapsed, setCollapsed] = useState(false)
   const [popover, setPopover] = useState(null)
-  const [userFilter, setUserFilter] = useState(currentUser?.name || "")
+  const [userFilter, setUserFilter] = useState("alle")
 
   const allUsers = useMemo(() => {
     const names = users.map(u => u.name).filter(Boolean)

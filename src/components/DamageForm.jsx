@@ -5236,8 +5236,9 @@ END:VCARD`;
                                                 gap: '0.5rem',
                                                 flex: 1,
                                                 padding: '0.75rem',
-                                                backgroundColor: 'var(--primary)',
-                                                color: 'white',
+                                                backgroundColor: 'var(--surface)',
+                                                border: '1px solid var(--border)',
+                                                color: 'var(--text-main)',
                                                 borderRadius: '8px',
                                                 cursor: 'pointer',
                                                 fontWeight: 600,
@@ -5504,36 +5505,19 @@ END:VCARD`;
 
                             <div>
                                 <h4 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '0.5rem', color: 'white' }}>Fotos zur Ursache</h4>
-                                <div
-                                    style={{
-                                        border: '2px dashed var(--border)', borderRadius: 'var(--radius)',
-                                        padding: '2rem 1rem', textAlign: 'center', cursor: 'pointer',
-                                        backgroundColor: 'var(--surface)', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)', transition: 'all 0.2s',
-                                        marginBottom: '1rem', display: 'flex', flexDirection: 'column',
-                                        alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)'
-                                    }}
-                                    onClick={() => document.getElementById('file-upload-Schadenfotos-desktop').click()}
-                                    onDragOver={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.backgroundColor = 'rgba(56, 189, 248, 0.1)'; e.currentTarget.style.color = 'var(--primary)'; }}
-                                    onDragLeave={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.02)'; e.currentTarget.style.color = 'var(--text-muted)'; }}
-                                    onDrop={(e) => handleCategoryDrop(e, 'Schadenfotos')}
-                                >
-                                    <Plus size={24} style={{ marginBottom: '0.5rem', opacity: 0.5 }} />
-                                    <span style={{ fontSize: '0.85rem' }}>Schadenfoto hochladen / Drop</span>
-                                    <input id="file-upload-Schadenfotos-desktop" type="file" multiple accept="image/*" style={{ display: 'none' }} onChange={(e) => handleCategorySelect(e, 'Schadenfotos')} />
-                                </div>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                                     {formData.images.filter(img => img.assignedTo === 'Schadenfotos').map((item, idx) => (
                                         <div key={idx} style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start', border: '1px solid var(--border)', padding: '0.5rem', borderRadius: '6px', backgroundColor: 'var(--background)' }}>
                                             {/* Thumbnail + Controls */}
-                                            <div style={{ flex: '0 0 140px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
-                                                <div style={{ width: '140px', height: '140px', borderRadius: '6px', overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+                                            <div style={{ flex: '0 0 160px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
+                                                <div style={{ width: '160px', height: '160px', borderRadius: '6px', overflow: 'hidden', backgroundColor: '#E5E7EB', border: '1px solid var(--border)', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
                                                     <img src={item.preview} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: 'pointer' }} onClick={() => setEditingImage(item)} />
                                                 </div>
                                                 <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', padding: '0 2px', alignItems: 'center' }}>
-                                                    <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', fontSize: '0.75rem', cursor: 'pointer', color: 'white' }}>
+                                                    <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', fontSize: '0.75rem', cursor: 'pointer', color: 'var(--text-main)' }}>
                                                         <input
                                                             type="checkbox"
-                                                            style={{ width: '16px', height: '16px', accentColor: 'var(--primary)', cursor: 'pointer' }}
+                                                            style={{ width: '20px', height: '20px', accentColor: 'var(--primary)', cursor: 'pointer' }}
                                                             checked={item.includeInReport !== false}
                                                             onChange={(e) => setFormData(prev => ({
                                                                 ...prev,
@@ -5545,58 +5529,175 @@ END:VCARD`;
                                                     <button
                                                         type="button"
                                                         title="Bearbeiten"
-                                                        style={{ border: '1px solid var(--border)', backgroundColor: 'var(--surface)', color: 'var(--text-main)', cursor: 'pointer', padding: '6px', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                                        style={{ border: '1px solid var(--border)', backgroundColor: 'var(--surface)', color: 'var(--text-main)', cursor: 'pointer', padding: '8px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 2px rgba(0,0,0,0.1)' }}
                                                         onClick={() => setEditingImage(item)}
                                                     >
-                                                        <Edit3 size={16} />
+                                                        <Edit3 size={22} />
                                                     </button>
                                                 </div>
                                             </div>
-                                            {/* Description */}
-                                            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '140px', gap: '4px' }}>
-                                                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                                            {/* File Info & Description */}
+                                            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                                                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
+                                                    <textarea
+                                                        id={`imgdesc-${idx}`}
+                                                        placeholder="Beschreibung..."
+                                                        className="form-input"
+                                                        style={{ fontSize: '0.9rem', padding: '0.5rem', flex: 1, resize: 'none', backgroundColor: isRecording === `imgdesc-${idx}` ? '#fef2f2' : 'var(--background)', borderColor: isRecording === `imgdesc-${idx}` ? '#EF4444' : 'var(--border)', color: 'var(--text-main)' }}
+                                                        value={item.description || ''}
+                                                        onChange={(e) => {
+                                                            const newDesc = e.target.value;
+                                                            setFormData(prev => ({
+                                                                ...prev,
+                                                                images: prev.images.map(i => i.preview === item.preview ? { ...i, description: newDesc } : i)
+                                                            }));
+                                                        }}
+                                                        rows={2}
+                                                    />
                                                     <button
                                                         type="button"
                                                         onClick={() => {
                                                             const tid = `imgdesc-${idx}`;
                                                             isRecording === tid ? stopRecording() : startRecording(tid);
                                                         }}
+                                                        title={isRecording === `imgdesc-${idx}` ? 'Aufnahme stoppen' : 'Spracheingabe starten'}
                                                         style={{
-                                                            width: '32px', height: '32px', borderRadius: '50%',
-                                                            border: `1px solid ${isRecording === `imgdesc-${idx}` ? '#ef4444' : 'var(--border)'}`,
-                                                            backgroundColor: isRecording === `imgdesc-${idx}` ? 'rgba(239,68,68,0.1)' : 'rgba(14,165,233,0.08)',
-                                                            color: isRecording === `imgdesc-${idx}` ? '#ef4444' : '#38bdf8',
-                                                            cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+                                                            border: isRecording === `imgdesc-${idx}` ? 'none' : '1px solid var(--border)',
+                                                            backgroundColor: isRecording === `imgdesc-${idx}` ? '#EF4444' : 'var(--surface)',
+                                                            color: isRecording === `imgdesc-${idx}` ? 'white' : 'var(--text-muted)',
+                                                            width: '36px',
+                                                            height: '36px',
+                                                            borderRadius: '50%',
+                                                            cursor: 'pointer',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
+                                                            transition: 'all 0.2s',
+                                                            boxShadow: isRecording === `imgdesc-${idx}` ? '0 0 0 4px rgba(239, 68, 68, 0.2)' : '0 1px 2px rgba(0,0,0,0.1)',
+                                                            flexShrink: 0
                                                         }}
-                                                        title={isRecording === `imgdesc-${idx}` ? 'Aufnahme stoppen' : 'Diktieren starten'}
                                                     >
-                                                        {isRecording === `imgdesc-${idx}` ? <MicOff size={16} /> : <Mic size={16} />}
+                                                        {isRecording === `imgdesc-${idx}` ? <MicOff size={20} className="animate-pulse" /> : <Mic size={20} />}
                                                     </button>
                                                 </div>
-                                                <textarea
-                                                    id={`imgdesc-${idx}`}
-                                                    placeholder="Beschreibung..."
-                                                    className="form-input"
-                                                    style={{ fontSize: '0.9rem', padding: '0.5rem', flex: 1, width: '100%', resize: 'none', backgroundColor: 'var(--surface)', color: 'var(--text-main)' }}
-                                                    value={item.description || ''}
-                                                    onChange={(e) => {
-                                                        const newDesc = e.target.value;
-                                                        setFormData(prev => ({
-                                                            ...prev,
-                                                            images: prev.images.map(i => i.preview === item.preview ? { ...i, description: newDesc } : i)
-                                                        }));
-                                                    }}
-                                                />
                                             </div>
                                             {/* Delete */}
-                                            <div style={{ display: 'flex', flexDirection: 'column', height: '100px', justifyContent: 'flex-start' }}>
-                                                <button type="button" onClick={() => setFormData(prev => ({ ...prev, images: prev.images.filter(i => i !== item) }))} style={{ color: '#EF4444', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '6px', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}><Trash size={16} /></button>
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-ghost"
+                                                    title="Bild löschen"
+                                                    style={{
+                                                        color: '#EF4444',
+                                                        padding: mode === 'technician' ? '0 0.5rem' : '0',
+                                                        backgroundColor: 'var(--surface)',
+                                                        border: '1px solid rgba(239,68,68,0.3)',
+                                                        borderRadius: mode === 'technician' ? '8px' : '50%',
+                                                        width: mode === 'technician' ? 'auto' : '36px',
+                                                        height: '36px',
+                                                        minWidth: '36px',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        gap: '6px',
+                                                        boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
+                                                        cursor: 'pointer',
+                                                        fontWeight: 700,
+                                                        fontSize: '0.8rem',
+                                                        whiteSpace: 'nowrap'
+                                                    }}
+                                                    onClick={() => {
+                                                        if (window.confirm('Bild wirklich löschen?')) {
+                                                            setFormData(prev => ({ ...prev, images: prev.images.filter(i => i !== item) }))
+                                                        }
+                                                    }}
+                                                >
+                                                    <Trash size={16} />
+                                                    {mode === 'technician' && 'Löschen'}
+                                                </button>
                                             </div>
                                         </div>
                                     ))}
                                     {formData.images.filter(img => img.assignedTo === 'Schadenfotos').length === 0 && (
-                                        <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.9rem', fontStyle: 'italic' }}>Keine Schadenfotos vorhanden.</div>
+                                        <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.9rem', fontStyle: 'italic', marginBottom: '0.5rem' }}>Keine Schadenfotos vorhanden.</div>
                                     )}
+                                </div>
+                                
+                                <div style={{ display: 'flex', gap: '0.5rem', width: '100%', marginTop: '0.5rem' }}>
+                                    {/* Camera Button */}
+                                    <label
+                                        style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            gap: '0.5rem',
+                                            flex: 1,
+                                            padding: '0.75rem',
+                                            backgroundColor: 'var(--surface)',
+                                            border: '1px solid var(--border)',
+                                            color: 'var(--text-main)',
+                                            borderRadius: '8px',
+                                            cursor: 'pointer',
+                                            fontWeight: 600,
+                                            boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
+                                        }}
+                                        onClick={(e) => {
+                                            const userAgent = navigator.userAgent || navigator.vendor || window.opera;
+                                            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent) ||
+                                                (navigator.maxTouchPoints && navigator.maxTouchPoints > 2 && /MacIntel/.test(navigator.platform));
+
+                                            if (!isMobile) {
+                                                e.preventDefault();
+                                                setCameraContext({ assignedTo: 'Schadenfotos' });
+                                                setShowCameraModal(true);
+                                            }
+                                        }}
+                                    >
+                                        <Camera size={20} />
+                                        Kamera
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            capture="environment"
+                                            onChange={(e) => {
+                                                if (e.target.files && e.target.files.length > 0) {
+                                                    handleImageUpload(Array.from(e.target.files), { assignedTo: 'Schadenfotos' });
+                                                }
+                                            }}
+                                            style={{ display: 'none' }}
+                                        />
+                                    </label>
+
+                                    {/* Gallery Button */}
+                                    <label style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        gap: '0.5rem',
+                                        flex: 1,
+                                        padding: '0.75rem',
+                                        backgroundColor: 'var(--surface)',
+                                        border: '1px solid var(--border)',
+                                        color: 'var(--text-main)',
+                                        borderRadius: '8px',
+                                        cursor: 'pointer',
+                                        fontWeight: 600,
+                                        boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
+                                    }}>
+                                        <Image size={20} />
+                                        Galerie
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            multiple
+                                            onChange={(e) => {
+                                                if (e.target.files && e.target.files.length > 0) {
+                                                    handleImageUpload(Array.from(e.target.files), { assignedTo: 'Schadenfotos' });
+                                                }
+                                            }}
+                                            style={{ display: 'none' }}
+                                        />
+                                    </label>
                                 </div>
                             </div>
                         </>)}

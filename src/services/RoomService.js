@@ -71,9 +71,16 @@ export const RoomService = {
      */
     getRoomImages: (room, images) => {
         if (!room || !Array.isArray(images)) return [];
-        return images.filter(img => 
-            img.roomId ? img.roomId === room.id : img.assignedTo === room.name
-        );
+        const roomId = room.id ? String(room.id) : null;
+        const roomName = room.name ? String(room.name).trim().toLowerCase() : '';
+
+        return images.filter(img => {
+            if (img.roomId) {
+                return String(img.roomId) === roomId;
+            }
+            const assignedTo = img.assignedTo ? String(img.assignedTo).trim().toLowerCase() : '';
+            return assignedTo === roomName;
+        });
     },
 
     /**

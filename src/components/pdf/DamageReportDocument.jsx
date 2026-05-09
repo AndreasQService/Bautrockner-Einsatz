@@ -4,6 +4,7 @@ import { Document, Page, View, Image } from '@react-pdf/renderer';
 
 // Import styles
 import { styles } from './PDFStyles';
+import { RoomService } from '../../services/RoomService';
 import PDFHeader from './layout/PDFHeader';
 import PDFFooter from './layout/PDFFooter';
 import PDFMetaData from './layout/PDFMetaData';
@@ -33,21 +34,8 @@ const DamageReportDocument = ({ data }) => {
         console.log("PDF Document: Checking rooms for content...");
         const roomsWithContent = data.rooms.filter(room => {
             // Check for visible images belonging to this room
-            const hasImages = (data.images || []).some(img => {
-                const assignedTo = String(img.assignedTo || '').trim().toLowerCase();
-                const roomName = String(room.name || '').trim().toLowerCase();
-                const imgRoomId = img.roomId ? String(img.roomId) : null;
-                const roomId = room.id ? String(room.id) : null;
-
-                // data.images is already pre-filtered for includeInReport in DamageForm.jsx,
-                // but we double check here for safety.
-                // Name-Fallback nur wenn Bild keine eigene roomId hat (sonst erscheinen
-                // Bilder gelöschter Räume via gleichem Raumnamen in falschen Räumen)
-                return img.includeInReport !== false && (
-                    (imgRoomId && roomId && imgRoomId === roomId) ||
-                    (!imgRoomId && assignedTo === roomName)
-                );
-            });
+            const roomImages = RoomService.getRoomImages(room, data.images || []);
+            const hasImages = roomImages.some(img => img.includeInReport !== false);
 
             // Check for textual content (Description or Notes)
             const hasTextContent =

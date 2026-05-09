@@ -5,6 +5,7 @@ import {
     AlertTriangle, Check, Table, Settings, RotateCcw, CheckCircle,
     ChevronUp, Mic, MicOff, Star, GripVertical
 } from 'lucide-react';
+import { RoomService } from '../../../services/RoomService';
 
 export default function RoomManager({
     formData,
@@ -834,7 +835,7 @@ export default function RoomManager({
                                                 }}
                                             >
                                                 <Image size={18} />
-                                                {formData.images.filter(img => img.roomId === room.id).length} Bilder
+                                                {RoomService.getRoomImages(room, formData.images).length} Bilder
                                                 {visibleRoomImages[room.id] ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                                             </button>
                                         </div>
@@ -856,7 +857,10 @@ export default function RoomManager({
                                     {/* Images Grid */}
                                     {(visibleRoomImages[room.id] || mode === 'desktop') && (
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1rem' }}>
-                                            {formData.images.map((img, globalIdx) => img.roomId !== room.id ? null : (
+                                            {RoomService.getRoomImages(room, formData.images).map((img) => {
+                                                const globalIdx = formData.images.indexOf(img);
+                                                if (globalIdx === -1) return null;
+                                                return (
                                                 <div
                                                     key={globalIdx}
                                                     draggable={mode === 'desktop'}

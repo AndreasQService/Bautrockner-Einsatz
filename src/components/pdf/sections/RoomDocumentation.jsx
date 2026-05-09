@@ -3,6 +3,7 @@ import React from 'react';
 import { View, Image, Text } from '@react-pdf/renderer';
 import { styles } from '../PDFStyles';
 import ImageGrid from '../components/ImageGrid';
+import { RoomService } from '../../../services/RoomService';
 
 const RoomDocumentation = ({ rooms, images, contacts = [] }) => {
     let currentApartment = null;
@@ -21,14 +22,8 @@ const RoomDocumentation = ({ rooms, images, contacts = [] }) => {
                     currentFloor = room.stockwerk;
                 }
 
-                const allRoomImages = (images || []).filter(img => {
-                    const assignedTo = String(img.assignedTo || '').trim().toLowerCase();
-                    const roomName = String(room.name || '').trim().toLowerCase();
-                    return img.includeInReport !== false && (
-                        (img.roomId && String(img.roomId) === String(room.id)) ||
-                        (!img.roomId && assignedTo === roomName)
-                    );
-                });
+                const allRoomImages = RoomService.getRoomImages(room, images || [])
+                    .filter(img => img.includeInReport !== false);
 
                 const roomImages = allRoomImages
                     .filter(img => !img.linkedToOriginal)
