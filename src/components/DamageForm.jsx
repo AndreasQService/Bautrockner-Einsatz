@@ -6057,6 +6057,25 @@ END:VCARD`;
                             <PdfIcon size={28} />
                             <span>{isGeneratingPDF ? 'Wird erstellt...' : 'Schadensbericht PDF'}</span>
                         </button>
+                        
+                        <button
+                            type="button"
+                            onClick={testGeneratePDFViaService}
+                            disabled={isGeneratingPDF}
+                            style={{
+                                padding: '0.8rem 1.5rem',
+                                fontSize: '0.9rem',
+                                fontWeight: 700,
+                                borderRadius: '12px',
+                                backgroundColor: '#6B7280',
+                                color: 'white',
+                                border: '2px dashed rgba(255,255,255,0.4)',
+                                cursor: isGeneratingPDF ? 'not-allowed' : 'pointer',
+                                marginLeft: '10px'
+                            }}
+                        >
+                            <span>TEST PDF SERVICE</span>
+                        </button>
                     </div>
                 )}
 
@@ -6380,6 +6399,27 @@ END:VCARD`;
                         >
                             <PdfIcon size={26} />
                             <span>{isGeneratingPDF ? 'Wird erstellt...' : 'Schadensbericht PDF'}</span>
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={testGeneratePDFViaService}
+                            disabled={isGeneratingPDF}
+                            style={{
+                                padding: '0.8rem 1.5rem',
+                                fontSize: '0.9rem',
+                                fontWeight: 700,
+                                borderRadius: '12px',
+                                backgroundColor: '#6B7280',
+                                color: 'white',
+                                border: '2px dashed rgba(255,255,255,0.4)',
+                                cursor: isGeneratingPDF ? 'not-allowed' : 'pointer',
+                                marginTop: '10px',
+                                width: '100%',
+                                maxWidth: '480px'
+                            }}
+                        >
+                            <span>[TEST] ZENTRALER PDF SERVICE</span>
                         </button>
                     </div>
                 )}
