@@ -351,6 +351,39 @@ export const PDFService = {
 
         console.log(`[PDFService Master] PDF erfolgreich generiert: ${fileName} (${(blob.size / 1024 / 1024).toFixed(2)} MB)`);
         
-        return { blob, fileName, docData };
+        const result = { blob, fileName, docData };
+
+        // 10. Optional OneDrive Upload
+        if (uploadToOneDrive && uploadReport && buildProjectFolderName) {
+            try {
+                onProgress("Lade Bericht zu OneDrive hoch...");
+                const odFolder = buildProjectFolderName(
+                    dataToUse.projectNumber || dataToUse.id || 'Unbekannt',
+                    dataToUse
+                );
+                const odResult = await uploadReport(odFolder, 'Schadensbericht', blob);
+                result.oneDriveResult = odResult;
+                console.log("[PDFService Master] OneDrive Upload erfolgreich.");
+            } catch (odErr) {
+                console.warn('[PDFService Master] OneDrive-Upload fehlgeschlagen:', odErr.message);
+                result.oneDriveError = odErr.message;
+            }
+        }
+
+        // 11. Optional App / Supabase Upload
+        if (uploadToApp && handleImageUpload) {
+            try {
+                onProgress("Speichere Bericht in der App...");
+                const file = new File([blob], fileName, { type: 'application/pdf' });
+                const appResult = await handleImageUpload([file], { assignedTo: 'Schadensbericht' });
+                result.appUploadResult = appResult;
+                console.log("[PDFService Master] App Upload erfolgreich.");
+            } catch (appErr) {
+                console.warn('[PDFService Master] App-Upload fehlgeschlagen:', appErr.message);
+                result.appUploadError = appErr.message;
+            }
+        }
+
+        return result;
     }
 };
