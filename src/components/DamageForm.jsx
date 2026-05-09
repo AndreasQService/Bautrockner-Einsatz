@@ -17,7 +17,7 @@ import { Camera, Image, Trash, X, Plus, Edit3, Save, Upload, FileText, CheckCirc
 import { supabase } from '../supabaseClient';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
-import { buildProjectFolderName, uploadPhotoAndGetUrl, getPhotoDownloadUrl } from '../services/OneDriveService';
+import { buildProjectFolderName, uploadPhotoAndGetUrl, getPhotoDownloadUrl, uploadReport } from '../services/OneDriveService';
 import { savePhotoLocally, updatePhotoSyncStatus, deleteOldSyncedPhotos, getPendingCount } from '../services/PhotoStorage';
 import { swissPLZ } from '../data/swiss_plz';
 
@@ -209,6 +209,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         images: Array.isArray(initialData.images)
             ? initialData.images.map(img => typeof img === 'string' ? { preview: img, name: 'Existing Image', date: new Date().toISOString() } : img)
             : [],
+        customMapImage: initialData.customMapImage || null,
         projectNumber: initialData.projectNumber || '',
         orderNumber: initialData.orderNumber || '',
         damageNumber: initialData.damageNumber || '',
@@ -263,6 +264,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         equipment: [],
         images: [],
         exteriorPhoto: null,
+        customMapImage: null,
         measures: '',
         selectedMeasures: [],
         includeDescriptionInReport: true,
@@ -1504,6 +1506,26 @@ END:VCARD`;
         }));
     };
 
+    const handleCustomMapImageUpload = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        try {
+            const base64 = await new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(reader.result);
+                reader.readAsDataURL(file);
+            });
+            setFormData(prev => ({ ...prev, customMapImage: base64 }));
+        } catch (err) {
+            console.error("Custom map image upload failed", err);
+        }
+    };
+
+    const removeCustomMapImage = () => {
+        setFormData(prev => ({ ...prev, customMapImage: null }));
+    };
+
     // --- Image Upload Handler: Supabase (Pflicht-Backup) + OneDrive (Primärarchiv) ---
     const handleImageUpload = async (files, contextData = {}) => {
         if (!files || files.length === 0) return;
@@ -2085,36 +2107,50 @@ END:VCARD`;
         };
 
         try {
-            // Build Static Map via Google Static Maps API
+            // Map Processing
             let staticMapUrl = null;
             try {
-                const mapAddress = dataToUse.street
-                    ? `${dataToUse.street}, ${dataToUse.zip || ''} ${dataToUse.city || ''}`
-                    : dataToUse.address;
-                if (mapAddress) {
-                    const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-                    const params = new URLSearchParams({
-                        center: mapAddress,
-                        zoom: '15',
-                        size: '640x300',
-                        scale: '2',
-                        maptype: 'roadmap',
-                        markers: `color:red|${mapAddress}`,
-                        key: apiKey,
-                        language: 'de',
-                    });
-                    const googleMapUrl = `/google-staticmap?${params.toString()}`;
-                    const resp = await fetch(googleMapUrl);
-                    if (resp.ok) {
-                        const blob = await resp.blob();
-                        staticMapUrl = await new Promise((resolve) => {
-                            const reader = new FileReader();
-                            reader.onloadend = () => resolve(reader.result);
-                            reader.readAsDataURL(blob);
+                if (dataToUse.customMapImage) {
+                    staticMapUrl = dataToUse.customMapImage;
+                } else {
+                    let mapAddress = dataToUse.street
+                        ? `${dataToUse.street}, ${dataToUse.zip || ''} ${dataToUse.city || ''}`
+                        : dataToUse.address;
+                    
+                    // Clean up address (remove leading/trailing commas, extra spaces)
+                    mapAddress = (mapAddress || '').trim().replace(/^,+/, '').replace(/,+$/, '').trim();
+                    if (mapAddress) {
+                        const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+                        const params = new URLSearchParams({
+                            center: mapAddress,
+                            zoom: '15',
+                            size: '640x300',
+                            scale: '2',
+                            maptype: 'roadmap',
+                            markers: `color:red|${mapAddress}`,
+                            key: apiKey,
+                            language: 'de',
                         });
+                        const googleMapUrl = `/google-staticmap?${params.toString()}`;
+                        const resp = await fetch(googleMapUrl);
+                        if (resp.ok) {
+                            const blob = await resp.blob();
+                            
+                            if (blob.type.startsWith('image/')) {
+                                staticMapUrl = await new Promise((resolve) => {
+                                    const reader = new FileReader();
+                                    reader.onloadend = () => resolve(reader.result);
+                                    reader.readAsDataURL(blob);
+                                });
+                            }
+                        }
                     }
                 }
-            } catch (e) { console.warn('Google Static Map error', e); }
+            } catch (e) { 
+                const errorMsg = e.message || '';
+                const maskedMsg = errorMsg.replace(/key=AIza[^&]*/g, 'key=AIza...REDACTED');
+                console.error('PDF GEN: Google Static Map error', maskedMsg); 
+            }
 
             // Pre-process images - Filter out PDFs and non-renderable documents
             console.log("PDF GEN: Starting image processing...");
@@ -2197,7 +2233,6 @@ END:VCARD`;
                 staticMapUrl: staticMapUrl || null,
             };
 
-
             // Generate Blob using @react-pdf
             const rawBlob = await pdf(<DamageReportDocument key={Math.random()} data={docData} />).toBlob();
             if (!rawBlob || rawBlob.size === 0) {
@@ -2209,10 +2244,12 @@ END:VCARD`;
             const dateStr = now.toLocaleDateString('de-CH').replace(/\./g, '-');
             const projNum = dataToUse.projectNumber || dataToUse.projectTitle || 'Project';
             const location = dataToUse.locationDetails || dataToUse.city || 'Schadenort';
-            const fileName = `${projNum}_${location}_${dateStr}_${timeStr}.pdf`;
+            let fileName = `${projNum}_${location}_${dateStr}_${timeStr}.pdf`;
 
             // 1. Download File
-            console.log('FINAL PDF FILENAME:', fileName);
+            if (!fileName.toLowerCase().endsWith('.pdf')) {
+              fileName = `${fileName}.pdf`;
+            }
             saveAs(blob, fileName);
 
 
@@ -4230,49 +4267,118 @@ END:VCARD`;
                             </h3>
 
                             {(formData.street || formData.address) ? (
-                                <div style={{ position: 'relative', borderRadius: '12px', overflow: 'hidden', border: '1px solid var(--border)', flex: 1 }}>
-                                    <iframe
-                                        width="100%"
-                                        height="300"
-                                        style={{ border: 0, display: 'block', filter: 'grayscale(0.2) contrast(1.1)' }}
-                                        loading="lazy"
-                                        allowFullScreen
-                                        src={`https://maps.google.com/maps?q=${encodeURIComponent(formData.street ? `${formData.street}, ${formData.zip} ${formData.city}` : formData.address)}&t=&z=15&ie=UTF8&iwloc=&output=embed`}
-                                        title="Standort Karte"
-                                    ></iframe>
+                                <div style={{ 
+                                    display: 'flex', 
+                                    flexDirection: 'row', 
+                                    borderRadius: '12px', 
+                                    overflow: 'hidden', 
+                                    border: '1px solid var(--border)', 
+                                    flex: 1, 
+                                    backgroundColor: 'rgba(0,0,0,0.05)',
+                                    height: '300px'
+                                }}>
+                                    {/* Linke Seite: Interaktive Karte */}
+                                    <div style={{ flex: 1, height: '100%', position: 'relative' }}>
+                                        <iframe
+                                            width="100%"
+                                            height="100%"
+                                            style={{ border: 0, display: 'block', filter: 'grayscale(0.2) contrast(1.1)' }}
+                                            loading="lazy"
+                                            allowFullScreen
+                                            src={`https://maps.google.com/maps?q=${encodeURIComponent(formData.street ? `${formData.street}, ${formData.zip} ${formData.city}` : formData.address)}&t=&z=15&ie=UTF8&iwloc=&output=embed`}
+                                            title="Standort Karte"
+                                        ></iframe>
 
-                                    {!formData.exteriorPhoto && (
-                                        <label
-                                            style={{
-                                                position: 'absolute',
-                                                bottom: '15px',
-                                                right: '15px',
-                                                backgroundColor: 'var(--primary)',
-                                                color: 'white',
-                                                padding: '0.6rem 1.2rem',
-                                                borderRadius: '99px',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                gap: '0.6rem',
-                                                cursor: 'pointer',
-                                                boxShadow: '0 10px 15px -3px rgba(14, 165, 233, 0.4)',
-                                                fontSize: '0.85rem',
-                                                fontWeight: 700,
-                                                zIndex: 10,
-                                                transition: 'all 0.2s'
-                                            }}
-                                            className="btn-primary"
-                                            title="Aussenaufnahme hinzufügen"
-                                        >
-                                            <Camera size={18} />
-                                            <span>Foto hinzufügen</span>
-                                            <input
-                                                type="file"
-                                                accept="image/*"
-                                                onChange={handleExteriorPhotoUpload}
-                                                style={{ display: 'none' }}
+                                        {/* Overlay-Buttons für Uploads (nur wenn Bild noch nicht split ist oder Platz da ist) */}
+                                        {!formData.customMapImage && (
+                                            <label
+                                                style={{
+                                                    position: 'absolute',
+                                                    top: '15px',
+                                                    right: '15px',
+                                                    backgroundColor: 'var(--surface)',
+                                                    color: 'var(--primary)',
+                                                    padding: '0.5rem 1rem',
+                                                    borderRadius: '8px',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '0.5rem',
+                                                    cursor: 'pointer',
+                                                    boxShadow: '0 4px 6px -1px rgba(0,0,0,0.3)',
+                                                    fontSize: '0.75rem',
+                                                    fontWeight: 700,
+                                                    zIndex: 15,
+                                                    border: '1px solid var(--primary)'
+                                                }}
+                                                title="Eigene Karte/Bild hinzufügen"
+                                            >
+                                                <Camera size={16} />
+                                                <span>Bild hinzufügen</span>
+                                                <input
+                                                    type="file"
+                                                    accept="image/*"
+                                                    onChange={handleCustomMapImageUpload}
+                                                    style={{ display: 'none' }}
+                                                />
+                                            </label>
+                                        )}
+
+                                        {!formData.exteriorPhoto && (
+                                            <label
+                                                style={{
+                                                    position: 'absolute',
+                                                    bottom: '15px',
+                                                    right: '15px',
+                                                    backgroundColor: 'var(--primary)',
+                                                    color: 'white',
+                                                    padding: '0.6rem 1.2rem',
+                                                    borderRadius: '99px',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '0.6rem',
+                                                    cursor: 'pointer',
+                                                    boxShadow: '0 10px 15px -3px rgba(14, 165, 233, 0.4)',
+                                                    fontSize: '0.85rem',
+                                                    fontWeight: 700,
+                                                    zIndex: 10,
+                                                    transition: 'all 0.2s'
+                                                }}
+                                                className="btn-primary"
+                                                title="Aussenaufnahme hinzufügen"
+                                            >
+                                                <Camera size={18} />
+                                                <span>Foto hinzufügen</span>
+                                                <input
+                                                    type="file"
+                                                    accept="image/*"
+                                                    onChange={handleExteriorPhotoUpload}
+                                                    style={{ display: 'none' }}
+                                                />
+                                            </label>
+                                        )}
+                                    </div>
+
+                                    {/* Rechte Seite: Das hinzugefügte Bild (halbiert die Karte) */}
+                                    {formData.customMapImage && (
+                                        <div style={{ flex: 1, height: '100%', position: 'relative', borderLeft: '1px solid var(--border)' }}>
+                                            <img
+                                                src={formData.customMapImage}
+                                                alt="Eigene Karte"
+                                                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
                                             />
-                                        </label>
+                                            <button
+                                                type="button"
+                                                onClick={removeCustomMapImage}
+                                                style={{
+                                                    position: 'absolute', top: '10px', right: '10px',
+                                                    backgroundColor: 'rgba(239, 68, 68, 0.9)', color: 'white', border: 'none', borderRadius: '50%',
+                                                    width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                    cursor: 'pointer', zIndex: 20
+                                                }}
+                                            >
+                                                <X size={18} />
+                                            </button>
+                                        </div>
                                     )}
                                 </div>
                             ) : (

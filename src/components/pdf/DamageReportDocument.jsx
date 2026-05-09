@@ -18,6 +18,11 @@ import DataLoggerSection from './sections/DataLoggerSection';
 
 
 const DamageReportDocument = ({ data }) => {
+    console.log("PDF Document: Rendering with staticMapUrl:", !!data.staticMapUrl);
+    if (data.staticMapUrl) {
+        console.log("PDF Document: staticMapUrl length:", data.staticMapUrl.length);
+    }
+
     // Filter rooms that have content (images or existing logic)
     // The previous logic filtered logic based on filtering dataToUse.images.
     // We should pre-process this OR do it here. 

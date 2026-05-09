@@ -97,32 +97,40 @@ export const PDFService = {
         // Load Google Static Map
         let staticMapUrl = null;
         try {
-            const mapAddress = formData.street
-                ? `${formData.street}, ${formData.zip || ''} ${formData.city || ''}`
-                : formData.address;
-            if (mapAddress) {
-                const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-                const params = new URLSearchParams({
-                    center: mapAddress,
-                    zoom: '15',
-                    size: '640x300',
-                    scale: '2',
-                    maptype: 'roadmap',
-                    markers: `color:red|${mapAddress}`,
-                    key: apiKey,
-                    language: 'de',
-                });
-                const resp = await fetch(`/google-staticmap?${params.toString()}`);
-                if (resp.ok) {
-                    const blob = await resp.blob();
-                    staticMapUrl = await new Promise((resolve) => {
-                        const reader = new FileReader();
-                        reader.onloadend = () => resolve(reader.result);
-                        reader.readAsDataURL(blob);
+            if (formData.customMapImage) {
+                staticMapUrl = formData.customMapImage;
+            } else {
+                const mapAddress = formData.street
+                    ? `${formData.street}, ${formData.zip || ''} ${formData.city || ''}`
+                    : formData.address;
+                if (mapAddress) {
+                    const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+                    const params = new URLSearchParams({
+                        center: mapAddress,
+                        zoom: '15',
+                        size: '640x300',
+                        scale: '2',
+                        maptype: 'roadmap',
+                        markers: `color:red|${mapAddress}`,
+                        key: apiKey,
+                        language: 'de',
                     });
+                    const resp = await fetch(`/google-staticmap?${params.toString()}`);
+                    if (resp.ok) {
+                        const blob = await resp.blob();
+                        staticMapUrl = await new Promise((resolve) => {
+                            const reader = new FileReader();
+                            reader.onloadend = () => resolve(reader.result);
+                            reader.readAsDataURL(blob);
+                        });
+                    }
                 }
             }
-        } catch (e) { console.warn('PDF Service: Google Static Map error', e); }
+        } catch (e) { 
+            const errorMsg = e.message || '';
+            const maskedMsg = errorMsg.replace(/key=AIza[^&]*/g, 'key=AIza...REDACTED');
+            console.warn('PDF Service: Google Static Map error', maskedMsg); 
+        }
 
         const docData = {
             ...formData,
