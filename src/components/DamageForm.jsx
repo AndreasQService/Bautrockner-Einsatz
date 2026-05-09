@@ -5647,58 +5647,116 @@ END:VCARD`;
                                 "Organisation externer Handwerker",
                                 "Instandstellung"
                             ].map(measure => {
-                                const isActive = (formData.measures || '').includes(measure);
+                                const isActive = formData.selectedMeasures?.includes(measure) || false;
                                 return (
-                                    <button
-                                        key={measure}
-                                        type="button"
-                                        onClick={() => {
-                                            let current = formData.measures || '';
-                                            let newValue = '';
-                                            if (current.includes(measure)) {
-                                                // Remove
-                                                newValue = current.replace(measure, '').replace(/\n\n/g, '\n').trim();
-                                            } else {
-                                                // Add
-                                                newValue = current ? (current + '\n' + measure) : measure;
-                                            }
-                                            setFormData(prev => ({ ...prev, measures: newValue }));
-                                        }}
-                                        style={{
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '0.75rem',
-                                            padding: '0.75rem 1rem',
-                                            backgroundColor: isActive ? 'rgba(15, 110, 163, 0.1)' : 'rgba(255,255,255,0.03)',
-                                            border: isActive ? '1px solid #0F6EA3' : '1px solid var(--border)',
-                                            borderRadius: '8px',
-                                            color: isActive ? '#0F6EA3' : 'var(--text-main)',
-                                            cursor: 'pointer',
-                                            textAlign: 'left',
-                                            fontSize: '0.95rem',
-                                            fontWeight: 600,
-                                            transition: 'all 0.2s'
-                                        }}
-                                    >
-                                        <div style={{
-                                            width: '20px',
-                                            height: '20px',
-                                            borderRadius: '4px',
-                                            border: isActive ? 'none' : '2px solid var(--text-muted)',
-                                            backgroundColor: isActive ? '#0F6EA3' : 'transparent',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            flexShrink: 0
-                                        }}>
-                                            {isActive && <Check size={14} color="white" strokeWidth={3} />}
-                                        </div>
-                                        {measure}
-                                    </button>
+                                    <div key={measure} style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setFormData(prev => {
+                                                    const current = prev.selectedMeasures || [];
+                                                    if (current.includes(measure)) {
+                                                        return { ...prev, selectedMeasures: current.filter(i => i !== measure) };
+                                                    } else {
+                                                        return { ...prev, selectedMeasures: [...current, measure] };
+                                                    }
+                                                });
+                                            }}
+                                            style={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '0.75rem',
+                                                padding: '0.75rem 1rem',
+                                                backgroundColor: isActive ? 'rgba(15, 110, 163, 0.1)' : 'rgba(255,255,255,0.03)',
+                                                border: isActive ? '1px solid #0F6EA3' : '1px solid var(--border)',
+                                                borderRadius: isActive ? '8px 8px 0 0' : '8px',
+                                                color: isActive ? '#0F6EA3' : 'var(--text-main)',
+                                                cursor: 'pointer',
+                                                textAlign: 'left',
+                                                fontSize: '0.95rem',
+                                                fontWeight: 600,
+                                                transition: 'all 0.2s'
+                                            }}
+                                        >
+                                            <div style={{
+                                                width: '20px',
+                                                height: '20px',
+                                                borderRadius: '4px',
+                                                border: isActive ? 'none' : '2px solid var(--text-muted)',
+                                                backgroundColor: isActive ? '#0F6EA3' : 'transparent',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                flexShrink: 0
+                                            }}>
+                                                {isActive && <Check size={14} color="white" strokeWidth={3} />}
+                                            </div>
+                                            {measure}
+                                        </button>
+                                        {isActive && (
+                                            <div style={{
+                                                border: '1px solid #0F6EA3',
+                                                borderTop: 'none',
+                                                borderRadius: '0 0 8px 8px',
+                                                padding: '0.75rem',
+                                                backgroundColor: 'rgba(15, 110, 163, 0.04)',
+                                            }}>
+                                                <div style={{
+                                                    fontSize: '0.8rem',
+                                                    fontWeight: 700,
+                                                    color: '#0F6EA3',
+                                                    marginBottom: '0.5rem',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'space-between'
+                                                }}>
+                                                    Details zu {measure}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => toggleDictation(`note_${measure}`, measure)}
+                                                        style={{
+                                                            background: 'none', border: 'none', cursor: 'pointer',
+                                                            color: listeningField === `note_${measure}` ? '#EF4444' : '#0F6EA3',
+                                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                            padding: '2px', borderRadius: '50%',
+                                                            backgroundColor: listeningField === `note_${measure}` ? 'rgba(239,68,68,0.1)' : 'transparent'
+                                                        }}
+                                                        title="Text diktieren"
+                                                    >
+                                                        {listeningField === `note_${measure}` ? <MicOff size={16} /> : <Mic size={16} />}
+                                                    </button>
+                                                </div>
+                                                <textarea
+                                                    rows={2}
+                                                    placeholder={`Notizen zu ${measure}...`}
+                                                    value={(formData.measureNotes || {})[measure] || ''}
+                                                    onChange={e => setFormData(prev => ({
+                                                        ...prev,
+                                                        measureNotes: { ...(prev.measureNotes || {}), [measure]: e.target.value }
+                                                    }))}
+                                                    onClick={e => e.stopPropagation()}
+                                                    style={{
+                                                        width: '100%',
+                                                        backgroundColor: 'var(--surface)',
+                                                        border: '1px solid var(--border)',
+                                                        borderRadius: '6px',
+                                                        color: 'var(--text-main)',
+                                                        fontSize: '0.9rem',
+                                                        padding: '0.5rem',
+                                                        resize: 'vertical',
+                                                        outline: 'none',
+                                                        fontFamily: 'inherit',
+                                                        boxSizing: 'border-box'
+                                                    }}
+                                                />
+                                            </div>
+                                        )}
+                                    </div>
                                 );
                             })}
                         </div>
 
+                        {/* Free‑text measures textarea */}
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                             <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600 }}>Eigener Text / Ergänzungen</label>
                             <button
@@ -5718,20 +5776,13 @@ END:VCARD`;
                                 {listeningField === 'measures' ? <MicOff size={16} /> : <Mic size={16} />}
                             </button>
                         </div>
-
-                        <div style={{ width: '100%' }}>
-                            <textarea
-                                id="measures"
-                                name="measures"
-                                className="form-input"
-                                style={{ minHeight: '120px', resize: 'vertical', width: '100%' }}
-                                placeholder="Details zu den Massnahmen..."
-                                value={formData.measures || ''}
-                                onChange={(e) => {
-                                    setFormData(prev => ({ ...prev, measures: e.target.value }));
-                                }}
-                            />
-                        </div>
+                        <textarea
+                            className="form-input"
+                            value={formData.measures || ''}
+                            onChange={e => setFormData(prev => ({ ...prev, measures: e.target.value }))}
+                            placeholder="Zusätzliche Massnahmen beschreiben..."
+                            style={{ width: '100%', minHeight: '100px', fontFamily: 'inherit', lineHeight: '1.5' }}
+                        />
                     </div>
                 )}
 
