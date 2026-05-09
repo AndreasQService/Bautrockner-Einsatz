@@ -72,7 +72,7 @@ export const RoomService = {
     getRoomImages: (room, images) => {
         if (!room || !Array.isArray(images)) return [];
         return images.filter(img => 
-            img.roomId === room.id || img.assignedTo === room.name
+            img.roomId ? img.roomId === room.id : img.assignedTo === room.name
         );
     },
 
