@@ -40,7 +40,7 @@ const PdfIcon = ({ size = 24, style = {} }) => (
         <path d="M14 2H6C4.9 2 4 2.9 4 4V20C4 21.1 4.9 22 6 22H18C19.1 22 20 21.1 20 20V8L14 2Z" fill="white" stroke="#4b5563" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
         <polyline points="14 2 14 8 20 8" fill="none" stroke="#4b5563" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
         <rect x="3" y="11" width="18" height="7" rx="1.5" fill="#ef4444" />
-        <text x="12" y="15.5" fill="white" fontSize="5.5" fontWeight="900" textAnchor="middle" dominantBaseline="middle" style={{ fontFamily: 'Arial, sans-serif', userSelect: 'none' }}>PDF</text>
+        <text x="12" y="15.5" fill="white" fontSize="5.5" fontWeight="900" textAnchor="middle" dominantBaseline="middle" style={{ fontFamily: 'var(--font-desktop)', userSelect: 'none' }}>PDF</text>
     </svg>
 );
 
@@ -50,7 +50,7 @@ const VcfIcon = ({ size = 24, style = {} }) => (
         <path d="M14 2H6C4.9 2 4 2.9 4 4V20C4 21.1 4.9 22 6 22H18C19.1 22 20 21.1 20 20V8L14 2Z" fill="white" stroke="#0F6EA3" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
         <polyline points="14 2 14 8 20 8" fill="none" stroke="#0F6EA3" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
         <rect x="3" y="11" width="18" height="7" rx="1.5" fill="#0F6EA3" />
-        <text x="12" y="15.5" fill="white" fontSize="5.5" fontWeight="900" textAnchor="middle" dominantBaseline="middle" style={{ fontFamily: 'Arial, sans-serif', userSelect: 'none' }}>VCF</text>
+        <text x="12" y="15.5" fill="white" fontSize="5.5" fontWeight="900" textAnchor="middle" dominantBaseline="middle" style={{ fontFamily: 'var(--font-desktop)', userSelect: 'none' }}>VCF</text>
     </svg>
 );
 
@@ -62,7 +62,7 @@ const CalendarIcon = ({ size = 24, style = {} }) => (
         <line x1="8" y1="2" x2="8" y2="6" stroke="#10B981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
         <line x1="3" y1="10" x2="21" y2="10" stroke="#10B981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
         <rect x="3" y="11" width="18" height="7" rx="1" fill="#10B981" />
-        <text x="12" y="15.5" fill="white" fontSize="5.5" fontWeight="900" textAnchor="middle" dominantBaseline="middle" style={{ fontFamily: 'Arial, sans-serif', userSelect: 'none' }}>ICS</text>
+        <text x="12" y="15.5" fill="white" fontSize="5.5" fontWeight="900" textAnchor="middle" dominantBaseline="middle" style={{ fontFamily: 'var(--font-desktop)', userSelect: 'none' }}>ICS</text>
     </svg>
 );
 
@@ -135,7 +135,7 @@ const addAnnotationToImage = (imgSrc, type = 'circle') => {
     });
 };
 
-export default function DamageForm({ onCancel, initialData, onSave, mode = 'desktop' }) {
+export default function DamageForm({ onCancel, initialData, onSave, mode = 'desktop', isDarkMode = true }) {
     // Helper to parse address string if editing
     const parseAddress = (addr) => {
         if (!addr) return { street: '', zip: '', city: '' };
@@ -2741,7 +2741,7 @@ END:VCARD`;
         const adresse = [formData.street, [formData.zip, formData.city].filter(Boolean).join(' ')].filter(Boolean).join(', ');
         const sub = [formData.projectNumber, formData.damageCategory].filter(Boolean).join(' · ');
         return (
-            <div className="force-dark-mode" style={{ minHeight: '100vh', backgroundColor: 'var(--color-app-bg, #0F172A)', padding: '2rem 1.25rem 3rem', fontFamily: 'Inter,system-ui,sans-serif', color: 'var(--text-main, #E2E8F0)' }}>
+            <div className={isDarkMode ? "force-dark-mode" : ""} style={{ minHeight: '100vh', backgroundColor: 'var(--color-app-bg)', padding: '2rem 1.25rem 3rem', fontFamily: 'var(--font-desktop)', color: 'var(--text-main)' }}>
                 <div style={{ marginBottom: '2.5rem' }}>
                     <div style={{ fontSize: '1.5rem', fontWeight: 800, lineHeight: 1.2 }}>{adresse || 'Schadenort'}</div>
                     {sub && <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.4rem', fontWeight: 500 }}>{sub}</div>}
@@ -2791,8 +2791,8 @@ END:VCARD`;
                     const activeApt = techSelectedApartment || (uniqueApartments.length === 1 ? uniqueApartments[0] : null);
 
                     return (
-                        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.85)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-                            <div style={{ backgroundColor: '#1E293B', borderRadius: '16px', width: '100%', maxWidth: '400px', padding: '1.5rem', color: '#F1F5F9', border: '1px solid rgba(255,255,255,0.1)' }}>
+                        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+                            <div style={{ backgroundColor: 'var(--surface)', borderRadius: '16px', width: '100%', maxWidth: '400px', padding: '1.5rem', color: 'var(--text-main)', border: '1px solid var(--border)' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                         {activeApt && uniqueApartments.length > 1 && techRoomSelectorMode === 'messung' && (
@@ -4964,14 +4964,22 @@ END:VCARD`;
 
                 <div style={{ display: (mode !== 'technician' && !isRoomsExpanded) ? 'none' : 'flex', flexDirection: 'column', gap: '1.25rem' }}>
                     {formData.rooms.map(room => (
-                        <div key={room.id} className="card" style={{ padding: 0, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)' }}>
+                        <div key={room.id} className="card" style={{ 
+                            padding: 0, 
+                            overflow: 'hidden', 
+                            border: '1px solid var(--border)',
+                            maxWidth: '850px',
+                            marginBottom: '1.5rem',
+                            backgroundColor: 'var(--background)'
+                        }}>
                             <div style={{
-                                background: mode === 'technician' ? 'var(--background)' : 'rgba(255,255,255,0.05)',
-                                padding: '1rem 1.25rem',
-                                borderBottom: mode === 'technician' ? '1px solid var(--border)' : '1px solid rgba(255,255,255,0.08)',
+                                background: 'rgba(30, 64, 175, 0.1)',
+                                padding: '0.75rem 1.25rem',
+                                borderBottom: '1px solid var(--border)',
                                 display: 'flex',
                                 justifyContent: 'space-between',
-                                alignItems: 'center'
+                                alignItems: 'center',
+                                margin: mode === 'technician' ? '0.75rem 0.75rem 0 0.75rem' : '0'
                             }}>
                                 <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem', flex: 1, minWidth: 0, paddingRight: '1rem', flexWrap: 'wrap' }}>
                                     <span style={{ fontWeight: 700, fontSize: '1rem', color: mode === 'technician' ? 'var(--text-main)' : 'var(--primary)', whiteSpace: 'nowrap' }}>{room.name}</span>
@@ -5149,7 +5157,7 @@ END:VCARD`;
                                                                             <div style={{ fontSize: '0.65rem', color: '#10B981', fontWeight: 'bold', textAlign: 'center' }}>Bitte Ziel wählen...</div>
                                                                         )}
                                                                         <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', padding: '0 2px', alignItems: 'center' }}>
-                                                                            <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', fontSize: '0.75rem', cursor: 'pointer', color: 'white' }}>
+                                                                            <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', fontSize: '0.75rem', cursor: 'pointer', color: 'var(--text-main)' }}>
                                                                                 <input
                                                                                     type="checkbox"
                                                                                     style={{ width: '20px', height: '20px', accentColor: 'var(--primary)' }}
@@ -5170,7 +5178,7 @@ END:VCARD`;
                                                                                 style={{
                                                                                     border: '1px solid var(--border)',
                                                                                     backgroundColor: 'var(--surface)',
-                                                                                    color: 'white',
+                                                                                    color: 'var(--text-main)',
                                                                                     cursor: 'pointer',
                                                                                     padding: '8px',
                                                                                     borderRadius: '8px',
@@ -5191,26 +5199,23 @@ END:VCARD`;
                                                                         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
                                                                             <textarea
                                                                                 placeholder="Beschreibung..."
-                                                                                className="form-input"
-                                                                                rows={3}
+                                                                                value={img.description || ''}
+                                                                                onChange={(e) => {
+                                                                                    const newImages = [...formData.images];
+                                                                                    const index = newImages.findIndex(i => i.preview === img.preview);
+                                                                                    newImages[index].description = e.target.value;
+                                                                                    setFormData({ ...formData, images: newImages });
+                                                                                }}
                                                                                 style={{
                                                                                     fontSize: '0.9rem',
                                                                                     padding: '0.5rem',
                                                                                     flex: 1,
-                                                                                    width: 'auto',
                                                                                     resize: 'none',
-                                                                                    backgroundColor: isRecording === img.preview ? '#450a0a' : '#0F172A',
-                                                                                    borderColor: isRecording === img.preview ? '#EF4444' : '#334155',
-                                                                                    color: 'white'
+                                                                                    backgroundColor: isRecording === img.preview ? '#fef2f2' : 'var(--background)',
+                                                                                    borderColor: isRecording === img.preview ? '#EF4444' : 'var(--border)',
+                                                                                    color: 'var(--text-main)'
                                                                                 }}
-                                                                                value={img.description || ''}
-                                                                                onChange={(e) => {
-                                                                                    const newDesc = e.target.value;
-                                                                                    setFormData(prev => ({
-                                                                                        ...prev,
-                                                                                        images: prev.images.map(i => i === img ? { ...i, description: newDesc } : i)
-                                                                                    }));
-                                                                                }}
+                                                                                rows={2}
                                                                             />
                                                                             <button
                                                                                 type="button"
@@ -5218,8 +5223,8 @@ END:VCARD`;
                                                                                 title={isRecording === img.preview ? "Aufnahme stoppen" : "Spracheingabe starten"}
                                                                                 style={{
                                                                                     border: isRecording === img.preview ? 'none' : '1px solid var(--border)',
-                                                                                    backgroundColor: isRecording === img.preview ? '#EF4444' : 'var(--text-main)',
-                                                                                    color: isRecording === img.preview ? 'white' : '#94A3B8',
+                                                                                    backgroundColor: isRecording === img.preview ? '#EF4444' : 'var(--surface)',
+                                                                                    color: isRecording === img.preview ? 'white' : 'var(--text-muted)',
                                                                                     width: '36px',
                                                                                     height: '36px',
                                                                                     borderRadius: '50%',
@@ -5380,7 +5385,7 @@ END:VCARD`;
                                             padding: '0.75rem',
                                             backgroundColor: 'var(--surface)',
                                             border: '1px solid var(--border)',
-                                            color: 'white',
+                                            color: 'var(--text-main)',
                                             borderRadius: '8px',
                                             cursor: 'pointer',
                                             fontWeight: 600,
@@ -7593,7 +7598,7 @@ END:VCARD`;
                             padding: '20mm',
                             backgroundColor: 'white',
                             color: 'black',
-                            fontFamily: 'Arial, sans-serif'
+                            fontFamily: 'var(--font-desktop)'
                         }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', borderBottom: '4px solid #0F6EA3', paddingBottom: '1.5rem' }}>
                                 <div>

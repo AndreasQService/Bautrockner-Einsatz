@@ -582,65 +582,74 @@ ${textContext}`;
     const mieterList = Array.isArray(previewData.mieter) ? previewData.mieter : (previewData.mieter?.name ? [previewData.mieter] : []);
 
     return createPortal(
-      <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.75)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }}>
-        <div style={{ backgroundColor: '#FFFFFF', padding: '2rem', borderRadius: '16px', width: '920px', maxWidth: '95%', maxHeight: '90vh', overflowY: 'auto', border: '1px solid #E2E8F0', boxShadow: '0 10px 30px rgba(0,0,0,0.1)', color: '#1E293B' }}>
+      <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.8)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(8px)' }}>
+        <div style={{ backgroundColor: 'var(--surface)', padding: '2rem', borderRadius: '12px', width: '960px', maxWidth: '98%', maxHeight: '92vh', overflowY: 'auto', border: '1.5px solid var(--color-border-strong)', boxShadow: 'var(--shadow-premium)', color: 'var(--text-main)' }}>
 
           {/* Header */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '1px solid #E2E8F0', paddingBottom: '1rem' }}>
-            <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800, color: '#10b981' }}>KI-Analyse Ergebnis</h2>
-            <button onClick={() => setPreviewData(null)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}><X size={24} /></button>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '1.5px solid var(--border)', paddingBottom: '1rem' }}>
+            <h2 style={{ margin: 0, fontSize: '1.3rem', fontWeight: 700, color: '#10b981', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+              <div style={{ width: 12, height: 12, borderRadius: '50%', backgroundColor: '#10b981' }}></div>
+              KI-Analyse Ergebnis
+            </h2>
+            <button onClick={() => setPreviewData(null)} className="btn btn-ghost" style={{ padding: '0.4rem' }}><X size={24} /></button>
           </div>
 
           {/* Schadenort + Schaden */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
-            <div style={{ backgroundColor: 'rgba(239,68,68,0.08)', padding: '1rem', borderRadius: '12px', border: '1px solid rgba(239,68,68,0.2)' }}>
-              <h4 style={{ marginTop: 0, color: '#ef4444', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Schadenort</h4>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', marginBottom: '1.5rem' }}>
+            <div style={{ backgroundColor: 'var(--color-surface-alt)', padding: '1.25rem', borderRadius: '8px', border: '1px solid var(--border)' }}>
+              <h4 style={{ marginTop: 0, marginBottom: '1rem', color: 'var(--text-muted)', fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>SCHADENORT</h4>
               {[['bezeichnung', 'Bezeichnung / Wohnung'], ['strasse_nr', 'Strasse & Nr.'], ['plz', 'PLZ'], ['ort', 'Ort']].map(([f, l]) => (
-                <div key={f} style={{ marginBottom: '0.6rem' }}>
-                  <label style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8', marginBottom: '2px' }}>{l}</label>
-                  <input className="form-input" style={{ width: '100%' }} value={previewData.schadenort?.[f] || ''} onChange={e => upd('schadenort', f, e.target.value)} />
+                <div key={f} style={{ marginBottom: '0.75rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 600, marginBottom: '3px', textTransform: 'uppercase' }}>{l}</label>
+                  <input className="form-input" style={{ width: '100%', padding: '0.5rem', fontSize: '0.88rem' }} value={previewData.schadenort?.[f] || ''} onChange={e => upd('schadenort', f, e.target.value)} />
                 </div>
               ))}
             </div>
-            <div style={{ backgroundColor: 'rgba(139,92,246,0.08)', padding: '1rem', borderRadius: '12px', border: '1px solid rgba(139,92,246,0.2)' }}>
-              <h4 style={{ marginTop: 0, color: '#8b5cf6', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Schaden</h4>
+            <div style={{ backgroundColor: 'var(--color-surface-alt)', padding: '1.25rem', borderRadius: '8px', border: '1px solid var(--border)' }}>
+              <h4 style={{ marginTop: 0, marginBottom: '1rem', color: 'var(--text-muted)', fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>SCHADENSDETAILS</h4>
               {[['art', 'Art des Schadens'], ['beschreibung', 'Beschreibung']].map(([f, l]) => (
-                <div key={f} style={{ marginBottom: '0.6rem' }}>
-                  <label style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8', marginBottom: '2px' }}>{l}</label>
-                  <input className="form-input" style={{ width: '100%' }} value={previewData.schaden?.[f] || ''} onChange={e => upd('schaden', f, e.target.value)} />
+                <div key={f} style={{ marginBottom: '0.75rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 600, marginBottom: '3px', textTransform: 'uppercase' }}>{l}</label>
+                  {f === 'beschreibung' ? (
+                    <textarea className="form-input" style={{ width: '100%', padding: '0.5rem', fontSize: '0.88rem', minHeight: '80px' }} value={previewData.schaden?.[f] || ''} onChange={e => upd('schaden', f, e.target.value)} />
+                  ) : (
+                    <input className="form-input" style={{ width: '100%', padding: '0.5rem', fontSize: '0.88rem' }} value={previewData.schaden?.[f] || ''} onChange={e => upd('schaden', f, e.target.value)} />
+                  )}
                 </div>
               ))}
             </div>
           </div>
 
           {/* Kontakte – Einzelrollen */}
-          <h4 style={{ color: '#10b981', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.75rem' }}>Kontakte</h4>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
+          <h4 style={{ color: 'var(--text-muted)', fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1rem', paddingLeft: '0.25rem' }}>PERSONEN & KONTAKTE</h4>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
             {singleRoles.map(({ key, label, color, fields }) => (
-              <div key={key} style={{ backgroundColor: 'rgba(255,255,255,0.03)', padding: '0.85rem', borderRadius: '10px', borderLeft: `3px solid ${color}` }}>
+              <div key={key} style={{ backgroundColor: 'var(--surface)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border)', borderLeft: `4px solid ${color}` }}>
                 {/* Überschrift = Dropdown zur Rollenkorrektur */}
-                <select
-                  value={previewData[key]?._blockRolle || key}
-                  onChange={e => upd(key, '_blockRolle', e.target.value)}
-                  style={{
-                    fontSize: '0.75rem', fontWeight: 700, color, marginBottom: '0.6rem',
-                    textTransform: 'uppercase', letterSpacing: '0.05em',
-                    background: 'transparent', border: 'none', borderBottom: `1px solid ${color}`,
-                    cursor: 'pointer', width: '100%', padding: '0 0 2px 0',
-                    appearance: 'auto', outline: 'none'
-                  }}
-                >
-                  <option value="auftraggeber">AUFTRAGGEBER (AG)</option>
-                  <option value="verwaltung">VERWALTUNG (Verw.)</option>
-                  <option value="eigentuemer">EIGENTÜMER (Eig.)</option>
-                  <option value="hauswart">HAUSWART (HW)</option>
-                  <option value="handwerker">HANDWERKER (Handw.)</option>
-                  <option value="mieter">MIETER</option>
-                </select>
+                <div style={{ marginBottom: '0.75rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem' }}>
+                    <select
+                      value={previewData[key]?._blockRolle || key}
+                      onChange={e => upd(key, '_blockRolle', e.target.value)}
+                      style={{
+                        fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-main)',
+                        textTransform: 'uppercase', letterSpacing: '0.05em',
+                        background: 'transparent', border: 'none',
+                        cursor: 'pointer', width: '100%', padding: '0',
+                        appearance: 'auto', outline: 'none'
+                      }}
+                    >
+                      <option value="auftraggeber">AUFTRAGGEBER (AG)</option>
+                      <option value="verwaltung">VERWALTUNG (Verw.)</option>
+                      <option value="eigentuemer">EIGENTÜMER (Eig.)</option>
+                      <option value="hauswart">HAUSWART (HW)</option>
+                      <option value="handwerker">HANDWERKER (Handw.)</option>
+                      <option value="mieter">MIETER</option>
+                    </select>
+                </div>
                 {fields.map(([f, l]) => (
-                  <div key={f} style={{ marginBottom: '0.4rem' }}>
-                    <label style={{ display: 'block', fontSize: '0.65rem', color: '#64748b', marginBottom: '1px' }}>{l}</label>
-                    <input className="form-input" style={{ width: '100%', fontSize: '0.85rem', padding: '0.3rem 0.5rem' }} value={previewData[key]?.[f] || ''} onChange={e => upd(key, f, e.target.value)} />
+                  <div key={f} style={{ marginBottom: '0.5rem' }}>
+                    <label style={{ display: 'block', fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 600, marginBottom: '2px', textTransform: 'uppercase' }}>{l}</label>
+                    <input className="form-input" style={{ width: '100%', fontSize: '0.85rem', padding: '0.4rem 0.5rem' }} value={previewData[key]?.[f] || ''} onChange={e => upd(key, f, e.target.value)} />
                   </div>
                 ))}
               </div>
@@ -648,24 +657,28 @@ ${textContext}`;
           </div>
 
           {/* Mieter – Array */}
-          <div style={{ marginBottom: '1.5rem' }}>
-            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#10b981', marginBottom: '0.5rem', textTransform: 'uppercase' }}>Mieter ({mieterList.length})</div>
-            {mieterList.map((m, idx) => (
-              <div key={idx} style={{ backgroundColor: 'rgba(16,185,129,0.06)', padding: '0.75rem', borderRadius: '10px', borderLeft: '3px solid #10b981', marginBottom: '0.5rem', display: 'grid', gridTemplateColumns: '1fr 120px 1fr 1fr', gap: '0.5rem' }}>
-                {[['name', 'Name'], ['wohnung', 'Wohnung'], ['telefon', 'Telefon'], ['email', 'E-Mail']].map(([f, l]) => (
-                  <div key={f}>
-                    <label style={{ display: 'block', fontSize: '0.65rem', color: '#64748b', marginBottom: '1px' }}>{l}</label>
-                    <input className="form-input" style={{ width: '100%', fontSize: '0.85rem', padding: '0.3rem 0.5rem' }} value={m[f] || ''} onChange={e => updMieter(idx, f, e.target.value)} />
-                  </div>
-                ))}
-              </div>
-            ))}
-          </div>
+          {mieterList.length > 0 && (
+            <div style={{ marginBottom: '1.5rem' }}>
+                <div style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)', marginBottom: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', paddingLeft: '0.25rem' }}>MIETER ({mieterList.length})</div>
+                <div style={{ display: 'grid', gap: '0.75rem' }}>
+                    {mieterList.map((m, idx) => (
+                    <div key={idx} style={{ backgroundColor: 'var(--color-surface-alt)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border)', borderLeft: '4px solid #10b981', display: 'grid', gridTemplateColumns: '1.2fr 0.8fr 1fr 1fr', gap: '0.75rem' }}>
+                        {[['name', 'Name'], ['wohnung', 'Wohnung'], ['telefon', 'Telefon'], ['email', 'E-Mail']].map(([f, l]) => (
+                        <div key={f}>
+                            <label style={{ display: 'block', fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 600, marginBottom: '2px', textTransform: 'uppercase' }}>{l}</label>
+                            <input className="form-input" style={{ width: '100%', fontSize: '0.85rem', padding: '0.4rem 0.5rem' }} value={m[f] || ''} onChange={e => updMieter(idx, f, e.target.value)} />
+                        </div>
+                        ))}
+                    </div>
+                    ))}
+                </div>
+            </div>
+          )}
 
           {/* Footer */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', borderTop: '1px solid #E2E8F0', paddingTop: '1.25rem' }}>
-            <button onClick={() => setPreviewData(null)} className="btn btn-outline" style={{ minWidth: '120px' }}>Abbrechen</button>
-            <button onClick={() => { if (onExtractionComplete) onExtractionComplete(previewData); setPreviewData(null); }} className="btn btn-primary" style={{ minWidth: '180px', backgroundColor: '#10b981', border: 'none' }}>Daten übernehmen</button>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', borderTop: '1.5px solid var(--border)', paddingTop: '1.5rem', marginTop: '1rem' }}>
+            <button onClick={() => setPreviewData(null)} className="btn btn-outline" style={{ minWidth: '140px', height: '42px' }}>Abbrechen</button>
+            <button onClick={() => { if (onExtractionComplete) onExtractionComplete(previewData); setPreviewData(null); }} className="btn btn-primary" style={{ minWidth: '220px', height: '42px', backgroundColor: '#10b981', border: 'none', fontSize: '0.95rem', fontWeight: 700 }}>Daten übernehmen</button>
           </div>
         </div>
       </div>,
@@ -679,41 +692,42 @@ ${textContext}`;
       {renderPreview()}
       <div style={{ display: "flex", flexDirection: "column", gap: "1rem", marginTop: 16 }}>
         {/* --- Text Input Area --- */}
-        <div style={{ padding: "1rem", border: "1px solid var(--border)", borderRadius: "8px", backgroundColor: "var(--surface)" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.75rem" }}>
-            <FileText size={18} style={{ color: "var(--text-muted)" }} />
-            <strong style={{ fontSize: "0.9rem", color: "var(--text-main)" }}>Projektimport</strong>
+        <div className="card" style={{ padding: "1.25rem", border: "1.5px solid var(--color-border-strong)", borderRadius: "8px", backgroundColor: "var(--color-surface-alt)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", marginBottom: "1rem" }}>
+            <FileText size={18} style={{ color: "var(--q-primary)" }} />
+            <strong style={{ fontSize: "0.85rem", color: "var(--text-main)", textTransform: 'uppercase', letterSpacing: '0.05em' }}>PROJEKTIMPORT & KI-ANALYSE</strong>
           </div>
 
           {/* PDF Drop Zone */}
           <div
-            onDragOver={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = '#2563eb'; e.currentTarget.style.backgroundColor = 'rgba(37,99,235,0.08)'; }}
-            onDragLeave={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'; e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.03)'; }}
+            onDragOver={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = 'var(--q-primary)'; e.currentTarget.style.backgroundColor = 'var(--color-primary-soft)'; }}
+            onDragLeave={(e) => { e.currentTarget.style.borderColor = 'var(--color-border)'; e.currentTarget.style.backgroundColor = 'var(--surface)'; }}
             onDrop={async (e) => {
               e.preventDefault();
-              e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)';
-              e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.03)';
+              e.currentTarget.style.borderColor = 'var(--color-border)';
+              e.currentTarget.style.backgroundColor = 'var(--surface)';
               const file = e.dataTransfer.files[0];
               if (!file || !file.name.toLowerCase().endsWith('.pdf')) return;
               setStatus('⏳ PDF wird gelesen...');
               try {
                 const text = await processPdfFile(file);
                 setTextInput(prev => prev ? prev + '\n\n' + text : text);
-                setStatus('✅ PDF-Text extrahiert — jetzt analysieren');
+                setStatus('✅ PDF extrahiert');
               } catch {
-                setStatus('❌ PDF konnte nicht gelesen werden');
+                setStatus('❌ Fehler beim Lesen');
               }
             }}
             onClick={() => document.getElementById('pdf-text-input').click()}
             style={{
-              border: '1.5px dashed rgba(255,255,255,0.12)',
-              borderRadius: '8px',
-              padding: '0.6rem 1rem',
-              display: 'flex', alignItems: 'center', gap: '0.6rem',
-              backgroundColor: 'rgba(255,255,255,0.03)',
-              cursor: 'pointer', marginBottom: '0.75rem',
-              fontSize: '0.8rem', color: 'var(--text-muted)',
-              transition: 'all 0.2s',
+              border: '1.5px dashed var(--color-border)',
+              borderRadius: '6px',
+              padding: '0.75rem 1rem',
+              display: 'flex', alignItems: 'center', gap: '0.75rem',
+              backgroundColor: 'var(--surface)',
+              cursor: 'pointer', marginBottom: '1rem',
+              fontSize: '0.85rem', color: 'var(--text-muted)',
+              transition: 'all 0.15s ease',
+              boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)'
             }}
           >
             <input id="pdf-text-input" type="file" accept=".pdf" style={{ display: 'none' }} onChange={async (e) => {
@@ -723,52 +737,60 @@ ${textContext}`;
               try {
                 const text = await processPdfFile(file);
                 setTextInput(prev => prev ? prev + '\n\n' + text : text);
-                setStatus('✅ PDF-Text extrahiert — jetzt analysieren');
+                setStatus('✅ PDF extrahiert');
               } catch {
-                setStatus('❌ PDF konnte nicht gelesen werden');
+                setStatus('❌ Fehler beim Lesen');
               }
               e.target.value = '';
             }} />
-            <FileText size={16} />
-            <span>PDF hier droppen oder klicken → Text wird extrahiert</span>
+            <Upload size={18} style={{ color: 'var(--q-primary)' }} />
+            <span style={{ fontWeight: 500 }}>PDF-Dokument hier ablegen oder anklicken</span>
           </div>
 
+          <label style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 800, marginBottom: '0.4rem', display: 'block' }}>Beschreibung</label>
           <textarea
             value={textInput}
             onChange={(e) => setTextInput(e.target.value)}
-            placeholder="Kopieren Sie hier E-Mail Text oder Notizen hinein..."
+            placeholder="E-Mail Text, Notizen oder Schadensmeldung hier einfügen..."
+            className="form-input"
             style={{
               width: "100%",
-              minHeight: "80px",
-              padding: "0.5rem",
+              minHeight: "120px",
+              padding: "0.75rem",
               borderRadius: "4px",
-              border: "1px solid var(--border)",
-              backgroundColor: "var(--background)",
+              border: "1.5px solid var(--color-input-border)",
+              backgroundColor: "var(--surface)",
               color: "var(--text-main)",
               resize: "vertical",
-              fontFamily: "inherit",
-              fontSize: "0.9rem"
+              fontFamily: "var(--font-desktop)",
+              fontSize: "0.85rem",
+              fontWeight: 500,
+              lineHeight: '1.5',
+              boxShadow: 'none'
             }}
           />
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "0.5rem" }}>
-            <span style={{ fontSize: "0.8rem", color: status.startsWith('❌') ? '#ef4444' : '#10b981' }}>{status}</span>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "1rem" }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <div style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: status.startsWith('❌') ? '#ef4444' : (status.startsWith('✅') ? '#10b981' : 'transparent') }}></div>
+                <span style={{ fontSize: "0.8rem", color: status.startsWith('❌') ? '#ef4444' : 'var(--text-muted)', fontWeight: 600 }}>{status || 'Bereit für Analyse'}</span>
+            </div>
             <button
               onClick={handleAnalyzeText}
               disabled={loading || !textInput.trim()}
+              className="btn btn-primary"
               style={{
-                padding: "0.5rem 1rem",
-                backgroundColor: !textInput.trim() ? "var(--muted)" : "var(--primary)",
-                color: "white",
-                border: "none",
-                borderRadius: "4px",
-                cursor: !textInput.trim() ? "not-allowed" : "pointer"
+                minWidth: "160px",
+                height: "36px",
+                backgroundColor: !textInput.trim() ? "var(--color-border)" : "var(--q-primary)",
+                opacity: !textInput.trim() ? 0.6 : 1
               }}
             >
-              {loading ? "..." : "Text analysieren"}
+              {loading ? "Analysiere..." : "KI-Analyse starten"}
             </button>
           </div>
         </div>
       </div>
+
     </>
   );
 }

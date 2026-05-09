@@ -182,6 +182,7 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
     const [history, setHistory] = useState([]); // Array of ImageData
     const [historyStep, setHistoryStep] = useState(-1);
     const [showHistoryOverlay, setShowHistoryOverlay] = useState(false);
+    const [showHistoryTable, setShowHistoryTable] = useState(false);
     const [isCanvasExpanded, setIsCanvasExpanded] = useState(false);
     const [isSketchLocked, setIsSketchLocked] = useState(true);
     const [isSketchFullscreen, setIsSketchFullscreen] = useState(false);
@@ -607,7 +608,7 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
     };
 
     const startDrawing = (e) => {
-        if (!isOpen || isSketchLocked) return;
+        if (!isOpen || isSketchLocked || activeTool === 'photo') return;
         // pointerType-Regel: Finger/touch -> immer Foto-Overlay, nie zeichnen
         if (e.pointerType === 'touch') return;
         if (stylusOnlyMode && e.pointerType !== 'pen') return;
@@ -882,6 +883,24 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
                             {isSaving ? <Loader size={16} className="animate-spin" /> : isSuccess ? <Check size={16} /> : <Save size={16} />}
                             {isSaving ? 'Speichert…' : isSuccess ? 'Gespeichert!' : (readOnly ? 'Schliessen' : 'Speichern')}
                         </button>
+                        <button 
+                            onClick={() => setShowHistoryTable(!showHistoryTable)} 
+                            style={{ 
+                                padding: '0.55rem 1rem', 
+                                borderRadius: '8px', 
+                                background: showHistoryTable ? 'rgba(96,165,250,0.2)' : 'rgba(255,255,255,0.07)', 
+                                border: showHistoryTable ? '1px solid #60A5FA' : '1px solid var(--border)', 
+                                color: showHistoryTable ? '#60A5FA' : '#94A3B8', 
+                                cursor: 'pointer', 
+                                minHeight: '42px', 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                gap: '0.4rem',
+                                fontWeight: 700
+                            }}
+                        >
+                            <RotateCcw size={16} /> Verlauf
+                        </button>
                         <button onClick={async () => {
                             if (hasUnsavedChanges) {
                                 await handleSave();
@@ -901,6 +920,49 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
                     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', borderRight: '1px solid rgba(255,255,255,0.08)', minWidth: 0 }}>
                         {/* Hidden canvas always in DOM for init/save */}
                         <canvas ref={hiddenCanvasRef} width={960} height={600} style={{ display: 'none' }} />
+
+                        {/* --- INTEGRATED HISTORY TABLE --- */}
+                        {showHistoryTable && (
+                            <div style={{ flexShrink: 0, maxHeight: '35%', backgroundColor: 'var(--surface)', borderBottom: '1px solid var(--border)', overflow: 'auto', padding: '0.5rem' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', padding: '0 0.5rem' }}>
+                                    <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#60A5FA', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Messverlauf (W/B)</span>
+                                    <button onClick={() => setShowHistoryTable(false)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><X size={14} /></button>
+                                </div>
+                                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+                                    <thead style={{ position: 'sticky', top: 0, background: 'var(--surface)', zIndex: 10 }}>
+                                        <tr>
+                                            <th style={{ padding: '0.4rem', textAlign: 'left', color: 'var(--text-muted)', borderBottom: '1px solid var(--border)', width: '70px' }}>MP</th>
+                                            {[...historyRows].reverse().map(row => (
+                                                <th key={row.id} style={{ padding: '0.4rem', textAlign: 'center', color: 'var(--text-muted)', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>
+                                                    {row.date ? new Date(row.date).toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit' }) : '-'}
+                                                </th>
+                                            ))}
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {historyColumns.map(mpName => (
+                                            <tr key={mpName} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                                                <td style={{ padding: '0.3rem 0.4rem', fontWeight: 700, color: 'var(--text-main)' }}>{mpName}</td>
+                                                {[...historyRows].reverse().map(row => {
+                                                    const cell = row.points[mpName];
+                                                    return (
+                                                        <td key={row.id} style={{ padding: '0.3rem 0.4rem', textAlign: 'center' }}>
+                                                            {cell ? (
+                                                                <span style={{ display: 'flex', justifyContent: 'center', gap: '4px' }}>
+                                                                    <span style={{ color: cell.w_color, fontWeight: 700 }}>{cell.w_value || '-'}</span>
+                                                                    <span style={{ color: 'var(--text-muted)' }}>/</span>
+                                                                    <span style={{ color: cell.b_color, fontWeight: 700 }}>{cell.b_value || '-'}</span>
+                                                                </span>
+                                                            ) : '-'}
+                                                        </td>
+                                                    );
+                                                })}
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
 
                         {/* Preview Area */}
                         <div style={{ flex: 1, position: 'relative', overflow: 'hidden', backgroundColor: '#f0f2f5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -1198,10 +1260,19 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
                 <div style={{ position: 'fixed', inset: 0, zIndex: 99999, backgroundColor: 'var(--background)', display: 'flex', flexDirection: 'column', touchAction: 'none' }}>
                     <div style={{ flexShrink: 0, padding: '0.75rem 1rem', backgroundColor: 'var(--surface)', borderBottom: '1px solid var(--border)', display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap', position: 'relative', zIndex: 100 }}>
                         <button onClick={() => { activateTool('pen'); setColor('#000000'); setLineWidth(2); }} style={{ padding: '0.5rem 0.75rem', borderRadius: '6px', background: (activeTool === 'pen' && color === '#000000') ? 'var(--primary)' : 'rgba(255,255,255,0.05)', border: (activeTool === 'pen' && color === '#000000') ? '1px solid var(--primary)' : '1px solid rgba(255,255,255,0.15)', color: (activeTool === 'pen' && color === '#000000') ? 'white' : '#94A3B8', display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Pen size={16} /><span style={{ fontSize: '0.8rem', fontWeight: 600 }}>Stift</span></button>
-                        <button onClick={() => { activateTool('pen'); setColor('#ef4444'); setLineWidth(3); }} style={{ padding: '0.5rem', borderRadius: '6px', background: (activeTool === 'pen' && color === '#ef4444') ? 'rgba(239,68,68,0.2)' : 'rgba(255,255,255,0.05)', border: (activeTool === 'pen' && color === '#ef4444') ? '1px solid #ef4444' : '1px solid rgba(255,255,255,0.15)', color: '#ef4444' }}><Pen size={16} /></button>
-                        <button onClick={() => { activateTool('pen'); setColor('#3b82f6'); setLineWidth(3); }} style={{ padding: '0.5rem', borderRadius: '6px', background: (activeTool === 'pen' && color === '#3b82f6') ? 'rgba(59,130,246,0.2)' : 'rgba(255,255,255,0.05)', border: (activeTool === 'pen' && color === '#3b82f6') ? '1px solid #3b82f6' : '1px solid rgba(255,255,255,0.15)', color: '#3b82f6' }}><Pen size={16} /></button>
+                        <button onClick={() => { activateTool('pen'); setColor('#ef4444'); setLineWidth(3); }} style={{ padding: '0.5rem', borderRadius: '6px', background: (activeTool === 'pen' && color === '#ef4444') ? 'rgba(239,68,68,0.2)' : 'rgba(255,255,255,0.05)', border: (activeTool === 'pen' && color === '#ef4444') ? '1px solid #ef4444' : '1px solid rgba(255,255,255,0.15)', color: '#ef4444' }} title="Rot"><Pen size={16} /></button>
+                        <button onClick={() => { activateTool('pen'); setColor('#3b82f6'); setLineWidth(3); }} style={{ padding: '0.5rem', borderRadius: '6px', background: (activeTool === 'pen' && color === '#3b82f6') ? 'rgba(59,130,246,0.2)' : 'rgba(255,255,255,0.05)', border: (activeTool === 'pen' && color === '#3b82f6') ? '1px solid #3b82f6' : '1px solid rgba(255,255,255,0.15)', color: '#3b82f6' }} title="Blau"><Pen size={16} /></button>
+                        <button onClick={() => { activateTool('pen'); setColor('#22c55e'); setLineWidth(3); }} style={{ padding: '0.5rem', borderRadius: '6px', background: (activeTool === 'pen' && color === '#22c55e') ? 'rgba(34,197,94,0.2)' : 'rgba(255,255,255,0.05)', border: (activeTool === 'pen' && color === '#22c55e') ? '1px solid #22c55e' : '1px solid rgba(255,255,255,0.15)', color: '#22c55e' }} title="Grün"><Pen size={16} /></button>
+                        <button onClick={() => { activateTool('pen'); setColor('#eab308'); setLineWidth(3); }} style={{ padding: '0.5rem', borderRadius: '6px', background: (activeTool === 'pen' && color === '#eab308') ? 'rgba(234,179,8,0.2)' : 'rgba(255,255,255,0.05)', border: (activeTool === 'pen' && color === '#eab308') ? '1px solid #eab308' : '1px solid rgba(255,255,255,0.15)', color: '#eab308' }} title="Gelb"><Pen size={16} /></button>
                         <button onClick={() => activateTool('eraser')} style={{ padding: '0.5rem 0.75rem', borderRadius: '6px', background: (activeTool === 'eraser') ? 'var(--color-panel-bg)' : 'rgba(255,255,255,0.05)', border: (activeTool === 'eraser') ? '1px solid var(--border)' : '1px solid rgba(255,255,255,0.15)', color: '#94A3B8', display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Eraser size={16} /><span style={{ fontSize: '0.8rem', fontWeight: 600 }}>Radierer</span></button>
-                        <button onClick={() => document.getElementById('sketch-photo-upload-fs').click()} style={{ padding: '0.5rem', borderRadius: '6px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.15)', color: '#94A3B8', display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Image size={16} /><span style={{ fontSize: '0.8rem', fontWeight: 600 }}>Bilder</span></button>
+                        
+                        <div style={{ width: '1px', height: '24px', background: 'var(--border)', margin: '0 0.5rem' }} />
+
+                        <button onClick={() => activateTool('photo')} style={{ padding: '0.5rem 0.75rem', borderRadius: '6px', background: (activeTool === 'photo') ? 'rgba(59,130,246,0.2)' : 'rgba(255,255,255,0.05)', border: (activeTool === 'photo') ? '1px solid #3b82f6' : '1px solid rgba(255,255,255,0.15)', color: activeTool === 'photo' ? '#60A5FA' : '#94A3B8', display: 'flex', alignItems: 'center', gap: '0.4rem' }} title="Bilder verschieben">
+                            <Image size={16} /><span style={{ fontSize: '0.8rem', fontWeight: 600 }}>Verschieben</span>
+                        </button>
+
+                        <button onClick={() => document.getElementById('sketch-photo-upload-fs').click()} style={{ padding: '0.5rem 0.75rem', borderRadius: '6px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.15)', color: '#94A3B8', display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Camera size={16} /><span style={{ fontSize: '0.8rem', fontWeight: 600 }}>+ Bilder</span></button>
                         <input id="sketch-photo-upload-fs" type="file" accept="image/*,.heic,.heif" multiple style={{ display: 'none' }} onChange={(e) => { const files = Array.from(e.target.files || []); files.forEach(file => { const reader = new FileReader(); reader.onload = (ev) => { setGalleryPhotos(prev => [...prev, { id: Date.now() + Math.random(), src: ev.target.result }]); activateTool('photo'); }; reader.readAsDataURL(file); }); e.target.value = ''; }} />
                         <button onClick={handleUndo} disabled={historyStep <= 0} style={{ padding: '0.5rem', borderRadius: '4px', background: 'transparent', border: '1px solid rgba(255,255,255,0.15)', color: historyStep <= 0 ? 'rgba(255,255,255,0.2)' : '#94A3B8', opacity: historyStep <= 0 ? 0.5 : 1 }}><Undo size={16} /></button>
 
@@ -1213,7 +1284,7 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
                         <canvas ref={gridCanvasRef} width={960} height={600} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 1, pointerEvents: 'none', display: 'block' }} />
                         <canvas ref={photoCanvasRef} width={960} height={600} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 2, pointerEvents: 'none', display: 'block' }} />
                         <canvas ref={canvasRef} width={960} height={600} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 60, display: 'block', backgroundColor: 'transparent', pointerEvents: 'none', touchAction: 'none' }} />
-                        <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 30, backgroundColor: 'transparent', touchAction: 'none', cursor: isDrawMode ? 'crosshair' : 'default' }}
+                        <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 30, backgroundColor: 'transparent', touchAction: 'none', cursor: isDrawMode ? 'crosshair' : (activeTool === 'photo' ? 'move' : 'default') }}
                             onPointerDown={(e) => { if (e.pointerType !== 'pen') return; setSelectedPhotoId(null); startDrawing(e); }}
                             onPointerMove={(e) => { if (e.pointerType === 'pen') draw(e); }}
                             onPointerUp={(e) => { if (e.pointerType === 'pen') stopDrawing(e); }}

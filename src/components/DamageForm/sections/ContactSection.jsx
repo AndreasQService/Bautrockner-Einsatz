@@ -169,7 +169,7 @@ const ContactSection = ({ formData, setFormData, mode, renderConflictWarn }) => 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                     {/* Project Number Reference */}
                     <div style={{ marginBottom: '0.25rem' }}>
-                        <label style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 700, display: 'block', marginBottom: '0.2rem' }}>PROJEKT-NR</label>
+                        <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 800, display: 'block', marginBottom: '0.4rem' }}>PROJEKT-NR</label>
                         <div style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--q-primary)', letterSpacing: '0.02em' }}>
                             {formData.projectNumber || '---'}
                         </div>

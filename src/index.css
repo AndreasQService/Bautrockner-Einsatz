@@ -126,17 +126,17 @@ html, body {
 
   --primary:        #1E6DB7;
   --primary-hover:  #175394;
-  --background:     #F8FAFC;
+  --background:     #F1F5F9; /* Etwas grauerer Hintergrund für besseren Kontrast zu weissen Cards */
   --surface:        #FFFFFF;
   --surface-opaque: #FFFFFF;
-  --border:         #E2E8F0;
-  --text-main:      #0F172A;
-  --text-muted:     #64748B;
+  --border:         #475569; /* +20% Finaler Kontrast */
+  --text-main:      #020617; /* Tiefschwarz für max. Kontrast */
+  --text-muted:     #1E293B; /* Fast Schwarz für Labels */
   --glass-bg:       #FFFFFF;
-  --glass-border:   #D5D9E0;
+  --glass-border:   #CBD5E1;
   --glass-blur:     none;
-  --shadow-sm:      0 1px 2px rgba(0,0,0,0.06);
-  --shadow-md:      0 2px 5px rgba(0,0,0,0.09);
+  --shadow-sm:      0 1px 3px rgba(0,0,0,0.1);
+  --shadow-md:      0 4px 6px -1px rgba(0,0,0,0.1);
   --shadow-premium: 0 1px 3px rgba(0,0,0,0.07);
 
   /* Enterprise Tokens – SPEC-EXAKTE WERTE */
@@ -154,18 +154,18 @@ html, body {
   --color-surface-alt:         #F4F6F9;
   --color-panel-bg:            #F1F5F9;
 
-  --color-border:              #D5D9E0;
-  --color-border-strong:       #C3C7D0;
+  --color-border:              #475569;
+  --color-border-strong:       #334155;
 
-  --color-text-primary:        #1F2937;
-  --color-text-secondary:      #4B5563;
-  --color-text-muted:          #6B7280;
+  --color-text-primary:        #0F172A;
+  --color-text-secondary:      #334155;
+  --color-text-muted:          #1E293B;
 
   --color-row-hover:           #EFF3F8;
   --color-row-selected:        #E1EEFF;
 
   --color-input-bg:            #FFFFFF;
-  --color-input-border:        #C3C7D0;
+  --color-input-border:        #334155;
   --color-input-focus:         #1E6DB7;
 
   --color-btn-secondary-bg:    #FFFFFF;
@@ -328,10 +328,10 @@ html, body {
   background: #FFFFFF;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
-  border: 1px solid #D5D9E0;
+  border: 1.5px solid #64748B; /* Erhöhter Kontrast (Stufe 2) für ERP-Look (vorher #94A3B8) */
   /* WICHTIG: Override der farbigen borderTop aus JSX-Inline-Styles */
-  border-top: 1px solid #D5D9E0 !important;
-  box-shadow: var(--shadow-sm);
+  border-top: 1.5px solid #64748B !important;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
   border-radius: 4px;
 }
 [data-theme="light"] .card:hover {
@@ -341,7 +341,7 @@ html, body {
 [data-theme="light"] .glass-card {
   background: #FFFFFF;
   backdrop-filter: none;
-  border: 1px solid #D5D9E0;
+  border: 1.5px solid #64748B;
   box-shadow: var(--shadow-sm);
   border-radius: 4px;
 }
@@ -396,10 +396,11 @@ html, body {
    ══════════════════════════════════════════════════════════════════════════ */
 [data-theme="light"] .form-input {
   background: #FFFFFF !important;
-  border: 1px solid #C3C7D0;
-  color: #1F2937;
+  border: 1.5px solid var(--color-input-border);
+  color: var(--text-main);
   box-shadow: none;
   font-size: var(--text-body);
+  font-weight: 500;
 }
 [data-theme="light"] .form-input:focus {
   background: #FFFFFF !important;

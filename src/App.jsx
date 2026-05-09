@@ -1099,6 +1099,7 @@ function App() {
               initialData={selectedReport}
               mode={projectMode}
               readOnly={isReadOnly}
+              isDarkMode={isDarkMode}
               onModeChange={(newMode) => {
                 setProjectModeExclusive(newMode);
               }}

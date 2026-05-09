@@ -46,13 +46,15 @@ export default function AiSuggestionsPanel({
 
     return (
         <div style={{
-            marginTop: "1rem",
-            padding: "1rem",
-            backgroundColor: "#f0fdf4", // Helles Grün für positive Vorschläge
-            border: "1px solid #bbf7d0",
+            marginTop: "1.25rem",
+            padding: "1.25rem",
+            backgroundColor: "var(--color-success-bg)",
+            border: "1.5px solid #A8D5B1",
             borderRadius: "8px",
-            color: "#166534"
+            color: "var(--color-text-primary)",
+            boxShadow: 'var(--shadow-sm)'
         }}>
+
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
                 <h3 style={{ margin: 0, fontSize: "1.1rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
                     ✨ KI-Vorschläge gefunden
@@ -60,30 +62,29 @@ export default function AiSuggestionsPanel({
                 <div style={{ display: "flex", gap: "0.5rem" }}>
                     <button
                         onClick={() => onApplyAll(extractedData)}
+                        className="btn btn-primary"
                         style={{
-                            padding: "0.5rem 1rem",
                             backgroundColor: "#16a34a",
-                            color: "white",
                             border: "none",
-                            borderRadius: "4px",
-                            cursor: "pointer",
-                            fontWeight: 600
+                            padding: "0 1.25rem",
+                            height: '32px'
                         }}
                     >
                         Alle übernehmen
                     </button>
                     <button
                         onClick={onDismiss}
+                        className="btn btn-outline"
                         style={{
-                            padding: "0.5rem",
-                            backgroundColor: "transparent",
-                            color: "#dc2626", // Rot für Schließen
-                            border: "1px solid #fca5a5",
-                            borderRadius: "4px",
-                            cursor: "pointer"
+                            padding: "0",
+                            width: '32px',
+                            height: '32px',
+                            color: "#dc2626",
+                            borderColor: "#fca5a5"
                         }}
                         title="Vorschläge verwerfen"
                     >
+
                         <X size={20} />
                     </button>
                 </div>
@@ -101,12 +102,14 @@ export default function AiSuggestionsPanel({
                             display: "flex",
                             alignItems: "center",
                             gap: "1rem",
-                            padding: "0.5rem",
-                            backgroundColor: different ? "white" : "rgba(255,255,255,0.5)",
+                            padding: "0.6rem 0.8rem",
+                            backgroundColor: different ? "var(--surface)" : "rgba(255,255,255,0.4)",
                             border: "1px solid",
-                            borderColor: different ? "#86efac" : "transparent",
-                            borderRadius: "4px"
+                            borderColor: different ? "#86efac" : "var(--color-border)",
+                            borderRadius: "4px",
+                            transition: 'all 0.1s ease'
                         }}>
+
                             <div style={{ width: "140px", fontWeight: 600, fontSize: "0.9rem" }}>{label}:</div>
 
                             <div style={{ flex: 1, fontSize: "0.9rem", color: "#374151" }}>
@@ -122,23 +125,22 @@ export default function AiSuggestionsPanel({
                             {different ? (
                                 <button
                                     onClick={() => onApplyField(key, value)}
+                                    className="btn btn-outline"
                                     style={{
-                                        padding: "0.25rem 0.5rem",
-                                        fontSize: "0.8rem",
+                                        padding: "0 0.75rem",
+                                        height: '28px',
+                                        fontSize: "0.75rem",
                                         backgroundColor: "#dcfce7",
                                         color: "#15803d",
-                                        border: "1px solid #86efac",
-                                        borderRadius: "4px",
-                                        cursor: "pointer",
-                                        display: "flex",
-                                        alignItems: "center",
-                                        gap: "0.25rem"
+                                        borderColor: "#86efac",
+                                        fontWeight: 700
                                     }}
                                 >
                                     Übernehmen <Check size={14} />
                                 </button>
                             ) : (
-                                <span style={{ fontSize: "0.8rem", color: "#16a34a", display: "flex", alignItems: "center", gap: "0.25rem" }}>
+                                <span style={{ fontSize: "0.8rem", color: "#16a34a", display: "flex", alignItems: "center", gap: "0.3rem", fontWeight: 600 }}>
+
                                     <Check size={14} /> Bereits aktuell
                                 </span>
                             )}
