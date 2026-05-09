@@ -33,6 +33,7 @@ import CameraCaptureModal from './CameraCaptureModal';
 import MeasurementModal from './MeasurementModal';
 import { applyDryingCheck } from '../features/projects/dryingCheckService';
 import { generateMeasurementExcel } from '../utils/MeasurementExcelExporter';
+import { PDFService } from '../services/PDFService';
 
 /* Custom PDF Icon */
 const PdfIcon = ({ size = 24, style = {} }) => (
@@ -2294,6 +2295,34 @@ END:VCARD`;
         } catch (error) {
             console.error("PDF Export failed", error);
             alert("Fehler beim Erstellen des PDFs");
+        } finally {
+            setIsGeneratingPDF(false);
+        }
+    };
+
+    const testGeneratePDFViaService = async () => {
+        setIsGeneratingPDF(true);
+        try {
+            console.log("[TEST] Starte Test-Export via PDFService Master-Pfad...");
+            const result = await PDFService.generateCompleteDamageReport(formData, {
+                supabase,
+                uploadToOneDrive: false,
+                uploadToApp: false,
+                getPhotoDownloadUrl,
+                uploadReport,
+                handleImageUpload,
+                buildProjectFolderName,
+                onProgress: (msg) => console.log(`[TEST Progress] ${msg}`)
+            });
+
+            if (result && result.blob) {
+                const testFileName = `TEST_SERVICE_${result.fileName}`;
+                PDFService.downloadBlob(result.blob, testFileName);
+                console.log("[TEST] Test-PDF erfolgreich erstellt:", testFileName);
+            }
+        } catch (error) {
+            console.error("[TEST] PDF Service Master Test failed", error);
+            alert("Test fehlgeschlagen: " + error.message);
         } finally {
             setIsGeneratingPDF(false);
         }
