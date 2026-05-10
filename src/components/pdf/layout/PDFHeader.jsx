@@ -1,13 +1,12 @@
 import React from 'react';
 import { View, Image, Text } from '@react-pdf/renderer';
 import { styles } from '../PDFStyles';
-import logoAsset from '../../../../public/1080p.jpg';
 
 const PDFHeader = ({ data }) => {
     return (
         <View style={styles.header}>
             <View style={{ alignItems: 'flex-start' }}>
-                <Image src={logoAsset} style={styles.logo} />
+                <Image src="/1080p.jpg" style={styles.logo} />
                 {data.projectNumber && (
                     <Text
                         style={{ fontSize: 9, color: '#0F6EA3', fontWeight: 'bold', marginTop: 2 }}
