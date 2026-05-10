@@ -410,9 +410,9 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
                                 borderRadius: '3px',
                                 border: 'none',
                                 fontSize: '0.78rem',
-                                fontWeight: 500,
-                                backgroundColor: !showArchive ? 'var(--primary)' : 'transparent',
-                                color: !showArchive ? 'white' : 'var(--text-muted)',
+                                fontWeight: !showArchive ? 700 : 500,
+                                backgroundColor: !showArchive ? '#1E6DB7' : 'transparent',
+                                color: !showArchive ? '#FFFFFF' : 'var(--text-muted)',
                                 transition: 'all 0.15s'
                             }}
                         >
@@ -426,9 +426,9 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
                                 borderRadius: '3px',
                                 border: 'none',
                                 fontSize: '0.78rem',
-                                fontWeight: 500,
-                                backgroundColor: showArchive ? 'var(--primary)' : 'transparent',
-                                color: showArchive ? 'white' : 'var(--text-muted)',
+                                fontWeight: showArchive ? 700 : 500,
+                                backgroundColor: showArchive ? '#1E6DB7' : 'transparent',
+                                color: showArchive ? '#FFFFFF' : 'var(--text-muted)',
                                 transition: 'all 0.15s'
                             }}
                         >
