@@ -30,7 +30,7 @@ export const ExportService = {
             console.error("Excel Service: Logo load error", err);
         }
 
-        const roomsWithMeasurements = (formData.rooms || []).filter(room =>
+        const roomsWithMeasurements = (formData.measurementRooms || []).filter(room =>
             room.measurementData && room.measurementData.measurements && room.measurementData.measurements.length > 0
         );
 

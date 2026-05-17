@@ -137,6 +137,64 @@ const addAnnotationToImage = (imgSrc, type = 'circle') => {
     });
 };
 
+const getMeasurementEntries = (room) => {
+  const entries = [];
+
+  if (Array.isArray(room.measurementHistory)) {
+    entries.push(...room.measurementHistory.map(h => ({
+      source: 'history',
+      date: h.date || h.datum || h.timestamp || h.createdAt || h.globalSettings?.date,
+      device: h.device || h.measurementDevice || h.messmittel || h.globalSettings?.device,
+      temperature: h.temperature || h.temp || h.globalSettings?.temperature,
+      humidity: h.humidity || h.rf || h.relativeHumidity || h.globalSettings?.humidity,
+      measurements: h.measurements || h.points || h.measurementPoints || [],
+      canvasImage: h.canvasImage,
+      protocolUrl: h.protocolUrl
+    })));
+  }
+
+  if (room.measurementData && Array.isArray(room.measurementData.measurements)) {
+    entries.push({
+      source: 'measurementData',
+      date: room.measurementData.globalSettings?.date,
+      device: room.measurementData.globalSettings?.device,
+      temperature: room.measurementData.globalSettings?.temperature,
+      humidity: room.measurementData.globalSettings?.humidity,
+      measurements: room.measurementData.measurements,
+      canvasImage: room.measurementData.canvasImage,
+      protocolUrl: room.measurementData.protocolUrl
+    });
+  }
+
+  if (Array.isArray(room.measurements)) {
+    entries.push({
+      source: 'measurements',
+      measurements: room.measurements
+    });
+  }
+
+  if (Array.isArray(room.measurementPoints)) {
+    entries.push({
+      source: 'measurementPoints',
+      measurements: room.measurementPoints
+    });
+  }
+
+  if (Array.isArray(room.points)) {
+    entries.push({
+      source: 'points',
+      measurements: room.points
+    });
+  }
+
+  return entries.filter(e => Array.isArray(e.measurements) && e.measurements.length > 0);
+};
+
+const getPointLabel = (p, index) => p.pointName || p.mp || p.point || p.label || p.id || `MP ${index + 1}`;
+const getWValue = (p) => p.w_value ?? p.w ?? p.wand ?? p.wall ?? p.W ?? '';
+const getBValue = (p) => p.b_value ?? p.b ?? p.boden ?? p.floor ?? p.B ?? '';
+
+
 export default function DamageForm({ onCancel, initialData, onSave, mode = 'desktop', isDarkMode = true }) {
     // Helper to parse address string if editing
     const parseAddress = (addr) => {
@@ -220,7 +278,8 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         measures: initialData.measures || '',
         selectedMeasures: Array.isArray(initialData.selectedMeasures) ? initialData.selectedMeasures : [],
         includeDescriptionInReport: initialData.includeDescriptionInReport !== false, // Default to true
-        rooms: Array.isArray(initialData.rooms) ? initialData.rooms : []
+        rooms: Array.isArray(initialData.rooms) ? initialData.rooms : [],
+        measurementRooms: Array.isArray(initialData.measurementRooms) ? initialData.measurementRooms : []
     } : {
         id: null,
         projectTitle: '',
@@ -270,8 +329,17 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         measures: '',
         selectedMeasures: [],
         includeDescriptionInReport: true,
-        rooms: []
+        rooms: [],
+        measurementRooms: []
     }));
+
+    useEffect(() => {
+        console.log('[MEASUREMENT-ROOMS TRACE] 2. DamageForm formData updated:', {
+            measurementRoomsLength: (formData.measurementRooms || []).length,
+            roomNames: (formData.measurementRooms || []).map(r => r.name),
+            historyCounts: (formData.measurementRooms || []).map(r => r.measurementHistory?.length)
+        });
+    }, [formData.measurementRooms]);
 
     const [isSaving, setIsSaving] = useState(false);
     const [lastSaved, setLastSaved] = useState(null);
@@ -475,6 +543,12 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                 type: formData.damageType, // Map back to 'type'
                 imageCount: formData.images.length
             };
+
+            console.log('[MEASUREMENT-ROOMS TRACE] 3. Vor Aufruf onSave (AutoSave):', {
+                payloadMeasurementRoomsLength: (reportData.measurementRooms || []).length,
+                payloadRoomNames: (reportData.measurementRooms || []).map(r => r.name),
+                payloadHistoryCounts: (reportData.measurementRooms || []).map(r => r.measurementHistory?.length)
+            });
 
             try {
                 const savedReport = await onSave(reportData, true); // silent=true
@@ -2584,8 +2658,12 @@ END:VCARD`;
                 </div>
 
                 {showTechRoomSelector && (() => {
-                    const allRooms = formData.rooms || [];
-                    const uniqueApartments = Array.from(new Set(allRooms.map(r => (r.apartment || 'Allgemeiner Bereich').trim())));
+                    const allRooms = formData.measurementRooms || [];
+                    const uniqueApartments = Array.from(new Set([
+                        ...allRooms.map(r => (r.apartment || 'Allgemeiner Bereich').trim()),
+                        ...(formData.rooms || []).map(r => (r.apartment || 'Allgemeiner Bereich').trim()),
+                        ...(formData.contacts || []).map(c => c.name ? c.name.trim().split(/\s+/).pop() : '').filter(Boolean)
+                    ].filter(a => a !== '')));
 
                     // Auto-select if there is only one apartment
                     const activeApt = techSelectedApartment || (uniqueApartments.length === 1 ? uniqueApartments[0] : null);
@@ -2690,6 +2768,15 @@ END:VCARD`;
                     );
                 })()}
 
+                {(() => {
+                    console.log('[MEASROOM TRACE] MeasurementModal rendered', {
+                        mode,
+                        techTab: techTab,
+                        showMeasurementModal,
+                        source: 'technician'
+                    });
+                    return null;
+                })()}
                 <MeasurementModal
                     isTechnicianMode={mode === 'technician'}
                     key={activeRoomForMeasurement?.id || 'none'}
@@ -2705,26 +2792,17 @@ END:VCARD`;
                         setActiveRoomForMeasurement(null);
                         setIsNewMeasurement(false);
                         setIsMeasurementReadOnly(false);
-                        setTechActiveSection(null);
+                        setTechTab(null);
                     }}
                     onStartNew={() => setIsNewMeasurement(true)}
                     readOnly={isMeasurementReadOnly}
-                    measurementHistory={[
-                        ...(activeRoomForMeasurement?.measurementHistory || []),
-                        ...(activeRoomForMeasurement?.measurementData?.measurements?.length > 0 ? [{
-                            id: `hist_current`,
-                            date: activeRoomForMeasurement.measurementData.globalSettings?.date || new Date().toISOString(),
-                            measurements: activeRoomForMeasurement.measurementData.measurements,
-                            globalSettings: activeRoomForMeasurement.measurementData.globalSettings,
-                            protocolUrl: activeRoomForMeasurement.measurementData.protocolUrl
-                        }] : [])
-                    ]}
+                    measurementHistory={activeRoomForMeasurement?.measurementHistory || []}
                     rooms={activeRoomForMeasurement ? [activeRoomForMeasurement] : []}
-                    allRooms={formData.rooms || []}
+                    allRooms={formData.measurementRooms || []}
                     projectTitle={formData.projectTitle}
                     address={[formData.street, formData.zip && formData.city ? `${formData.zip} ${formData.city}` : formData.city].filter(Boolean).join(', ')}
                     apartments={[...new Set((formData.contacts || []).filter(c => c.role === 'Mieter' || c.role === 'Eigentümer').map(c => [c.name, c.apartment].filter(Boolean).join(' - ').trim()).filter(Boolean))]}
-                    initialData={(formData.rooms || []).reduce((acc, r) => {
+                    initialData={(formData.measurementRooms || []).reduce((acc, r) => {
                         let mData = r.measurementData;
                         if (activeRoomForMeasurement && r.id === activeRoomForMeasurement.id && isNewMeasurement && mData && Array.isArray(mData.measurements)) {
                             mData = {
@@ -2747,6 +2825,15 @@ END:VCARD`;
                         return { ...acc, [r.id]: mData };
                     }, {})}
                     onSave={async (data) => {
+                        console.log('[MEASROOM TRACE] MeasurementModal onSave fired', {
+                          time: new Date().toISOString(),
+                          mode,
+                          techTab: techTab,
+                          roomName: data.globalSettings?.room,
+                          isNewRoomCreated: activeRoomForMeasurement ? String(activeRoomForMeasurement.id).startsWith('temp_') : false,
+                          activeRoomForMeasurementId: activeRoomForMeasurement?.id,
+                          showMeasurementModal
+                        });
                         const { file, measurements, globalSettings, canvasImage, galleryPhotos } = data;
                         let protocolUrl = null;
                         if (supabase && file) {
@@ -2761,73 +2848,94 @@ END:VCARD`;
                             } catch (err) { console.error(err); }
                         }
                         if (activeRoomForMeasurement) {
-                            setFormData(prev => {
-                                let updatedRooms;
-                                if (String(activeRoomForMeasurement.id).startsWith('temp_')) {
-                                    const finalRoomName = RoomService.normalizeRoomName(globalSettings.room);
-                                    
-                                    // Create standard room via service
-                                    const baseRoom = RoomService.createRoom({
-                                        name: finalRoomName,
-                                        apartment: globalSettings.apartment || '',
-                                        stockwerk: activeRoomForMeasurement.stockwerk
-                                    });
+                            const prev = formData;
+                            let updatedRooms;
+                            const measurementRooms = Array.isArray(prev.measurementRooms) ? prev.measurementRooms : [];
 
-                                    const history = [{
-                                        id: `hist_${Date.now()}`,
-                                        date: globalSettings.date || new Date().toISOString(),
-                                        measurements: measurements.map(m => ({ ...m })),
-                                        globalSettings: { ...globalSettings },
-                                        canvasImage: canvasImage,
-                                        protocolUrl: protocolUrl,
-                                        galleryPhotos: galleryPhotos || []
-                                    }];
+                            const normApt = String(globalSettings.apartment || activeRoomForMeasurement.apartment || 'Allgemeiner Bereich').trim().toLowerCase().replace(/-/g, ' ').replace(/\s+/g, ' ');
+                            const normName = String(globalSettings.room || activeRoomForMeasurement.name || 'Unbenannter Raum').trim().toLowerCase().replace(/-/g, ' ').replace(/\s+/g, ' ');
 
-                                    const newRoom = {
-                                        ...activeRoomForMeasurement,
-                                        ...baseRoom,
-                                        id: `room_${Date.now()}`,
-                                        measurementData: { measurements, globalSettings, canvasImage, protocolUrl, galleryPhotos: galleryPhotos || [] },
-                                        measurementHistory: history
-                                    };
-                                    console.log("QTOOL DEBUG: creating new room", newRoom);
-                                    updatedRooms = [...(prev.rooms || []), newRoom];
-                                    setTimeout(() => setActiveRoomForMeasurement(newRoom), 0);
-                                } else {
-                                    console.log("QTOOL DEBUG: updating existing room", activeRoomForMeasurement.id);
-                                    updatedRooms = (prev.rooms || []).map(r => {
-                                        if (r.id === activeRoomForMeasurement.id) {
-                                            const history = r.measurementHistory ? [...r.measurementHistory] : [];
-                                            const updatedHistory = (isNewMeasurement && r.measurementData && r.measurementData.measurements && r.measurementData.measurements.length > 0)
-                                                ? [...history, {
-                                                    id: `hist_${Date.now()}`,
-                                                    date: r.measurementData.globalSettings?.date || new Date().toISOString(),
-                                                    measurements: r.measurementData.measurements.map(m => ({ ...m })),
-                                                    globalSettings: { ...(r.measurementData.globalSettings || {}) },
-                                                    canvasImage: r.measurementData.canvasImage,
-                                                    protocolUrl: r.measurementData.protocolUrl,
-                                                    galleryPhotos: r.measurementData.galleryPhotos || []
-                                                }]
-                                                : history;
-                                            const updatedRoom = { ...r, name: globalSettings.room || r.name, apartment: globalSettings.apartment || r.apartment, measurementData: { measurements, globalSettings, canvasImage, protocolUrl, galleryPhotos: galleryPhotos || [] }, measurementHistory: updatedHistory };
-                                            setTimeout(() => setActiveRoomForMeasurement(updatedRoom), 0);
-                                            return updatedRoom;
-                                        }
-                                        return r;
-                                    });
-                                }
-                                const measuredAt = globalSettings.date ? new Date(globalSettings.date).toISOString() : new Date().toISOString();
-                                const documentationComplete = !!(measurements && measurements.length > 0 && globalSettings.date);
-                                const dryingUpdate = applyDryingCheck({ ...prev, rooms: updatedRooms }, { measuredAt, documentationComplete });
+                            const existingRoomIndex = measurementRooms.findIndex(r => 
+                                String(r.apartment || 'Allgemeiner Bereich').trim().toLowerCase().replace(/-/g, ' ').replace(/\s+/g, ' ') === normApt &&
+                                String(r.name || 'Unbenannter Raum').trim().toLowerCase().replace(/-/g, ' ').replace(/\s+/g, ' ') === normName
+                            );
+
+                            let updatedMeasurementRooms = [...measurementRooms];
+                            let finalRoom;
+
+                            if (existingRoomIndex >= 0) {
+                                const existingRoom = measurementRooms[existingRoomIndex];
+                                const history = existingRoom.measurementHistory ? [...existingRoom.measurementHistory] : [];
                                 
-                                const finalState = dryingUpdate ? { ...dryingUpdate, rooms: updatedRooms } : { ...prev, rooms: updatedRooms };
-                                console.log("QTOOL DEBUG: Final State Rooms:", finalState.rooms);
-                                return finalState;
-                            });
+                                const updatedHistory = (isNewMeasurement && existingRoom.measurementData && existingRoom.measurementData.measurements && existingRoom.measurementData.measurements.length > 0)
+                                    ? [{
+                                        id: `hist_${Date.now()}_prev`,
+                                        date: existingRoom.measurementData.globalSettings?.date || new Date().toISOString(),
+                                        measurements: existingRoom.measurementData.measurements.map(m => ({ ...m })),
+                                        globalSettings: { ...(existingRoom.measurementData.globalSettings || {}) },
+                                        canvasImage: existingRoom.measurementData.canvasImage,
+                                        protocolUrl: existingRoom.measurementData.protocolUrl,
+                                        galleryPhotos: existingRoom.measurementData.galleryPhotos || []
+                                    }, ...history]
+                                    : history;
+
+                                finalRoom = {
+                                    ...existingRoom,
+                                    name: globalSettings.room || existingRoom.name,
+                                    apartment: globalSettings.apartment || existingRoom.apartment,
+                                    measurementData: { measurements, globalSettings, canvasImage, protocolUrl, galleryPhotos: galleryPhotos || [] },
+                                    measurementHistory: updatedHistory
+                                };
+                                updatedMeasurementRooms[existingRoomIndex] = finalRoom;
+                            } else {
+                                const baseRoom = RoomService.createRoom({
+                                    name: globalSettings.room || activeRoomForMeasurement.name || 'Unbenannter Raum',
+                                    apartment: globalSettings.apartment || activeRoomForMeasurement.apartment || '',
+                                    stockwerk: activeRoomForMeasurement.stockwerk || ''
+                                });
+
+                                const history = activeRoomForMeasurement.measurementHistory ? [...activeRoomForMeasurement.measurementHistory] : [];
+                                const updatedHistory = (isNewMeasurement && activeRoomForMeasurement.measurementData && activeRoomForMeasurement.measurementData.measurements && activeRoomForMeasurement.measurementData.measurements.length > 0)
+                                    ? [{
+                                        id: `hist_${Date.now()}_prev`,
+                                        date: activeRoomForMeasurement.measurementData.globalSettings?.date || new Date().toISOString(),
+                                        measurements: activeRoomForMeasurement.measurementData.measurements.map(m => ({ ...m })),
+                                        globalSettings: { ...(activeRoomForMeasurement.measurementData.globalSettings || {}) },
+                                        canvasImage: activeRoomForMeasurement.measurementData.canvasImage,
+                                        protocolUrl: activeRoomForMeasurement.measurementData.protocolUrl,
+                                        galleryPhotos: activeRoomForMeasurement.measurementData.galleryPhotos || []
+                                    }, ...history]
+                                    : history;
+
+                                finalRoom = {
+                                    ...activeRoomForMeasurement,
+                                    ...baseRoom,
+                                    id: `room_${Date.now()}`,
+                                    measurementData: { measurements, globalSettings, canvasImage, protocolUrl, galleryPhotos: galleryPhotos || [] },
+                                    measurementHistory: updatedHistory
+                                };
+                                updatedMeasurementRooms.push(finalRoom);
+                            }
+
+                            setTimeout(() => setActiveRoomForMeasurement(finalRoom), 0);
+                            
+                            const measuredAt = globalSettings.date ? new Date(globalSettings.date).toISOString() : new Date().toISOString();
+                            const documentationComplete = !!(measurements && measurements.length > 0 && globalSettings.date);
+                            const dryingUpdate = applyDryingCheck({ ...prev, measurementRooms: updatedMeasurementRooms }, { measuredAt, documentationComplete });
+                            
+                            const updatedFormData = dryingUpdate ? { ...dryingUpdate, measurementRooms: updatedMeasurementRooms } : { ...prev, measurementRooms: updatedMeasurementRooms };
+                            
+                            setFormData(updatedFormData);
+                            
+                            if (typeof onSave === 'function') {
+                                onSave(updatedFormData, true);
+                            }
+
                             setIsNewMeasurement(false); // So subsequent saves don't duplicate history
                         }
                     }}
                 />
+
             </div>
         );
     }
@@ -6491,134 +6599,163 @@ END:VCARD`;
                                 {formData.images.filter(img => img.assignedTo === 'Sonstiges').length === 0 && <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem', fontStyle: 'italic' }}>Keine Lieferantenrechnungen vorhanden.</div>}
                             </div>
                         </div>
+                    </div>
+                )}
 
-                        {/* Messprotokolle */}
-                        <div className="card" style={{ padding: '1.5rem' }}>
-                            <h3 className="section-header">
-                                <ClipboardList size={18} /> Messprotokolle
-                            </h3>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                                {formData.rooms.map(room => {
-                                    const hasMeasurement = !!room.measurementData;
-                                    const date = hasMeasurement ? (room.measurementData.globalSettings?.date ? new Date(room.measurementData.globalSettings.date).toLocaleDateString('de-CH') : 'Kein Datum') : '-';
-                                    const allImages = [
-                                        ...(room.measurementData?.canvasImage ? [{ id: 'current', src: room.measurementData.canvasImage, label: `Aktuell · ${date}`, isCurrent: true }] : [])
-                                    ];
-                                    return (
-                                        <div key={room.id} style={{
-                                            padding: '1rem', backgroundColor: 'rgba(255, 255, 255, 0.02)',
-                                            border: '1px solid var(--border)', borderRadius: '12px',
-                                            display: 'flex', flexDirection: 'column', gap: '0.75rem',
-                                        }}>
-                                            {/* Header: Raumname + Buttons */}
-                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
-                                                <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-                                                    <div style={{ fontWeight: 700, fontSize: '1rem', color: 'white' }}>{room.name}</div>
-                                                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 500 }}>{hasMeasurement ? `Letzte Messung: ${date}` : 'Keine Messdaten'}</div>
+                {(mode === 'desktop' || (mode === 'technician' && techTab === 'uebersicht')) && (
+                    <div className="card" style={{ padding: '1.5rem', marginBottom: '1.5rem' }}>
+                        <h3 className="section-header">
+                            <ClipboardList size={18} /> Messprotokolle
+                        </h3>
+                        {console.log('[MEASUREMENT-ROOMS TRACE] 6. Render Messprotokolle:', { length: (formData.measurementRooms || []).length, names: (formData.measurementRooms || []).map(r=>r.name) })}
+                        {(() => {
+                            const measuredRooms = (formData.measurementRooms || [])
+                              .map(room => ({
+                                room,
+                                entries: getMeasurementEntries(room)
+                              }))
+                              .filter(x => x.entries.length > 0);
+
+                            if (measuredRooms.length === 0) {
+                                return (
+                                    <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.9rem', fontStyle: 'italic', padding: '1rem' }}>
+                                        Noch kein Messprotokoll vorhanden.
+                                    </div>
+                                );
+                            }
+
+                            return (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                                    {measuredRooms.map(({ room, entries }) => {
+                                        const latestEntry = entries[0];
+                                        const dateStr = latestEntry.date ? new Date(latestEntry.date).toLocaleDateString('de-CH') : 'Kein Datum';
+                                        
+                                        const canvasImage = latestEntry.canvasImage || room.canvasImage;
+                                        const protocolUrl = latestEntry.protocolUrl || room.protocolUrl;
+
+                                        const allImages = [
+                                            ...(canvasImage ? [{ id: 'current', src: canvasImage, label: `Aktuell · ${dateStr}`, isCurrent: true }] : [])
+                                        ];
+
+                                        let maxW = '-';
+                                        let maxB = '-';
+                                        if (latestEntry.measurements.length > 0) {
+                                            const wValues = latestEntry.measurements.map(m => parseFloat(String(getWValue(m)).replace(',', '.'))).filter(v => !isNaN(v));
+                                            const bValues = latestEntry.measurements.map(m => parseFloat(String(getBValue(m)).replace(',', '.'))).filter(v => !isNaN(v));
+                                            if (wValues.length > 0) maxW = Math.max(...wValues);
+                                            if (bValues.length > 0) maxB = Math.max(...bValues);
+                                        }
+
+                                        return (
+                                            <div key={room.id} style={{
+                                                padding: '1rem', backgroundColor: 'var(--surface)',
+                                                border: '1px solid var(--border)', borderRadius: '12px',
+                                                display: 'flex', flexDirection: 'column', gap: '0.75rem',
+                                            }}>
+                                                {/* Header */}
+                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem' }}>
+                                                    <div>
+                                                        <div style={{ fontWeight: 700, fontSize: '1rem', color: 'white' }}>{room.name || 'Unbenannter Raum'}</div>
+                                                        <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 500 }}>
+                                                            {dateStr}
+                                                        </div>
+                                                    </div>
+                                                    <button 
+                                                        type="button" 
+                                                        className="btn-glass" 
+                                                        style={{ padding: '0.4rem 0.8rem', fontSize: '0.75rem', borderRadius: '8px', color: 'var(--primary)' }} 
+                                                        onClick={() => { setActiveRoomForMeasurement(room); setIsNewMeasurement(false); setShowMeasurementModal(true); }}
+                                                    >
+                                                        Details öffnen
+                                                    </button>
                                                 </div>
-                                                {mode !== 'desktop' && <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                                    {room.measurementData ? (
-                                                        <>
-                                                            <button type="button" className="btn-glass" style={{ padding: '0.4rem 0.8rem', minHeight: '44px', fontSize: '0.75rem', borderRadius: '8px' }} onClick={() => { setActiveRoomForMeasurement(room); setIsNewMeasurement(true); setShowMeasurementModal(true); }}>Neue Messung</button>
-                                                            <button type="button" className="btn-glass" style={{ padding: '0.4rem 0.8rem', minHeight: '44px', fontSize: '0.75rem', borderRadius: '8px', color: 'var(--primary)' }} onClick={() => { setActiveRoomForMeasurement(room); setIsNewMeasurement(false); setShowMeasurementModal(true); }}>Bearbeiten</button>
-                                                        </>
-                                                    ) : (
-                                                        <button type="button" className="btn-glass" style={{ padding: '0.4rem 0.8rem', minHeight: '44px', fontSize: '0.75rem', borderRadius: '8px', color: 'var(--success)' }} onClick={() => { setActiveRoomForMeasurement(room); setIsNewMeasurement(false); setShowMeasurementModal(true); }}>Messung starten</button>
-                                                    )}
-                                                </div>}
-                                            </div>
-                                            {/* Skizzen 2-Spalten Grid (responsive) */}
-                                            {mode !== 'desktop' && allImages.length > 0 && (
-                                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', borderTop: '1px solid var(--border)', paddingTop: '0.75rem' }}>
-                                                    {allImages.map((entry) => (
-                                                        <div key={entry.id} style={{ position: 'relative', borderRadius: '8px', overflow: 'hidden', border: `1px solid ${entry.isCurrent ? 'var(--primary)' : 'var(--border)'}`, width: 'calc(50% - 0.375rem)', flexShrink: 0 }}>
-                                                            <img
-                                                                src={entry.src}
-                                                                alt={entry.label}
-                                                                style={{ width: '100%', height: '160px', objectFit: 'contain', backgroundColor: '#fff', display: 'block', cursor: 'pointer' }}
-                                                                onClick={() => window.open(entry.src, '_blank')}
-                                                            />
-                                                            <div style={{ padding: '0.3rem 0.6rem', fontSize: '0.7rem', fontWeight: 600, color: entry.isCurrent ? 'var(--primary)' : 'var(--text-muted)', borderTop: '1px solid var(--border)' }}>
-                                                                {entry.isCurrent ? `● ${entry.label}` : entry.label}
-                                                            </div>
-                                                            <button
-                                                                type="button"
-                                                                title="Skizze als PDF speichern"
-                                                                onClick={async (e) => {
-                                                                    e.stopPropagation();
-                                                                    try {
-                                                                        const { ExportService } = await import('../services/ExportService');
-                                                                        await ExportService.generateSketchPdf(formData, room, entry);
-                                                                    } catch(err) {
-                                                                        alert('Fehler beim PDF Export: ' + err.message);
-                                                                    }
-                                                                }}
-                                                                style={{ position: 'absolute', top: '6px', right: '44px', background: 'rgba(59,130,246,0.85)', color: 'white', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 2px 4px rgba(0,0,0,0.3)', zIndex: 10 }}
-                                                            >
-                                                                <Download size={14} />
-                                                            </button>
-                                                            <button
-                                                                type="button"
-                                                                title="Bild löschen"
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    if (!window.confirm('Dieses Messprotokoll-Bild wirklich löschen?')) return;
-                                                                    setFormData(prev => ({
-                                                                        ...prev,
-                                                                        rooms: prev.rooms.map(r => {
-                                                                            if (r.id !== room.id) return r;
-                                                                            if (entry.isCurrent) {
-                                                                                const newHistory = [...(r.measurementHistory || [])];
-                                                                                const lastHist = newHistory.pop();
-                                                                                return { ...r, measurementData: lastHist ? { ...lastHist } : null, measurementHistory: newHistory };
-                                                                            } else {
-                                                                                return { ...r, measurementHistory: (r.measurementHistory || []).filter(h => h.id !== entry.id) };
-                                                                            }
-                                                                        })
-                                                                    }));
-                                                                }}
-                                                                style={{ position: 'absolute', top: '6px', right: '6px', background: 'rgba(239,68,68,0.85)', color: 'white', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 2px 4px rgba(0,0,0,0.3)', zIndex: 10 }}
-                                                            >
-                                                                <X size={14} />
-                                                            </button>
+
+                                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', fontSize: '0.85rem', color: 'var(--text-main)' }}>
+                                                    <div><strong>Gerät:</strong> {latestEntry.device || '-'}</div>
+                                                    <div><strong>Temp:</strong> {latestEntry.temperature ? `${latestEntry.temperature} °C` : '-'}</div>
+                                                    <div><strong>rF:</strong> {latestEntry.humidity ? `${latestEntry.humidity} %` : '-'}</div>
+                                                    <div><strong>Punkte:</strong> {latestEntry.measurements.length}</div>
+                                                    <div><strong>Max W:</strong> {maxW}</div>
+                                                    <div><strong>Max B:</strong> {maxB}</div>
+                                                </div>
+
+                                                {/* Messpunkte Liste */}
+                                                <div style={{ marginTop: '0.5rem', backgroundColor: 'rgba(255,255,255,0.02)', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                                                    <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '0.5rem', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', borderBottom: '1px solid var(--border)', paddingBottom: '0.4rem', marginBottom: '0.4rem' }}>
+                                                        <div>Messpunkt</div>
+                                                        <div>W-Wert</div>
+                                                        <div>B-Wert</div>
+                                                    </div>
+                                                    {latestEntry.measurements.map((m, i) => (
+                                                        <div key={m.id || i} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '0.5rem', fontSize: '0.85rem', color: 'white', padding: '0.2rem 0' }}>
+                                                            <div>{getPointLabel(m, i)}</div>
+                                                            <div>{getWValue(m) || '-'}</div>
+                                                            <div>{getBValue(m) || '-'}</div>
                                                         </div>
                                                     ))}
                                                 </div>
-                                            )}
-                                        </div>
-                                    );
-                                })}
-                            </div>
 
-                            <div style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'flex-end' }}>
-                                <button
-                                    type="button"
-                                    className="btn-glass"
-                                    onClick={async () => {
-                                        try {
-                                            const result = await generateMeasurementExcel(formData);
-                                            if (result?.blob) {
-                                                try {
-                                                    const odFolder = buildProjectFolderName(
-                                                        formData.projectNumber || formData.id || 'Unbekannt',
-                                                        formData
-                                                    );
-                                                    const { uploadExcel } = await import('../services/OneDriveService');
-                                                    await uploadExcel(odFolder, result.blob);
-                                                } catch (odErr) {
-                                                    console.warn('[OneDrive] Excel-Upload fehlgeschlagen:', odErr.message);
-                                                }
+                                                {/* Protokoll URL falls vorhanden */}
+                                                {protocolUrl && (
+                                                    <div style={{ marginTop: '0.5rem' }}>
+                                                        <a href={protocolUrl} target="_blank" rel="noopener noreferrer" className="btn-glass" style={{ display: 'inline-block', padding: '0.4rem 0.8rem', fontSize: '0.75rem', borderRadius: '8px', color: 'var(--primary)', textDecoration: 'none' }}>
+                                                            📄 Protokoll öffnen
+                                                        </a>
+                                                    </div>
+                                                )}
+
+                                                {/* Skizzen */}
+                                                {allImages.length > 0 && (
+                                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', marginTop: '0.5rem' }}>
+                                                        {allImages.map((entry) => (
+                                                            <div key={entry.id} style={{ position: 'relative', borderRadius: '8px', overflow: 'hidden', border: `1px solid var(--border)`, width: 'calc(50% - 0.375rem)', minWidth: '120px', flexShrink: 0 }}>
+                                                                <img
+                                                                    src={entry.src}
+                                                                    alt={entry.label}
+                                                                    style={{ width: '100%', height: '120px', objectFit: 'contain', backgroundColor: '#fff', display: 'block', cursor: 'pointer' }}
+                                                                    onClick={() => window.open(entry.src, '_blank')}
+                                                                />
+                                                                <div style={{ padding: '0.3rem 0.6rem', fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)', borderTop: '1px solid var(--border)', backgroundColor: 'var(--surface)' }}>
+                                                                    {entry.label}
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            );
+                        })()}
+                        <div style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'flex-end' }}>
+                            <button
+                                type="button"
+                                className="btn-glass"
+                                onClick={async () => {
+                                    try {
+                                        const result = await generateMeasurementExcel(formData);
+                                        if (result?.blob) {
+                                            try {
+                                                const odFolder = buildProjectFolderName(
+                                                    formData.projectNumber || formData.id || 'Unbekannt',
+                                                    formData
+                                                );
+                                                const { uploadExcel } = await import('../services/OneDriveService');
+                                                await uploadExcel(odFolder, result.blob);
+                                            } catch (odErr) {
+                                                console.warn('[OneDrive] Excel-Upload fehlgeschlagen:', odErr.message);
                                             }
-                                        } catch (error) {
-                                            console.error("Excel Export failed:", error);
-                                            alert("Fehler beim Erstellen des Excel-Protokolls.");
                                         }
-                                    }}
-                                    style={{ fontSize: '0.85rem', padding: '0.6rem 1.25rem', color: '#10B981', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700, border: '2px solid #1E6DB7' }}
-                                >
-                                    <Table size={16} /> Excel Export
-                                </button>
-                            </div>
+                                    } catch (error) {
+                                        console.error("Excel Export failed:", error);
+                                        alert("Fehler beim Erstellen des Excel-Protokolls.");
+                                    }
+                                }}
+                                style={{ fontSize: '0.85rem', padding: '0.6rem 1.25rem', color: '#10B981', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700, border: '2px solid #1E6DB7' }}
+                            >
+                                <Table size={16} /> Excel Export
+                            </button>
                         </div>
                     </div>
                 )}
@@ -7421,6 +7558,15 @@ END:VCARD`;
                     )
                 }
 
+                {(() => {
+                    console.log('[MEASROOM TRACE] MeasurementModal rendered', {
+                        mode,
+                        techTab: null, // Desktop doesn't have techTab
+                        showMeasurementModal,
+                        source: 'desktop'
+                    });
+                    return null;
+                })()}
                 <MeasurementModal
                     isTechnicianMode={mode === 'technician'}
                     key={activeRoomForMeasurement?.id || 'none'}
@@ -7431,29 +7577,36 @@ END:VCARD`;
                         setIsNewMeasurement(false);
                         setIsMeasurementReadOnly(false);
                     }}
+                    onBackToDashboard={() => {
+                        setShowMeasurementModal(false);
+                        setActiveRoomForMeasurement(null);
+                        setIsNewMeasurement(false);
+                        setIsMeasurementReadOnly(false);
+                        setTechTab(null);
+                    }}
+                    onStartNew={() => setIsNewMeasurement(true)}
                     readOnly={isMeasurementReadOnly}
                     measurementHistory={activeRoomForMeasurement?.measurementHistory || []}
                     rooms={activeRoomForMeasurement ? [activeRoomForMeasurement] : []}
-                    allRooms={formData.rooms || []}
+                    allRooms={formData.measurementRooms || []}
                     projectTitle={formData.projectTitle}
                     address={[formData.street, formData.zip && formData.city ? `${formData.zip} ${formData.city}` : formData.city].filter(Boolean).join(', ')}
                     apartments={[...new Set((formData.contacts || []).filter(c => c.role === 'Mieter' || c.role === 'Eigentümer').map(c => [c.name, c.apartment].filter(Boolean).join(' - ').trim()).filter(Boolean))]}
-                    initialData={(formData.rooms || []).reduce((acc, r) => {
+                    initialData={(formData.measurementRooms || []).reduce((acc, r) => {
                         let mData = r.measurementData;
-                        // If this is the active room AND we are starting a NEW measurement based on old one
                         if (activeRoomForMeasurement && r.id === activeRoomForMeasurement.id && isNewMeasurement && mData && Array.isArray(mData.measurements)) {
                             mData = {
-                                canvasImage: mData.canvasImage, // Keep Sketch
+                                canvasImage: mData.canvasImage,
                                 globalSettings: {
                                     ...(mData.globalSettings || {}),
-                                    date: new Date().toISOString().split('T')[0], // Reset Date to Today
+                                    date: new Date().toISOString().split('T')[0],
                                     temp: '',
                                     humidity: ''
                                 },
                                 measurements: mData.measurements.map(m => ({
                                     id: m.id,
                                     pointName: m.pointName,
-                                    w_value: '', // Clear values
+                                    w_value: '',
                                     b_value: '',
                                     notes: ''
                                 }))
@@ -7462,98 +7615,112 @@ END:VCARD`;
                         return { ...acc, [r.id]: mData };
                     }, {})}
                     onSave={async (data) => {
-                        const { file, measurements, globalSettings, canvasImage } = data;
-
-                        // 1. Silent Upload to Supabase (if available) and store URL in history
+                        console.log('[MEASROOM TRACE] MeasurementModal onSave fired', {
+                          time: new Date().toISOString(),
+                          mode,
+                          techTab: null,
+                          roomName: data.globalSettings?.room,
+                          isNewRoomCreated: activeRoomForMeasurement ? String(activeRoomForMeasurement.id).startsWith('temp_') : false,
+                          activeRoomForMeasurementId: activeRoomForMeasurement?.id,
+                          showMeasurementModal
+                        });
+                        const { file, measurements, globalSettings, canvasImage, galleryPhotos } = data;
                         let protocolUrl = null;
                         if (supabase && file) {
                             try {
                                 const fileExt = file.name.split('.').pop() || (file.type === 'application/pdf' ? 'pdf' : 'png');
                                 const fileName = `cases/${formData.id || 'temp'}/protocols/${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
-
-                                const { error: uploadError } = await supabase.storage
-                                    .from('case-files')
-                                    .upload(fileName, file);
-
-                                if (!uploadError) {
-                                    const { data: { publicUrl } } = supabase.storage
-                                        .from('case-files')
-                                        .getPublicUrl(fileName);
+                                const { error } = await supabase.storage.from('case-files').upload(fileName, file);
+                                if (!error) {
+                                    const { data: { publicUrl } } = supabase.storage.from('case-files').getPublicUrl(fileName);
                                     protocolUrl = publicUrl;
                                 }
-                            } catch (err) {
-                                console.error("Silent protocol upload failed:", err);
-                            }
+                            } catch (err) { console.error(err); }
                         }
-
                         if (activeRoomForMeasurement) {
-                            setFormData(prev => {
-                                let updatedRooms;
-                                if (String(activeRoomForMeasurement.id).startsWith('temp_')) {
-                                    const history = [{
-                                        id: `hist_${Date.now()}`,
-                                        date: globalSettings.date || new Date().toISOString(),
-                                        measurements: measurements.map(m => ({ ...m })),
-                                        globalSettings: { ...globalSettings },
-                                        canvasImage: canvasImage,
-                                        protocolUrl: protocolUrl
-                                    }];
-                                    const newRoom = {
-                                        ...activeRoomForMeasurement,
-                                        id: `room_${Date.now()}`,
-                                        name: globalSettings.room || 'Unbenannter Raum',
-                                        apartment: globalSettings.apartment || '',
-                                        measurementData: { measurements, globalSettings, canvasImage, protocolUrl },
-                                        measurementHistory: history
-                                    };
-                                    updatedRooms = [...(prev.rooms || []), newRoom];
-                                    setTimeout(() => setActiveRoomForMeasurement(newRoom), 0);
-                                } else {
-                                    updatedRooms = (prev.rooms || []).map(r => {
-                                        if (r.id === activeRoomForMeasurement.id) {
-                                            const history = r.measurementHistory ? [...r.measurementHistory] : [];
-                                            const updatedHistory = isNewMeasurement
-                                                ? [...history, {
-                                                    id: `hist_${Date.now()}`,
-                                                    date: globalSettings.date || new Date().toISOString(),
-                                                    measurements: measurements.map(m => ({ ...m })),
-                                                    globalSettings: { ...globalSettings },
-                                                    canvasImage: canvasImage,
-                                                    protocolUrl: protocolUrl
-                                                }]
-                                                : history; // Bearbeiten: Verlauf unverändert lassen
-                                            const updatedRoom = {
-                                                ...r,
-                                                name: globalSettings.room || r.name,
-                                                apartment: globalSettings.apartment || r.apartment,
-                                                measurementData: { measurements, globalSettings, canvasImage, protocolUrl },
-                                                measurementHistory: updatedHistory
-                                            };
-                                            setTimeout(() => setActiveRoomForMeasurement(updatedRoom), 0);
-                                            return updatedRoom;
-                                        }
-                                        return r;
-                                    });
-                                }
+                            const prev = formData;
+                            let updatedRooms;
+                            const measurementRooms = Array.isArray(prev.measurementRooms) ? prev.measurementRooms : [];
 
-                                // ── Büro-Projektkontrolle aktualisieren wenn Trocknungskontrolle ──
-                                // Bedingung: Status Trocknung + Messung hat Datum (= documentationComplete)
-                                const measuredAt = globalSettings.date
-                                    ? new Date(globalSettings.date).toISOString()
-                                    : new Date().toISOString();
-                                const documentationComplete = !!(measurements && measurements.length > 0 && globalSettings.date);
+                            const normApt = String(globalSettings.apartment || activeRoomForMeasurement.apartment || 'Allgemeiner Bereich').trim().toLowerCase().replace(/-/g, ' ').replace(/\s+/g, ' ');
+                            const normName = String(globalSettings.room || activeRoomForMeasurement.name || 'Unbenannter Raum').trim().toLowerCase().replace(/-/g, ' ').replace(/\s+/g, ' ');
 
-                                const dryingUpdate = applyDryingCheck(
-                                    { ...prev, rooms: updatedRooms },  // aktueller State mit neuen Räumen
-                                    { measuredAt, documentationComplete }
-                                );
+                            const existingRoomIndex = measurementRooms.findIndex(r => 
+                                String(r.apartment || 'Allgemeiner Bereich').trim().toLowerCase().replace(/-/g, ' ').replace(/\s+/g, ' ') === normApt &&
+                                String(r.name || 'Unbenannter Raum').trim().toLowerCase().replace(/-/g, ' ').replace(/\s+/g, ' ') === normName
+                            );
 
-                                // applyDryingCheck gibt null zurück wenn Bedingungen nicht erfüllt
-                                // (z.B. kein Trocknung-Status) — dann nur Räume updaten
-                                return dryingUpdate
-                                    ? { ...dryingUpdate, rooms: updatedRooms }
-                                    : { ...prev, rooms: updatedRooms };
-                            });
+                            let updatedMeasurementRooms = [...measurementRooms];
+                            let finalRoom;
+
+                            if (existingRoomIndex >= 0) {
+                                const existingRoom = measurementRooms[existingRoomIndex];
+                                const history = existingRoom.measurementHistory ? [...existingRoom.measurementHistory] : [];
+                                
+                                const updatedHistory = (isNewMeasurement && existingRoom.measurementData && existingRoom.measurementData.measurements && existingRoom.measurementData.measurements.length > 0)
+                                    ? [{
+                                        id: `hist_${Date.now()}_prev`,
+                                        date: existingRoom.measurementData.globalSettings?.date || new Date().toISOString(),
+                                        measurements: existingRoom.measurementData.measurements.map(m => ({ ...m })),
+                                        globalSettings: { ...(existingRoom.measurementData.globalSettings || {}) },
+                                        canvasImage: existingRoom.measurementData.canvasImage,
+                                        protocolUrl: existingRoom.measurementData.protocolUrl,
+                                        galleryPhotos: existingRoom.measurementData.galleryPhotos || []
+                                    }, ...history]
+                                    : history;
+
+                                finalRoom = {
+                                    ...existingRoom,
+                                    name: globalSettings.room || existingRoom.name,
+                                    apartment: globalSettings.apartment || existingRoom.apartment,
+                                    measurementData: { measurements, globalSettings, canvasImage, protocolUrl, galleryPhotos: galleryPhotos || [] },
+                                    measurementHistory: updatedHistory
+                                };
+                                updatedMeasurementRooms[existingRoomIndex] = finalRoom;
+                            } else {
+                                const baseRoom = RoomService.createRoom({
+                                    name: globalSettings.room || activeRoomForMeasurement.name || 'Unbenannter Raum',
+                                    apartment: globalSettings.apartment || activeRoomForMeasurement.apartment || '',
+                                    stockwerk: activeRoomForMeasurement.stockwerk || ''
+                                });
+
+                                const history = activeRoomForMeasurement.measurementHistory ? [...activeRoomForMeasurement.measurementHistory] : [];
+                                const updatedHistory = (isNewMeasurement && activeRoomForMeasurement.measurementData && activeRoomForMeasurement.measurementData.measurements && activeRoomForMeasurement.measurementData.measurements.length > 0)
+                                    ? [{
+                                        id: `hist_${Date.now()}_prev`,
+                                        date: activeRoomForMeasurement.measurementData.globalSettings?.date || new Date().toISOString(),
+                                        measurements: activeRoomForMeasurement.measurementData.measurements.map(m => ({ ...m })),
+                                        globalSettings: { ...(activeRoomForMeasurement.measurementData.globalSettings || {}) },
+                                        canvasImage: activeRoomForMeasurement.measurementData.canvasImage,
+                                        protocolUrl: activeRoomForMeasurement.measurementData.protocolUrl,
+                                        galleryPhotos: activeRoomForMeasurement.measurementData.galleryPhotos || []
+                                    }, ...history]
+                                    : history;
+
+                                finalRoom = {
+                                    ...activeRoomForMeasurement,
+                                    ...baseRoom,
+                                    id: `room_${Date.now()}`,
+                                    measurementData: { measurements, globalSettings, canvasImage, protocolUrl, galleryPhotos: galleryPhotos || [] },
+                                    measurementHistory: updatedHistory
+                                };
+                                updatedMeasurementRooms.push(finalRoom);
+                            }
+
+                            setTimeout(() => setActiveRoomForMeasurement(finalRoom), 0);
+                            
+                            const measuredAt = globalSettings.date ? new Date(globalSettings.date).toISOString() : new Date().toISOString();
+                            const documentationComplete = !!(measurements && measurements.length > 0 && globalSettings.date);
+                            const dryingUpdate = applyDryingCheck({ ...prev, measurementRooms: updatedMeasurementRooms }, { measuredAt, documentationComplete });
+                            
+                            const updatedFormData = dryingUpdate ? { ...dryingUpdate, measurementRooms: updatedMeasurementRooms } : { ...prev, measurementRooms: updatedMeasurementRooms };
+                            
+                            setFormData(updatedFormData);
+                            
+                            if (typeof onSave === 'function') {
+                                onSave(updatedFormData, true);
+                            }
+
                             setIsNewMeasurement(false); // So subsequent saves don't duplicate history
                         }
                     }}

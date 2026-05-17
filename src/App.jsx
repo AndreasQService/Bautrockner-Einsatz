@@ -12,6 +12,67 @@ import EmailImportModalV2 from './components/EmailImportModalV2'
 import i18n from './i18n'
 import { buildProjectFolderName, uploadProjectJson } from "./services/OneDriveService";
 
+function sanitizeMeasurementStorage(reportData) {
+  if (!reportData || !Array.isArray(reportData.rooms)) return reportData;
+
+  const normalize = (val) => String(val || '').trim().toLowerCase().replace(/-/g, ' ').replace(/\s+/g, ' ');
+
+  let updatedMeasurementRooms = Array.isArray(reportData.measurementRooms) ? [...reportData.measurementRooms] : [];
+  let updatedRooms = [];
+
+  for (const r of reportData.rooms) {
+    const hasMeasurementData = r.measurementData || r.measurementHistory || r.measurements || r.measurementPoints || r.points;
+
+    if (hasMeasurementData) {
+      const normApt = normalize(r.apartment || 'Allgemeiner Bereich');
+      const normName = normalize(r.name || 'Unbenannter Raum');
+
+      const existingIdx = updatedMeasurementRooms.findIndex(mr => 
+        normalize(mr.apartment || 'Allgemeiner Bereich') === normApt &&
+        normalize(mr.name || 'Unbenannter Raum') === normName
+      );
+
+      if (existingIdx >= 0) {
+        const existingRoom = updatedMeasurementRooms[existingIdx];
+        if (!existingRoom.measurementHistory && r.measurementHistory) existingRoom.measurementHistory = r.measurementHistory;
+        if (!existingRoom.measurementData && r.measurementData) existingRoom.measurementData = r.measurementData;
+        if (!existingRoom.canvasImage && r.canvasImage) existingRoom.canvasImage = r.canvasImage;
+      } else {
+        updatedMeasurementRooms.push({
+          id: r.id || `room_${Date.now()}`,
+          name: r.name,
+          apartment: r.apartment,
+          stockwerk: r.stockwerk,
+          measurementData: r.measurementData,
+          measurementHistory: r.measurementHistory,
+          measurements: r.measurements,
+          measurementPoints: r.measurementPoints,
+          points: r.points,
+          canvasImage: r.canvasImage,
+          sketch: r.sketch
+        });
+      }
+    }
+
+    const hasRealRoomData = (r.photos && r.photos.length > 0) || (r.damages && r.damages.length > 0) || (r.equipment && r.equipment.length > 0) || r.construction || r.notes;
+
+    if (hasRealRoomData || !hasMeasurementData) {
+      const cleanRoom = { ...r };
+      delete cleanRoom.measurementData;
+      delete cleanRoom.measurementHistory;
+      delete cleanRoom.measurements;
+      delete cleanRoom.measurementPoints;
+      delete cleanRoom.points;
+      updatedRooms.push(cleanRoom);
+    }
+  }
+
+  return {
+    ...reportData,
+    rooms: updatedRooms,
+    measurementRooms: updatedMeasurementRooms
+  };
+}
 
 function App() {
   // Neuer Tab = neue sessionStorage → startet immer auf Dashboard
@@ -320,6 +381,10 @@ function App() {
           })).filter(r => !r._isSession && !r.deleted_at); // Session + soft-deleted ausblenden
 
           console.log(`[Supabase] ${loadedReports.length} Projekte geladen (${data.length} DB-Einträge gesamt).`);
+          console.log('[MEASROOM TRACE] fetchReports loaded', {
+             measurementRoomsLength: loadedReports[0]?.measurementRooms?.length,
+             names: loadedReports[0]?.measurementRooms?.map(r=>r.name)
+          });
           setSupabaseStatus({ ok: true, count: loadedReports.length, total: data.length, error: null });
 
           if (loadedReports.length > 0) {
@@ -368,7 +433,20 @@ function App() {
   }
 
   const handleSaveReport = useCallback(async (updatedReport, silent = false) => {
-    let finalReport = { ...updatedReport };
+    let finalReport = sanitizeMeasurementStorage({ ...updatedReport });
+    
+    console.log('[MEAS STORAGE GUARD]', {
+        roomsLength: finalReport.rooms?.length,
+        measurementRoomsLength: finalReport.measurementRooms?.length,
+        measurementNames: finalReport.measurementRooms?.map(r => r.name),
+        roomsWithMeasurementData: finalReport.rooms?.filter(r => r.measurementData || r.measurementHistory)?.length
+    });
+
+    console.log('[MEASROOM TRACE] App handleSaveReport incoming', {
+        measurementRoomsLength: finalReport.measurementRooms?.length,
+        names: finalReport.measurementRooms?.map(r => r.name)
+    });
+
     if (!finalReport.id) {
       // Immer UUID verwenden — verhindert ID-Kollisionen die zu Datenverlust führen
       finalReport.id = (typeof crypto !== 'undefined' && crypto.randomUUID)
@@ -448,6 +526,11 @@ function App() {
         updated_at: now
       };
 
+      console.log('[MEASROOM TRACE] App final report_data', {
+          measurementRoomsLength: reportForStorage.measurementRooms?.length,
+          keys: Object.keys(reportForStorage)
+      });
+
       const oneDriveBackup = () => {
         try {
           const odFolder = buildProjectFolderName(
@@ -472,20 +555,24 @@ function App() {
           .select('id');
 
         if (error) {
+          console.log('[MEASROOM TRACE] Supabase update result', { error, data: updateResult });
           console.error('Error saving to Supabase:', error);
           showToast(`⚠️ Speicherfehler: ${error.message || error.code || 'Supabase-Fehler'}. Daten nur lokal gesichert!`, 'error');
         } else if (!updateResult || updateResult.length === 0) {
+          console.log('[MEASROOM TRACE] Supabase update result', { error: 'Conflict', data: null });
           // Konflikt: Ein anderes Gerät hat neuere Daten → NICHT überschreiben
           console.warn('[Sync-Konflikt] Neuere Version in Supabase – abgebrochen:', finalReport.id);
           showToast('⚠️ Neuere Version auf anderem Gerät! Seite neu laden.', 'warning');
         } else {
+          console.log('[MEASROOM TRACE] Supabase update result', { error: null, data: updateResult });
           // Erfolgreich: _supabase_updated_at aktualisieren damit nächster Save erlaubt ist
           setReports(prev => prev.map(r => r.id === finalReport.id ? { ...r, _supabase_updated_at: now } : r));
           oneDriveBackup();
         }
       } else {
         // Neues Projekt oder kein bekannter Zeitstempel → einfaches Upsert
-        supabase.from('damage_reports').upsert(rowData).then(({ error }) => {
+        supabase.from('damage_reports').upsert(rowData).then(({ data, error }) => {
+          console.log('[MEASROOM TRACE] Supabase update result', { error, data });
           if (error) {
             console.error('Error saving to Supabase:', error);
             showToast(`⚠️ Speicherfehler: ${error.message || error.code || 'Supabase-Fehler'}. Daten nur lokal gesichert!`, 'error');
