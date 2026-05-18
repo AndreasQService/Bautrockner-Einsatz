@@ -28,6 +28,7 @@ import html2canvas from 'html2canvas';
 import ImageEditor from './ImageEditor';
 import EmailImportModal from './EmailImportModalV2';
 import { jsPDF } from 'jspdf';
+import TechnicianMeasurementPage from '../features/measurements/TechnicianMeasurementPage';
 import autoTable from 'jspdf-autotable';
 import CameraCaptureModal from './CameraCaptureModal';
 import MeasurementModal from './MeasurementModal';
@@ -216,7 +217,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         return { street, zip, city };
     }
     const [caseId, setCaseId] = useState(null);
-    const [isCauseExpanded, setIsCauseExpanded] = useState(true);
+    const [isCauseExpanded, setIsCauseExpanded] = useState(false);
 
     const initialAddressParts = parseAddress(initialData?.address);
 
@@ -346,8 +347,10 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
     const [linkingImageId, setLinkingImageId] = useState(null);
     const [visibleRoomImages, setVisibleRoomImages] = useState({}); // Stores roomId -> boolean for toggle
     const [conflicts, setConflicts] = useState({}); // Stores { fieldPath: { original: '...', new: '...' } }
-    const [isContactsExpanded, setIsContactsExpanded] = useState(mode !== 'technician');
-    const [isRoomsExpanded, setIsRoomsExpanded] = useState(true);
+    const [isContactsExpanded, setIsContactsExpanded] = useState(false);
+    const [isRoomsExpanded, setIsRoomsExpanded] = useState(false);
+    const [isDevicesExpanded, setIsDevicesExpanded] = useState(false);
+    const [isMeasurementsExpanded, setIsMeasurementsExpanded] = useState(false);
     const [isOnline, setIsOnline] = useState(navigator.onLine);
     const [pendingSyncCount, setPendingSyncCount] = useState(0);
     const [isSyncing, setIsSyncing] = useState(false);
@@ -2603,8 +2606,8 @@ END:VCARD`;
         </div>
     );
 
-    // ── TECHNIKER MODUS: Kachel-Home ────────────────────────────────────────
-    if (mode === 'technician' && techTab === null) {
+    // ── TECHNIKER MODUS: Kachel-Home & Messen-Auswahl ────────────────────────────────────────
+    if (mode === 'technician' && (techTab === null || techTab === 'messung')) {
         const TECH_TILES = [
             { id: 'uebersicht', label: 'Übersicht', icon: '📋', color: '#3B82F6', status: null },
             { id: 'aufnahme', label: 'Schadenaufnahme', icon: '🔍', color: '#F97316', status: 'Schadenaufnahme' },
@@ -2616,7 +2619,9 @@ END:VCARD`;
         const sub = [formData.projectNumber, formData.damageCategory].filter(Boolean).join(' · ');
         return (
             <div className={isDarkMode ? "force-dark-mode" : ""} style={{ minHeight: '100vh', backgroundColor: 'var(--color-app-bg)', padding: '2rem 1.25rem 3rem', fontFamily: 'var(--font-desktop)', color: 'var(--text-main)' }}>
-                <div style={{ marginBottom: '2.5rem' }}>
+                {techTab === null ? (
+                    <>
+                        <div style={{ marginBottom: '2.5rem' }}>
                     <div style={{ fontSize: '1.5rem', fontWeight: 800, lineHeight: 1.2 }}>{adresse || 'Schadenort'}</div>
                     {sub && <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.4rem', fontWeight: 500 }}>{sub}</div>}
                 </div>
@@ -2644,8 +2649,7 @@ END:VCARD`;
                 <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1rem' }}>
                     <button onClick={() => {
                         if (TECH_TILES[4].status) setFormData(prev => ({ ...prev, status: TECH_TILES[4].status }));
-                        setTechRoomSelectorMode('messung');
-                        setShowTechRoomSelector(true);
+                        setTechTab('messung');
                     }} style={{
                         background: 'var(--surface)', border: `2px solid ${TECH_TILES[4].color}`,
                         borderRadius: '16px', padding: '2.5rem 1rem', cursor: 'pointer',
@@ -2717,7 +2721,19 @@ END:VCARD`;
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '40vh', overflowY: 'auto', paddingBottom: '1rem' }}>
                                         {allRooms.filter(r => (r.apartment || 'Allgemeiner Bereich').trim() === activeApt).map(r => (
                                             <button key={r.id} onClick={() => {
-                                                setActiveRoomForMeasurement(r);
+                                                setActiveRoomForMeasurement({
+                                                    ...r,
+                                                    measurementHistory: Array.isArray(r.measurementHistory) ? r.measurementHistory : [],
+                                                    measurementData: null,
+                                                    currentMeasurementData: null,
+                                                    measurements: [],
+                                                    canvasImage: null,
+                                                    protocolUrl: null,
+                                                    galleryPhotos: [],
+                                                    isNewMeasurement: true,
+                                                    isContinueMeasurement: true,
+                                                    measurementSessionId: `continue_empty_${r.id}_${Date.now()}`
+                                                });
                                                 setIsNewMeasurement(true);
                                                 setShowTechRoomSelector(false);
                                                 setTechSelectedApartment(null);
@@ -2767,6 +2783,50 @@ END:VCARD`;
                         </div>
                     );
                 })()}
+                </>
+            ) : (
+                <TechnicianMeasurementPage
+                    measurementRooms={formData.measurementRooms || []}
+                    onBackToTiles={() => setTechTab(null)}
+                    onContinueMeasurement={(room) => {
+                        setActiveRoomForMeasurement({
+                            ...room,
+                            measurementHistory: Array.isArray(room.measurementHistory) ? room.measurementHistory : [],
+                            measurementData: null,
+                            currentMeasurementData: null,
+                            measurements: [],
+                            canvasImage: null,
+                            protocolUrl: null,
+                            galleryPhotos: [],
+                            isNewMeasurement: true,
+                            isContinueMeasurement: true,
+                            measurementSessionId: `continue_empty_${room.id}_${Date.now()}`
+                        });
+                        setIsNewMeasurement(true);
+                        setShowMeasurementModal(true);
+                    }}
+                    onNewRoom={() => {
+                        setActiveRoomForMeasurement({
+                            id: `temp_${Date.now()}`,
+                            name: '',
+                            apartment: '',
+                            stockwerk: '',
+                            measurementHistory: [],
+                            measurementData: null,
+                            currentMeasurementData: null,
+                            measurements: [],
+                            canvasImage: null,
+                            protocolUrl: null,
+                            galleryPhotos: [],
+                            isNewMeasurement: true,
+                            isNewRoom: true,
+                            measurementSessionId: `new_room_${Date.now()}`
+                        });
+                        setIsNewMeasurement(true);
+                        setShowMeasurementModal(true);
+                    }}
+                />
+            )}
 
                 {(() => {
                     console.log('[MEASROOM TRACE] MeasurementModal rendered', {
@@ -2779,7 +2839,7 @@ END:VCARD`;
                 })()}
                 <MeasurementModal
                     isTechnicianMode={mode === 'technician'}
-                    key={activeRoomForMeasurement?.id || 'none'}
+                    key={activeRoomForMeasurement?.measurementSessionId || `${activeRoomForMeasurement?.id || 'none'}_${activeRoomForMeasurement?.isNewMeasurement ? 'new' : 'open'}`}
                     isOpen={showMeasurementModal}
                     onClose={() => {
                         setShowMeasurementModal(false);
@@ -2804,23 +2864,34 @@ END:VCARD`;
                     apartments={[...new Set((formData.contacts || []).filter(c => c.role === 'Mieter' || c.role === 'Eigentümer').map(c => [c.name, c.apartment].filter(Boolean).join(' - ').trim()).filter(Boolean))]}
                     initialData={(formData.measurementRooms || []).reduce((acc, r) => {
                         let mData = r.measurementData;
-                        if (activeRoomForMeasurement && r.id === activeRoomForMeasurement.id && isNewMeasurement && mData && Array.isArray(mData.measurements)) {
-                            mData = {
-                                canvasImage: mData.canvasImage,
-                                globalSettings: {
-                                    ...(mData.globalSettings || {}),
-                                    date: new Date().toISOString().split('T')[0],
-                                    temp: '',
-                                    humidity: ''
-                                },
-                                measurements: mData.measurements.map(m => ({
-                                    id: m.id,
-                                    pointName: m.pointName,
-                                    w_value: '',
-                                    b_value: '',
-                                    notes: ''
-                                }))
-                            };
+                        if (!mData && Array.isArray(r.measurements) && r.measurements.length > 0) {
+                            mData = { measurements: r.measurements, globalSettings: r.globalSettings, canvasImage: r.canvasImage };
+                        }
+
+                        // History fallback for "Messung fortsetzen" when measurementData is missing
+                        if (!mData && Array.isArray(r.measurementHistory) && r.measurementHistory.length > 0) {
+                            const validHistory = r.measurementHistory.filter(h => h.date || h.datum || h.timestamp || h.createdAt || h.globalSettings?.date);
+                            if (validHistory.length > 0) {
+                                const latestHistory = [...validHistory].sort((a, b) => {
+                                    const da = a.date || a.datum || a.timestamp || a.createdAt || a.globalSettings?.date || 0;
+                                    const db = b.date || b.datum || b.timestamp || b.createdAt || b.globalSettings?.date || 0;
+                                    return new Date(db) - new Date(da);
+                                })[0];
+                                mData = {
+                                    measurements: latestHistory.measurements || latestHistory.points || latestHistory.measurementPoints || [],
+                                    globalSettings: latestHistory.globalSettings || {
+                                        date: latestHistory.date || latestHistory.datum || latestHistory.timestamp || latestHistory.createdAt,
+                                        device: latestHistory.device || latestHistory.measurementDevice || latestHistory.messmittel,
+                                        temp: latestHistory.temp || '',
+                                        humidity: latestHistory.humidity || ''
+                                    },
+                                    canvasImage: latestHistory.canvasImage || null
+                                };
+                            }
+                        }
+
+                        if (activeRoomForMeasurement && String(r.id) === String(activeRoomForMeasurement.id) && isNewMeasurement) {
+                            mData = null;
                         }
                         return { ...acc, [r.id]: mData };
                     }, {})}
@@ -4139,6 +4210,7 @@ END:VCARD`;
                 )}
 
                 {/* Container for Map & Exterior Photo (Side-by-Side) */}
+                {(mode === 'desktop' || (mode === 'technician' && techTab === 'uebersicht')) && (
                 <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap', alignItems: 'stretch', marginBottom: '1.5rem' }}>
                     {/* Map Card – Anzeige in Desktop und Techniker-Übersicht */}
                     {(mode === 'desktop' || (mode === 'technician' && techTab === 'uebersicht')) && (
@@ -4351,6 +4423,7 @@ END:VCARD`;
                         </div>
                     )}
                 </div>
+                )}
 
                 {/* 2. Contacts */}
                 {!(mode === 'technician' && (techTab === 'aufnahme' || techTab === 'messung' || techTab === 'trocknung')) && <div className="card" style={{ marginBottom: '1.5rem', padding: '1.5rem' }}>
@@ -4661,7 +4734,7 @@ END:VCARD`;
 
 
                 {/* 3. Rooms & Photos */}
-                {!(mode === 'technician' && techTab === 'trocknung') && (
+                {!(mode === 'technician' && (techTab === 'trocknung' || techTab === 'messung')) && (
                 <>
                 <div style={{ marginBottom: '2rem' }}>
                     <div style={{ marginBottom: '1rem' }}>
@@ -6602,13 +6675,24 @@ END:VCARD`;
                     </div>
                 )}
 
+
+
                 {(mode === 'desktop' || (mode === 'technician' && techTab === 'uebersicht')) && (
                     <div className="card" style={{ padding: '1.5rem', marginBottom: '1.5rem' }}>
-                        <h3 className="section-header">
-                            <ClipboardList size={18} /> Messprotokolle
-                        </h3>
+                        <div 
+                            onClick={() => setIsMeasurementsExpanded(prev => !prev)}
+                            style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', userSelect: 'none', marginBottom: isMeasurementsExpanded ? '1rem' : '0' }}
+                        >
+                            <h3 className="section-header" style={{ marginBottom: 0, border: 'none' }}>
+                                <ClipboardList size={18} /> Messprotokolle
+                            </h3>
+                            <div style={{ color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>{isMeasurementsExpanded ? 'Einklappen' : 'Ausklappen'}</span>
+                                <ChevronDown size={18} style={{ transform: isMeasurementsExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.3s ease' }} />
+                            </div>
+                        </div>
                         {console.log('[MEASUREMENT-ROOMS TRACE] 6. Render Messprotokolle:', { length: (formData.measurementRooms || []).length, names: (formData.measurementRooms || []).map(r=>r.name) })}
-                        {(() => {
+                        {isMeasurementsExpanded && (() => {
                             const measuredRooms = (formData.measurementRooms || [])
                               .map(room => ({
                                 room,
@@ -6664,7 +6748,7 @@ END:VCARD`;
                                                         type="button" 
                                                         className="btn-glass" 
                                                         style={{ padding: '0.4rem 0.8rem', fontSize: '0.75rem', borderRadius: '8px', color: 'var(--primary)' }} 
-                                                        onClick={() => { setActiveRoomForMeasurement(room); setIsNewMeasurement(false); setShowMeasurementModal(true); }}
+                                                        onClick={() => { setActiveRoomForMeasurement({...room, measurementHistory: Array.isArray(room.measurementHistory) ? room.measurementHistory : [], measurementData: null, currentMeasurementData: null, measurements: [], canvasImage: null, protocolUrl: null, galleryPhotos: [], isNewMeasurement: true, isContinueMeasurement: true, measurementSessionId: `continue_empty_${room.id}_${Date.now()}`}); setIsNewMeasurement(true); setShowMeasurementModal(true); }}
                                                     >
                                                         Details öffnen
                                                     </button>
@@ -7297,32 +7381,42 @@ END:VCARD`;
                 {/* Zusammenfassung Trocknung */}
                 {(mode === 'desktop' || true) && formData.equipment?.length > 0 && (
                     <div style={{ marginBottom: '1.5rem', backgroundColor: 'var(--surface)', padding: '1.25rem', borderRadius: '12px', border: '2px solid #1E6DB7', color: 'var(--text-main)', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+                        <div 
+                            onClick={() => setIsDevicesExpanded(prev => !prev)}
+                            style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: isDevicesExpanded ? '1.25rem' : '0', cursor: 'pointer', userSelect: 'none' }}
+                        >
                             <h3 style={{ fontSize: '1rem', fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: '0.6rem', color: 'var(--primary)' }}>
                                 <Database size={18} /> Geräteliste
                             </h3>
-                            <button
-                                type="button"
-                                onClick={generateEnergyReport}
-                                style={{
-                                    background: 'rgba(16, 185, 129, 0.1)',
-                                    color: '#10B981',
-                                    border: '1px solid rgba(16, 185, 129, 0.3)',
-                                    padding: '4px 12px',
-                                    borderRadius: '6px',
-                                    fontSize: '0.75rem',
-                                    fontWeight: 700,
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '4px',
-                                    cursor: 'pointer',
-                                    textTransform: 'uppercase'
-                                }}
-                            >
-                                <PdfIcon size={14} />
-                                Export
-                            </button>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                <button
+                                    type="button"
+                                    onClick={(e) => { e.stopPropagation(); generateEnergyReport(e); }}
+                                    style={{
+                                        background: 'rgba(16, 185, 129, 0.1)',
+                                        color: '#10B981',
+                                        border: '1px solid rgba(16, 185, 129, 0.3)',
+                                        padding: '4px 12px',
+                                        borderRadius: '6px',
+                                        fontSize: '0.75rem',
+                                        fontWeight: 700,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '4px',
+                                        cursor: 'pointer',
+                                        textTransform: 'uppercase'
+                                    }}
+                                >
+                                    <PdfIcon size={14} />
+                                    Export
+                                </button>
+                                <div style={{ color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                    <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>{isDevicesExpanded ? 'Einklappen' : 'Ausklappen'}</span>
+                                    <ChevronDown size={18} style={{ transform: isDevicesExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.3s ease' }} />
+                                </div>
+                            </div>
                         </div>
+                        {isDevicesExpanded && (
                         <div style={{ overflowX: 'auto' }}>
                             {mode === 'technician' ? (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
@@ -7455,6 +7549,7 @@ END:VCARD`;
                                 </table>
                             )}
                         </div>
+                        )}
                     </div>
                 )}
                 <div style={{ height: '80px', ...(mode === 'desktop' ? { order: 3 } : {}) }} />

@@ -1,0 +1,406 @@
+import { supabase } from '../supabaseClient';
+
+export const MeasurementRelationalService = {
+  async loadRelationalRoomsForReport(reportId) {
+    if (!reportId) return [];
+
+    try {
+      // 1. Fetch Rooms
+      const { data: roomsData, error: roomsError } = await supabase
+        .from('damage_report_rooms')
+        .select('*')
+        .eq('report_id', reportId)
+        .is('deleted_at', null)
+        .order('sort_order', { ascending: true });
+
+      if (roomsError) throw roomsError;
+      if (!roomsData || roomsData.length === 0) return [];
+
+      // 2. Fetch Measurements
+      const { data: measurementsData, error: measurementsError } = await supabase
+        .from('room_measurements')
+        .select('*')
+        .eq('report_id', reportId)
+        .is('deleted_at', null);
+
+      if (measurementsError) throw measurementsError;
+
+      // 3. Fetch Protocols
+      const { data: protocolsData, error: protocolsError } = await supabase
+        .from('measurement_protocols')
+        .select('*')
+        .eq('report_id', reportId)
+        .is('deleted_at', null);
+
+      if (protocolsError) throw protocolsError;
+
+      // 4. Map back to UI format
+      const mappedRooms = roomsData.map(roomRow => {
+        // Find measurements for this room
+        const roomMeasurements = measurementsData?.filter(m => m.room_id === roomRow.id) || [];
+        const roomProtocols = protocolsData?.filter(p => p.room_id === roomRow.id) || [];
+
+        // Current measurements (measurementData)
+        const currentMeasurements = roomMeasurements
+          .filter(m => m.source === 'measurementData')
+          .sort((a, b) => (a.mp_number || 0) - (b.mp_number || 0))
+          .map(m => ({
+            mp: m.mp_number?.toString() || '',
+            w: m.wall_value !== null ? m.wall_value.toString() : '',
+            b: m.floor_value !== null ? m.floor_value.toString() : '',
+            device: m.device || ''
+          }));
+
+        // Current protocol
+        const currentProtocol = roomProtocols.find(p => p.source === 'measurementData');
+
+        // Extract global settings date from one of the measurements if available
+        const currentMeasurementWithDate = roomMeasurements.find(m => m.source === 'measurementData' && m.measured_at);
+        const globalSettingsDate = currentMeasurementWithDate ? currentMeasurementWithDate.measured_at : '';
+
+        const measurementData = {
+          globalSettings: {
+            date: globalSettingsDate,
+            device: currentMeasurements.length > 0 ? currentMeasurements[0].device : ''
+          },
+          measurements: currentMeasurements,
+          protocolUrl: currentProtocol ? currentProtocol.file_url : null
+        };
+
+        // History measurements (measurementHistory)
+        const historyRows = roomMeasurements.filter(m => m.source === 'measurementHistory');
+        const historyProtocols = roomProtocols.filter(p => p.source === 'measurementHistory');
+
+        // Group history by measured_at (or fallback to legacy_measurement_id prefix logic if needed)
+        // Since measured_at is our best grouping key for histories:
+        const historyGroups = {};
+        historyRows.forEach(m => {
+          const key = m.measured_at || 'unknown_date';
+          if (!historyGroups[key]) {
+            historyGroups[key] = {
+              date: m.measured_at,
+              measurements: []
+            };
+          }
+          historyGroups[key].measurements.push({
+            mp: m.mp_number?.toString() || '',
+            w: m.wall_value !== null ? m.wall_value.toString() : '',
+            b: m.floor_value !== null ? m.floor_value.toString() : '',
+            device: m.device || ''
+          });
+        });
+
+        // Sort measurements in groups
+        Object.values(historyGroups).forEach(g => {
+            g.measurements.sort((a, b) => (parseInt(a.mp) || 0) - (parseInt(b.mp) || 0));
+        });
+
+        // Try to assign history protocols to groups
+        // If we can't easily match them by date, we might just put them in a loose array or match by index.
+        const measurementHistory = Object.values(historyGroups).map((group, idx) => {
+          const proto = historyProtocols[idx]; 
+          return {
+            ...group,
+            protocolUrl: proto ? proto.file_url : null
+          };
+        });
+
+        // Add remaining protocols to the first history entry if there's a mismatch (fallback)
+        if (historyProtocols.length > measurementHistory.length && measurementHistory.length > 0) {
+           for (let i = measurementHistory.length; i < historyProtocols.length; i++) {
+               if (!measurementHistory[0].extraProtocols) measurementHistory[0].extraProtocols = [];
+               measurementHistory[0].extraProtocols.push(historyProtocols[i].file_url);
+           }
+        } else if (historyProtocols.length > 0 && measurementHistory.length === 0) {
+           // We have protocols but no measurements
+           historyProtocols.forEach(p => {
+               measurementHistory.push({
+                   date: p.created_at,
+                   measurements: [],
+                   protocolUrl: p.file_url
+               });
+           });
+        }
+
+        return {
+          id: roomRow.legacy_room_id || roomRow.id,
+          relationalId: roomRow.id,
+          name: roomRow.name || '',
+          apartment: roomRow.room_type || '',
+          measurementData,
+          measurementHistory
+        };
+      });
+
+      return mappedRooms;
+    } catch (err) {
+      console.error('[RELATIONAL-READ-DIAG] Error fetching relational data', err);
+      return [];
+    }
+  },
+
+  compareLegacyAndRelationalRooms(legacyRooms, relationalRooms) {
+    const lRooms = Array.isArray(legacyRooms) ? legacyRooms : [];
+    const rRooms = Array.isArray(relationalRooms) ? relationalRooms : [];
+
+    let legacyMeasDataCount = 0;
+    let relationalMeasDataCount = 0;
+    let legacyMeasHistCount = 0;
+    let relationalMeasHistCount = 0;
+    let protocolCount = 0;
+
+    lRooms.forEach(r => {
+      if (r.measurementData?.measurements) legacyMeasDataCount += r.measurementData.measurements.length;
+      if (r.measurementHistory) {
+        r.measurementHistory.forEach(h => {
+          if (h.measurements) legacyMeasHistCount += h.measurements.length;
+        });
+      }
+    });
+
+    rRooms.forEach(r => {
+      if (r.measurementData?.measurements) relationalMeasDataCount += r.measurementData.measurements.length;
+      if (r.measurementData?.protocolUrl) protocolCount++;
+      if (r.measurementHistory) {
+        r.measurementHistory.forEach(h => {
+          if (h.measurements) relationalMeasHistCount += h.measurements.length;
+          if (h.protocolUrl) protocolCount++;
+          if (h.extraProtocols) protocolCount += h.extraProtocols.length;
+        });
+      }
+    });
+
+    const mismatches = [];
+    if (lRooms.length !== rRooms.length) mismatches.push('rooms_length_mismatch');
+    if (legacyMeasDataCount !== relationalMeasDataCount) mismatches.push('measurement_data_count_mismatch');
+    if (legacyMeasHistCount !== relationalMeasHistCount) mismatches.push('measurement_history_count_mismatch');
+
+    return {
+      legacyRoomsLength: lRooms.length,
+      relationalRoomsLength: rRooms.length,
+      legacyMeasurementDataCount: legacyMeasDataCount,
+      relationalMeasurementDataCount: relationalMeasDataCount,
+      legacyMeasurementHistoryCount: legacyMeasHistCount,
+      relationalMeasurementHistoryCount: relationalMeasHistCount,
+      protocolCount,
+      mismatches
+    };
+  },
+
+  async ensureRelationalRoom(reportId, legacyRoom) {
+    if (!reportId || !legacyRoom) return null;
+
+    try {
+      // Upsert room based on report_id and legacy_room_id
+      const { data, error } = await supabase
+        .from('damage_report_rooms')
+        .upsert({
+          report_id: reportId,
+          legacy_room_id: legacyRoom.id,
+          name: legacyRoom.name || '',
+          room_type: legacyRoom.apartment || '',
+          // Don't set deleted_at here, keep it idempotent
+        }, {
+          onConflict: 'report_id, legacy_room_id'
+        })
+        .select('id')
+        .single();
+
+      if (error) {
+        console.error('[RELATIONAL-WRITE-DIAG] ensureRelationalRoom error', error);
+        return null;
+      }
+      return data?.id;
+    } catch (e) {
+      console.error('[RELATIONAL-WRITE-DIAG] ensureRelationalRoom exception', e);
+      return null;
+    }
+  },
+
+  async saveRoomMeasurementsRelational(reportId, legacyRoom, measurements, globalSettings) {
+    if (!reportId || !legacyRoom || !measurements) return;
+
+    console.log('[RELATIONAL-WRITE-DIAG] start', {
+      reportId,
+      legacyRoomId: legacyRoom?.id,
+      roomName: legacyRoom?.name,
+      measurementsLength: measurements?.length,
+      firstMeasurement: measurements?.[0],
+      globalSettings
+    });
+
+    try {
+      const roomId = await this.ensureRelationalRoom(reportId, legacyRoom);
+      if (!roomId) throw new Error('Could not ensure relational room');
+
+      const measuredAt = globalSettings?.date || new Date().toISOString();
+      const defaultDevice = globalSettings?.device || '';
+
+      const upsertPayload = measurements.map((m, index) => {
+        // Extract mp number from mp or pointName ("MP 1" -> 1)
+        let mpNumber = parseInt(m.mp, 10);
+        if (isNaN(mpNumber) && m.pointName) {
+            const match = m.pointName.match(/\d+/);
+            if (match) mpNumber = parseInt(match[0], 10);
+        }
+
+        // Handle empty strings as null
+        const wallVal = m.w ?? m.w_value;
+        const floorVal = m.b ?? m.b_value;
+        const finalWallValue = (wallVal === '' || wallVal === undefined) ? null : parseFloat(wallVal.toString().replace(',', '.'));
+        const finalFloorValue = (floorVal === '' || floorVal === undefined) ? null : parseFloat(floorVal.toString().replace(',', '.'));
+
+        const legacyMeasurementId = `${reportId}:${legacyRoom.id}:measurementData:${index}`;
+
+        return {
+          report_id: reportId,
+          room_id: roomId,
+          legacy_measurement_id: legacyMeasurementId,
+          source: 'measurementData',
+          mp_number: isNaN(mpNumber) ? null : mpNumber,
+          wall_value: isNaN(finalWallValue) ? null : finalWallValue,
+          floor_value: isNaN(finalFloorValue) ? null : finalFloorValue,
+          device: m.device || defaultDevice,
+          measured_at: measuredAt
+        };
+      });
+
+      let insertedOrUpdatedCount = 0;
+
+      // Upsert measurements individually or as batch
+      if (upsertPayload.length > 0) {
+          const { data, error } = await supabase
+            .from('room_measurements')
+            .upsert(upsertPayload, {
+              onConflict: 'report_id, room_id, legacy_measurement_id'
+            })
+            .select('id');
+            
+          if (error) {
+              console.error('[RELATIONAL-WRITE-DIAG] measurements upsert error', error);
+          } else {
+              insertedOrUpdatedCount = data?.length || 0;
+          }
+      }
+
+      console.log('[RELATIONAL-WRITE-DIAG] result', {
+        reportId,
+        relationalRoomId: roomId,
+        insertedOrUpdatedCount
+      });
+
+    } catch (e) {
+      console.error('[RELATIONAL-WRITE-DIAG] saveRoomMeasurementsRelational exception', e);
+      throw e; // We re-throw so the caller can catch it and log, but it won't break the UI
+    }
+  },
+
+  async saveMeasurementProtocolRelational(reportId, legacyRoom, protocolUrl) {
+    if (!reportId || !legacyRoom || !protocolUrl) return;
+
+    try {
+      const roomId = await this.ensureRelationalRoom(reportId, legacyRoom);
+      if (!roomId) throw new Error('Could not ensure relational room for protocol');
+
+      const legacyProtocolId = `${reportId}:${legacyRoom.id}:measurementData_protocol`;
+
+      const { data, error } = await supabase
+        .from('measurement_protocols')
+        .upsert({
+          report_id: reportId,
+          room_id: roomId,
+          legacy_protocol_id: legacyProtocolId,
+          source: 'measurementData',
+          protocol_type: 'pdf_protocol',
+          file_url: protocolUrl,
+          upload_status: 'completed',
+          created_by: 'dual_write_system'
+        }, {
+          onConflict: 'report_id, room_id, legacy_protocol_id'
+        })
+        .select('id');
+
+      if (error) {
+        console.error('[RELATIONAL-WRITE-DIAG] protocol upsert error', error);
+      } else {
+        console.log('[RELATIONAL-WRITE-DIAG] protocol saved successfully', { reportId, roomId, legacyProtocolId });
+      }
+
+    } catch (e) {
+      console.error('[RELATIONAL-WRITE-DIAG] saveMeasurementProtocolRelational exception', e);
+    }
+  },
+
+  async deleteRoomRelational(reportId, legacyRoomId) {
+    if (!reportId || !legacyRoomId) return;
+
+    try {
+      const { data: roomData, error: roomError } = await supabase
+        .from('damage_report_rooms')
+        .select('id')
+        .eq('report_id', reportId)
+        .eq('legacy_room_id', legacyRoomId)
+        .single();
+
+      if (roomError || !roomData) {
+        console.log('[MEASURE-SYNC] relational room not found for soft delete', { legacyRoomId });
+        return;
+      }
+
+      const relationalRoomId = roomData.id;
+      const now = new Date().toISOString();
+
+      await supabase
+        .from('damage_report_rooms')
+        .update({ deleted_at: now })
+        .eq('id', relationalRoomId);
+
+      await supabase
+        .from('room_measurements')
+        .update({ deleted_at: now })
+        .eq('room_id', relationalRoomId);
+
+      await supabase
+        .from('measurement_protocols')
+        .update({ deleted_at: now })
+        .eq('room_id', relationalRoomId);
+
+      console.log('[MEASURE-SYNC] relational room soft deleted', { roomId: legacyRoomId, relationalRoomId });
+    } catch (e) {
+      console.error('[MEASURE-SYNC] relational room delete failed', { roomId: legacyRoomId, error: e });
+    }
+  },
+
+  async deleteMeasurementPointRelational({ reportId, legacyRoomId, mp }) {
+    if (!reportId || !legacyRoomId || mp === undefined) return;
+
+    try {
+      const { data: roomData, error: roomError } = await supabase
+        .from('damage_report_rooms')
+        .select('id')
+        .eq('report_id', reportId)
+        .eq('legacy_room_id', legacyRoomId)
+        .single();
+
+      if (roomError || !roomData) return;
+
+      const relationalRoomId = roomData.id;
+      const now = new Date().toISOString();
+      const mpNumber = parseInt(mp, 10);
+
+      const { error } = await supabase
+        .from('room_measurements')
+        .update({ deleted_at: now })
+        .eq('room_id', relationalRoomId)
+        .eq('mp_number', isNaN(mpNumber) ? null : mpNumber);
+
+      if (error) {
+        console.error('[MEASURE-SYNC] relational point delete failed', { roomId: legacyRoomId, mp, error });
+      } else {
+        console.log('[MEASURE-SYNC] relational point soft deleted', { roomId: legacyRoomId, mp });
+      }
+    } catch (e) {
+      console.error('[MEASURE-SYNC] relational point delete failed', { roomId: legacyRoomId, mp, error: e });
+    }
+  }
+};

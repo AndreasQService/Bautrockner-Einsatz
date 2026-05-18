@@ -273,6 +273,46 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
         }
     }, [isOpen]);
 
+    // History overview helper
+    const getHistoryEntries = () => {
+        const entries = [];
+        const activeRoomForMeasurement = rooms && rooms.length > 0 ? rooms[0] : null;
+
+        if (Array.isArray(activeRoomForMeasurement?.measurementHistory)) {
+            entries.push(...activeRoomForMeasurement.measurementHistory.map((h, i) => ({
+                id: `hist_${i}`,
+                source: 'history',
+                date: h.date || h.datum || h.timestamp || h.createdAt || h.globalSettings?.date,
+                measurements: h.measurements || h.points || h.measurementPoints || [],
+                device: h.device || h.measurementDevice || h.messmittel || h.globalSettings?.device
+            })));
+        }
+
+        if (
+            activeRoomForMeasurement?.measurementData &&
+            Array.isArray(activeRoomForMeasurement.measurementData.measurements) &&
+            activeRoomForMeasurement.measurementData.measurements.length > 0
+        ) {
+            const dDate = activeRoomForMeasurement.measurementData.globalSettings?.date;
+            // Dedupe check
+            const isDuplicate = entries.length > 0 && entries.some(e => e.date === dDate && e.measurements.length === activeRoomForMeasurement.measurementData.measurements.length);
+
+            if (!isDuplicate) {
+                entries.unshift({
+                    id: 'current_data',
+                    source: 'current',
+                    date: dDate,
+                    measurements: activeRoomForMeasurement.measurementData.measurements,
+                    device: activeRoomForMeasurement.measurementData.globalSettings?.device
+                });
+            }
+        }
+
+        return entries.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+    };
+
+    const historyEntries = getHistoryEntries();
+
     // Calculate History View Data
     // Calculate History View Data - PIVOT
     const { historyColumns, historyRows } = React.useMemo(() => {
@@ -422,6 +462,8 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
         if (isSuccess) return;
 
         const currentRoomId = rooms && rooms.length > 0 ? rooms[0].id : null;
+        const isNewMeasurementFlag = rooms && rooms.length > 0 ? rooms[0].isNewMeasurement : false;
+        
         if (!currentRoomId) return;
 
         if (isInitializedRef.current === currentRoomId) return;
@@ -437,13 +479,15 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
                 return;
             }
 
-            if (roomData) {
-                const migrateNames = (ms) => (ms || []).map(m => ({
-                    ...m,
-                    pointName: m.pointName?.replace(/^Messpunkt\s+(\d+)$/i, 'MP $1') ?? m.pointName
-                }));
-                setMeasurements(migrateNames(roomData.measurements));
-                const gs = roomData.globalSettings || {
+            if (isNewMeasurementFlag) {
+                const initial = [
+                    { id: `p${Date.now()}`, pointName: 'MP 1', w_value: '', b_value: '', notes: '' },
+                    { id: `p${Date.now() + 1}`, pointName: 'MP 2', w_value: '', b_value: '', notes: '' },
+                    { id: `p${Date.now() + 2}`, pointName: 'MP 3', w_value: '', b_value: '', notes: '' },
+                    { id: `p${Date.now() + 3}`, pointName: 'MP 4', w_value: '', b_value: '', notes: '' }
+                ];
+                setMeasurements(initial);
+                const gs = {
                     date: new Date().toISOString().split('T')[0],
                     temp: '',
                     humidity: '',
@@ -453,7 +497,31 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
                 };
                 setGlobalSettings(gs);
                 const rm = gs.room || '';
-                setIsCustomRoom(rm && rm !== 'Ganze Wohnung' && !dynamicRoomOptions.includes(rm));
+                setIsCustomRoom(rm === '' || (rm !== 'Ganze Wohnung' && !dynamicRoomOptions.includes(rm)));
+                setGalleryPhotos([]);
+                setPreviewSnapshot(null);
+                initCanvas();
+                return;
+            }
+
+            if (roomData) {
+                const migrateNames = (ms) => (ms || []).map(m => ({
+                    ...m,
+                    pointName: m.pointName?.replace(/^Messpunkt\s+(\d+)$/i, 'MP $1') ?? m.pointName
+                }));
+                setMeasurements(migrateNames(roomData.measurements));
+                const baseGs = roomData.globalSettings || {};
+                const gs = {
+                    date: baseGs.date || new Date().toISOString().split('T')[0],
+                    temp: baseGs.temp || '',
+                    humidity: baseGs.humidity || '',
+                    device: baseGs.device || '',
+                    apartment: baseGs.apartment || (rooms && rooms.length > 0 ? (rooms[0].apartment || '') : ''),
+                    room: baseGs.room || (rooms && rooms.length > 0 ? (rooms[0].name || '') : '')
+                };
+                setGlobalSettings(gs);
+                const rm = gs.room || '';
+                setIsCustomRoom(rm === '' || (rm !== 'Ganze Wohnung' && !dynamicRoomOptions.includes(rm)));
                 if (roomData.galleryPhotos) setGalleryPhotos(roomData.galleryPhotos);
 
                 if (roomData.canvasImage) {
@@ -492,7 +560,9 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
                 };
                 setGlobalSettings(gs);
                 const rm = gs.room || '';
-                setIsCustomRoom(rm && rm !== 'Ganze Wohnung' && !dynamicRoomOptions.includes(rm));
+                setIsCustomRoom(rm === '' || (rm !== 'Ganze Wohnung' && !dynamicRoomOptions.includes(rm)));
+                setGalleryPhotos([]);
+                setPreviewSnapshot(null);
                 initCanvas();
             }
         };
@@ -844,9 +914,12 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
         }
     };
 
+    const isLightMode = document.documentElement.getAttribute('data-theme') === 'light';
+    const forceDark = isTechnicianMode && !isLightMode;
+
     return createPortal(
-        <div className={isTechnicianMode ? 'force-dark-mode' : ''} style={{ position: 'fixed', inset: 0, backgroundColor: isTechnicianMode ? 'rgba(0,0,0,0.85)' : 'rgba(255,255,255,0.85)', backdropFilter: 'blur(4px)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0.75rem' }}>
-            <div ref={containerRef} style={{ backgroundColor: 'var(--background)', borderRadius: '14px', width: '98vw', maxWidth: '1240px', height: '94vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', color: 'var(--text-main)', border: '1px solid var(--border)', boxShadow: isTechnicianMode ? '0 30px 80px rgba(0,0,0,0.7)' : '0 30px 80px rgba(0,0,0,0.1)' }}>
+        <div className={forceDark ? 'force-dark-mode' : ''} style={{ position: 'fixed', inset: 0, backgroundColor: forceDark ? 'rgba(0,0,0,0.85)' : 'rgba(255,255,255,0.85)', backdropFilter: 'blur(4px)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0.75rem' }}>
+            <div ref={containerRef} style={{ backgroundColor: 'var(--background)', borderRadius: '14px', width: '98vw', maxWidth: '1240px', height: '94vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', color: 'var(--text-main)', border: '1px solid var(--border)', boxShadow: forceDark ? '0 30px 80px rgba(0,0,0,0.7)' : '0 30px 80px rgba(0,0,0,0.1)' }}>
 
                 {/* ── HEADER ── */}
                 <div style={{ flexShrink: 0, padding: '0.7rem 1.1rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'var(--surface)' }}>
@@ -921,6 +994,21 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
                         {/* Hidden canvas always in DOM for init/save */}
                         <canvas ref={hiddenCanvasRef} width={960} height={600} style={{ display: 'none' }} />
 
+                        {/* --- READ-ONLY HISTORY BAR --- */}
+                        {historyEntries.length > 0 && (
+                            <div style={{ flexShrink: 0, padding: '0.6rem 1rem', background: 'var(--surface)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '0.6rem', overflowX: 'auto' }}>
+                                <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', marginRight: '0.5rem', flexShrink: 0 }}>Messverlauf:</span>
+                                {historyEntries.map(entry => (
+                                    <div key={entry.id} style={{ display: 'flex', alignItems: 'center', background: entry.source === 'current' ? 'rgba(59,130,246,0.1)' : 'rgba(255,255,255,0.03)', border: entry.source === 'current' ? '1px solid rgba(59,130,246,0.3)' : '1px solid var(--border)', padding: '0.35rem 0.6rem', borderRadius: '6px', fontSize: '0.8rem', whiteSpace: 'nowrap', color: entry.source === 'current' ? '#60A5FA' : 'var(--text-main)', flexShrink: 0 }}>
+                                        <span style={{ fontWeight: 600 }}>{entry.date ? new Date(entry.date).toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'Unbekannt'}</span>
+                                        <span style={{ margin: '0 0.4rem', color: 'var(--text-muted)' }}>•</span>
+                                        <span>{entry.measurements.length} MP</span>
+                                        {entry.source === 'current' && <span style={{ marginLeft: '0.4rem', fontSize: '0.7rem', backgroundColor: '#3B82F6', color: 'white', padding: '0.1rem 0.3rem', borderRadius: '4px', fontWeight: 700 }}>Aktuell</span>}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
                         {/* --- INTEGRATED HISTORY TABLE --- */}
                         {showHistoryTable && (
                             <div style={{ flexShrink: 0, maxHeight: '35%', backgroundColor: 'var(--surface)', borderBottom: '1px solid var(--border)', overflow: 'auto', padding: '0.5rem' }}>
@@ -986,9 +1074,9 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
                                             <X size={18} /> Schliessen
                                         </button>
                                     </div>
-                                    <div style={{ background: 'var(--text-main)', borderRadius: '12px', border: '1px solid var(--border)', boxShadow: '0 30px 80px rgba(0,0,0,0.1)', overflow: 'auto', flex: 1 }}>
+                                    <div style={{ background: 'var(--surface)', borderRadius: '12px', border: '1px solid var(--border)', boxShadow: '0 30px 80px rgba(0,0,0,0.1)', overflow: 'auto', flex: 1 }}>
                                         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
-                                            <thead style={{ position: 'sticky', top: 0, background: 'var(--text-main)', zIndex: 10, boxShadow: '0 1px 0 rgba(255,255,255,0.08)' }}>
+                                            <thead style={{ position: 'sticky', top: 0, background: 'var(--surface)', zIndex: 10, boxShadow: '0 1px 0 rgba(255,255,255,0.08)' }}>
                                                 <tr>
                                                     <th style={{ padding: '0.75rem 1rem', textAlign: 'left', color: '#94A3B8', whiteSpace: 'nowrap', width: '100px' }}>Messpunkt</th>
                                                     {[...historyRows].reverse().map(row => (
@@ -1061,6 +1149,85 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
                     <div style={{ width: 340, flexShrink: 0, display: 'flex', flexDirection: 'column', backgroundColor: 'var(--surface)', position: 'relative' }}>
                         <div style={{ flex: 1, overflowY: 'auto', padding: '1rem', paddingBottom: '40vh', display: 'flex', flexDirection: 'column', gap: '0.85rem', WebkitOverflowScrolling: 'touch' }}>
                             {!readOnly && (<>
+                                {/* Wohnung – Bereich */}
+                                <div>
+                                    <label style={S.label}>Wohnung / Bereich</label>
+                                    <div style={{ position: 'relative', marginBottom: isCustomApartment ? '0.5rem' : '0' }}>
+                                        <select 
+                                            value={isCustomApartment ? 'Sonstiges' : (globalSettings.apartment || '')} 
+                                            onChange={e => {
+                                                const val = e.target.value;
+                                                if (val === 'Sonstiges') {
+                                                    setIsCustomApartment(true);
+                                                    setGlobalSettings({ ...globalSettings, apartment: '' });
+                                                } else {
+                                                    setIsCustomApartment(false);
+                                                    setGlobalSettings({ ...globalSettings, apartment: val });
+                                                }
+                                            }} 
+                                            style={{ ...S.input, paddingRight: '2rem', appearance: 'none', backgroundColor: 'transparent' }}
+                                        >
+                                            <option value="" style={{ background: 'var(--surface)', color: 'var(--text-main)' }}>Bitte wählen...</option>
+                                            <option value="Allgemeiner Bereich" style={{ background: 'var(--surface)', color: 'var(--text-main)' }}>Allgemeiner Bereich</option>
+                                            {(apartments || []).map((a, i) => <option key={i} value={a} style={{ background: 'var(--surface)', color: 'var(--text-main)' }}>{a}</option>)}
+                                            <option value="Sonstiges" style={{ background: 'var(--surface)', color: 'var(--text-main)' }}>+ Neuer Bereich</option>
+                                        </select>
+                                        <ChevronDown size={14} style={{ position: 'absolute', right: '0.7rem', top: '50%', transform: 'translateY(-50%)', color: '#475569', pointerEvents: 'none' }} />
+                                    </div>
+                                    {isCustomApartment && (
+                                        <div style={{ marginTop: '0.5rem' }}>
+                                            <label style={{ ...S.label, color: '#60A5FA' }}>Neuer Bereich</label>
+                                            <input
+                                                type="text"
+                                                value={globalSettings.apartment || ''}
+                                                onChange={e => setGlobalSettings({ ...globalSettings, apartment: e.target.value })}
+                                                style={S.input}
+                                                placeholder="z.B. Treppenhaus EG"
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Raum */}
+                                <div>
+                                    <label style={S.label}>Raum</label>
+                                    <div style={{ position: 'relative', marginBottom: isCustomRoom ? '0.5rem' : '0' }}>
+                                        <select
+                                            value={isCustomRoom ? 'Sonstiges' : (globalSettings.room || 'Sonstiges')}
+                                            onChange={e => {
+                                                const val = e.target.value;
+                                                if (val === 'Sonstiges') {
+                                                    setIsCustomRoom(true);
+                                                    setGlobalSettings({ ...globalSettings, room: '' });
+                                                } else {
+                                                    setIsCustomRoom(false);
+                                                    setGlobalSettings({ ...globalSettings, room: val });
+                                                }
+                                            }}
+                                            style={{ ...S.input, appearance: 'none', paddingRight: '2rem', backgroundColor: 'transparent' }}
+                                        >
+                                            <option value="Sonstiges" style={{ background: 'var(--surface)', color: 'var(--text-main)' }}>Eigene Eingabe</option>
+                                            <option value="Ganze Wohnung" style={{ background: 'var(--surface)', color: 'var(--text-main)' }}>Ganze Wohnung</option>
+                                            {dynamicRoomOptions.map((opt, i) => <option key={i} value={opt} style={{ background: 'var(--surface)', color: 'var(--text-main)' }}>{opt}</option>)}
+                                        </select>
+                                        <ChevronDown size={14} style={{ position: 'absolute', right: '0.7rem', top: '50%', transform: 'translateY(-50%)', color: '#475569', pointerEvents: 'none' }} />
+                                    </div>
+                                    {isCustomRoom && (
+                                        <div style={{ marginTop: '0.5rem' }}>
+                                            <label style={{ ...S.label, color: '#60A5FA' }}>Eigener Raum</label>
+                                            <input
+                                                type="text"
+                                                value={globalSettings.room || ''}
+                                                onChange={e => setGlobalSettings({ ...globalSettings, room: e.target.value })}
+                                                style={S.input}
+                                                placeholder="z.B. Dusche, Bad, Garage"
+                                                autoFocus
+                                                autoComplete="off"
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+
                                 {/* Messmittel */}
                                 <div>
                                     <label style={S.label}>Messmittel</label>
@@ -1071,90 +1238,12 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
                                     </div>
                                 </div>
 
-                                {/* Wohnung – Bereich (nur bei komplett neuem Raum) */}
-                                {isNewRoom && (
-                                    <div>
-                                        <label style={S.label}>Wohnung / Bereich</label>
-                                        <div style={{ position: 'relative', marginBottom: isCustomApartment ? '0.5rem' : '0' }}>
-                                            <select 
-                                                value={isCustomApartment ? 'Sonstiges' : (globalSettings.apartment || '')} 
-                                                onChange={e => {
-                                                    const val = e.target.value;
-                                                    if (val === 'Sonstiges') {
-                                                        setIsCustomApartment(true);
-                                                        setGlobalSettings({ ...globalSettings, apartment: '' });
-                                                    } else {
-                                                        setIsCustomApartment(false);
-                                                        setGlobalSettings({ ...globalSettings, apartment: val });
-                                                    }
-                                                }} 
-                                                style={{ ...S.input, paddingRight: '2rem', appearance: 'none', backgroundColor: 'transparent' }}
-                                            >
-                                                <option value="" style={{ background: 'var(--surface)', color: 'var(--text-main)' }}>Bitte wählen...</option>
-                                                <option value="Sonstiges" style={{ background: 'var(--surface)', color: 'var(--text-main)' }}>Sonstiges / Eigene Eingabe</option>
-                                                <option value="Allgemeiner Bereich" style={{ background: 'var(--surface)', color: 'var(--text-main)' }}>Allgemeiner Bereich</option>
-                                                {(apartments || []).map((a, i) => <option key={i} value={a} style={{ background: 'var(--surface)', color: 'var(--text-main)' }}>{a}</option>)}
-                                            </select>
-                                            <ChevronDown size={14} style={{ position: 'absolute', right: '0.7rem', top: '50%', transform: 'translateY(-50%)', color: '#475569', pointerEvents: 'none' }} />
-                                        </div>
-                                        {isCustomApartment && (
-                                            <input
-                                                type="text"
-                                                value={globalSettings.apartment || ''}
-                                                onChange={e => setGlobalSettings({ ...globalSettings, apartment: e.target.value })}
-                                                style={S.input}
-                                                placeholder="z.B. Treppenhaus EG"
-                                            />
-                                        )}
-                                    </div>
-                                )}
-
-                                {/* Raum (nur bei komplett neuem Raum) */}
-                                {isNewRoom && (
-                                    <div>
-                                        <label style={S.label}>Raum</label>
-                                        <div style={{ position: 'relative', marginBottom: isCustomRoom ? '0.5rem' : '0' }}>
-                                            <select
-                                                value={isCustomRoom ? 'Sonstiges' : (globalSettings.room || '')}
-                                                onChange={e => {
-                                                    const val = e.target.value;
-                                                    if (val === 'Sonstiges') {
-                                                        setIsCustomRoom(true);
-                                                        setGlobalSettings({ ...globalSettings, room: '' });
-                                                    } else {
-                                                        setIsCustomRoom(false);
-                                                        setGlobalSettings({ ...globalSettings, room: val });
-                                                    }
-                                                }}
-                                                style={{ ...S.input, appearance: 'none', paddingRight: '2rem', backgroundColor: 'transparent' }}
-                                            >
-                                                <option value="" style={{ background: 'var(--surface)', color: 'var(--text-main)' }}>Raum wählen...</option>
-                                                <option value="Sonstiges" style={{ background: 'var(--surface)', color: 'var(--text-main)' }}>Sonstiges / Eigener Name</option>
-                                                <option value="Ganze Wohnung" style={{ background: 'var(--surface)', color: 'var(--text-main)' }}>Ganze Wohnung</option>
-                                                {dynamicRoomOptions.map((opt, i) => <option key={i} value={opt} style={{ background: 'var(--surface)', color: 'var(--text-main)' }}>{opt}</option>)}
-                                            </select>
-                                            <ChevronDown size={14} style={{ position: 'absolute', right: '0.7rem', top: '50%', transform: 'translateY(-50%)', color: '#475569', pointerEvents: 'none' }} />
-                                        </div>
-                                        {isCustomRoom && (
-                                            <input
-                                                type="text"
-                                                value={globalSettings.room || ''}
-                                                onChange={e => setGlobalSettings({ ...globalSettings, room: e.target.value })}
-                                                style={S.input}
-                                                placeholder="Eigener Raumname"
-                                                autoFocus
-                                                autoComplete="off"
-                                            />
-                                        )}
-                                    </div>
-                                )}
-
                                 {/* Datum / Temp / Feuchte */}
                                 <div style={{ display: 'grid', gridTemplateColumns: '1.25fr 0.85fr 0.85fr', gap: '0.4rem' }}>
                                     {[
                                         { lbl: 'Datum', type: 'date', key: 'date', ph: '' },
-                                        { lbl: 'Temp °C', type: 'text', key: 'temp', ph: '20', isNumeric: true },
-                                        { lbl: 'Feuchte %', type: 'text', key: 'humidity', ph: '55', isNumeric: true },
+                                        { lbl: 'Temp °C', type: 'text', key: 'temp', ph: '', isNumeric: true },
+                                        { lbl: 'Feuchte %', type: 'text', key: 'humidity', ph: '', isNumeric: true },
                                     ].map(f => (
                                         <div key={f.key}>
                                             <label style={{ ...S.label, fontSize: '0.65rem', whiteSpace: 'nowrap' }}>{f.lbl}</label>
