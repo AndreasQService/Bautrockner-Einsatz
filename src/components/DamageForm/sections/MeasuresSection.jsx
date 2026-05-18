@@ -49,7 +49,7 @@ const MeasuresSection = ({
         recognition.start();
     };
 
-    if (mode !== 'technician' || (formData.status !== 'Schadenaufnahme' && formData.status !== 'Leckortung')) {
+    if (mode !== 'technician') {
         return null;
     }
 
