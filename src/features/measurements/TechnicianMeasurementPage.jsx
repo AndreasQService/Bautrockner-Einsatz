@@ -11,8 +11,8 @@ export default function TechnicianMeasurementPage({
         <div style={{ marginBottom: '2rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2rem' }}>
                 <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-start' }}>
-                    <button onClick={onBackToTiles} style={{ background: 'var(--surface)', border: '2px solid rgba(96, 165, 250, 0.4)', color: '#60A5FA', cursor: 'pointer', padding: '0.75rem 1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem', borderRadius: '12px', fontWeight: 700, fontSize: '1.1rem', boxShadow: '0 2px 8px rgba(96, 165, 250, 0.1)' }}>
-                        <ArrowLeft size={20} /> Kacheln
+                    <button onClick={onBackToTiles} style={{ background: 'var(--color-primary, #1E6DB7)', border: '1px solid var(--color-primary-hover, #175394)', color: '#FFFFFF', cursor: 'pointer', padding: '0.6rem 1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem', borderRadius: '4px', fontWeight: 600, fontSize: '1.1rem', boxShadow: '0 1px 3px rgba(0,0,0,0.12)' }}>
+                        <ArrowLeft size={18} /> Zurück zu Kacheln
                     </button>
                 </div>
                 <div style={{ flex: 2, textAlign: 'center' }}>
