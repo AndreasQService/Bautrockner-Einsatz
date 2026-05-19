@@ -223,17 +223,11 @@ export const PDFService = {
                         canvas.height = height;
                         const ctx = canvas.getContext('2d');
                         ctx.drawImage(img, 0, 0, width, height);
-                        canvas.toBlob((blob) => {
-                            if (blob) {
-                                resolve(URL.createObjectURL(blob));
-                            } else {
-                                resolve(canvas.toDataURL('image/jpeg', 0.85)); // Fallback
-                            }
-                        }, 'image/jpeg', 0.85);
+                        // Use PNG to avoid pdfkit JPEG parsing bugs with objectPosition
+                        resolve(canvas.toDataURL('image/png'));
                     };
                     img.onerror = () => {
-                        // Only resolve raw dataUrl if it's explicitly an image type supported by react-pdf
-                        if (dataUrl.startsWith('data:image/jpeg') || dataUrl.startsWith('data:image/png')) {
+                        if (dataUrl.startsWith('data:image/')) {
                             resolve(dataUrl);
                         } else {
                             resolve(null);
