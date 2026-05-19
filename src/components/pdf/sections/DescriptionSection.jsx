@@ -21,34 +21,32 @@ const DescriptionSection = ({ data }) => {
 
     if (!hasDescription && !hasUnassignedImages) return null;
 
-    return (
-        <>
-            {/* Images only (no description text) */}
-            {hasUnassignedImages && !hasDescription && (
-                <View style={{ marginBottom: 15 }}>
-                    <View style={styles.divider} />
-                    <ImageGrid images={unassignedImages} />
-                </View>
-            )}
+    const firstImages = unassignedImages.slice(0, 2);
+    const restImages = unassignedImages.slice(2);
 
-            {/* Description + optional images */}
-            {hasDescription && (
-                <>
-                    <View style={{ marginBottom: 15 }}>
-                        <View wrap={false}>
-                            <View style={styles.divider} />
-                            <Text style={styles.sectionTitle}>Schadenbeschreibung</Text>
-                        </View>
+    return (
+        <View style={{ marginBottom: 15 }}>
+            {/* Header + first image pair: wrap=false keeps them together */}
+            <View wrap={false}>
+                <View style={styles.divider} />
+                
+                {hasDescription && (
+                    <>
+                        <Text style={styles.sectionTitle}>Schadenbeschreibung</Text>
                         <Text style={styles.textBlock}>{data.description.trim()}</Text>
-                    </View>
-                    {hasUnassignedImages && (
-                        <View style={{ marginBottom: 15 }}>
-                            <ImageGrid images={unassignedImages} />
-                        </View>
-                    )}
-                </>
+                    </>
+                )}
+
+                {firstImages.length > 0 && (
+                    <ImageGrid images={firstImages} />
+                )}
+            </View>
+
+            {/* Remaining images can flow freely */}
+            {restImages.length > 0 && (
+                <ImageGrid images={restImages} />
             )}
-        </>
+        </View>
     );
 };
 
