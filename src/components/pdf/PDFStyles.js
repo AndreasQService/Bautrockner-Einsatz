@@ -99,7 +99,7 @@ export const styles = StyleSheet.create({
 
     // Apartment / Room Grouping
     apartmentHeader: {
-        fontSize: 16,
+        fontSize: 14,
         color: '#0F6EA3',
         fontWeight: 'bold',
         marginTop: 10,
