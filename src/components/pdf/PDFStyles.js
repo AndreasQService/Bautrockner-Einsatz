@@ -137,12 +137,9 @@ export const styles = StyleSheet.create({
         alignItems: 'flex-start',
     },
     image: {
-        width: '100%',
-        minWidth: '100%', // Prevents base64 image collapse bug in react-pdf
-        height: 185, // Slightly reduced for footer clearance
-        minHeight: 185, // Prevents base64 image collapse bug in react-pdf
+        height: 185,
+        maxWidth: '100%',
         objectFit: 'contain',
-        objectPosition: 'left',
         borderRadius: 2,
     },
     imageDescription: {
