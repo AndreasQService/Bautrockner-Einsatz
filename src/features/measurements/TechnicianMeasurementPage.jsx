@@ -28,7 +28,7 @@ export default function TechnicianMeasurementPage({
 
                 {(!measurementRooms || measurementRooms.length === 0) ? (
                     <div style={{ textAlign: 'center', padding: '2rem 1rem' }}>
-                        <div style={{ color: 'var(--text-main)', fontWeight: 500, fontSize: '1.1rem', marginBottom: '1.5rem' }}>Noch keine Messräume angelegt.</div>
+                        <div style={{ color: 'var(--text-main)', fontWeight: 500, fontSize: '1.1rem', marginBottom: '1.5rem' }}>Noch keine Räume angelegt.</div>
                     </div>
                 ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
