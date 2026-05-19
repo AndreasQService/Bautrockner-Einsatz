@@ -7338,12 +7338,12 @@ END:VCARD`;
 
                 {/* Zusammenfassung Trocknung */}
                 {(mode === 'desktop' || true) && (
-                    <div style={{ marginBottom: '1.5rem', backgroundColor: 'var(--surface)', padding: '1.25rem', borderRadius: '12px', border: '2px solid #1E6DB7', color: 'var(--text-main)', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}>
+                    <div className="card" style={{ padding: '1.5rem', marginBottom: '1.5rem' }}>
                         <div 
                             onClick={() => setIsDevicesExpanded(prev => !prev)}
-                            style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: isDevicesExpanded ? '1.25rem' : '0', cursor: 'pointer', userSelect: 'none' }}
+                            style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', userSelect: 'none', marginBottom: isDevicesExpanded ? '1rem' : '0' }}
                         >
-                            <h3 style={{ fontSize: '1rem', fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: '0.6rem', color: 'var(--primary)' }}>
+                            <h3 className="section-header" style={{ marginBottom: 0, border: 'none' }}>
                                 <Database size={18} /> Geräteliste
                             </h3>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
@@ -7445,7 +7445,8 @@ END:VCARD`;
                                         )}
                                 </div>
                             ) : (
-                                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
+                                <div style={{ border: '1px solid var(--border)', borderRadius: '12px', overflow: 'hidden' }}>
+                                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
                                     <thead>
                                         <tr style={{ borderBottom: '2px solid var(--border)' }}>
                                             <th style={{ textAlign: 'left', padding: '0.75rem' }}>Gerät</th>
@@ -7504,7 +7505,8 @@ END:VCARD`;
                                             <td style={{ textAlign: 'right', padding: '0.75rem' }}>{totalDryingKwh.toFixed(2)} kWh</td>
                                         </tr>
                                     </tbody>
-                                </table>
+                                    </table>
+                                </div>
                             )}
                         </div>
                         )}
