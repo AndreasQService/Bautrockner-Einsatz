@@ -6697,7 +6697,16 @@ END:VCARD`;
                                                 {/* Header */}
                                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem' }}>
                                                     <div>
-                                                        <div style={{ fontWeight: 700, fontSize: '1rem', color: 'white' }}>{room.name || 'Unbenannter Raum'}</div>
+                                                        <div style={{ fontWeight: 700, fontSize: '1rem', color: 'white' }}>
+                                                            {(() => {
+                                                                const rName = room.name || 'Unbenannter Raum';
+                                                                const floor = room.stockwerk ? `${room.stockwerk} ` : '';
+                                                                const apt = room.apartment || '';
+                                                                const hasKeyword = apt.toLowerCase().includes('wohnung') || apt.toLowerCase().includes('whg');
+                                                                const displayApt = apt ? (hasKeyword ? apt : `Whg ${apt}`) : '';
+                                                                return `${rName} ${floor}${displayApt}`.trim();
+                                                            })()}
+                                                        </div>
                                                         <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 500 }}>
                                                             {dateStr}
                                                         </div>
