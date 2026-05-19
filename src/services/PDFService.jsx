@@ -220,7 +220,13 @@ export const PDFService = {
                         canvas.height = height;
                         const ctx = canvas.getContext('2d');
                         ctx.drawImage(img, 0, 0, width, height);
-                        resolve(canvas.toDataURL('image/jpeg', 0.85));
+                        canvas.toBlob((blob) => {
+                            if (blob) {
+                                resolve(URL.createObjectURL(blob));
+                            } else {
+                                resolve(canvas.toDataURL('image/jpeg', 0.85)); // Fallback
+                            }
+                        }, 'image/jpeg', 0.85);
                     };
                     img.onerror = () => {
                         // Only resolve raw dataUrl if it's explicitly an image type supported by react-pdf
@@ -244,12 +250,8 @@ export const PDFService = {
                     if (path) {
                         const { data, error } = await supabase.storage.from('case-files').download(path);
                         if (data && !error) {
-                            const raw = await new Promise((resolve) => {
-                                const reader = new FileReader();
-                                reader.onloadend = () => resolve(reader.result);
-                                reader.readAsDataURL(data);
-                            });
-                            return await resizeImage(raw);
+                            const blobUrl = URL.createObjectURL(data);
+                            return await resizeImage(blobUrl);
                         }
                     }
                 } catch (e) { console.warn("[PDFService Master] Supabase error", e); }
@@ -260,12 +262,8 @@ export const PDFService = {
                 const response = await fetch(url, { cache: 'no-cache' });
                 if (response.ok) {
                     const blob = await response.blob();
-                    const raw = await new Promise((resolve) => {
-                        const reader = new FileReader();
-                        reader.onloadend = () => resolve(reader.result);
-                        reader.readAsDataURL(blob);
-                    });
-                    return await resizeImage(raw);
+                    const blobUrl = URL.createObjectURL(blob);
+                    return await resizeImage(blobUrl);
                 }
             } catch (err) { /* silent fail */ }
 
@@ -281,7 +279,13 @@ export const PDFService = {
                             canvas.height = img.height;
                             const ctx = canvas.getContext('2d');
                             ctx.drawImage(img, 0, 0);
-                            resolve(canvas.toDataURL('image/jpeg', 0.9));
+                            canvas.toBlob((blob) => {
+                                if (blob) {
+                                    resolve(URL.createObjectURL(blob));
+                                } else {
+                                    resolve(canvas.toDataURL('image/jpeg', 0.9));
+                                }
+                            }, 'image/jpeg', 0.9);
                         } catch (e) { resolve(null); }
                     };
                     img.onerror = () => resolve(null);
