@@ -3982,12 +3982,10 @@ END:VCARD`;
                                 }).map((img, idx) => (
                                     <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '4px', marginBottom: '8px' }}>
                                         <div
-                                            className="btn-glass"
                                             style={{
-                                                position: 'relative', width: '140px', height: '140px', borderRadius: '12px', overflow: 'hidden',
+                                                position: 'relative', width: '140px', height: '140px', borderRadius: '8px', overflow: 'hidden',
                                                 cursor: 'pointer',
-                                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                                border: img.includeInReport !== false ? '2px solid #0F6EA3' : '1px solid var(--border)'
+                                                border: '1px solid var(--border)'
                                             }}
                                         >
                                             <img
@@ -4036,7 +4034,7 @@ END:VCARD`;
 
                                         {/* Action Bar Below Image */}
                                         <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', padding: '0 2px', alignItems: 'center' }}>
-                                            <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', fontSize: '0.75rem', cursor: 'pointer', color: 'white' }}>
+                                            <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', fontSize: '0.75rem', cursor: 'pointer', color: 'var(--text-main)' }}>
                                                 <input
                                                     type="checkbox"
                                                     style={{ width: '20px', height: '20px', accentColor: 'var(--primary)' }}
@@ -4057,7 +4055,7 @@ END:VCARD`;
                                                 style={{
                                                     border: '1px solid var(--border)',
                                                     backgroundColor: 'var(--surface)',
-                                                    color: 'white',
+                                                    color: 'var(--text-main)',
                                                     cursor: 'pointer',
                                                     padding: '8px',
                                                     borderRadius: '8px',
