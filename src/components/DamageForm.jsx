@@ -7337,7 +7337,7 @@ END:VCARD`;
                 }
 
                 {/* Zusammenfassung Trocknung */}
-                {(mode === 'desktop' || true) && formData.equipment?.length > 0 && (
+                {(mode === 'desktop' || true) && (
                     <div style={{ marginBottom: '1.5rem', backgroundColor: 'var(--surface)', padding: '1.25rem', borderRadius: '12px', border: '2px solid #1E6DB7', color: 'var(--text-main)', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}>
                         <div 
                             onClick={() => setIsDevicesExpanded(prev => !prev)}
@@ -7378,7 +7378,7 @@ END:VCARD`;
                         <div style={{ overflowX: 'auto' }}>
                             {mode === 'technician' ? (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                                    {formData.equipment
+                                    {(formData.equipment || [])
                                         .map((d, i) => ({ ...d, _originalIndex: i }))
                                         .filter(device => !techSelectedEquipmentRoom?.apartment || (device.apartment || 'Allgemeiner Bereich').trim() === techSelectedEquipmentRoom.apartment)
                                         .map((device) => {
@@ -7431,10 +7431,10 @@ END:VCARD`;
                                                 </div>
                                             );
                                         })}
-                                        {formData.equipment.filter(device => !techSelectedEquipmentRoom?.apartment || (device.apartment || 'Allgemeiner Bereich').trim() === techSelectedEquipmentRoom.apartment).length === 0 && (
+                                        {(formData.equipment || []).filter(device => !techSelectedEquipmentRoom?.apartment || (device.apartment || 'Allgemeiner Bereich').trim() === techSelectedEquipmentRoom.apartment).length === 0 && (
                                             <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>Keine Geräte vorhanden.</div>
                                         )}
-                                        {formData.equipment.filter(device => !techSelectedEquipmentRoom?.apartment || (device.apartment || 'Allgemeiner Bereich').trim() === techSelectedEquipmentRoom.apartment).length > 0 && (
+                                        {(formData.equipment || []).filter(device => !techSelectedEquipmentRoom?.apartment || (device.apartment || 'Allgemeiner Bereich').trim() === techSelectedEquipmentRoom.apartment).length > 0 && (
                                             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem', backgroundColor: 'var(--surface)', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)', borderRadius: '8px', border: '2px solid #1E6DB7', marginTop: '0.5rem' }}>
                                                 <div style={{ fontWeight: 800, color: 'var(--text-main)' }}>Gesamt</div>
                                                 <div style={{ textAlign: 'right', fontWeight: 800, color: 'var(--text-main)' }}>
@@ -7455,7 +7455,7 @@ END:VCARD`;
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {formData.equipment.map((device, idx) => {
+                                        {(formData.equipment || []).map((device, idx) => {
                                             const isFinished = !!device.endDate;
                                             const hasMeter = device.counterEnd && device.counterStart;
                                             const hasKw = device.energyConsumption && device.hours;
@@ -7492,7 +7492,7 @@ END:VCARD`;
                                                 </tr>
                                             );
                                         })}
-                                        {formData.equipment.length === 0 && (
+                                        {(formData.equipment || []).length === 0 && (
                                             <tr>
                                                 <td colSpan="4" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>Keine Geräte vorhanden.</td>
                                             </tr>
