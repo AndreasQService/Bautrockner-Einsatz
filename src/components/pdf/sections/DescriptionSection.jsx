@@ -32,7 +32,7 @@ const DescriptionSection = ({ data }) => {
                 
                 {hasDescription && (
                     <>
-                        <Text style={styles.sectionTitle}>Schadenbeschreibung</Text>
+                        <Text style={styles.sectionTitle}>SCHADENBESCHREIBUNG</Text>
                         <Text style={styles.textBlock}>{data.description.trim()}</Text>
                     </>
                 )}
