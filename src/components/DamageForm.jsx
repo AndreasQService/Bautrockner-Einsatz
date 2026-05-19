@@ -2641,12 +2641,12 @@ END:VCARD`;
                                 setTechTab(tile.id); 
                             }
                         }} style={{
-                            background: 'var(--surface)', border: `2px solid ${tile.color}`,
+                            background: isDarkMode ? 'var(--surface)' : '#FFFFFF', border: `2px solid ${tile.color}`,
                             borderRadius: '16px', padding: '2.5rem 1rem', cursor: 'pointer',
                             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                             gap: '0.75rem', boxShadow: `0 4px 20px ${tile.color}33`, minHeight: '130px', transition: 'transform 0.15s'
                         }}>
-                            <span style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-main)' }}>{tile.label === 'Trocknung' ? 'Geräte' : tile.label}</span>
+                            <span style={{ fontSize: '1rem', fontWeight: 700, color: isDarkMode ? 'var(--text-main)' : '#1E293B' }}>{tile.label === 'Trocknung' ? 'Geräte' : tile.label}</span>
                         </button>
                     ))}
                 </div>
@@ -2655,13 +2655,13 @@ END:VCARD`;
                         if (TECH_TILES[4].status) setFormData(prev => ({ ...prev, status: TECH_TILES[4].status }));
                         setTechTab('messung');
                     }} style={{
-                        background: 'var(--surface)', border: `2px solid ${TECH_TILES[4].color}`,
+                        background: isDarkMode ? 'var(--surface)' : '#FFFFFF', border: `2px solid ${TECH_TILES[4].color}`,
                         borderRadius: '16px', padding: '2.5rem 1rem', cursor: 'pointer',
                         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                         gap: '0.75rem', boxShadow: `0 4px 20px ${TECH_TILES[4].color}33`,
                         width: 'calc(50% - 0.5rem)', minHeight: '130px'
                     }}>
-                        <span style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-main)' }}>{TECH_TILES[4].label}</span>
+                        <span style={{ fontSize: '1rem', fontWeight: 700, color: isDarkMode ? 'var(--text-main)' : '#1E293B' }}>{TECH_TILES[4].label}</span>
                     </button>
                 </div>
 
