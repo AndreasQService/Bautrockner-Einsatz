@@ -64,11 +64,11 @@ const VcfIcon = ({ size = 24, style = {} }) => (
 /* Custom Calendar Icon */
 const CalendarIcon = ({ size = 24, style = {} }) => (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" style={style}>
-        <rect x="3" y="4" width="18" height="18" rx="2" ry="2" fill="white" stroke="#10B981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-        <line x1="16" y1="2" x2="16" y2="6" stroke="#10B981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-        <line x1="8" y1="2" x2="8" y2="6" stroke="#10B981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-        <line x1="3" y1="10" x2="21" y2="10" stroke="#10B981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-        <rect x="3" y="11" width="18" height="7" rx="1" fill="#10B981" />
+        <rect x="3" y="4" width="18" height="18" rx="2" ry="2" fill="white" stroke="#1E6DB7" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        <line x1="16" y1="2" x2="16" y2="6" stroke="#1E6DB7" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        <line x1="8" y1="2" x2="8" y2="6" stroke="#1E6DB7" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        <line x1="3" y1="10" x2="21" y2="10" stroke="#1E6DB7" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        <rect x="3" y="11" width="18" height="7" rx="1" fill="#1E6DB7" />
         <text x="12" y="15.5" fill="white" fontSize="5.5" fontWeight="900" textAnchor="middle" dominantBaseline="middle" style={{ fontFamily: 'var(--font-desktop)', userSelect: 'none' }}>ICS</text>
     </svg>
 );
@@ -2635,7 +2635,7 @@ END:VCARD`;
             { id: 'aufnahme', label: 'Schadenaufnahme', icon: '🔍', color: '#F97316', status: 'Schadenaufnahme' },
             { id: 'leck', label: 'Leckortung', icon: '💧', color: '#06B6D4', status: 'Leckortung' },
             { id: 'trocknung', label: 'Trocknung', icon: '🌬', color: '#A855F7', status: 'Trocknung' },
-            { id: 'messung', label: 'Messung', icon: '📏', color: '#10B981', status: null },
+            { id: 'messung', label: 'Messung', icon: '📏', color: '#1E6DB7', status: null },
         ];
         const adresse = [formData.street, [formData.zip, formData.city].filter(Boolean).join(' ')].filter(Boolean).join(', ');
         const sub = [formData.projectNumber, formData.damageCategory].filter(Boolean).join(' · ');
@@ -2797,7 +2797,7 @@ END:VCARD`;
                                             setTechSelectedApartment(null);
                                             setShowMeasurementModal(true);
                                         }
-                                    }} style={{ width: '100%', background: 'rgba(16, 185, 129, 0.1)', color: '#10B981', border: '1px dashed #10B981', padding: '1rem', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '0.95rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                                    }} style={{ width: '100%', background: 'rgba(30, 109, 183, 0.1)', color: '#1E6DB7', border: '1px dashed #1E6DB7', padding: '1rem', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '0.95rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
                                         <Plus size={18} /> {techRoomSelectorMode === 'geraete' ? 'Gerät hinzufügen' : 'Neuer Raum / Neue Messung'}
                                     </button>
                                 </div>
@@ -3185,8 +3185,8 @@ END:VCARD`;
                             <label style={{
                                 display: 'flex', alignItems: 'center', gap: '0.5rem',
                                 cursor: 'pointer', userSelect: 'none',
-                                background: isChecked ? 'rgba(16,185,129,0.12)' : 'rgba(255,255,255,0.04)',
-                                border: `1.5px solid ${isChecked ? '#10B981' : 'rgba(255,255,255,0.1)'}`,
+                                background: isChecked ? 'rgba(30, 109, 183,0.12)' : 'rgba(255,255,255,0.04)',
+                                border: `1.5px solid ${isChecked ? '#1E6DB7' : 'rgba(255,255,255,0.1)'}`,
                                 borderRadius: 12, padding: '0.5rem 1rem',
                                 transition: 'all 0.15s', whiteSpace: 'nowrap'
                             }}>
@@ -3201,9 +3201,9 @@ END:VCARD`;
                                             if (onSave) setTimeout(() => onSave(updated, true), 200);
                                         }
                                     }}
-                                    style={{ width: 18, height: 18, accentColor: '#10B981', cursor: 'pointer' }}
+                                    style={{ width: 18, height: 18, accentColor: '#1E6DB7', cursor: 'pointer' }}
                                 />
-                                <span style={{ fontSize: '0.85rem', fontWeight: 700, color: isChecked ? '#10B981' : '#94A3B8' }}>
+                                <span style={{ fontSize: '0.85rem', fontWeight: 700, color: isChecked ? '#1E6DB7' : '#94A3B8' }}>
                                     {isChecked ? '✓ ' : ''}{label}
                                 </span>
                             </label>
@@ -3585,10 +3585,10 @@ END:VCARD`;
                             <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginTop: '1rem' }}>
                                 {/* Rechnungsvermerk */}
                                 <div style={{ flex: '0 1 250px' }}>
-                                    <label style={{ fontSize: '0.65rem', color: '#10B981', textTransform: 'uppercase', fontWeight: 700, display: 'block', marginBottom: '0.25rem' }}>Rechnungsvermerk</label>
+                                    <label style={{ fontSize: '0.65rem', color: '#1E6DB7', textTransform: 'uppercase', fontWeight: 700, display: 'block', marginBottom: '0.25rem' }}>Rechnungsvermerk</label>
                                     <input
                                         className="form-input"
-                                        style={{ borderColor: '#10B981', width: '100%', fontWeight: 700 }}
+                                        style={{ borderColor: '#1E6DB7', width: '100%', fontWeight: 700 }}
                                         placeholder="z.B. EIM-..."
                                         value={formData.invoiceReference || ''}
                                         onChange={(e) => setFormData(prev => ({ ...prev, invoiceReference: e.target.value }))}
@@ -4488,7 +4488,7 @@ END:VCARD`;
                                     if (contact.role === 'Auftraggeber' && !formData.clientIsResident) return null;
                                     if (contact.role === 'Eigentümer' && !formData.ownerIsResident) return null;
                                     
-                                    const roleColorMap = { 'Auftraggeber': '#3b82f6', 'Verwaltung': '#f59e0b', 'Eigentümer': '#8b5cf6', 'Handwerker': '#ef4444', 'Hauswart': '#94a3b8', 'Mieter': '#10b981', 'Sonstiges': 'var(--text-muted)' };
+                                    const roleColorMap = { 'Auftraggeber': '#1E6DB7', 'Verwaltung': '#1E6DB7', 'Eigentümer': '#1E6DB7', 'Handwerker': '#1E6DB7', 'Hauswart': '#1E6DB7', 'Mieter': '#1E6DB7', 'Sonstiges': 'var(--text-muted)' };
                                     const rc = roleColorMap[contact.role] || 'var(--text-muted)';
                                     return (
                                         <div key={idx} className="glass-card" style={{
@@ -4660,14 +4660,14 @@ END:VCARD`;
                                                         style={{
                                                             padding: '0.45rem',
                                                             borderRadius: '8px',
-                                                            color: '#10B981',
+                                                            color: '#1E6DB7',
                                                             cursor: contact.phone ? 'pointer' : 'default',
                                                             display: 'flex',
                                                             alignItems: 'center',
                                                             justifyContent: 'center',
                                                             opacity: contact.phone ? 1 : 0.3,
-                                                            backgroundColor: 'rgba(16, 185, 129, 0.08)',
-                                                            border: '1px solid rgba(16, 185, 129, 0.15)'
+                                                            backgroundColor: 'rgba(30, 109, 183, 0.08)',
+                                                            border: '1px solid rgba(30, 109, 183, 0.15)'
                                                         }}
                                                         title="Anrufen"
                                                     >
@@ -4686,9 +4686,9 @@ END:VCARD`;
                                                             display: 'flex',
                                                             alignItems: 'center',
                                                             justifyContent: 'center',
-                                                            backgroundColor: 'rgba(16, 185, 129, 0.08)',
-                                                            border: '1px solid rgba(16, 185, 129, 0.15)',
-                                                            color: '#10B981',
+                                                            backgroundColor: 'rgba(30, 109, 183, 0.08)',
+                                                            border: '1px solid rgba(30, 109, 183, 0.15)',
+                                                            color: '#1E6DB7',
                                                             fontSize: '0.75rem',
                                                             fontWeight: 700,
                                                         }}
@@ -5209,7 +5209,7 @@ END:VCARD`;
                                                                             overflow: 'hidden',
                                                                             backgroundColor: '#E5E7EB',
                                                                             boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-                                                                            border: (activeImageMeta?.preview === img.preview || editingImage?.preview === img.preview) ? '3px solid #3B82F6' : (linkingImageId ? '3px solid #10B981' : '1px solid var(--border)'),
+                                                                            border: (activeImageMeta?.preview === img.preview || editingImage?.preview === img.preview) ? '3px solid #3B82F6' : (linkingImageId ? '3px solid #1E6DB7' : '1px solid var(--border)'),
                                                                             transform: (activeImageMeta?.preview === img.preview || editingImage?.preview === img.preview) ? 'scale(1.05)' : 'none',
                                                                             transition: 'all 0.2s ease',
                                                                             zIndex: (activeImageMeta?.preview === img.preview || editingImage?.preview === img.preview) ? 10 : 1,
@@ -5252,7 +5252,7 @@ END:VCARD`;
                                                                             }} />
                                                                         </div>
                                                                         {linkingImageId === img.id && (
-                                                                            <div style={{ fontSize: '0.65rem', color: '#10B981', fontWeight: 'bold', textAlign: 'center' }}>Bitte Ziel wählen...</div>
+                                                                            <div style={{ fontSize: '0.65rem', color: '#1E6DB7', fontWeight: 'bold', textAlign: 'center' }}>Bitte Ziel wählen...</div>
                                                                         )}
                                                                         <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', padding: '0 2px', alignItems: 'center' }}>
                                                                             <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', fontSize: '0.75rem', cursor: 'pointer', color: 'var(--text-main)' }}>
@@ -5343,9 +5343,9 @@ END:VCARD`;
                                                                     {/* Second Thumbnail (Thermal if exists) */}
                                                                     {thermalImg && (
                                                                         <div style={{ flex: '0 0 160px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', opacity: linkingImageId ? 0.5 : 1 }}>
-                                                                            <div style={{ width: '160px', height: '160px', borderRadius: '6px', overflow: 'hidden', backgroundColor: '#E5E7EB', border: '2px solid #10B981', position: 'relative' }}>
+                                                                            <div style={{ width: '160px', height: '160px', borderRadius: '6px', overflow: 'hidden', backgroundColor: '#E5E7EB', border: '2px solid #1E6DB7', position: 'relative' }}>
                                                                                 <img src={thermalImg.preview} alt="Thermobild" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onClick={() => window.open(thermalImg.preview, '_blank')} />
-                                                                                <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(16, 185, 129, 0.9)', color: 'white', fontSize: '0.65rem', textAlign: 'center', padding: '3px 0', fontWeight: 'bold', textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>THERMO</div>
+                                                                                <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(30, 109, 183, 0.9)', color: 'white', fontSize: '0.65rem', textAlign: 'center', padding: '3px 0', fontWeight: 'bold', textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>THERMO</div>
                                                                             </div>
                                                                         </div>
                                                                     )}
@@ -5357,7 +5357,7 @@ END:VCARD`;
                                                                                 type="button"
                                                                                 className="btn btn-ghost"
                                                                                 title="Als Thermobild verknüpfen"
-                                                                                style={{ color: '#10B981', padding: '0', backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 2px rgba(0,0,0,0.1)', cursor: 'pointer' }}
+                                                                                style={{ color: '#1E6DB7', padding: '0', backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 2px rgba(0,0,0,0.1)', cursor: 'pointer' }}
                                                                                 onClick={() => setLinkingImageId(isLinkingThis ? null : img.id)}
                                                                             >
                                                                                 <Link size={16} />
@@ -6282,7 +6282,7 @@ END:VCARD`;
                         border: '1px solid rgba(255,255,255,0.8)'
                     }}>
                         <h3 className="section-header" style={{ color: 'white', fontWeight: 800, fontSize: '1.1rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                            <ClipboardList size={20} color="#10B981" /> Massnahmen
+                            <ClipboardList size={20} color="#1E6DB7" /> Massnahmen
                         </h3>
 
                         {/* Checkbox Liste */}
@@ -6300,11 +6300,11 @@ END:VCARD`;
                                         <label style={{
                                             display: 'flex', alignItems: 'center', gap: '1rem',
                                             padding: '1.25rem',
-                                            border: isChecked ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid rgba(226,232,240,0.8)',
+                                            border: isChecked ? '1px solid rgba(30, 109, 183, 0.4)' : '1px solid rgba(226,232,240,0.8)',
                                             borderRadius: isChecked ? '16px 16px 0 0' : '16px',
                                             cursor: 'pointer',
-                                            backgroundColor: isChecked ? 'rgba(16, 185, 129, 0.08)' : 'var(--surface)',
-                                            boxShadow: isChecked ? '0 4px 12px rgba(16, 185, 129, 0.1)' : '0 2px 4px rgba(0,0,0,0.02)',
+                                            backgroundColor: isChecked ? 'rgba(30, 109, 183, 0.08)' : 'var(--surface)',
+                                            boxShadow: isChecked ? '0 4px 12px rgba(30, 109, 183, 0.1)' : '0 2px 4px rgba(0,0,0,0.02)',
                                             transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
                                         }}>
                                             <input
@@ -6320,25 +6320,25 @@ END:VCARD`;
                                                         }
                                                     });
                                                 }}
-                                                style={{ width: '22px', height: '22px', accentColor: '#10B981', cursor: 'pointer' }}
+                                                style={{ width: '22px', height: '22px', accentColor: '#1E6DB7', cursor: 'pointer' }}
                                             />
-                                            <span style={{ fontSize: '1.05rem', fontWeight: 700, color: isChecked ? '#10B981' : 'var(--text-main)' }}>{item}</span>
+                                            <span style={{ fontSize: '1.05rem', fontWeight: 700, color: isChecked ? '#1E6DB7' : 'var(--text-main)' }}>{item}</span>
                                         </label>
                                         {/* Titel + Textarea — erscheint wenn angehakt */}
                                         {isChecked && (
                                             <div style={{
-                                                border: '1px solid rgba(16, 185, 129, 0.4)',
+                                                border: '1px solid rgba(30, 109, 183, 0.4)',
                                                 borderTop: 'none',
                                                 borderRadius: '0 0 16px 16px',
                                                 padding: '1.25rem',
-                                                backgroundColor: 'rgba(16, 185, 129, 0.04)',
-                                                boxShadow: '0 8px 16px -4px rgba(16, 185, 129, 0.05)'
+                                                backgroundColor: 'rgba(30, 109, 183, 0.04)',
+                                                boxShadow: '0 8px 16px -4px rgba(30, 109, 183, 0.05)'
                                             }}>
                                                 {/* Titel — entspricht sectionTitle im PDF: 16pt, blau, bold */}
                                                 <div style={{
                                                     fontSize: '0.85rem',
                                                     fontWeight: 800,
-                                                    color: '#10B981',
+                                                    color: '#1E6DB7',
                                                     marginBottom: '0.75rem',
                                                     letterSpacing: '0.05em',
                                                     textTransform: 'uppercase',
@@ -6352,7 +6352,7 @@ END:VCARD`;
                                                         onClick={() => toggleDictation(`note_${item}`, item)}
                                                         style={{
                                                             background: 'none', border: 'none', cursor: 'pointer',
-                                                            color: listeningField === `note_${item}` ? '#EF4444' : '#059669',
+                                                            color: listeningField === `note_${item}` ? '#EF4444' : '#1E6DB7',
                                                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                                                             padding: '4px', borderRadius: '50%',
                                                             backgroundColor: listeningField === `note_${item}` ? 'rgba(239,68,68,0.1)' : 'transparent'
@@ -6858,7 +6858,7 @@ END:VCARD`;
                                         alert("Fehler beim Erstellen des Excel-Protokolls.");
                                     }
                                 }}
-                                style={{ fontSize: '0.85rem', padding: '0.6rem 1.25rem', color: '#10B981', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700, border: '2px solid #1E6DB7' }}
+                                style={{ fontSize: '0.85rem', padding: '0.6rem 1.25rem', color: '#1E6DB7', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700, border: '2px solid #1E6DB7' }}
                             >
                                 <Table size={16} /> Excel Export
                             </button>
@@ -7415,9 +7415,9 @@ END:VCARD`;
                                     type="button"
                                     onClick={(e) => { e.stopPropagation(); generateEnergyReport(e); }}
                                     style={{
-                                        background: 'rgba(16, 185, 129, 0.1)',
-                                        color: '#10B981',
-                                        border: '1px solid rgba(16, 185, 129, 0.3)',
+                                        background: 'rgba(30, 109, 183, 0.1)',
+                                        color: '#1E6DB7',
+                                        border: '1px solid rgba(30, 109, 183, 0.3)',
                                         padding: '4px 12px',
                                         borderRadius: '6px',
                                         fontSize: '0.75rem',
@@ -7489,7 +7489,7 @@ END:VCARD`;
                                                                 <div style={{ fontSize: '0.75rem', color: '#475569', marginTop: '0.2rem' }}>{device.hours} h • {getDaysDiff(device.startDate, device.endDate)} Tg.</div>
                                                             </>
                                                         ) : (
-                                                            <span style={{ fontSize: '0.7rem', color: '#10B981', backgroundColor: 'rgba(16, 185, 129, 0.15)', padding: '4px 8px', borderRadius: '4px', textTransform: 'uppercase', fontWeight: 700 }}>Aktiv</span>
+                                                            <span style={{ fontSize: '0.7rem', color: '#1E6DB7', backgroundColor: 'rgba(30, 109, 183, 0.15)', padding: '4px 8px', borderRadius: '4px', textTransform: 'uppercase', fontWeight: 700 }}>Aktiv</span>
                                                         )}
                                                     </div>
                                                 </div>
@@ -7536,7 +7536,7 @@ END:VCARD`;
                                                         <div style={{ fontWeight: 600 }}>#{device.deviceNumber} {device.model ? `- ${device.model}` : (device.type && device.type !== 'Unbekannt' ? `- ${device.type}` : '')}</div>
                                                         <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
                                                             {device.room}
-                                                            {!isFinished && <span style={{ fontSize: '0.65rem', color: '#10B981', marginLeft: '6px', backgroundColor: 'rgba(16, 185, 129, 0.15)', padding: '2px 6px', borderRadius: '4px', textTransform: 'uppercase', fontWeight: 700 }}>Aktiv</span>}
+                                                            {!isFinished && <span style={{ fontSize: '0.65rem', color: '#1E6DB7', marginLeft: '6px', backgroundColor: 'rgba(30, 109, 183, 0.15)', padding: '2px 6px', borderRadius: '4px', textTransform: 'uppercase', fontWeight: 700 }}>Aktiv</span>}
                                                         </div>
                                                     </td>
                                                     <td style={{ textAlign: 'center', padding: '0.75rem' }}>
@@ -7595,7 +7595,7 @@ END:VCARD`;
                     boxShadow: mode === 'technician' ? '0 -4px 12px rgba(0,0,0,0.05)' : '0 -4px 12px rgba(0, 0, 0, 0.5)'
                 }}>
                     {/* Status Indicator */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem', color: isSaving ? '#fbbf24' : '#10B981', transition: 'color 0.3s' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem', color: isSaving ? '#fbbf24' : '#1E6DB7', transition: 'color 0.3s' }}>
                         {isSaving ? (
                             <>
                                 <RotateCcw size={12} className="spin" /> Speichert...
@@ -8007,7 +8007,7 @@ END:VCARD`;
                         style={{
                             background: 'var(--surface)',
                             borderRadius: '20px',
-                            border: '1px solid rgba(16,185,129,0.3)',
+                            border: '1px solid rgba(30, 109, 183,0.3)',
                             boxShadow: '0 25px 60px rgba(0,0,0,0.6)',
                             padding: '1.5rem',
                             display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem',
@@ -8015,7 +8015,7 @@ END:VCARD`;
                         }}
                     >
                         {/* Titel */}
-                        <div style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#10b981', fontWeight: 700 }}>
+                        <div style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#1E6DB7', fontWeight: 700 }}>
                             Kontakt QR-Code
                         </div>
 
@@ -8060,9 +8060,9 @@ END:VCARD`;
                             onClick={() => setQrModal(null)}
                             style={{
                                 padding: '0.55rem 2rem', borderRadius: '10px',
-                                border: '1px solid rgba(16,185,129,0.3)',
-                                background: 'rgba(16,185,129,0.1)',
-                                color: '#10b981', fontWeight: 700, fontSize: '0.9rem',
+                                border: '1px solid rgba(30, 109, 183,0.3)',
+                                background: 'rgba(30, 109, 183,0.1)',
+                                color: '#1E6DB7', fontWeight: 700, fontSize: '0.9rem',
                                 cursor: 'pointer', width: '100%',
                             }}
                         >
