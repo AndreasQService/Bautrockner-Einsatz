@@ -22,8 +22,8 @@ export default function TechnicianMeasurementPage({
             </div>
 
             <div style={{ background: 'var(--surface)', borderRadius: '16px', border: '2px solid var(--border)', padding: '1.5rem', boxShadow: '0 2px 10px rgba(0,0,0,0.1)' }}>
-                <div style={{ marginBottom: '1.5rem' }}>
-                    <h3 style={{ margin: 0, fontSize: '1.3rem', fontWeight: 800, color: 'var(--text-main)' }}>Messräume</h3>
+                <div style={{ marginBottom: '1.5rem', textAlign: 'center' }}>
+                    <h3 style={{ margin: 0, fontSize: '1.3rem', fontWeight: 800, color: 'var(--text-main)' }}>Räume</h3>
                 </div>
 
                 {(!measurementRooms || measurementRooms.length === 0) ? (
