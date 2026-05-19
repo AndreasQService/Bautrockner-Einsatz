@@ -761,7 +761,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         try {
             const dataUrl = await QRCode.toDataURL(lines.join('\n'), {
                 width: 280, margin: 2,
-                color: { dark: '#0F172A', light: 'var(--surface)' }
+                color: { dark: '#0F172A', light: '#FFFFFF' }
             });
             setQrModal({ dataUrl });
         } catch (err) { console.error('QR-Fehler:', err); }
