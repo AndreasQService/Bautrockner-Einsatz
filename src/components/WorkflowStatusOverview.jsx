@@ -233,7 +233,7 @@ function StepDot({ rep, store, step, i, ai, openKey, onOpen }) {
   const isOpen = openKey === `${rep.id}__${step.id}`
   // Spezialfarbe für Kontrolle* ok = grün
   const isKontrolleOk = step.id === "kontrolle" && state === "ok"
-  const dotColor = (state === "done" || isKontrolleOk) ? "#10B981" : state === "ok" ? "#3B82F6" : state === "warning" ? "#F59E0B" : state === "overdue" ? "#EF4444" : state === "skip" ? "#94A3B8" : "#BAE6FD"
+  const dotColor = (state === "done" || isKontrolleOk) ? "#10B981" : state === "ok" ? "#3B82F6" : state === "warning" ? "#F59E0B" : state === "overdue" ? "#EF4444" : state === "skip" ? "#94A3B8" : "#7DD3FC"
   const dotBg = (state === "done" || isKontrolleOk) ? "#10B981" : state === "ok" ? "rgba(59,130,246,0.15)" : state === "warning" ? "#F59E0B" : state === "overdue" ? "#EF4444" : state === "skip" ? "var(--border, #E2E8F0)" : "#F0F9FF"
   return (
     <div style={{ display: "flex", alignItems: "center", flex: i < STEPS.length - 1 ? 1 : "0 0 auto" }}>
@@ -261,7 +261,7 @@ function StepDot({ rep, store, step, i, ai, openKey, onOpen }) {
           {(state === "warning" || state === "overdue") && <span style={{ fontSize: "0.8rem", fontWeight: 900, color: "white" }}>!</span>}
           {state === "ok" && <div style={{ width: 9, height: 9, borderRadius: "50%", background: isKontrolleOk ? "#10B981" : "#3B82F6", boxShadow: isKontrolleOk ? `0 0 7px #10B981` : "0 0 7px #3B82F6", animation: "wfPulse 2s ease-in-out infinite" }} />}
         </button>
-        <span style={{ fontSize: "0.6rem", color: state === "pending" ? "#94A3B8" : state === "done" ? "#10B981" : dotColor, fontWeight: state === "pending" ? 500 : 700, marginTop: 3, whiteSpace: "nowrap", lineHeight: 1, textAlign: "center" }}>{step.label}</span>
+        <span style={{ fontSize: "0.6rem", color: state === "pending" ? "#64748B" : state === "done" ? "#10B981" : dotColor, fontWeight: state === "pending" ? 600 : 700, marginTop: 3, whiteSpace: "nowrap", lineHeight: 1, textAlign: "center" }}>{step.label}</span>
         {hasNote && <span style={{ fontSize: "0.6rem", color: "var(--text-muted, #6B7280)", marginTop: 2, whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 2 }}>📝 Notiz</span>}
       </div>
       {i < STEPS.length - 1 && (
