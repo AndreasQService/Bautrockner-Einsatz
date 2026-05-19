@@ -4149,7 +4149,23 @@ END:VCARD`;
                                 {/* Berichte & Protokolle moved to bottom section */}
 
                                 {/* 2. Eingegangene Dokumente (External / Uploaded) */}
-                                <div>
+                                <div
+                                    onDragOver={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.backgroundColor = 'rgba(14, 165, 233, 0.05)'; }}
+                                    onDragLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.backgroundColor = 'transparent'; }}
+                                    onDrop={(e) => {
+                                        e.currentTarget.style.borderColor = 'var(--border)';
+                                        e.currentTarget.style.backgroundColor = 'transparent';
+                                        handleCategoryDrop(e, 'Dokumente');
+                                    }}
+                                    style={{
+                                        border: '1px dashed var(--border)',
+                                        borderRadius: '8px',
+                                        padding: '1rem',
+                                        minHeight: '100px',
+                                        transition: 'all 0.2s ease',
+                                        cursor: 'default'
+                                    }}
+                                >
                                     <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                                         <div style={{ width: '4px', height: '12px', background: '#94A3B8', borderRadius: '2px' }} />
                                         Eingegangene Dokumente (Mail/PDF)
