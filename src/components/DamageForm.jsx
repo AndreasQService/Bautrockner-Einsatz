@@ -4158,7 +4158,7 @@ END:VCARD`;
                                         handleCategoryDrop(e, 'Dokumente');
                                     }}
                                     style={{
-                                        border: '1px dashed var(--border)',
+                                        border: '1px solid var(--border)',
                                         borderRadius: '8px',
                                         padding: '1rem',
                                         minHeight: '100px',
