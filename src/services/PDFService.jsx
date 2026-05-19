@@ -222,7 +222,14 @@ export const PDFService = {
                         ctx.drawImage(img, 0, 0, width, height);
                         resolve(canvas.toDataURL('image/jpeg', 0.85));
                     };
-                    img.onerror = () => resolve(dataUrl.startsWith('data:') ? dataUrl : null);
+                    img.onerror = () => {
+                        // Only resolve raw dataUrl if it's explicitly an image type supported by react-pdf
+                        if (dataUrl.startsWith('data:image/jpeg') || dataUrl.startsWith('data:image/png')) {
+                            resolve(dataUrl);
+                        } else {
+                            resolve(null);
+                        }
+                    };
                     img.src = dataUrl;
                 });
             };

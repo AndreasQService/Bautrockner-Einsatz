@@ -32,7 +32,7 @@ const RoomDocumentation = ({ rooms, images, contacts = [] }) => {
                 const roomImages = allRoomImages
                     .filter(img => !img.linkedToOriginal)
                     .map(img => {
-                        const thermal = allRoomImages.find(i => i.linkedToOriginal === img.id);
+                        const thermal = img.id ? allRoomImages.find(i => i.linkedToOriginal === img.id) : null;
                         return thermal ? { ...img, thermalImage: thermal } : img;
                     });
 

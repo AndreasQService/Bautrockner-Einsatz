@@ -12,7 +12,7 @@ const DescriptionSection = ({ data }) => {
     const unassignedImages = allUnassignedImages
         .filter(img => !img.linkedToOriginal)
         .map(img => {
-            const thermal = allUnassignedImages.find(i => i.linkedToOriginal === img.id);
+            const thermal = img.id ? allUnassignedImages.find(i => i.linkedToOriginal === img.id) : null;
             return thermal ? { ...img, thermalImage: thermal } : img;
         });
 

@@ -14,7 +14,7 @@ const CauseSection = ({ data }) => {
     const causeImages = allCauseImages
         .filter(img => !img.linkedToOriginal)
         .map(img => {
-            const thermal = data.images.find(i => i.linkedToOriginal === img.id);
+            const thermal = img.id ? data.images.find(i => i.linkedToOriginal === img.id) : null;
             return thermal ? { ...img, thermalImage: thermal } : img;
         });
 
