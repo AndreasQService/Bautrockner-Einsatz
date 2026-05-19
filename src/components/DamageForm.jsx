@@ -3944,6 +3944,7 @@ END:VCARD`;
                         </div>
                         <textarea
                             id="desc-desktop"
+                            className="form-input"
                             value={formData.description || ''}
                             onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
                             placeholder="Beschrieb aus der Meldung..."
@@ -3951,11 +3952,6 @@ END:VCARD`;
                                 width: '100%',
                                 minHeight: '150px',
                                 padding: '1rem',
-                                borderRadius: '12px',
-                                border: '1px solid rgba(255,255,255,0.1)',
-                                backgroundColor: 'rgba(255,255,255,0.05)', 
-                                boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.2)',
-                                color: 'var(--text-main)',
                                 resize: 'vertical',
                                 fontFamily: 'inherit',
                                 fontSize: '1rem',
