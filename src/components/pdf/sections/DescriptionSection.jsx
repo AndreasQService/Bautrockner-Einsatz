@@ -22,11 +22,10 @@ const DescriptionSection = ({ data }) => {
     if (!hasDescription && !hasUnassignedImages) return null;
 
     return (
-        <View>
-
+        <>
             {/* Images only (no description text) */}
             {hasUnassignedImages && !hasDescription && (
-                <View style={{ marginBottom: 15 }}>
+                <View style={{ marginBottom: 15 }} break>
                     <View style={styles.divider} />
                     <ImageGrid images={unassignedImages} />
                 </View>
@@ -34,20 +33,22 @@ const DescriptionSection = ({ data }) => {
 
             {/* Description + optional images */}
             {hasDescription && (
-                <View style={{ marginBottom: 15 }}>
-                    <View wrap={false}>
-                        <View style={styles.divider} />
-                        <Text style={styles.sectionTitle}>Schadenbeschreibung</Text>
+                <>
+                    <View style={{ marginBottom: 15 }}>
+                        <View wrap={false}>
+                            <View style={styles.divider} />
+                            <Text style={styles.sectionTitle}>Schadenbeschreibung</Text>
+                        </View>
+                        <Text style={styles.textBlock}>{data.description.trim()}</Text>
                     </View>
-                    <Text style={styles.textBlock}>{data.description.trim()}</Text>
                     {hasUnassignedImages && (
-                        <View style={{ marginTop: 10 }}>
+                        <View style={{ marginBottom: 15 }} break>
                             <ImageGrid images={unassignedImages} />
                         </View>
                     )}
-                </View>
+                </>
             )}
-        </View>
+        </>
     );
 };
 
