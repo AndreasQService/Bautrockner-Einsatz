@@ -6538,31 +6538,7 @@ END:VCARD`;
                                     return img && !img.roomId && isDoc && isGenerated;
                                 }).map((img, idx) => renderDocCard(img, idx))}
                             </div>
-                            <div
-                                className="btn-glass"
-                                style={{
-                                    border: '2px dashed var(--border)',
-                                    borderRadius: '16px',
-                                    padding: '1.5rem',
-                                    textAlign: 'center',
-                                    cursor: 'pointer',
-                                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                                    marginBottom: '1.25rem',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    color: 'var(--text-muted)'
-                                }}
-                                onClick={() => document.getElementById('file-upload-Schadensberichte-desktop').click()}
-                                onDragOver={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.background = 'rgba(14, 165, 233, 0.08)'; }}
-                                onDragLeave={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.background = 'none'; }}
-                                onDrop={(e) => handleCategoryDrop(e, 'Schadensberichte')}
-                            >
-                                <Plus size={24} style={{ marginBottom: '0.5rem', opacity: 0.5 }} />
-                                <span style={{ fontSize: '0.85rem' }}>Schadensbericht hochladen / Drop</span>
-                                <input id="file-upload-Schadensberichte-desktop" type="file" multiple accept="image/*,application/pdf" style={{ display: 'none' }} onChange={(e) => handleCategorySelect(e, 'Schadensberichte')} />
-                            </div>
+
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                                 {formData.images.filter(img => img.assignedTo === 'Schadensberichte').map((item, idx) => (
                                     <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem', backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
