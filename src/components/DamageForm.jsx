@@ -4134,57 +4134,7 @@ END:VCARD`;
                                     />
                                 </label>
 
-                                {/* Drop Zone */}
-                                <div
-                                    style={{ width: '100%', marginTop: '0.75rem', flexBasis: '100%' }}
-                                    onDragOver={(e) => { e.preventDefault(); e.currentTarget.firstChild.style.borderColor = '#0ea5e9'; e.currentTarget.firstChild.style.background = 'rgba(14,165,233,0.12)'; }}
-                                    onDragLeave={(e) => { e.currentTarget.firstChild.style.borderColor = '#0F6EA3'; e.currentTarget.firstChild.style.background = 'rgba(15,110,163,0.06)'; }}
-                                    onDrop={async (e) => {
-                                        e.preventDefault();
-                                        e.currentTarget.firstChild.style.borderColor = '#0F6EA3';
-                                        e.currentTarget.firstChild.style.background = 'rgba(15,110,163,0.06)';
 
-                                        // 1. Echte Dateien (Explorer, Desktop Outlook wenn unterstützt)
-                                        const dropped = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
-                                        if (dropped.length > 0) {
-                                            handleImageUpload(dropped, { assignedTo: 'Schadensbilder' });
-                                            return;
-                                        }
-
-                                        // 2. HTML-Bilder aus Web-Mails (Gmail, Outlook.com)
-                                        const html = e.dataTransfer.getData('text/html');
-                                        if (html) {
-                                            const imgs = Array.from(new DOMParser().parseFromString(html, 'text/html').querySelectorAll('img'));
-                                            for (const imgEl of imgs) {
-                                                const src = imgEl.src;
-                                                if (!src || src.startsWith('cid:')) continue;
-                                                try {
-                                                    const resp = await fetch(src, { mode: 'cors' });
-                                                    const blob = await resp.blob();
-                                                    if (blob.type.startsWith('image/')) {
-                                                        const file = new File([blob], 'email-bild.jpg', { type: blob.type });
-                                                        handleImageUpload([file], { assignedTo: 'Schadensbilder' });
-                                                    }
-                                                } catch (err) { console.warn('CORS Fehler bei E-Mail Bild:', err); }
-                                            }
-                                        }
-                                    }}
-                                >
-                                    <div
-                                        tabIndex={0}
-                                        onPaste={async (e) => {
-                                            const items = Array.from(e.clipboardData?.items || []).filter(i => i.type.startsWith('image/'));
-                                            if (items.length > 0) {
-                                                e.preventDefault();
-                                                const files = items.map(i => i.getAsFile()).filter(Boolean);
-                                                if (files.length > 0) handleImageUpload(files, { assignedTo: 'Schadensbilder' });
-                                            }
-                                        }}
-                                        style={{ border: '2px dashed #0F6EA3', borderRadius: '10px', padding: '0.75rem 1rem', textAlign: 'center', fontSize: '0.82rem', color: '#0F6EA3', cursor: 'text', transition: 'all 0.2s', outline: 'none', background: 'rgba(15,110,163,0.06)' }}
-                                    >
-                                        📎 Bilder hier ablegen · <kbd style={{ fontSize: '0.72rem', padding: '1px 5px', background: 'rgba(15,110,163,0.2)', borderRadius: '3px', border: '1px solid #0F6EA3' }}>Ctrl+V</kbd> zum Einfügen
-                                    </div>
-                                </div>
 
                             </div>
                         </div>
