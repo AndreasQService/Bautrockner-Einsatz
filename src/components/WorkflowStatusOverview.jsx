@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useMemo } from "react"
+import { useState, useRef, useCallback, useMemo, useEffect } from "react"
 import { createPortal } from "react-dom"
 import { X, Check, Minus, CalendarDays, CheckCircle2, MinusCircle, MessageSquare, Zap, AlertTriangle, Bell, Clock, Search, MoreVertical } from "lucide-react"
 
@@ -191,6 +191,13 @@ function Popover({ rid, step, sd, onSave, onClose, rect }) {
     document.addEventListener("mousedown", hc); document.addEventListener("keydown", hk)
     return () => { document.removeEventListener("mousedown", hc); document.removeEventListener("keydown", hk) }
   }, [])
+  useEffect(() => {
+    const t = setTimeout(() => {
+      onSave({ status: mode, date: mode === "date" ? date : null, note, installedAt: mode === "date" ? installedAt : null });
+    }, 300);
+    return () => clearTimeout(t);
+  }, [mode, date, note, installedAt, onSave]);
+
   const st = { position: "fixed", zIndex: 9999, background: "var(--surface, #FFFFFF)", border: "1px solid var(--border, #E2E8F0)", borderRadius: 14, padding: "1rem", width: 240, boxShadow: "0 12px 32px rgba(0,0,0,0.15)", animation: "wfFade 0.12s ease", fontFamily: '"Segoe UI", "Roboto", Arial, sans-serif' }
   if (rect) { const wh = window.innerHeight, ww = window.innerWidth, ph = 320, pw = 248, lp = Math.min(Math.max(4, rect.left), ww - pw - 4); st[rect.bottom + ph + 8 < wh ? "top" : "top"] = rect.bottom + ph + 8 < wh ? rect.bottom + 6 : Math.max(8, rect.top - ph - 6); st.left = lp }
   const btn = (a, c) => ({ flex: 1, padding: "0.4rem", borderRadius: 8, border: `1.5px solid ${a ? c : "var(--border, #E2E8F0)"}`, background: a ? `${c}22` : "var(--background, #F8FAFC)", color: a ? c : "var(--text-muted, #64748B)", fontWeight: a ? 700 : 500, fontSize: "0.72rem", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 4 })
@@ -209,8 +216,8 @@ function Popover({ rid, step, sd, onSave, onClose, rect }) {
       {mode === "date" && step.id === "trocknung" && <div style={{ marginBottom: "0.65rem" }}><label style={{ fontSize: "0.68rem", color: "var(--text-muted, #64748B)", display: "block", marginBottom: "0.25rem", fontWeight: 600 }}>Installiert am</label><input type="date" value={installedAt} onChange={e => setInstalledAt(e.target.value)} style={{ width: "100%", padding: "0.4rem 0.55rem", borderRadius: 8, border: `1px solid ${installedAt ? "rgba(16,185,129,0.5)" : "var(--border, #E2E8F0)"}`, background: "var(--background, #F8FAFC)", color: "var(--text-main, #1E293B)", fontSize: "0.82rem", boxSizing: "border-box", outline: "none" }} /></div>}
       <div style={{ marginBottom: "0.75rem" }}><label style={{ fontSize: "0.68rem", color: "var(--text-muted, #64748B)", display: "block", marginBottom: "0.25rem", fontWeight: 600 }}>Notiz</label><textarea value={note} onChange={e => setNote(e.target.value)} placeholder="Kurze Notiz…" rows={2} style={{ width: "100%", padding: "0.35rem 0.55rem", borderRadius: 8, border: "1px solid var(--border, #E2E8F0)", background: "var(--background, #F8FAFC)", color: "var(--text-main, #1E293B)", fontSize: "0.75rem", resize: "none", boxSizing: "border-box", outline: "none", fontFamily: "inherit" }} /></div>
       <div style={{ display: "flex", gap: "0.35rem" }}>
-        <button onClick={() => { onSave({ status: mode, date: mode === "date" ? date : null, note, installedAt: mode === "date" ? installedAt : null }); onClose() }} style={{ flex: 1, padding: "0.4rem", borderRadius: 8, border: "none", background: mode === "done" ? "#10B981" : mode === "skip" ? "#475569" : "#3B82F6", color: "white", fontWeight: 700, fontSize: "0.75rem", cursor: "pointer" }}>Speichern</button>
-        {sd.status && <button onClick={() => { onSave({ status: null, date: null, note: "", installedAt: null }); onClose() }} style={{ padding: "0.4rem 0.6rem", borderRadius: 8, border: "1px solid rgba(239,68,68,0.3)", background: "rgba(239,68,68,0.08)", color: "#EF4444", fontSize: "0.75rem", cursor: "pointer" }}>×</button>}
+        <button onClick={onClose} style={{ flex: 1, padding: "0.4rem", borderRadius: 8, border: "none", background: "#F1F5F9", color: "#475569", fontWeight: 700, fontSize: "0.75rem", cursor: "pointer" }}>Schließen</button>
+        {sd.status && <button onClick={() => { onSave({ status: null, date: null, note: "", installedAt: null }); onClose() }} title="Status löschen" style={{ padding: "0.4rem 0.6rem", borderRadius: 8, border: "none", background: "rgba(239,68,68,0.1)", color: "#EF4444", fontSize: "0.75rem", cursor: "pointer" }}>Löschen</button>}
       </div>
     </div>, document.body)
 }
