@@ -25,7 +25,7 @@ const DescriptionSection = ({ data }) => {
         <>
             {/* Images only (no description text) */}
             {hasUnassignedImages && !hasDescription && (
-                <View style={{ marginBottom: 15 }} break>
+                <View style={{ marginBottom: 15 }}>
                     <View style={styles.divider} />
                     <ImageGrid images={unassignedImages} />
                 </View>
@@ -42,7 +42,7 @@ const DescriptionSection = ({ data }) => {
                         <Text style={styles.textBlock}>{data.description.trim()}</Text>
                     </View>
                     {hasUnassignedImages && (
-                        <View style={{ marginBottom: 15 }} break>
+                        <View style={{ marginBottom: 15 }}>
                             <ImageGrid images={unassignedImages} />
                         </View>
                     )}
