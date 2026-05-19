@@ -208,12 +208,15 @@ export const PDFService = {
                     img.crossOrigin = "anonymous";
                     img.onload = () => {
                         const MAX_SIZE = 1200;
+                        const MIN_SIZE = 600; // Force tiny thumbnails to be larger to bypass react-pdf bug
                         let width = img.width;
                         let height = img.height;
                         if (width > height) {
                             if (width > MAX_SIZE) { height *= MAX_SIZE / width; width = MAX_SIZE; }
+                            else if (width < MIN_SIZE && width > 0) { height *= MIN_SIZE / width; width = MIN_SIZE; }
                         } else {
                             if (height > MAX_SIZE) { width *= MAX_SIZE / height; height = MAX_SIZE; }
+                            else if (height < MIN_SIZE && height > 0) { width *= MIN_SIZE / height; height = MIN_SIZE; }
                         }
                         const canvas = document.createElement('canvas');
                         canvas.width = width;
