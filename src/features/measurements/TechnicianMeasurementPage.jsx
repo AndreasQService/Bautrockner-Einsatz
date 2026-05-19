@@ -10,15 +10,16 @@ export default function TechnicianMeasurementPage({
     return (
         <div style={{ marginBottom: '2rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                    <button onClick={onBackToTiles} style={{ background: 'var(--surface)', border: '1px solid rgba(96, 165, 250, 0.3)', color: '#60A5FA', cursor: 'pointer', padding: '0.5rem 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', borderRadius: '8px', fontWeight: 600 }}>
-                        <ArrowLeft size={18} /> Kacheln
+                <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-start' }}>
+                    <button onClick={onBackToTiles} style={{ background: 'var(--surface)', border: '2px solid rgba(96, 165, 250, 0.4)', color: '#60A5FA', cursor: 'pointer', padding: '0.75rem 1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem', borderRadius: '12px', fontWeight: 700, fontSize: '1.1rem', boxShadow: '0 2px 8px rgba(96, 165, 250, 0.1)' }}>
+                        <ArrowLeft size={20} /> Kacheln
                     </button>
-                    <div style={{ marginLeft: '1rem' }}>
-                        <h2 style={{ fontSize: '1.5rem', fontWeight: 800, margin: 0, color: 'var(--text-main)' }}>Messen</h2>
-                        <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', margin: 0 }}>Messräume & Messprotokolle</p>
-                    </div>
                 </div>
+                <div style={{ flex: 2, textAlign: 'center' }}>
+                    <h2 style={{ fontSize: '1.8rem', fontWeight: 800, margin: 0, color: 'var(--text-main)' }}>Messen</h2>
+                    <p style={{ fontSize: '1rem', color: 'var(--text-muted)', margin: 0 }}>Messräume & Messprotokolle</p>
+                </div>
+                <div style={{ flex: 1 }}></div>
             </div>
 
             <div style={{ background: 'var(--surface)', borderRadius: '16px', border: '2px solid var(--border)', padding: '1.5rem', boxShadow: '0 2px 10px rgba(0,0,0,0.1)' }}>
