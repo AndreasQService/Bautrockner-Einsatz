@@ -749,13 +749,22 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
     const [qrEditFields, setQrEditFields] = useState({}); // { name, phone, email, note }
     const [qrSessionKey, setQrSessionKey] = useState(0); // stabil pro Modal-Session
 
-    // QR-Code aus Feldern generieren
     const buildQR = async (fields) => {
         const lines = ['BEGIN:VCARD', 'VERSION:3.0'];
-        if (fields.name) lines.push(`FN:${fields.name}`);
-        if (fields.name) lines.push(`ORG:${fields.name}`);
+        if (fields.vorname || fields.nachname) {
+            lines.push(`N:${fields.nachname || ''};${fields.vorname || ''};;;`);
+            const fn = [fields.vorname, fields.nachname].filter(Boolean).join(' ');
+            lines.push(`FN:${fn}`);
+        } else if (fields.name) {
+            lines.push(`FN:${fields.name}`);
+        }
+        
+        if (fields.name) lines.push(`ORG:Q-Service AG - Kontakt`);
         if (fields.phone) lines.push(`TEL;TYPE=CELL:${fields.phone}`);
         if (fields.email) lines.push(`EMAIL:${fields.email}`);
+        if (fields.street) {
+            lines.push(`ADR;TYPE=HOME:;;${fields.street};;;;`);
+        }
         if (fields.note) lines.push(`NOTE:${fields.note}`);
         lines.push('END:VCARD');
         try {
@@ -769,8 +778,17 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
 
     // QR-Modal öffnen
     const handleContactQR = (contact) => {
+        const nameParts = (contact.name || '').trim().split(' ');
+        const nachname = nameParts.length > 1 ? nameParts.pop() : '';
+        const vorname = nameParts.join(' ');
+        
+        const street = formData.street || (formData.address ? formData.address.split(',')[0] : '');
+
         const fields = {
             name: contact.name || '',
+            vorname: vorname || '',
+            nachname: nachname || contact.name || '',
+            street: street || '',
             phone: contact.phone || '',
             email: contact.email || '',
             note: [contact.floor, contact.role].filter(Boolean).join(' · '),
@@ -8009,13 +8027,15 @@ END:VCARD`;
                         {/* Editierbare Felder */}
                         <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                             {[
-                                { key: 'name', label: 'Name', placeholder: 'Name' },
+                                { key: 'vorname', label: 'Vorname', placeholder: 'Vorname' },
+                                { key: 'nachname', label: 'Nachname', placeholder: 'Nachname' },
+                                { key: 'street', label: 'Strasse', placeholder: 'Strasse & Nr.' },
                                 { key: 'phone', label: 'Telefon', placeholder: '+41 ...' },
                                 { key: 'email', label: 'E-Mail', placeholder: 'email@...' },
                                 { key: 'note', label: 'Notiz', placeholder: 'Etage, Hinweis...' },
                             ].map(({ key, label, placeholder }) => (
                                 <div key={key} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                    <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600, width: '52px', flexShrink: 0 }}>{label}</label>
+                                    <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600, width: '68px', flexShrink: 0 }}>{label}</label>
                                     <input
                                         key={`qr-${key}-${qrSessionKey}`}
                                         defaultValue={qrEditFields[key] || ''}
@@ -8024,9 +8044,9 @@ END:VCARD`;
                                         style={{
                                             flex: 1, padding: '0.4rem 0.7rem',
                                             borderRadius: '8px', fontSize: '0.85rem',
-                                            border: '1px solid var(--border)', boxShadow: '0 10px 25px rgba(0,0,0,0.05)',
-                                            background: 'rgba(255,255,255,0.06)',
-                                            color: 'white', outline: 'none',
+                                            border: '1px solid var(--border)', boxShadow: '0 4px 12px rgba(0,0,0,0.03)',
+                                            background: 'var(--background, #F8FAFC)',
+                                            color: 'var(--text-main, #1E293B)', outline: 'none',
                                         }}
                                     />
                                 </div>
