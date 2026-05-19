@@ -21,14 +21,14 @@ export default function TechnicianMeasurementPage({
                 </div>
             </div>
 
-            <div style={{ background: 'var(--surface-light)', borderRadius: '16px', border: '1px solid var(--border)', padding: '1.5rem' }}>
+            <div style={{ background: 'var(--surface)', borderRadius: '16px', border: '2px solid var(--border)', padding: '1.5rem', boxShadow: '0 2px 10px rgba(0,0,0,0.1)' }}>
                 <div style={{ marginBottom: '1.5rem' }}>
-                    <h3 style={{ margin: 0, fontSize: '1.2rem', color: 'white' }}>Messräume</h3>
+                    <h3 style={{ margin: 0, fontSize: '1.3rem', fontWeight: 800, color: 'var(--text-main)' }}>Messräume</h3>
                 </div>
 
                 {(!measurementRooms || measurementRooms.length === 0) ? (
                     <div style={{ textAlign: 'center', padding: '2rem 1rem' }}>
-                        <div style={{ color: 'var(--text-muted)', fontSize: '1.1rem', marginBottom: '1.5rem' }}>Noch keine Messräume angelegt.</div>
+                        <div style={{ color: 'var(--text-main)', fontWeight: 500, fontSize: '1.1rem', marginBottom: '1.5rem' }}>Noch keine Messräume angelegt.</div>
                     </div>
                 ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -58,14 +58,14 @@ export default function TechnicianMeasurementPage({
                                 }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                         <div>
-                                            <div style={{ fontSize: '1.2rem', fontWeight: 700, color: 'white', marginBottom: '0.2rem' }}>
+                                            <div style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '0.2rem' }}>
                                                 {room.name || 'Unbenannter Raum'}
                                             </div>
                                             {room.apartment && (
                                                 <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{room.apartment}</div>
                                             )}
                                             <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.4rem' }}>
-                                                Letzte Messung: <span style={{ color: 'white', fontWeight: 600 }}>{dateStr}</span>
+                                                Letzte Messung: <span style={{ color: 'var(--text-main)', fontWeight: 600 }}>{dateStr}</span>
                                             </div>
                                         </div>
                                     </div>
