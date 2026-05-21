@@ -1,0 +1,1 @@
+AI LOCK: The Web UI design (DamageForm.jsx, index.css, Light Mode, Blue Theme) is locked. Do not make any further changes to the React UI styling or layout. Focus exclusively on the PDF generation (src/components/pdf) unless explicitly instructed otherwise.

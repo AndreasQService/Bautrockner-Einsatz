@@ -48,11 +48,30 @@ const ImageGrid = ({ images, showName = false, imageStyle = styles.image, contai
                                 <Text style={[styles.imageDescription, { color: '#ef4444', fontWeight: 'bold' }]}>
                                     [Thermobild] {img.description || img._parentDescription || ''}
                                 </Text>
-                            ) : showName ? (
-                                img.name && <Text style={styles.imageDescription}>{img.name}</Text>
-                            ) : (
-                                img.description && <Text style={styles.imageDescription}>{img.description}</Text>
-                            )}
+                            ) : ((showName && img.name) || img.description) ? (
+                                <View style={{ marginTop: 3 }}>
+                                    {showName && img.name && (
+                                        <Text style={{
+                                            ...styles.imageDescription,
+                                            textAlign: 'center',
+                                            fontSize: 8,
+                                        }}>
+                                            {img.name}
+                                        </Text>
+                                    )}
+
+                                    {img.description && (
+                                        <Text style={{
+                                            ...styles.imageDescription,
+                                            textAlign: 'center',
+                                            fontSize: 8,
+                                            marginTop: (showName && img.name) ? 1 : 0,
+                                        }}>
+                                            {img.description}
+                                        </Text>
+                                    )}
+                                </View>
+                            ) : null}
                         </View>
                     ))}
                     {/* Fill empty slot if odd number */}
