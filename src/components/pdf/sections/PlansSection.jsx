@@ -18,7 +18,7 @@ const PlansSection = ({ data }) => {
                 <View style={styles.divider} />
                 <Text style={styles.sectionTitle}>PLÄNE &amp; GRUNDRISSE</Text>
             </View>
-            <ImageGrid images={plansImages} showName={true} />
+            <ImageGrid images={plansImages} showName={true} imageStyle={styles.planImage} />
         </View>
     );
 };

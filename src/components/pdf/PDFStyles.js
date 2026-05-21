@@ -139,8 +139,15 @@ export const styles = StyleSheet.create({
     image: {
         width: '100%',
         height: 185, // Slightly reduced for footer clearance
+        objectFit: 'cover',
+        objectPosition: 'center',
+        borderRadius: 2,
+    },
+    planImage: {
+        width: '100%',
+        height: 185,
         objectFit: 'contain',
-        objectPosition: 'left',
+        objectPosition: 'center',
         borderRadius: 2,
     },
     imageDescription: {
