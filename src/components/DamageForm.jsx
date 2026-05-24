@@ -7090,14 +7090,14 @@ END:VCARD`;
                                                 className="form-input"
                                                 value={newDevice.apartment || 'Allgemeiner Bereich'}
                                                 onChange={(e) => setNewDevice(prev => ({ ...prev, apartment: e.target.value, room: '' }))}
-                                                style={{ fontSize: '1.1rem', padding: '1rem' }}
+                                                style={{ fontSize: '1.1rem', padding: '1rem', backgroundColor: 'var(--surface)', color: 'var(--text-main)' }}
                                             >
-                                                <option value="Allgemeiner Bereich">Allgemeiner Bereich</option>
+                                                <option value="Allgemeiner Bereich" style={{ backgroundColor: 'var(--surface)', color: 'var(--text-main)' }}>Allgemeiner Bereich</option>
                                                 {Array.from(new Set([
                                                     ...formData.rooms.map(r => r.apartment).filter(Boolean),
                                                     ...(formData.contacts || []).map(c => c.name ? c.name.trim().split(/\s+/).pop() : '').filter(Boolean)
                                                 ])).sort().filter(a => a !== 'Allgemeiner Bereich').map(apt => (
-                                                    <option key={apt} value={apt}>{apt}</option>
+                                                    <option key={apt} value={apt} style={{ backgroundColor: 'var(--surface)', color: 'var(--text-main)' }}>{apt}</option>
                                                 ))}
                                             </select>
                                             
@@ -7105,19 +7105,19 @@ END:VCARD`;
                                                 className="form-input"
                                                 value={newDevice.room || ''}
                                                 onChange={(e) => setNewDevice(prev => ({ ...prev, room: e.target.value }))}
-                                                style={{ fontSize: '1.1rem', padding: '1rem' }}
+                                                style={{ fontSize: '1.1rem', padding: '1rem', backgroundColor: 'var(--surface)', color: 'var(--text-main)' }}
                                             >
-                                                <option value="">Raum wählen... (Optional)</option>
-                                                <optgroup label="Projekträume">
+                                                <option value="" style={{ backgroundColor: 'var(--surface)', color: 'var(--text-main)' }}>Raum wählen... (Optional)</option>
+                                                <optgroup label="Projekträume" style={{ backgroundColor: 'var(--surface)', color: 'var(--text-main)' }}>
                                                     {formData.rooms
                                                         .filter(r => (r.apartment || 'Allgemeiner Bereich').trim() === (newDevice.apartment || 'Allgemeiner Bereich').trim())
                                                         .map(r => (
-                                                        <option key={r.id} value={r.name}>{r.name || 'Ohne Namen'}</option>
+                                                        <option key={r.id} value={r.name} style={{ backgroundColor: 'var(--surface)', color: 'var(--text-main)' }}>{r.name || 'Ohne Namen'}</option>
                                                     ))}
                                                 </optgroup>
-                                                <optgroup label="Standard">
+                                                <optgroup label="Standard" style={{ backgroundColor: 'var(--surface)', color: 'var(--text-main)' }}>
                                                     {ROOM_OPTIONS.map(opt => (
-                                                        <option key={opt} value={opt}>{opt}</option>
+                                                        <option key={opt} value={opt} style={{ backgroundColor: 'var(--surface)', color: 'var(--text-main)' }}>{opt}</option>
                                                     ))}
                                                 </optgroup>
                                             </select>
