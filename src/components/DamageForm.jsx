@@ -7108,11 +7108,18 @@ END:VCARD`;
                                                 style={{ fontSize: '1.1rem', padding: '1rem' }}
                                             >
                                                 <option value="">Raum wählen... (Optional)</option>
-                                                {formData.rooms
-                                                    .filter(r => (r.apartment || 'Allgemeiner Bereich').trim() === (newDevice.apartment || 'Allgemeiner Bereich').trim())
-                                                    .map(r => (
-                                                    <option key={r.id} value={r.name}>{r.name || 'Ohne Namen'}</option>
-                                                ))}
+                                                <optgroup label="Projekträume">
+                                                    {formData.rooms
+                                                        .filter(r => (r.apartment || 'Allgemeiner Bereich').trim() === (newDevice.apartment || 'Allgemeiner Bereich').trim())
+                                                        .map(r => (
+                                                        <option key={r.id} value={r.name}>{r.name || 'Ohne Namen'}</option>
+                                                    ))}
+                                                </optgroup>
+                                                <optgroup label="Standard">
+                                                    {ROOM_OPTIONS.map(opt => (
+                                                        <option key={opt} value={opt}>{opt}</option>
+                                                    ))}
+                                                </optgroup>
                                             </select>
 
                                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', width: '100%' }}>
