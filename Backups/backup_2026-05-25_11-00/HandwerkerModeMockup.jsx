@@ -128,71 +128,6 @@ const INITIAL_SKETCHES = [
     }
 ];
 
-// Pre-drawn premium SVGs for existing project photos (damage report pool)
-const PROJECT_PHOTOS_POOL = [
-    {
-        id: 'proj_photo_1',
-        room: 'Badezimmer',
-        title: 'Leckage unter Waschtisch',
-        src: `data:image/svg+xml;utf8,` + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400" viewBox="0 0 600 400" fill="none">
-            <rect width="600" height="400" fill="#F1F5F9"/>
-            <rect x="50" y="50" width="500" height="300" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="4"/>
-            <rect x="200" y="150" width="200" height="150" fill="#E2E8F0" stroke="#475569" stroke-width="3"/>
-            <line x1="300" y1="150" x2="300" y2="300" stroke="#475569" stroke-width="2"/>
-            <path d="M290 100v60c0 15 20 15 20 30v40" fill="none" stroke="#94A3B8" stroke-width="8"/>
-            <ellipse cx="310" cy="230" rx="30" ry="8" fill="#3B82F6" opacity="0.7"/>
-            <path d="M310 190l-5 15h10z" fill="#3B82F6"/>
-            <path d="M308 165l-4 10h8z" fill="#3B82F6"/>
-            <text x="300" y="380" fill="#475569" font-family="sans-serif" font-size="14" font-weight="bold" text-anchor="middle">Originalaufnahme: Leckage Siphon (Badezimmer)</text>
-        </svg>`)
-    },
-    {
-        id: 'proj_photo_2',
-        room: 'Badezimmer',
-        title: 'Feuchtigkeit Wand unten',
-        src: `data:image/svg+xml;utf8,` + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400" viewBox="0 0 600 400" fill="none">
-            <rect width="600" height="400" fill="#F1F5F9"/>
-            <rect x="50" y="50" width="500" height="300" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="4"/>
-            <line x1="50" y1="200" x2="550" y2="200" stroke="#CBD5E1" stroke-width="1"/>
-            <line x1="50" y1="280" x2="550" y2="280" stroke="#CBD5E1" stroke-width="1"/>
-            <line x1="180" y1="50" x2="180" y2="350" stroke="#CBD5E1" stroke-width="1"/>
-            <line x1="360" y1="50" x2="360" y2="350" stroke="#CBD5E1" stroke-width="1"/>
-            <path d="M220 350c-30-10-50-40-50-60 0-30 40-50 80-50s90 30 90 60c0 20-30 40-60 50z" fill="#D97706" opacity="0.45"/>
-            <path d="M240 330c-15-5-25-20-25-30 0-15 20-25 40-25s45 15 45 30c0 10-15 20-30 25z" fill="#B45309" opacity="0.6"/>
-            <text x="300" y="380" fill="#475569" font-family="sans-serif" font-size="14" font-weight="bold" text-anchor="middle">Originalaufnahme: Feuchtigkeitsausbreitung (Badezimmer)</text>
-        </svg>`)
-    },
-    {
-        id: 'proj_photo_3',
-        room: 'Küche',
-        title: 'Wasserschaden Küchenzeile',
-        src: `data:image/svg+xml;utf8,` + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400" viewBox="0 0 600 400" fill="none">
-            <rect width="600" height="400" fill="#F1F5F9"/>
-            <rect x="50" y="50" width="500" height="300" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="4"/>
-            <rect x="50" y="220" width="500" height="30" fill="#D8B4FE" stroke="#6B21A8" stroke-width="2"/>
-            <rect x="150" y="210" width="120" height="10" fill="#94A3B8" stroke="#475569"/>
-            <path d="M100 220c10-30 40-50 80-50s90 20 110 50z" fill="#D97706" opacity="0.4"/>
-            <path d="M320 220c5-15 20-25 40-25s35 10 45 25z" fill="#D97706" opacity="0.3"/>
-            <text x="300" y="380" fill="#475569" font-family="sans-serif" font-size="14" font-weight="bold" text-anchor="middle">Originalaufnahme: Feuchte Küchenrückwand (Küche)</text>
-        </svg>`)
-    },
-    {
-        id: 'proj_photo_4',
-        room: 'Keller',
-        title: 'Bodenüberschwemmung Technik',
-        src: `data:image/svg+xml;utf8,` + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400" viewBox="0 0 600 400" fill="none">
-            <rect width="600" height="400" fill="#F1F5F9"/>
-            <rect x="50" y="50" width="500" height="300" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="4"/>
-            <rect x="120" y="80" width="100" height="200" rx="10" fill="#94A3B8" stroke="#475569" stroke-width="3"/>
-            <circle cx="170" cy="150" r="15" fill="#3B82F6" stroke="#1D4ED8" stroke-width="2"/>
-            <text x="170" y="154" fill="#FFFFFF" font-family="sans-serif" font-size="10" font-weight="bold" text-anchor="middle">52°C</text>
-            <path d="M50 320c100-10 200-5 300-15 100-10 150 10 200 5v40H50z" fill="#3B82F6" opacity="0.6"/>
-            <ellipse cx="280" cy="300" rx="60" ry="10" fill="#2563EB" opacity="0.4"/>
-            <text x="300" y="380" fill="#475569" font-family="sans-serif" font-size="14" font-weight="bold" text-anchor="middle">Originalaufnahme: Wasseraustritt Boiler (Keller)</text>
-        </svg>`)
-    }
-];
-
 // DraggablePhoto is now handled internally inside MeasurementSketchCanvas
 
 const STORAGE_KEY = 'qtool_handwerker_mode_mockup_v1';
@@ -245,23 +180,6 @@ export default function HandwerkerModeMockup() {
 
     // Sketches state
     const [sketches, setSketches] = useState(savedState?.sketches || INITIAL_SKETCHES);
-
-    // Project Photos Selection & Room Filtering states
-    const [selectedRoomFilter, setSelectedRoomFilter] = useState('');
-    const [selectedPhotoId, setSelectedPhotoId] = useState('');
-    const [selectedProjectPhotos, setSelectedProjectPhotos] = useState(savedState?.selectedProjectPhotos || []);
-    const [customProjectPhotos, setCustomProjectPhotos] = useState(savedState?.customProjectPhotos || []);
-    const [canvasBackgroundPhoto, setCanvasBackgroundPhoto] = useState(null);
-
-    // Custom photo library import modal state
-    const [showImportModal, setShowImportModal] = useState(false);
-    const [importRoom, setImportRoom] = useState('Badezimmer');
-    const [importFile, setImportFile] = useState(null);
-    const [importFilePreview, setImportFilePreview] = useState(null);
-
-    const projectPhotosPool = [...PROJECT_PHOTOS_POOL, ...customProjectPhotos];
-
-    const projectPhotoInputRef = useRef(null);
 
     // ── 3-LAYER DRAWING CANVAS STATE ──
     const [showCanvasModal, setShowCanvasModal] = useState(false);
@@ -353,25 +271,6 @@ export default function HandwerkerModeMockup() {
         }
     };
 
-    const handleProjectPhotoUpload = (e) => {
-        const file = e.target.files[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                const newProjPhoto = {
-                    id: `custom_proj_photo_${Date.now()}`,
-                    room: selectedRoomFilter || 'Badezimmer',
-                    title: file.name.split('.')[0] || 'Foto Mediathek',
-                    src: reader.result
-                };
-                setCustomProjectPhotos(prev => [...prev, newProjPhoto]);
-                setSelectedPhotoId(newProjPhoto.id);
-            };
-            reader.readAsDataURL(file);
-        }
-        e.target.value = '';
-    };
-
     // Click outside handler for Handwerker Zuweisung dropdown
     const handwerkerDropdownRef = useRef(null);
     useEffect(() => {
@@ -393,7 +292,7 @@ export default function HandwerkerModeMockup() {
         }
     };
 
-    // ── SEPARATE ISOLATED STORAGE FUNCTIONS (AUTOSAVE & LIVE SYNC) ──
+    // ── SEPARATE ISOLATED STORAGE FUNCTIONS (AUTOSAVE) ──
     useEffect(() => {
         try {
             const stateToSave = {
@@ -412,9 +311,7 @@ export default function HandwerkerModeMockup() {
                 sketches,
                 location,
                 userRole,
-                timeEntries,
-                selectedProjectPhotos,
-                customProjectPhotos
+                timeEntries
             };
             localStorage.setItem(STORAGE_KEY, JSON.stringify(stateToSave));
         } catch (e) {
@@ -436,43 +333,8 @@ export default function HandwerkerModeMockup() {
         sketches,
         location,
         userRole,
-        timeEntries,
-        selectedProjectPhotos,
-        customProjectPhotos
+        timeEntries
     ]);
-
-    // Live cross-tab sync via storage events
-    useEffect(() => {
-        const handleStorageChange = (e) => {
-            if (e.key === STORAGE_KEY && e.newValue) {
-                try {
-                    const data = JSON.parse(e.newValue);
-                    if (data.photos) setPhotos(data.photos);
-                    if (data.timeEntries) setTimeEntries(data.timeEntries);
-                    if (data.status) setStatus(data.status);
-                    if (data.selectedProjectPhotos) setSelectedProjectPhotos(data.selectedProjectPhotos);
-                    if (data.customProjectPhotos) setCustomProjectPhotos(data.customProjectPhotos);
-                    if (data.sketches) setSketches(data.sketches);
-                    if (data.orderNumber) setOrderNumber(data.orderNumber);
-                    if (data.projectTitle) setProjectTitle(data.projectTitle);
-                    if (data.description) setDescription(data.description);
-                    if (data.startDate) setStartDate(data.startDate);
-                    if (data.endDate) setEndDate(data.endDate);
-                    if (data.plannedDuration) setPlannedDuration(data.plannedDuration);
-                    if (data.plannedDurationUnit) setPlannedDurationUnit(data.plannedDurationUnit);
-                    if (data.assignedHandwerker) setAssignedHandwerker(data.assignedHandwerker);
-                    if (data.location) setLocation(data.location);
-                    if (data.priority) setPriority(data.priority);
-                    if (data.userRole) setUserRole(data.userRole);
-                    if (data.activeTab) setActiveTab(data.activeTab);
-                } catch (err) {
-                    console.error("Error parsing storage sync data:", err);
-                }
-            }
-        };
-        window.addEventListener('storage', handleStorageChange);
-        return () => window.removeEventListener('storage', handleStorageChange);
-    }, []);
 
     const handleResetState = () => {
         try {
@@ -1052,8 +914,8 @@ https://qtool.q-service.ch/project/${orderNumber}`;
                         <section className="card" style={{ padding: '1.5rem', border: '1.5px solid var(--border)' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
                                 <h2 className="section-header" style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: 'none', paddingBottom: 0 }}>
-                                    Bilder Instandstellung
-                               </h2>
+                                    Eigene Bilder
+                                </h2>
                                 <div>
                                     <input 
                                         type="file" 
@@ -1176,16 +1038,15 @@ https://qtool.q-service.ch/project/${orderNumber}`;
                             <h2 className="section-header" style={{ margin: '0 0 1rem 0', fontSize: '1.05rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                                 Informationen
                             </h2>
-                            {sketches.length === 0 && selectedProjectPhotos.length === 0 ? (
-                                <p style={{ fontStyle: 'italic', fontSize: '0.85rem', color: 'var(--text-muted)', margin: 0 }}>Keine Pläne oder Projektbilder hinterlegt.</p>
+                            {sketches.length === 0 ? (
+                                <p style={{ fontStyle: 'italic', fontSize: '0.85rem', color: 'var(--text-muted)', margin: 0 }}>Keine Pläne hinterlegt.</p>
                             ) : (
                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
-                                    {/* 1. Render all assigned original project photos with green "Original" badge */}
-                                    {projectPhotosPool.filter(p => selectedProjectPhotos.includes(p.id)).map(photo => (
+                                    {sketches.map(sketch => (
                                         <div 
-                                            key={photo.id}
+                                            key={sketch.id}
                                             onClick={() => {
-                                                setZoomedSketch({ id: photo.id, title: `${photo.title} (Original)`, src: photo.src });
+                                                setZoomedSketch(sketch);
                                                 setShowZoomModal(true);
                                             }}
                                             className="card"
@@ -1207,8 +1068,8 @@ https://qtool.q-service.ch/project/${orderNumber}`;
                                                 overflow: 'hidden'
                                             }}>
                                                 <img 
-                                                    src={photo.src} 
-                                                    alt={photo.title} 
+                                                    src={sketch.src} 
+                                                    alt={sketch.title} 
                                                     style={{ width: '100%', height: '100%', objectFit: 'contain' }}
                                                 />
                                             </div>
@@ -1219,94 +1080,16 @@ https://qtool.q-service.ch/project/${orderNumber}`;
                                                 color: 'var(--text-main)',
                                                 whiteSpace: 'nowrap',
                                                 textOverflow: 'ellipsis',
-                                                overflow: 'hidden',
-                                                display: 'flex',
-                                                justifyContent: 'space-between',
-                                                alignItems: 'center'
+                                                overflow: 'hidden'
                                             }}>
-                                                <span>{photo.title}</span>
-                                                <span style={{ 
-                                                    fontSize: '0.65rem', 
-                                                    color: '#065F46', 
-                                                    backgroundColor: '#ECFDF5', 
-                                                    padding: '0.1rem 0.4rem', 
-                                                    borderRadius: '4px',
-                                                    fontWeight: 800,
-                                                    border: '1.5px solid #A7F3D0'
-                                                }}>Original</span>
+                                                {sketch.title}
                                             </div>
                                         </div>
                                     ))}
-
-                                    {/* 2. Render all sketches (including marked/edited photos) with blue/indigo badges */}
-                                    {sketches.map(sketch => {
-                                        const isMarked = sketch.title.toLowerCase().includes('markiert');
-                                        const badgeText = isMarked ? 'Markiert' : 'Skizze';
-                                        const badgeColor = isMarked ? '#1E40AF' : '#3730A3';
-                                        const badgeBg = isMarked ? '#EFF6FF' : '#EEF2FF';
-                                        const badgeBorder = isMarked ? '1.5px solid #BFDBFE' : '1.5px solid #C7D2FE';
-                                        
-                                        return (
-                                            <div 
-                                                key={sketch.id}
-                                                onClick={() => {
-                                                    setZoomedSketch(sketch);
-                                                    setShowZoomModal(true);
-                                                }}
-                                                className="card"
-                                                style={{
-                                                    padding: 0,
-                                                    overflow: 'hidden',
-                                                    cursor: 'pointer',
-                                                    position: 'relative',
-                                                    border: '1.5px solid var(--border)'
-                                                }}
-                                            >
-                                                <div style={{ 
-                                                    height: '100px', 
-                                                    backgroundColor: '#FFFFFF', 
-                                                    display: 'flex', 
-                                                    alignItems: 'center', 
-                                                    justifyContent: 'center',
-                                                    borderBottom: '1px solid var(--border)',
-                                                    overflow: 'hidden'
-                                                }}>
-                                                    <img 
-                                                        src={sketch.src} 
-                                                        alt={sketch.title} 
-                                                        style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-                                                    />
-                                                </div>
-                                                <div style={{ 
-                                                    padding: '0.4rem', 
-                                                    fontSize: '0.75rem', 
-                                                    fontWeight: 700, 
-                                                    color: 'var(--text-main)',
-                                                    whiteSpace: 'nowrap',
-                                                    textOverflow: 'ellipsis',
-                                                    overflow: 'hidden',
-                                                    display: 'flex',
-                                                    justifyContent: 'space-between',
-                                                    alignItems: 'center'
-                                                }}>
-                                                    <span>{sketch.title}</span>
-                                                    <span style={{ 
-                                                        fontSize: '0.65rem', 
-                                                        color: badgeColor, 
-                                                        backgroundColor: badgeBg, 
-                                                        padding: '0.1rem 0.4rem', 
-                                                        borderRadius: '4px',
-                                                        fontWeight: 800,
-                                                        border: badgeBorder
-                                                    }}>{badgeText}</span>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
                                 </div>
                             )}
                             <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.75rem', marginTop: '1rem', fontStyle: 'italic' }}>
-                                Klicke auf einen Plan oder Bild, um es im Vollbild zu betrachten.
+                                Klicke auf einen Plan, um ihn im Vollbild zu betrachten.
                             </div>
                         </section>
                     </div>
@@ -1583,14 +1366,36 @@ https://qtool.q-service.ch/project/${orderNumber}`;
                 {/* ── RIGHT COLUMN ── */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
                     
-                    {/* UNIFIED BILDER & SKIZZEN CARD */}
-                    <section className="card" style={{ padding: '1.5rem', border: '1.5px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                        {/* Main Card Header */}
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+                    {/* COMBINED FOTOS, SKIZZEN & PLÄNE CARD */}
+                    <section className="card" style={{ padding: '1.5rem', border: '1.5px solid var(--border)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '0.75rem' }}>
                             <h2 className="section-header" style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: 'none', paddingBottom: 0 }}>
-                                Bilder & Skizzen
+                                Fotos, Skizzen & Pläne
                             </h2>
                             <div style={{ display: 'flex', gap: '0.6rem' }}>
+                                <input 
+                                    type="file" 
+                                    ref={fileInputRef} 
+                                    onChange={handleFileChange} 
+                                    accept="image/*" 
+                                    style={{ display: 'none' }}
+                                />
+                                <button 
+                                    onClick={() => fileInputRef.current?.click()}
+                                    className="btn btn-outline"
+                                    style={{ 
+                                        display: 'inline-flex', 
+                                        alignItems: 'center', 
+                                        gap: '0.4rem', 
+                                        padding: '0.4rem 0.8rem', 
+                                        fontSize: '0.8rem', 
+                                        fontWeight: 700, 
+                                        cursor: 'pointer',
+                                        height: '34px'
+                                    }}
+                                >
+                                    <Camera size={14} /> Foto hinzufügen
+                                </button>
                                 <button 
                                     onClick={() => {
                                         setEditingSketchId(null);
@@ -1614,231 +1419,10 @@ https://qtool.q-service.ch/project/${orderNumber}`;
                             </div>
                         </div>
 
-                        {/* PART 1: PROJECT PHOTO SELECTION DROPDOWNS (SCHADENAUFNAHME) */}
-                        <div style={{ 
-                            backgroundColor: 'var(--background)', 
-                            padding: '1rem', 
-                            borderRadius: '6px', 
-                            border: '1px solid var(--border)',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '0.75rem'
-                        }}>
-                            <div style={{ fontSize: '0.78rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '0.03em' }}>
-                                🔍 Vorhandene Projektbilder (Schadenaufnahme) auswählen
-                            </div>
-
-                            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-                                {/* Room Dropdown */}
-                                <div style={{ flex: 1, minWidth: '130px', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                                    <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)' }}>Raum wählen:</span>
-                                    <select 
-                                        value={selectedRoomFilter} 
-                                        onChange={(e) => {
-                                            if (e.target.value === 'import_from_library') {
-                                                setImportRoom(selectedRoomFilter || 'Badezimmer');
-                                                setImportFile(null);
-                                                setImportFilePreview(null);
-                                                setShowImportModal(true);
-                                            } else {
-                                                setSelectedRoomFilter(e.target.value);
-                                                setSelectedPhotoId('');
-                                            }
-                                        }}
-                                        className="select"
-                                        style={{ 
-                                            padding: '0.25rem 0.5rem', 
-                                            fontSize: '0.8rem', 
-                                            borderRadius: '4px',
-                                            border: '1.5px solid var(--border)',
-                                            backgroundColor: 'var(--surface)',
-                                            color: 'var(--text-main)',
-                                            cursor: 'pointer',
-                                            fontWeight: 600,
-                                            outline: 'none',
-                                            height: '32px'
-                                        }}
-                                    >
-                                        <option value="">-- Raum wählen --</option>
-                                        <option value="Badezimmer">
-                                            Badezimmer ({projectPhotosPool.filter(p => p.room === 'Badezimmer').length} Bild{projectPhotosPool.filter(p => p.room === 'Badezimmer').length === 1 ? '' : 'er'})
-                                        </option>
-                                        <option value="Küche">
-                                            Küche ({projectPhotosPool.filter(p => p.room === 'Küche').length} Bild{projectPhotosPool.filter(p => p.room === 'Küche').length === 1 ? '' : 'er'})
-                                        </option>
-                                        <option value="Keller">
-                                            Keller ({projectPhotosPool.filter(p => p.room === 'Keller').length} Bild{projectPhotosPool.filter(p => p.room === 'Keller').length === 1 ? '' : 'er'})
-                                        </option>
-                                        <option value="import_from_library" style={{ fontWeight: 'bold', color: 'var(--primary)' }}>
-                                            📁 + Aus Fotomediathek...
-                                        </option>
-                                    </select>
-                                </div>
-
-                                {/* Photo Dropdown */}
-                                <div style={{ flex: 1.2, minWidth: '170px', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                                    <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)' }}>Bild wählen:</span>
-                                    <select 
-                                        value={selectedPhotoId} 
-                                        onChange={(e) => {
-                                            setSelectedPhotoId(e.target.value);
-                                        }}
-                                        disabled={!selectedRoomFilter}
-                                        className="select"
-                                        style={{ 
-                                            padding: '0.25rem 0.5rem', 
-                                            fontSize: '0.8rem', 
-                                            borderRadius: '4px',
-                                            border: '1.5px solid var(--border)',
-                                            backgroundColor: !selectedRoomFilter ? 'rgba(0,0,0,0.03)' : 'var(--surface)',
-                                            color: 'var(--text-main)',
-                                            cursor: !selectedRoomFilter ? 'not-allowed' : 'pointer',
-                                            fontWeight: 600,
-                                            outline: 'none',
-                                            height: '32px',
-                                            opacity: !selectedRoomFilter ? 0.6 : 1
-                                        }}
-                                    >
-                                        <option value="">
-                                            {!selectedRoomFilter ? '-- Zuerst Raum wählen --' : '-- Wähle ein Bild --'}
-                                        </option>
-                                        {projectPhotosPool.filter(p => p.room === selectedRoomFilter).map(p => (
-                                            <option key={p.id} value={p.id}>
-                                                {p.title}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                            </div>
-
-                            {/* Preview Frame for selected project photo */}
-                            {selectedPhotoId && selectedPhotoId !== 'import_from_library' ? (() => {
-                                const selectedPhoto = projectPhotosPool.find(p => p.id === selectedPhotoId);
-                                if (!selectedPhoto) return null;
-                                const isSelected = selectedProjectPhotos.includes(selectedPhoto.id);
-                                return (
-                                    <div 
-                                        style={{ 
-                                            border: '1px solid var(--border)', 
-                                            borderRadius: '4px', 
-                                            padding: '0.5rem',
-                                            backgroundColor: 'var(--surface)',
-                                            display: 'flex',
-                                            flexDirection: 'column',
-                                            gap: '0.5rem',
-                                            animation: 'fadeIn 0.2s ease'
-                                        }}
-                                    >
-                                        <div 
-                                            onClick={() => {
-                                                setZoomedSketch({ id: selectedPhoto.id, title: `${selectedPhoto.title} (Original)`, src: selectedPhoto.src });
-                                                setShowZoomModal(true);
-                                            }}
-                                            style={{ 
-                                                height: '140px', 
-                                                backgroundColor: '#FFFFFF', 
-                                                display: 'flex', 
-                                                alignItems: 'center', 
-                                                justifyContent: 'center',
-                                                borderRadius: '4px',
-                                                border: '1px solid var(--border)',
-                                                overflow: 'hidden',
-                                                cursor: 'pointer'
-                                            }}
-                                            title="Großansicht"
-                                        >
-                                            <img 
-                                                src={selectedPhoto.src} 
-                                                alt={selectedPhoto.title} 
-                                                style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-                                            />
-                                        </div>
-
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.4rem' }}>
-                                            <div>
-                                                <div style={{ fontWeight: 800, fontSize: '0.78rem', color: 'var(--text-main)' }}>{selectedPhoto.title}</div>
-                                                <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Raum: 🚪 {selectedPhoto.room}</div>
-                                            </div>
-
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                                {/* Checkbox "Senden" */}
-                                                <label 
-                                                    style={{ 
-                                                        display: 'inline-flex', 
-                                                        alignItems: 'center', 
-                                                        gap: '0.25rem', 
-                                                        cursor: 'pointer', 
-                                                        fontSize: '0.72rem', 
-                                                        fontWeight: 700, 
-                                                        color: isSelected ? 'var(--primary)' : 'var(--text-muted)',
-                                                        backgroundColor: isSelected ? 'var(--color-primary-soft)' : 'transparent',
-                                                        padding: '0.25rem 0.5rem',
-                                                        borderRadius: '4px',
-                                                        border: isSelected ? '1px solid var(--color-border-strong)' : '1px solid var(--border)'
-                                                    }}
-                                                >
-                                                    <input 
-                                                        type="checkbox"
-                                                        checked={isSelected}
-                                                        onChange={() => {
-                                                            if (isSelected) {
-                                                                setSelectedProjectPhotos(prev => prev.filter(id => id !== selectedPhoto.id));
-                                                            } else {
-                                                                setSelectedProjectPhotos(prev => [...prev, selectedPhoto.id]);
-                                                            }
-                                                        }}
-                                                        style={{ cursor: 'pointer', accentColor: 'var(--primary)' }}
-                                                    />
-                                                    <span>An Handwerker senden</span>
-                                                </label>
-
-                                                {/* Sketch button */}
-                                                <button
-                                                    onClick={() => {
-                                                        setEditingSketchId(null);
-                                                        setCanvasBackgroundPhoto(selectedPhoto.src);
-                                                        setCanvasTitle(`${selectedPhoto.title} - markiert`);
-                                                        setShowCanvasModal(true);
-                                                    }}
-                                                    className="btn btn-outline"
-                                                    style={{ 
-                                                        padding: '0.25rem 0.5rem', 
-                                                        fontSize: '0.72rem', 
-                                                        fontWeight: 700, 
-                                                        height: '26px', 
-                                                        display: 'inline-flex', 
-                                                        alignItems: 'center', 
-                                                        gap: '0.2rem' 
-                                                }}
-                                                >
-                                                    <Pen size={10} /> Für Auftrag skizzieren
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                );
-                            })() : (
-                                <div style={{ 
-                                    border: '1px dashed var(--border)', 
-                                    borderRadius: '4px', 
-                                    padding: '1rem', 
-                                    textAlign: 'center',
-                                    color: 'var(--text-muted)',
-                                    fontSize: '0.75rem',
-                                    fontStyle: 'italic'
-                                }}>
-                                    Wähle oben einen Raum und ein Bild aus, um es anzusehen, für den Auftrag zu bearbeiten (skizzieren) oder freizugeben.
-                                </div>
-                            )}
-                        </div>
-
-                        {/* DIVIDER */}
-                        <div style={{ borderTop: '1px dashed var(--border)' }}></div>
-
-                        {/* PART 2: SECTION A - BILDER INSTANDSTELLUNG */}
-                        <div>
+                        {/* SECTION A: PHOTOS */}
+                        <div style={{ marginBottom: '1.5rem' }}>
                             <h3 style={{ fontSize: '0.8rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.75rem', letterSpacing: '0.03em', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                                <span>📷</span> Bilder Instandstellung ({photos.length})
+                                <span>📷</span> Eigene Bilder ({photos.length})
                             </h3>
                             <div style={{ display: 'flex', gap: '1rem', overflowX: 'auto', paddingBottom: '0.5rem' }}>
                                 {photos.length === 0 ? (
@@ -1879,31 +1463,50 @@ https://qtool.q-service.ch/project/${orderNumber}`;
                                                 {photo.title}
                                             </div>
                                             
-                                            
-                                            </div>
+                                            <button 
+                                                onClick={() => setPhotos(prev => prev.filter(p => p.id !== photo.id))}
+                                                style={{
+                                                    position: 'absolute',
+                                                    top: 4,
+                                                    right: 4,
+                                                    backgroundColor: 'rgba(239,68,68,0.9)',
+                                                    color: 'white',
+                                                    border: 'none',
+                                                    borderRadius: '50%',
+                                                    width: 18,
+                                                    height: 18,
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    cursor: 'pointer',
+                                                    padding: 0
+                                                }}
+                                            >
+                                                <X size={10} />
+                                            </button>
+                                        </div>
                                     ))
                                 )}
                             </div>
                         </div>
 
                         {/* DIVIDER */}
-                        <div style={{ borderTop: '1px dashed var(--border)' }}></div>
+                        <div style={{ borderTop: '1px dashed var(--border)', margin: '1.5rem 0' }}></div>
 
-                        {/* PART 3: SECTION B - SKIZZEN & PLÄNE */}
+                        {/* SECTION B: SKETCHES */}
                         <div>
                             <h3 style={{ fontSize: '0.8rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.75rem', letterSpacing: '0.03em', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                                <span>📐</span> Skizzen & Pläne ({sketches.length + selectedProjectPhotos.length})
+                                <span>📐</span> Skizzen & Pläne ({sketches.length})
                             </h3>
-                            {sketches.length === 0 && selectedProjectPhotos.length === 0 ? (
-                                <p style={{ fontStyle: 'italic', fontSize: '0.8rem', color: 'var(--text-muted)', margin: '0.5rem 0' }}>Keine Skizzen oder zugewiesenen Originalbilder vorhanden.</p>
+                            {sketches.length === 0 ? (
+                                <p style={{ fontStyle: 'italic', fontSize: '0.8rem', color: 'var(--text-muted)', margin: '0.5rem 0' }}>Keine Skizzen vorhanden.</p>
                             ) : (
                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
-                                    {/* 1. Render all assigned original project photos with green "Original" badge */}
-                                    {projectPhotosPool.filter(p => selectedProjectPhotos.includes(p.id)).map(photo => (
+                                    {sketches.map(sketch => (
                                         <div 
-                                            key={photo.id}
+                                            key={sketch.id}
                                             onClick={() => {
-                                                setZoomedSketch({ id: photo.id, title: `${photo.title} (Original)`, src: photo.src });
+                                                setZoomedSketch(sketch);
                                                 setShowZoomModal(true);
                                             }}
                                             className="card"
@@ -1925,8 +1528,8 @@ https://qtool.q-service.ch/project/${orderNumber}`;
                                                 overflow: 'hidden'
                                             }}>
                                                 <img 
-                                                    src={photo.src} 
-                                                    alt={photo.title} 
+                                                    src={sketch.src} 
+                                                    alt={sketch.title} 
                                                     style={{ width: '100%', height: '100%', objectFit: 'contain' }}
                                                 />
                                             </div>
@@ -1937,180 +1540,66 @@ https://qtool.q-service.ch/project/${orderNumber}`;
                                                 color: 'var(--text-main)',
                                                 whiteSpace: 'nowrap',
                                                 textOverflow: 'ellipsis',
-                                                overflow: 'hidden',
-                                                display: 'flex',
-                                                justifyContent: 'space-between',
-                                                alignItems: 'center'
+                                                overflow: 'hidden'
                                             }}>
-                                                <span>{photo.title}</span>
-                                                <span style={{ 
-                                                    fontSize: '0.65rem', 
-                                                    color: '#065F46', 
-                                                    backgroundColor: '#ECFDF5', 
-                                                    padding: '0.1rem 0.4rem', 
-                                                    borderRadius: '4px',
-                                                    fontWeight: 800,
-                                                    border: '1.5px solid #A7F3D0'
-                                                }}>Original</span>
+                                                {sketch.title}
                                             </div>
 
-                                            {/* Disconnect/Deselect button for original image in Disponent View */}
+                                            {/* Edit sketch button */}
                                             <button 
                                                 onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setSelectedProjectPhotos(prev => prev.filter(id => id !== photo.id));
+                                                    e.stopPropagation(); 
+                                                    setEditingSketchId(sketch.id);
+                                                    setCanvasTitle(sketch.title);
+                                                    setShowCanvasModal(true);
                                                 }}
+                                                title="Skizze bearbeiten"
                                                 style={{
                                                     position: 'absolute',
-                                                    top: '6px',
-                                                    right: '6px',
-                                                    backgroundColor: '#EF4444',
+                                                    top: 4,
+                                                    right: 26,
+                                                    backgroundColor: 'var(--primary)',
                                                     color: 'white',
-                                                    border: '2.5px solid var(--surface)',
+                                                    border: 'none',
                                                     borderRadius: '50%',
-                                                    width: '20px',
-                                                    height: '20px',
+                                                    width: 18,
+                                                    height: 18,
                                                     display: 'flex',
                                                     alignItems: 'center',
                                                     justifyContent: 'center',
                                                     cursor: 'pointer',
-                                                    padding: 0,
-                                                    boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-                                                    zIndex: 10
+                                                    padding: 0
                                                 }}
-                                                title="Zuweisung aufheben"
                                             >
-                                                <X size={10} strokeWidth={3} />
+                                                <Pen size={9} />
+                                            </button>
+
+                                            <button 
+                                                onClick={(e) => {
+                                                    e.stopPropagation(); 
+                                                    setSketches(prev => prev.filter(s => s.id !== sketch.id));
+                                                }}
+                                                style={{
+                                                    position: 'absolute',
+                                                    top: 4,
+                                                    right: 4,
+                                                    backgroundColor: 'rgba(239,68,68,0.9)',
+                                                    color: 'white',
+                                                    border: 'none',
+                                                    borderRadius: '50%',
+                                                    width: 18,
+                                                    height: 18,
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    cursor: 'pointer',
+                                                    padding: 0
+                                                }}
+                                            >
+                                                <X size={10} />
                                             </button>
                                         </div>
                                     ))}
-
-                                    {/* 2. Render all sketches/edited photos */}
-                                    {sketches.map(sketch => {
-                                        const isMarked = sketch.title.toLowerCase().includes('markiert');
-                                        const badgeColor = isMarked ? '#1D4ED8' : '#4338CA';
-                                        const badgeText = isMarked ? 'Markiert' : 'Skizze';
-                                        const badgeBg = isMarked ? '#EFF6FF' : '#EEF2FF';
-                                        const badgeBorder = isMarked ? '1.5px solid #BFDBFE' : '1.5px solid #C7D2FE';
-
-                                        return (
-                                            <div 
-                                                key={sketch.id}
-                                                onClick={() => {
-                                                    setZoomedSketch(sketch);
-                                                    setShowZoomModal(true);
-                                                }}
-                                                className="card"
-                                                style={{
-                                                    padding: 0,
-                                                    overflow: 'hidden',
-                                                    cursor: 'pointer',
-                                                    position: 'relative',
-                                                    border: '1.5px solid var(--border)'
-                                                }}
-                                            >
-                                                <div style={{ 
-                                                    height: '110px', 
-                                                    backgroundColor: '#FFFFFF', 
-                                                    display: 'flex', 
-                                                    alignItems: 'center', 
-                                                    justifyContent: 'center',
-                                                    borderBottom: '1px solid var(--border)',
-                                                    overflow: 'hidden'
-                                                }}>
-                                                    <img 
-                                                        src={sketch.src} 
-                                                        alt={sketch.title} 
-                                                        style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-                                                    />
-                                                </div>
-                                                <div style={{ 
-                                                    padding: '0.5rem', 
-                                                    fontSize: '0.75rem', 
-                                                    fontWeight: 700, 
-                                                    color: 'var(--text-main)',
-                                                    whiteSpace: 'nowrap',
-                                                    textOverflow: 'ellipsis',
-                                                    overflow: 'hidden',
-                                                    display: 'flex',
-                                                    justifyContent: 'space-between',
-                                                    alignItems: 'center'
-                                                }}>
-                                                    <span>{sketch.title}</span>
-                                                    <span style={{ 
-                                                        fontSize: '0.65rem', 
-                                                        color: badgeColor, 
-                                                        backgroundColor: badgeBg, 
-                                                        padding: '0.1rem 0.4rem', 
-                                                        borderRadius: '4px',
-                                                        fontWeight: 800,
-                                                        border: badgeBorder
-                                                        }}>{badgeText}</span>
-                                                </div>
-
-                                                {/* Edit pen button */}
-                                                <button 
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        setEditingSketchId(sketch.id);
-                                                        setCanvasBackgroundPhoto(sketch.src.startsWith('data:image/svg') ? null : sketch.src);
-                                                        setCanvasTitle(sketch.title);
-                                                        setShowCanvasModal(true);
-                                                    }}
-                                                    style={{
-                                                        position: 'absolute',
-                                                        top: '6px',
-                                                        right: '30px',
-                                                        backgroundColor: 'var(--primary)',
-                                                        color: 'white',
-                                                        border: '2.5px solid var(--surface)',
-                                                        borderRadius: '50%',
-                                                        width: '20px',
-                                                        height: '20px',
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        justifyContent: 'center',
-                                                        cursor: 'pointer',
-                                                        padding: 0,
-                                                        boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-                                                        zIndex: 10
-                                                    }}
-                                                    title="Skizze bearbeiten"
-                                                >
-                                                    <Pen size={9} />
-                                                </button>
-
-                                                {/* Delete button */}
-                                                <button 
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        setSketches(prev => prev.filter(s => s.id !== sketch.id));
-                                                    }}
-                                                    style={{
-                                                        position: 'absolute',
-                                                        top: '6px',
-                                                        right: '6px',
-                                                        backgroundColor: '#EF4444',
-                                                        color: 'white',
-                                                        border: '2.5px solid var(--surface)',
-                                                        borderRadius: '50%',
-                                                        width: '20px',
-                                                        height: '20px',
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        justifyContent: 'center',
-                                                        cursor: 'pointer',
-                                                        padding: 0,
-                                                        boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-                                                        zIndex: 10
-                                                    }}
-                                                    title="Skizze löschen"
-                                                >
-                                                    <X size={10} strokeWidth={3} />
-                                                </button>
-                                            </div>
-                                        );
-                                    })}
                                 </div>
                             )}
                         </div>
@@ -2130,7 +1619,6 @@ https://qtool.q-service.ch/project/${orderNumber}`;
                     setShowCanvasModal(false);
                     setCanvasTitle('');
                     setEditingSketchId(null);
-                    setCanvasBackgroundPhoto(null);
                 }}
                 onSave={({ canvasImage, galleryPhotos, title }) => {
                     if (editingSketchId) {
@@ -2146,12 +1634,11 @@ https://qtool.q-service.ch/project/${orderNumber}`;
                     setShowCanvasModal(false);
                     setCanvasTitle('');
                     setEditingSketchId(null);
-                    setCanvasBackgroundPhoto(null);
                 }}
                 title={canvasTitle}
                 showTitleInput={true}
                 initialGalleryPhotos={[]}
-                initialCanvasImage={editingSketchId ? sketches.find(s => s.id === editingSketchId)?.src : canvasBackgroundPhoto}
+                initialCanvasImage={editingSketchId ? sketches.find(s => s.id === editingSketchId)?.src : null}
             />
 
             {/* ── 5. ZOOM / FULLSCREEN MODAL ── */}
@@ -2268,220 +1755,6 @@ https://qtool.q-service.ch/project/${orderNumber}`;
                                 style={{ padding: '0.6rem 1.2rem', fontWeight: 700 }}
                             >
                                 Schliessen
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* ── CUSTOM PHOTO LIBRARY IMPORT MODAL ── */}
-            {showImportModal && (
-                <div style={{
-                    position: 'fixed',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    backgroundColor: 'rgba(0, 0, 0, 0.55)',
-                    backdropFilter: 'blur(4px)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    zIndex: 99999,
-                    animation: 'fadeIn 0.2s ease'
-                }}>
-                    <div style={{
-                        backgroundColor: 'var(--surface)',
-                        borderRadius: '12px',
-                        border: '1.5px solid var(--border)',
-                        width: '420px',
-                        maxWidth: '90%',
-                        padding: '1.5rem',
-                        boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '1.25rem'
-                    }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <h3 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.03em', display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--text-main)' }}>
-                                <span>📁</span> Foto aus Mediathek importieren
-                            </h3>
-                            <button 
-                                onClick={() => setShowImportModal(false)}
-                                style={{
-                                    background: 'transparent',
-                                    border: 'none',
-                                    color: 'var(--text-muted)',
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    padding: '0.2rem'
-                                }}
-                            >
-                                <X size={18} />
-                            </button>
-                        </div>
-
-                        {/* Room selection */}
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                            <label style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--text-muted)' }}>1. ZUGEHÖRIGEN RAUM WÄHLEN:</label>
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem' }}>
-                                {['Badezimmer', 'Küche', 'Keller'].map(room => {
-                                    const isSelected = importRoom === room;
-                                    return (
-                                        <button
-                                            key={room}
-                                            type="button"
-                                            onClick={() => setImportRoom(room)}
-                                            style={{
-                                                padding: '0.5rem 0.25rem',
-                                                fontSize: '0.75rem',
-                                                fontWeight: 700,
-                                                borderRadius: '6px',
-                                                border: isSelected ? '2px solid var(--primary)' : '1px solid var(--border)',
-                                                backgroundColor: isSelected ? 'var(--color-primary-soft)' : 'var(--background)',
-                                                color: isSelected ? 'var(--primary)' : 'var(--text-main)',
-                                                cursor: 'pointer',
-                                                transition: 'all 0.15s ease'
-                                            }}
-                                        >
-                                            {room === 'Badezimmer' ? '🚪 Bad' : room === 'Küche' ? '🍳 Küche' : '📦 Keller'}
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                        </div>
-
-                        {/* File select area */}
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                            <label style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--text-muted)' }}>2. BILD AUSWÄHLEN:</label>
-                            <input 
-                                type="file" 
-                                id="modal-photo-library-input" 
-                                accept="image/*"
-                                onChange={(e) => {
-                                    const file = e.target.files[0];
-                                    if (file) {
-                                        setImportFile(file);
-                                        const reader = new FileReader();
-                                        reader.onloadend = () => {
-                                            setImportFilePreview(reader.result);
-                                        };
-                                        reader.readAsDataURL(file);
-                                    }
-                                }}
-                                style={{ display: 'none' }}
-                            />
-                            
-                            {importFilePreview ? (
-                                <div style={{
-                                    position: 'relative',
-                                    height: '160px',
-                                    borderRadius: '8px',
-                                    border: '1.5px solid var(--border)',
-                                    overflow: 'hidden',
-                                    backgroundColor: '#FFFFFF',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center'
-                                }}>
-                                    <img 
-                                        src={importFilePreview} 
-                                        alt="Preview" 
-                                        style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-                                    />
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setImportFile(null);
-                                            setImportFilePreview(null);
-                                        }}
-                                        style={{
-                                            position: 'absolute',
-                                            top: '8px',
-                                            right: '8px',
-                                            backgroundColor: 'rgba(0,0,0,0.6)',
-                                            border: 'none',
-                                            borderRadius: '50%',
-                                            width: '24px',
-                                            height: '24px',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            color: 'white',
-                                            cursor: 'pointer'
-                                        }}
-                                    >
-                                        <X size={12} strokeWidth={2.5} />
-                                    </button>
-                                </div>
-                            ) : (
-                                <label 
-                                    htmlFor="modal-photo-library-input"
-                                    style={{
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        height: '140px',
-                                        border: '2px dashed var(--border)',
-                                        borderRadius: '8px',
-                                        cursor: 'pointer',
-                                        backgroundColor: 'var(--background)',
-                                        transition: 'all 0.2s ease',
-                                        gap: '0.5rem',
-                                        color: 'var(--text-muted)'
-                                    }}
-                                >
-                                    <span style={{ fontSize: '1.6rem' }}>📁</span>
-                                    <span style={{ fontSize: '0.78rem', fontWeight: 700 }}>Foto aus Mediathek wählen</span>
-                                    <span style={{ fontSize: '0.62rem' }}>Unterstützt JPEG, PNG, WEBP</span>
-                                </label>
-                            )}
-                        </div>
-
-                        {/* Actions */}
-                        <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
-                            <button
-                                type="button"
-                                onClick={() => setShowImportModal(false)}
-                                className="btn btn-outline"
-                                style={{ flex: 1, height: '36px', fontSize: '0.78rem', fontWeight: 700 }}
-                            >
-                                Abbrechen
-                            </button>
-                            <button
-                                type="button"
-                                disabled={!importFilePreview}
-                                onClick={() => {
-                                    const newProjPhoto = {
-                                        id: `custom_proj_photo_${Date.now()}`,
-                                        room: importRoom,
-                                        title: importFile ? importFile.name.split('.')[0] : 'Foto Mediathek',
-                                        src: importFilePreview
-                                    };
-                                    setCustomProjectPhotos(prev => [...prev, newProjPhoto]);
-                                    setSelectedRoomFilter(importRoom);
-                                    setSelectedPhotoId(newProjPhoto.id);
-                                    // Auto-assign to sketches & plans
-                                    setSelectedProjectPhotos(prev => {
-                                        if (prev.includes(newProjPhoto.id)) return prev;
-                                        return [...prev, newProjPhoto.id];
-                                    });
-                                    setShowImportModal(false);
-                                }}
-                                className="btn btn-primary"
-                                style={{ 
-                                    flex: 1, 
-                                    height: '36px', 
-                                    fontSize: '0.78rem', 
-                                    fontWeight: 700,
-                                    opacity: !importFilePreview ? 0.6 : 1,
-                                    cursor: !importFilePreview ? 'not-allowed' : 'pointer'
-                                }}
-                            >
-                                Hinzufügen
                             </button>
                         </div>
                     </div>
