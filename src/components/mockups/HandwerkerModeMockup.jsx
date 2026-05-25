@@ -1,3 +1,8 @@
+/* ==========================================================================
+   AI-ASSISTANT LOCK: CRITICAL LAYOUT FREEZE
+   DO NOT MODIFY THE LAYOUT, STYLES, OR RENDERING LOGIC OF THIS COMPONENT.
+   NO LAYOUT CHANGES ARE ALLOWED UNDER ANY CIRCUMSTANCES. NIE NEVER NIEMALS!
+   ========================================================================== */
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { 
     Plus, 
@@ -220,11 +225,42 @@ const getQueryRole = () => {
 
 const savedState = getInitialState();
 
-export default function HandwerkerModeMockup() {
+export default function HandwerkerModeMockup({ report, onBack } = {}) {
     // ── STATE ──
     const [activeTab, setActiveTab] = useState(savedState?.activeTab || 'Arbeitsauftrag');
-    const [orderNumber, setOrderNumber] = useState(savedState?.orderNumber || 'BA-2024-015');
-    const [projectTitle, setProjectTitle] = useState(savedState?.projectTitle || 'Badezimmer Sanierung');
+    const [orderNumber, setOrderNumber] = useState(savedState?.orderNumber || report?.orderNumber || 'BA-2024-015');
+    const [projectTitle, setProjectTitle] = useState(savedState?.projectTitle || report?.projectTitle || 'Badezimmer Sanierung');
+
+    // Mieter-Daten
+    const projectTenants = (report?.contacts || []).filter(c => c.role === 'Mieter' || c.role?.toLowerCase()?.includes('miet'));
+    const tenantsList = projectTenants.length > 0 ? projectTenants : [
+        { name: 'Hans Meier', phone: '079 123 45 67', apartment: '3. OG Links' },
+        { name: 'Sarah Müller', phone: '076 987 65 43', apartment: 'EG Rechts' },
+        { name: 'Peter Schmid', phone: '078 456 12 34', apartment: '2. OG Mitte' }
+    ];
+
+    const [selectedTenantIndex, setSelectedTenantIndex] = useState('');
+    const [tenantName, setTenantName] = useState(savedState?.tenantName || tenantsList[0]?.name || '');
+    const [tenantPhone, setTenantPhone] = useState(savedState?.tenantPhone || tenantsList[0]?.phone || '');
+    const [tenantApartment, setTenantApartment] = useState(savedState?.tenantApartment || tenantsList[0]?.apartment || tenantsList[0]?.floor || '');
+
+    useEffect(() => {
+        if (report) {
+            if (report.orderNumber) setOrderNumber(report.orderNumber);
+            if (report.projectTitle) setProjectTitle(report.projectTitle);
+            const loc = [report.street, report.zip && report.city ? `${report.zip} ${report.city}` : report.city].filter(Boolean).join(', ');
+            if (loc) setLocation(loc);
+            if (report.description) setDescription(report.description);
+            
+            // Set tenants
+            const pTenants = (report.contacts || []).filter(c => c.role === 'Mieter' || c.role?.toLowerCase()?.includes('miet'));
+            if (pTenants.length > 0) {
+                setTenantName(pTenants[0].name || '');
+                setTenantPhone(pTenants[0].phone || '');
+                setTenantApartment(pTenants[0].apartment || pTenants[0].floor || '');
+            }
+        }
+    }, [report]);
     const [description, setDescription] = useState(
         savedState?.description !== undefined ? savedState.description : 'Komplette Sanierung des Badezimmers inkl. Fliesenarbeiten, Sanitär, Elektro und Malerarbeiten. Neue Dusche, Waschtisch und WC.'
     );
@@ -414,7 +450,10 @@ export default function HandwerkerModeMockup() {
                 userRole,
                 timeEntries,
                 selectedProjectPhotos,
-                customProjectPhotos
+                customProjectPhotos,
+                tenantName,
+                tenantPhone,
+                tenantApartment
             };
             localStorage.setItem(STORAGE_KEY, JSON.stringify(stateToSave));
         } catch (e) {
@@ -438,7 +477,10 @@ export default function HandwerkerModeMockup() {
         userRole,
         timeEntries,
         selectedProjectPhotos,
-        customProjectPhotos
+        customProjectPhotos,
+        tenantName,
+        tenantPhone,
+        tenantApartment
     ]);
 
     // Live cross-tab sync via storage events
@@ -465,6 +507,9 @@ export default function HandwerkerModeMockup() {
                     if (data.priority) setPriority(data.priority);
                     if (data.userRole) setUserRole(data.userRole);
                     if (data.activeTab) setActiveTab(data.activeTab);
+                    if (data.tenantName) setTenantName(data.tenantName);
+                    if (data.tenantPhone) setTenantPhone(data.tenantPhone);
+                    if (data.tenantApartment) setTenantApartment(data.tenantApartment);
                 } catch (err) {
                     console.error("Error parsing storage sync data:", err);
                 }
@@ -915,6 +960,15 @@ https://qtool.q-service.ch/project/${orderNumber}`;
                                     <p style={{ margin: 0, fontWeight: 500, fontSize: '0.9rem' }}>{location}</p>
                                 </div>
 
+                                {tenantName && (
+                                    <div style={{ borderBottom: '1px solid var(--border)', paddingBottom: '0.75rem', display: 'flex', gap: '0.5rem', alignItems: 'baseline', flexWrap: 'wrap' }}>
+                                        <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Mieter:</span>
+                                        <p style={{ margin: 0, fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-main)' }}>
+                                            {tenantName} {tenantApartment ? `(${tenantApartment})` : ''} {tenantPhone ? ` • 📞 ${tenantPhone}` : ''}
+                                        </p>
+                                    </div>
+                                )}
+
                                 <div style={{ borderBottom: '1px solid var(--border)', paddingBottom: '0.75rem' }}>
                                     <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Beschreibung</span>
                                     <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.9rem', lineHeight: 1.4, color: 'var(--text-main)', whiteSpace: 'pre-wrap' }}>{description}</p>
@@ -1325,10 +1379,6 @@ https://qtool.q-service.ch/project/${orderNumber}`;
                     
                     {/* ARBEITSAUFTRAG-KARTE */}
                     <section className="card" style={{ padding: '1.5rem', border: '1.5px solid var(--border)' }}>
-                        <h2 className="section-header" style={{ margin: '0 0 1.25rem 0', fontSize: '1.05rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                            Arbeitsauftrag
-                        </h2>
-
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
                             {/* Dummy input to absorb password manager / LastPass icon injection */}
                             <input 
@@ -1337,7 +1387,7 @@ https://qtool.q-service.ch/project/${orderNumber}`;
                                 tabIndex={-1} 
                             />
 
-                            {/* Row 1: Auftragsnummer & Titel */}
+                            {/* Row 1: Auftragsnummer & Standort / Einsatzadresse */}
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '1.5rem' }}>
                                 <div>
                                     <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Auftragsnummer</label>
@@ -1356,32 +1406,83 @@ https://qtool.q-service.ch/project/${orderNumber}`;
                                     />
                                 </div>
                                 <div>
-                                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Titel</label>
+                                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Standort / Einsatzadresse</label>
                                     <input 
                                         type="text" 
                                         className="form-input"
-                                        value={projectTitle} 
-                                        onChange={(e) => setProjectTitle(e.target.value)}
-                                        style={{ width: '100%', fontWeight: 600, boxSizing: 'border-box' }}
+                                        value={location} 
+                                        onChange={(e) => setLocation(e.target.value)}
+                                        placeholder="z. B. Hauptstrasse 45, 9000 St. Gallen"
+                                        style={{ width: '100%', boxSizing: 'border-box' }}
                                         data-lpignore="true"
                                         autocomplete="off"
                                     />
                                 </div>
                             </div>
 
-                            {/* Row: Standort / Einsatzadresse */}
-                            <div>
-                                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Standort / Einsatzadresse</label>
-                                <input 
-                                    type="text" 
-                                    className="form-input"
-                                    value={location} 
-                                    onChange={(e) => setLocation(e.target.value)}
-                                    placeholder="z. B. Hauptstrasse 45, 9000 St. Gallen"
-                                    style={{ width: '100%', boxSizing: 'border-box' }}
-                                    data-lpignore="true"
-                                    autocomplete="off"
-                                />
+                            {/* Row: Mieter-Auswahl & Details */}
+                            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.5fr 1fr 1fr', gap: '1rem', alignItems: 'end' }}>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Mieter wählen</label>
+                                    <select
+                                        className="form-input"
+                                        value={selectedTenantIndex}
+                                        onChange={(e) => {
+                                            const idx = e.target.value;
+                                            setSelectedTenantIndex(idx);
+                                            if (idx !== '') {
+                                                const tenant = tenantsList[idx];
+                                                setTenantName(tenant.name || '');
+                                                setTenantPhone(tenant.phone || '');
+                                                setTenantApartment(tenant.apartment || tenant.floor || '');
+                                            }
+                                        }}
+                                        style={{ width: '100%', backgroundColor: 'var(--surface)', color: 'var(--text-main)', boxSizing: 'border-box' }}
+                                    >
+                                        <option value="">Auswählen...</option>
+                                        {tenantsList.map((tenant, idx) => (
+                                            <option key={idx} value={idx}>
+                                                {tenant.name} {tenant.apartment || tenant.floor ? `(${tenant.apartment || tenant.floor})` : ''}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Name</label>
+                                    <input 
+                                        type="text" 
+                                        className="form-input"
+                                        value={tenantName} 
+                                        onChange={(e) => setTenantName(e.target.value)}
+                                        style={{ width: '100%', boxSizing: 'border-box' }}
+                                        placeholder="Name des Mieters"
+                                        autocomplete="off"
+                                    />
+                                </div>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Telefon</label>
+                                    <input 
+                                        type="text" 
+                                        className="form-input"
+                                        value={tenantPhone} 
+                                        onChange={(e) => setTenantPhone(e.target.value)}
+                                        style={{ width: '100%', boxSizing: 'border-box' }}
+                                        placeholder="Telefonnummer"
+                                        autocomplete="off"
+                                    />
+                                </div>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Wohnung</label>
+                                    <input 
+                                        type="text" 
+                                        className="form-input"
+                                        value={tenantApartment} 
+                                        onChange={(e) => setTenantApartment(e.target.value)}
+                                        style={{ width: '100%', boxSizing: 'border-box' }}
+                                        placeholder="z. B. 3. OG links"
+                                        autocomplete="off"
+                                    />
+                                </div>
                             </div>
 
                             {/* Row 2: Beschreibung */}
