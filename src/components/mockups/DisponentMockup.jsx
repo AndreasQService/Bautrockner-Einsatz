@@ -1307,7 +1307,7 @@ https://qtool.q-service.ch/project/${orderNumber}`;
                                 </h3>
                                 <div style={{ display: 'flex', gap: '1rem', overflowX: 'auto', paddingBottom: '0.5rem' }}>
                                     {photos.length === 0 ? (
-                                        <p style={{ fontStyle: 'italic', fontSize: '0.8rem', color: 'var(--text-muted)', margin: '0.5rem 0' }}>Keine Bilder erfasst.</p>
+                                        <p style={{ fontStyle: 'italic', fontSize: '0.8rem', color: 'var(--text-muted)', margin: '0.5rem 0' }}>Keine Bilder erfasst</p>
                                     ) : (
                                         photos.map(photo => (
                                             <div 

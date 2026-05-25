@@ -538,7 +538,7 @@ export default function HandwerkerMockup() {
                             overflow: 'visible'
                         }}>
                             {photos.length === 0 ? (
-                                <p style={{ fontStyle: 'italic', fontSize: '0.85rem', color: 'var(--text-muted)', margin: 0, gridColumn: '1 / -1' }}>Keine Bilder erfasst.</p>
+                                <p style={{ fontStyle: 'italic', fontSize: '0.85rem', color: 'var(--text-muted)', margin: 0, gridColumn: '1 / -1' }}>Keine Bilder erfasst</p>
                             ) : (
                                 photos.map(photo => (
                                     <div 
