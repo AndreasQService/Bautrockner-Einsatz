@@ -1629,9 +1629,9 @@ https://qtool.q-service.ch/project/${orderNumber}`;
                             </div>
 
                             <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-                                {/* Room Dropdown */}
+                                {/* Room Dropdown (now Bild wählen) */}
                                 <div style={{ flex: 1, minWidth: '130px', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                                    <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)' }}>Raum wählen:</span>
+                                    <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)' }}>Bild wählen:</span>
                                     <select 
                                         value={selectedRoomFilter} 
                                         onChange={(e) => {
@@ -1659,7 +1659,7 @@ https://qtool.q-service.ch/project/${orderNumber}`;
                                             height: '32px'
                                         }}
                                     >
-                                        <option value="">-- Raum wählen --</option>
+                                        <option value="">-- Bild wählen --</option>
                                         <option value="Badezimmer">
                                             Badezimmer ({projectPhotosPool.filter(p => p.room === 'Badezimmer').length} Bild{projectPhotosPool.filter(p => p.room === 'Badezimmer').length === 1 ? '' : 'er'})
                                         </option>
@@ -1675,9 +1675,9 @@ https://qtool.q-service.ch/project/${orderNumber}`;
                                     </select>
                                 </div>
 
-                                {/* Photo Dropdown */}
+                                {/* Photo Dropdown (now Detailbild wählen) */}
                                 <div style={{ flex: 1.2, minWidth: '170px', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                                    <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)' }}>Bild wählen:</span>
+                                    <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)' }}>Detailbild wählen:</span>
                                     <select 
                                         value={selectedPhotoId} 
                                         onChange={(e) => {
@@ -1700,7 +1700,7 @@ https://qtool.q-service.ch/project/${orderNumber}`;
                                         }}
                                     >
                                         <option value="">
-                                            {!selectedRoomFilter ? '-- Zuerst Raum wählen --' : '-- Wähle ein Bild --'}
+                                            {!selectedRoomFilter ? '-- Zuerst Bild wählen --' : '-- Detailbild wählen --'}
                                         </option>
                                         {projectPhotosPool.filter(p => p.room === selectedRoomFilter).map(p => (
                                             <option key={p.id} value={p.id}>
