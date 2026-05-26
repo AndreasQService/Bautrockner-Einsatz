@@ -62,7 +62,6 @@ const MeasurementsSection = ({ data }) => {
                                     {img.name && (
                                         <Text style={{
                                             ...styles.imageDescription,
-                                            textAlign: 'center',
                                             marginTop: 3,
                                             fontSize: 8,
                                         }}>

@@ -53,7 +53,6 @@ const ImageGrid = ({ images, showName = false, imageStyle = styles.image, contai
                                     {showName && img.name && (
                                         <Text style={{
                                             ...styles.imageDescription,
-                                            textAlign: 'center',
                                             fontSize: 8,
                                         }}>
                                             {img.name}
@@ -63,7 +62,6 @@ const ImageGrid = ({ images, showName = false, imageStyle = styles.image, contai
                                     {img.description && (
                                         <Text style={{
                                             ...styles.imageDescription,
-                                            textAlign: 'center',
                                             fontSize: 8,
                                             marginTop: (showName && img.name) ? 1 : 0,
                                         }}>
