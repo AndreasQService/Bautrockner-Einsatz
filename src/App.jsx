@@ -4,7 +4,8 @@
    ========================================================================== */
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSessionLock } from './hooks/useSessionLock'
-import { Plus, LayoutDashboard, Settings, User, Users, LogOut, Thermometer, Database, RotateCcw, Download, Sun, Moon } from 'lucide-react'
+import { Plus, LayoutDashboard, Settings, User, Users, LogOut, Thermometer, Database, RotateCcw, Download, Sun, Moon, Hammer } from 'lucide-react';
+import ProjectSelection from './components/ProjectSelection';
 import { supabase } from './supabaseClient'
 import Dashboard from './components/Dashboard'
 import DamageForm from './components/DamageForm'
@@ -13,6 +14,7 @@ import UserManagementModal from './components/UserManagementModal'
 import MeasurementDeviceManager from './components/MeasurementDeviceManager'
 import LoginScreen from './components/LoginScreen'
 import EmailImportModalV2 from './components/EmailImportModalV2'
+import DisponentMockup from './components/mockups/DisponentMockup'
 import i18n from './i18n'
 import { buildProjectFolderName, uploadProjectJson } from "./services/OneDriveService";
 
@@ -1004,6 +1006,14 @@ function App() {
                     </button>
                     <button
                       className="btn btn-ghost"
+                      onClick={() => setView('project_selection')}
+                      title="Handwerker"
+                      style={{ padding: '0.5rem', color: view === 'project_selection' ? 'var(--q-primary)' : 'inherit' }}
+                    >
+                      <Hammer size={18} />
+                    </button>
+                    <button
+                      className="btn btn-ghost"
                       onClick={() => setShowUserModal(true)}
                       title="Benutzer"
                       style={{ padding: '0.5rem' }}
@@ -1121,6 +1131,19 @@ function App() {
           }}
         />}
         {view === 'devices' && <DeviceManager reports={reports} onBack={() => setView('dashboard')} onNavigateToReport={handleNavigateToReport} />}
+        {view === 'project_selection' && (
+          <ProjectSelection
+            reports={reports}
+            onSelect={(report) => {
+              setSelectedReport(report);
+              setView('handwerker_integration');
+            }}
+            onBack={() => setView('dashboard')}
+          />
+        )}
+        {view === 'handwerker_integration' && (
+          <DisponentMockup report={selectedReport} onBack={() => setView('dashboard')} />
+        )}
         {(view === 'new-report' || view === 'details') && (
           <div style={{ position: 'relative' }}>
             {/* ── Sitzungssperre: Overlay + UI gesperrt wenn anderer Modus aktiv ── */}
