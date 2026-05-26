@@ -94,7 +94,7 @@ export const styles = StyleSheet.create({
     textBlock: {
         marginBottom: 10,
         fontSize: 10,
-        textAlign: 'justify',
+        textAlign: 'left',
     },
 
     // Apartment / Room Grouping
