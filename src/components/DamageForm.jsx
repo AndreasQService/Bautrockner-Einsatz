@@ -282,6 +282,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         damageReportDate: initialData.damageReportDate || '',
         measures: initialData.measures || '',
         selectedMeasures: Array.isArray(initialData.selectedMeasures) ? initialData.selectedMeasures : [],
+        measureNotes: initialData.measureNotes || {},
         includeDescriptionInReport: initialData.includeDescriptionInReport !== false, // Default to true
         rooms: Array.isArray(initialData.rooms) ? initialData.rooms : [],
         measurementRooms: Array.isArray(initialData.measurementRooms) ? initialData.measurementRooms : []
@@ -333,6 +334,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         customMapImage: null,
         measures: '',
         selectedMeasures: [],
+        measureNotes: {},
         includeDescriptionInReport: true,
         rooms: [],
         measurementRooms: []

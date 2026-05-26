@@ -14,7 +14,6 @@ import PDFFooter from './layout/PDFFooter';
 import PDFMetaData from './layout/PDFMetaData';
 import DescriptionSection from './sections/DescriptionSection';
 import RoomDocumentation from './sections/RoomDocumentation';
-import PlansSection from './sections/PlansSection';
 import CauseSection from './sections/CauseSection';
 import MeasuresSection from './sections/MeasuresSection';
 import MeasurementsSection from './sections/MeasurementsSection';
@@ -152,10 +151,6 @@ const DamageReportDocument = ({ data }) => {
 
                 {/* Raumdokumentation Section */}
                 <RoomDocumentation rooms={validRooms} images={data.images} contacts={data.contacts} />
-
-
-
-                <PlansSection data={data} />
 
 
 

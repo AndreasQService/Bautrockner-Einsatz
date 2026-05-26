@@ -63,6 +63,7 @@ export const useDamageForm = (initialData, onSave, mode = 'desktop') => {
         damageReportDate: initialData.damageReportDate || '',
         measures: initialData.measures || '',
         selectedMeasures: Array.isArray(initialData.selectedMeasures) ? initialData.selectedMeasures : [],
+        measureNotes: initialData.measureNotes || {},
         includeDescriptionInReport: initialData.includeDescriptionInReport !== false,
         rooms: Array.isArray(initialData.rooms) ? initialData.rooms : []
     } : {
@@ -113,6 +114,7 @@ export const useDamageForm = (initialData, onSave, mode = 'desktop') => {
         exteriorPhoto: null,
         measures: '',
         selectedMeasures: [],
+        measureNotes: {},
         includeDescriptionInReport: true,
         rooms: []
     }));
