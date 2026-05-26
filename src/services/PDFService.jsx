@@ -108,7 +108,7 @@ export const PDFService = {
                     ? `${formData.street}, ${formData.zip || ''} ${formData.city || ''}`
                     : formData.address;
                 if (mapAddress) {
-                    const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+                    const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || import.meta.env.VITE_GOOGLE_API_KEY;
                     const params = new URLSearchParams({
                         center: mapAddress,
                         zoom: '15',
@@ -119,14 +119,53 @@ export const PDFService = {
                         key: apiKey,
                         language: 'de',
                     });
-                    const resp = await fetch(`/google-staticmap?${params.toString()}`);
-                    if (resp.ok) {
-                        const blob = await resp.blob();
-                        staticMapUrl = await new Promise((resolve) => {
-                            const reader = new FileReader();
-                            reader.onloadend = () => resolve(reader.result);
-                            reader.readAsDataURL(blob);
-                        });
+                    const directUrl = `https://maps.googleapis.com/maps/api/staticmap?${params.toString()}`;
+                    const proxyUrl = `/google-staticmap?${params.toString()}`;
+                    
+                    let loaded = false;
+                    
+                    // Try 1: Local proxy (Vite Dev Server)
+                    try {
+                        const resp = await fetch(proxyUrl);
+                        if (resp.ok) {
+                            const blob = await resp.ok ? await resp.blob() : null;
+                            if (blob && blob.type.startsWith('image/')) {
+                                staticMapUrl = await new Promise((resolve) => {
+                                    const reader = new FileReader();
+                                    reader.onloadend = () => resolve(reader.result);
+                                    reader.readAsDataURL(blob);
+                                });
+                                loaded = true;
+                            }
+                        }
+                    } catch (proxyErr) {
+                        console.warn("[PDFService] Proxy fetch failed, trying direct URL:", proxyErr.message);
+                    }
+                    
+                    // Try 2: Direct URL fetch (Base64 conversion)
+                    if (!loaded) {
+                        try {
+                            const resp = await fetch(directUrl);
+                            if (resp.ok) {
+                                const blob = await resp.blob();
+                                if (blob && blob.type.startsWith('image/')) {
+                                    staticMapUrl = await new Promise((resolve) => {
+                                        const reader = new FileReader();
+                                        reader.onloadend = () => resolve(reader.result);
+                                        reader.readAsDataURL(blob);
+                                    });
+                                    loaded = true;
+                                }
+                            }
+                        } catch (directErr) {
+                            console.warn("[PDFService] Direct fetch failed:", directErr.message);
+                        }
+                    }
+                    
+                    // Try 3: Direct URL string fallback (React-PDF native load)
+                    if (!loaded) {
+                        console.log("[PDFService] Fallback to direct absolute URL string for staticMapUrl");
+                        staticMapUrl = directUrl;
                     }
                 }
             }
@@ -306,7 +345,7 @@ export const PDFService = {
                 // Clean up address (remove leading/trailing commas, extra spaces)
                 mapAddress = (mapAddress || '').trim().replace(/^,+/, '').replace(/,+$/, '').trim();
                 if (mapAddress) {
-                    const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+                    const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || import.meta.env.VITE_GOOGLE_API_KEY;
                     const params = new URLSearchParams({
                         center: mapAddress,
                         zoom: '15',
@@ -317,18 +356,53 @@ export const PDFService = {
                         key: apiKey,
                         language: 'de',
                     });
-                    const googleMapUrl = `/google-staticmap?${params.toString()}`;
-                    const resp = await fetch(googleMapUrl);
-                    if (resp.ok) {
-                        const blob = await resp.blob();
-                        
-                        if (blob.type.startsWith('image/')) {
-                            staticMapUrl = await new Promise((resolve) => {
-                                const reader = new FileReader();
-                                reader.onloadend = () => resolve(reader.result);
-                                reader.readAsDataURL(blob);
-                            });
+                    const directUrl = `https://maps.googleapis.com/maps/api/staticmap?${params.toString()}`;
+                    const proxyUrl = `/google-staticmap?${params.toString()}`;
+                    
+                    let loaded = false;
+                    
+                    // Try 1: Local proxy (Vite Dev Server)
+                    try {
+                        const resp = await fetch(proxyUrl);
+                        if (resp.ok) {
+                            const blob = await resp.blob();
+                            if (blob && blob.type.startsWith('image/')) {
+                                staticMapUrl = await new Promise((resolve) => {
+                                    const reader = new FileReader();
+                                    reader.onloadend = () => resolve(reader.result);
+                                    reader.readAsDataURL(blob);
+                                });
+                                loaded = true;
+                            }
                         }
+                    } catch (proxyErr) {
+                        console.warn("[PDFService Master] Proxy fetch failed, trying direct URL:", proxyErr.message);
+                    }
+                    
+                    // Try 2: Direct URL fetch (Base64 conversion)
+                    if (!loaded) {
+                        try {
+                            const resp = await fetch(directUrl);
+                            if (resp.ok) {
+                                const blob = await resp.blob();
+                                if (blob && blob.type.startsWith('image/')) {
+                                    staticMapUrl = await new Promise((resolve) => {
+                                        const reader = new FileReader();
+                                        reader.onloadend = () => resolve(reader.result);
+                                        reader.readAsDataURL(blob);
+                                    });
+                                    loaded = true;
+                                }
+                            }
+                        } catch (directErr) {
+                            console.warn("[PDFService Master] Direct fetch failed:", directErr.message);
+                        }
+                    }
+                    
+                    // Try 3: Direct URL string fallback (React-PDF native load)
+                    if (!loaded) {
+                        console.log("[PDFService Master] Fallback to direct absolute URL string for staticMapUrl");
+                        staticMapUrl = directUrl;
                     }
                 }
             }
