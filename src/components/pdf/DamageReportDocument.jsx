@@ -80,7 +80,7 @@ const DamageReportDocument = ({ data }) => {
                 <PDFMetaData data={data} />
 
                 {/* Karte und/oder Aussenbild unter den Projektinfos */}
-                {(data.staticMapUrl || data.customMapImage || (data.exteriorPhoto && data.exteriorPhoto.startsWith('data:'))) && (
+                {(data.staticMapUrl || data.customMapImage || data.exteriorPhoto) && (
                     <View>
                         <View style={styles.divider} />
                         <View style={{ gap: 6, marginBottom: 6, marginTop: 6 }}>
@@ -112,7 +112,7 @@ const DamageReportDocument = ({ data }) => {
                                         />
                                     )}
                                     {/* Show exterior photo here ONLY if no customMapImage is present (legacy behavior) */}
-                                    {!data.customMapImage && data.exteriorPhoto && data.exteriorPhoto.startsWith('data:') && (
+                                    {!data.customMapImage && data.exteriorPhoto && (
                                         <Image
                                             src={data.exteriorPhoto}
                                             style={{
@@ -128,7 +128,7 @@ const DamageReportDocument = ({ data }) => {
                             )}
 
                             {/* Row 2: Exterior Photo (Full width if customMapImage is present) */}
-                            {data.customMapImage && data.exteriorPhoto && data.exteriorPhoto.startsWith('data:') && (
+                            {data.customMapImage && data.exteriorPhoto && (
                                 <Image
                                     src={data.exteriorPhoto}
                                     style={{
