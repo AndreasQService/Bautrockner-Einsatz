@@ -1,0 +1,21 @@
+{
+  "task": "Remove Schadensbericht Upload Dropzone",
+  "allowedFiles": [
+    "src/components/DamageForm.jsx"
+  ],
+  "forbiddenPaths": [
+    "src/App.jsx",
+    "src/components/MeasurementModal.jsx",
+    "src/features/measurements/TechnicianMeasurementPage.jsx",
+    "src/services/**",
+    "src/utils/**",
+    "src/index.css",
+    "src/**/*.css",
+    "supabase/**",
+    "migrations/**",
+    ".env",
+    ".env.local",
+    "package.json",
+    "package-lock.json"
+  ]
+}

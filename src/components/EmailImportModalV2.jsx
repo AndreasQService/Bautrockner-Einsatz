@@ -435,7 +435,7 @@ ${text}`;
                 <div style={{
                     backgroundColor: '#FFFFFF', padding: '2rem', borderRadius: '16px',
                     width: '900px', maxWidth: '95%', maxHeight: '90vh', overflowY: 'auto',
-                    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)', border: '1px solid #E2E8F0', boxShadow: '0 10px 30px rgba(0,0,0,0.1)',
+                    border: '1px solid #E2E8F0', boxShadow: '0 10px 30px rgba(0,0,0,0.1)',
                     color: '#1E293B'
                 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '1px solid #E2E8F0', paddingBottom: '1rem' }}>

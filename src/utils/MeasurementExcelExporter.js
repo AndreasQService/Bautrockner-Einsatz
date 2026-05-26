@@ -10,12 +10,12 @@ export const generateMeasurementExcel = async (formData) => {
     // Load Logo
     let logoId = null;
     try {
-        const logoResponse = await fetch('/logo.png');
+        const logoResponse = await fetch('/1080p.jpg');
         if (logoResponse.ok) {
             const logoBuffer = await logoResponse.arrayBuffer();
             logoId = workbook.addImage({
                 buffer: logoBuffer,
-                extension: 'png',
+                extension: 'jpeg',
             });
         }
     } catch (err) {

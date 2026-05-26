@@ -120,6 +120,16 @@ export default defineConfig({
   esbuild: {
     target: 'safari14',
   },
+  build: {
+    rollupOptions: {
+      input: {
+        main: 'index.html',
+        mockup: 'mockup.html',
+        handwerker: 'handwerker.html',
+        disponent: 'disponent.html'
+      }
+    }
+  },
   server: {
     proxy: {
       '/openai-api': {

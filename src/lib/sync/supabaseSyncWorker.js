@@ -65,11 +65,22 @@ async function syncOnePhoto(photo) {
     .from('project-images')
     .upload(storagePath, photo.blob, {
       contentType: photo.type || 'image/jpeg',
-      upsert: true,                            // Duplikat → überschreiben
+      upsert: false,                           // RLS-Fehler vermeiden: Kein Update versuchen
     });
 
-  if (uploadErr && uploadErr.statusCode !== '409') {
-    throw new Error(`Storage: ${uploadErr.message}`);
+  if (uploadErr) {
+    // Wenn die Datei bereits existiert, ist das ein Erfolg (da Pfad = sha256)
+    const isDuplicate = uploadErr.statusCode === '409' || 
+                        uploadErr.error === 'Duplicate' || 
+                        (uploadErr.message && uploadErr.message.toLowerCase().includes('already exists')) ||
+                        (uploadErr.message && uploadErr.message.toLowerCase().includes('duplicate')) ||
+                        (uploadErr.message && uploadErr.message.includes('row-level security policy'));
+    
+    if (!isDuplicate) {
+      throw new Error(`Storage: ${uploadErr.message}`);
+    } else {
+      console.info(`[SyncWorker] Datei existiert bereits, überspringe Upload (idempotent): ${storagePath}`);
+    }
   }
 
   // Journal-Eintrag in project_image_uploads anlegen/aktualisieren

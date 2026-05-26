@@ -182,6 +182,7 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
     const [history, setHistory] = useState([]); // Array of ImageData
     const [historyStep, setHistoryStep] = useState(-1);
     const [showHistoryOverlay, setShowHistoryOverlay] = useState(false);
+    const [showHistoryTable, setShowHistoryTable] = useState(false);
     const [isCanvasExpanded, setIsCanvasExpanded] = useState(false);
     const [isSketchLocked, setIsSketchLocked] = useState(true);
     const [isSketchFullscreen, setIsSketchFullscreen] = useState(false);
@@ -271,6 +272,46 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
             setStylusOnlyMode(true); // Palm Rejection beim Reset aktiv lassen
         }
     }, [isOpen]);
+
+    // History overview helper
+    const getHistoryEntries = () => {
+        const entries = [];
+        const activeRoomForMeasurement = rooms && rooms.length > 0 ? rooms[0] : null;
+
+        if (Array.isArray(activeRoomForMeasurement?.measurementHistory)) {
+            entries.push(...activeRoomForMeasurement.measurementHistory.map((h, i) => ({
+                id: `hist_${i}`,
+                source: 'history',
+                date: h.date || h.datum || h.timestamp || h.createdAt || h.globalSettings?.date,
+                measurements: h.measurements || h.points || h.measurementPoints || [],
+                device: h.device || h.measurementDevice || h.messmittel || h.globalSettings?.device
+            })));
+        }
+
+        if (
+            activeRoomForMeasurement?.measurementData &&
+            Array.isArray(activeRoomForMeasurement.measurementData.measurements) &&
+            activeRoomForMeasurement.measurementData.measurements.length > 0
+        ) {
+            const dDate = activeRoomForMeasurement.measurementData.globalSettings?.date;
+            // Dedupe check
+            const isDuplicate = entries.length > 0 && entries.some(e => e.date === dDate && e.measurements.length === activeRoomForMeasurement.measurementData.measurements.length);
+
+            if (!isDuplicate) {
+                entries.unshift({
+                    id: 'current_data',
+                    source: 'current',
+                    date: dDate,
+                    measurements: activeRoomForMeasurement.measurementData.measurements,
+                    device: activeRoomForMeasurement.measurementData.globalSettings?.device
+                });
+            }
+        }
+
+        return entries.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+    };
+
+    const historyEntries = getHistoryEntries();
 
     // Calculate History View Data
     // Calculate History View Data - PIVOT
@@ -421,6 +462,8 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
         if (isSuccess) return;
 
         const currentRoomId = rooms && rooms.length > 0 ? rooms[0].id : null;
+        const isNewMeasurementFlag = rooms && rooms.length > 0 ? rooms[0].isNewMeasurement : false;
+        
         if (!currentRoomId) return;
 
         if (isInitializedRef.current === currentRoomId) return;
@@ -436,13 +479,15 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
                 return;
             }
 
-            if (roomData) {
-                const migrateNames = (ms) => (ms || []).map(m => ({
-                    ...m,
-                    pointName: m.pointName?.replace(/^Messpunkt\s+(\d+)$/i, 'MP $1') ?? m.pointName
-                }));
-                setMeasurements(migrateNames(roomData.measurements));
-                const gs = roomData.globalSettings || {
+            if (isNewMeasurementFlag) {
+                const initial = [
+                    { id: `p${Date.now()}`, pointName: 'MP 1', w_value: '', b_value: '', notes: '' },
+                    { id: `p${Date.now() + 1}`, pointName: 'MP 2', w_value: '', b_value: '', notes: '' },
+                    { id: `p${Date.now() + 2}`, pointName: 'MP 3', w_value: '', b_value: '', notes: '' },
+                    { id: `p${Date.now() + 3}`, pointName: 'MP 4', w_value: '', b_value: '', notes: '' }
+                ];
+                setMeasurements(initial);
+                const gs = {
                     date: new Date().toISOString().split('T')[0],
                     temp: '',
                     humidity: '',
@@ -452,7 +497,31 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
                 };
                 setGlobalSettings(gs);
                 const rm = gs.room || '';
-                setIsCustomRoom(rm && rm !== 'Ganze Wohnung' && !dynamicRoomOptions.includes(rm));
+                setIsCustomRoom(rm === '' || (rm !== 'Ganze Wohnung' && !dynamicRoomOptions.includes(rm)));
+                setGalleryPhotos([]);
+                setPreviewSnapshot(null);
+                initCanvas();
+                return;
+            }
+
+            if (roomData) {
+                const migrateNames = (ms) => (ms || []).map(m => ({
+                    ...m,
+                    pointName: m.pointName?.replace(/^Messpunkt\s+(\d+)$/i, 'MP $1') ?? m.pointName
+                }));
+                setMeasurements(migrateNames(roomData.measurements));
+                const baseGs = roomData.globalSettings || {};
+                const gs = {
+                    date: baseGs.date || new Date().toISOString().split('T')[0],
+                    temp: baseGs.temp || '',
+                    humidity: baseGs.humidity || '',
+                    device: baseGs.device || '',
+                    apartment: baseGs.apartment || (rooms && rooms.length > 0 ? (rooms[0].apartment || '') : ''),
+                    room: baseGs.room || (rooms && rooms.length > 0 ? (rooms[0].name || '') : '')
+                };
+                setGlobalSettings(gs);
+                const rm = gs.room || '';
+                setIsCustomRoom(rm === '' || (rm !== 'Ganze Wohnung' && !dynamicRoomOptions.includes(rm)));
                 if (roomData.galleryPhotos) setGalleryPhotos(roomData.galleryPhotos);
 
                 if (roomData.canvasImage) {
@@ -491,7 +560,9 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
                 };
                 setGlobalSettings(gs);
                 const rm = gs.room || '';
-                setIsCustomRoom(rm && rm !== 'Ganze Wohnung' && !dynamicRoomOptions.includes(rm));
+                setIsCustomRoom(rm === '' || (rm !== 'Ganze Wohnung' && !dynamicRoomOptions.includes(rm)));
+                setGalleryPhotos([]);
+                setPreviewSnapshot(null);
                 initCanvas();
             }
         };
@@ -607,7 +678,7 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
     };
 
     const startDrawing = (e) => {
-        if (!isOpen || isSketchLocked) return;
+        if (!isOpen || isSketchLocked || activeTool === 'photo') return;
         // pointerType-Regel: Finger/touch -> immer Foto-Overlay, nie zeichnen
         if (e.pointerType === 'touch') return;
         if (stylusOnlyMode && e.pointerType !== 'pen') return;
@@ -843,9 +914,12 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
         }
     };
 
+    const isLightMode = document.documentElement.getAttribute('data-theme') === 'light';
+    const forceDark = isTechnicianMode && !isLightMode;
+
     return createPortal(
-        <div className={isTechnicianMode ? 'force-dark-mode' : ''} style={{ position: 'fixed', inset: 0, backgroundColor: isTechnicianMode ? 'rgba(0,0,0,0.85)' : 'rgba(255,255,255,0.85)', backdropFilter: 'blur(4px)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0.75rem' }}>
-            <div ref={containerRef} style={{ backgroundColor: 'var(--background)', borderRadius: '14px', width: '98vw', maxWidth: '1240px', height: '94vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', color: 'var(--text-main)', border: '1px solid var(--border)', boxShadow: '0 30px 80px rgba(0,0,0,0.1)', boxShadow: '0 30px 80px rgba(0,0,0,0.7)' }}>
+        <div className={forceDark ? 'force-dark-mode' : ''} style={{ position: 'fixed', inset: 0, backgroundColor: forceDark ? 'rgba(0,0,0,0.85)' : 'rgba(255,255,255,0.85)', backdropFilter: 'blur(4px)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0.75rem' }}>
+            <div ref={containerRef} style={{ backgroundColor: 'var(--background)', borderRadius: '14px', width: '98vw', maxWidth: '1240px', height: '94vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', color: 'var(--text-main)', border: '1px solid var(--border)', boxShadow: forceDark ? '0 30px 80px rgba(0,0,0,0.7)' : '0 30px 80px rgba(0,0,0,0.1)' }}>
 
                 {/* ── HEADER ── */}
                 <div style={{ flexShrink: 0, padding: '0.7rem 1.1rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'var(--surface)' }}>
@@ -882,6 +956,24 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
                             {isSaving ? <Loader size={16} className="animate-spin" /> : isSuccess ? <Check size={16} /> : <Save size={16} />}
                             {isSaving ? 'Speichert…' : isSuccess ? 'Gespeichert!' : (readOnly ? 'Schliessen' : 'Speichern')}
                         </button>
+                        <button 
+                            onClick={() => setShowHistoryTable(!showHistoryTable)} 
+                            style={{ 
+                                padding: '0.55rem 1rem', 
+                                borderRadius: '8px', 
+                                background: showHistoryTable ? 'rgba(96,165,250,0.2)' : 'rgba(255,255,255,0.07)', 
+                                border: showHistoryTable ? '1px solid #60A5FA' : '1px solid var(--border)', 
+                                color: showHistoryTable ? '#60A5FA' : '#94A3B8', 
+                                cursor: 'pointer', 
+                                minHeight: '42px', 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                gap: '0.4rem',
+                                fontWeight: 700
+                            }}
+                        >
+                            <RotateCcw size={16} /> Verlauf
+                        </button>
                         <button onClick={async () => {
                             if (hasUnsavedChanges) {
                                 await handleSave();
@@ -901,6 +993,64 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
                     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', borderRight: '1px solid rgba(255,255,255,0.08)', minWidth: 0 }}>
                         {/* Hidden canvas always in DOM for init/save */}
                         <canvas ref={hiddenCanvasRef} width={960} height={600} style={{ display: 'none' }} />
+
+                        {/* --- READ-ONLY HISTORY BAR --- */}
+                        {historyEntries.length > 0 && (
+                            <div style={{ flexShrink: 0, padding: '0.6rem 1rem', background: 'var(--surface)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '0.6rem', overflowX: 'auto' }}>
+                                <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', marginRight: '0.5rem', flexShrink: 0 }}>Messverlauf:</span>
+                                {historyEntries.map(entry => (
+                                    <div key={entry.id} style={{ display: 'flex', alignItems: 'center', background: entry.source === 'current' ? 'rgba(59,130,246,0.1)' : 'rgba(255,255,255,0.03)', border: entry.source === 'current' ? '1px solid rgba(59,130,246,0.3)' : '1px solid var(--border)', padding: '0.35rem 0.6rem', borderRadius: '6px', fontSize: '0.8rem', whiteSpace: 'nowrap', color: entry.source === 'current' ? '#60A5FA' : 'var(--text-main)', flexShrink: 0 }}>
+                                        <span style={{ fontWeight: 600 }}>{entry.date ? new Date(entry.date).toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'Unbekannt'}</span>
+                                        <span style={{ margin: '0 0.4rem', color: 'var(--text-muted)' }}>•</span>
+                                        <span>{entry.measurements.length} MP</span>
+                                        {entry.source === 'current' && <span style={{ marginLeft: '0.4rem', fontSize: '0.7rem', backgroundColor: '#3B82F6', color: 'white', padding: '0.1rem 0.3rem', borderRadius: '4px', fontWeight: 700 }}>Aktuell</span>}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        {/* --- INTEGRATED HISTORY TABLE --- */}
+                        {showHistoryTable && (
+                            <div style={{ flexShrink: 0, maxHeight: '35%', backgroundColor: 'var(--surface)', borderBottom: '1px solid var(--border)', overflow: 'auto', padding: '0.5rem' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', padding: '0 0.5rem' }}>
+                                    <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#60A5FA', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Messverlauf (W/B)</span>
+                                    <button onClick={() => setShowHistoryTable(false)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><X size={14} /></button>
+                                </div>
+                                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+                                    <thead style={{ position: 'sticky', top: 0, background: 'var(--surface)', zIndex: 10 }}>
+                                        <tr>
+                                            <th style={{ padding: '0.4rem', textAlign: 'left', color: 'var(--text-muted)', borderBottom: '1px solid var(--border)', width: '70px' }}>MP</th>
+                                            {[...historyRows].reverse().map(row => (
+                                                <th key={row.id} style={{ padding: '0.4rem', textAlign: 'center', color: 'var(--text-muted)', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>
+                                                    {row.date ? new Date(row.date).toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit' }) : '-'}
+                                                </th>
+                                            ))}
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {historyColumns.map(mpName => (
+                                            <tr key={mpName} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                                                <td style={{ padding: '0.3rem 0.4rem', fontWeight: 700, color: 'var(--text-main)' }}>{mpName}</td>
+                                                {[...historyRows].reverse().map(row => {
+                                                    const cell = row.points[mpName];
+                                                    return (
+                                                        <td key={row.id} style={{ padding: '0.3rem 0.4rem', textAlign: 'center' }}>
+                                                            {cell ? (
+                                                                <span style={{ display: 'flex', justifyContent: 'center', gap: '4px' }}>
+                                                                    <span style={{ color: cell.w_color, fontWeight: 700 }}>{cell.w_value || '-'}</span>
+                                                                    <span style={{ color: 'var(--text-muted)' }}>/</span>
+                                                                    <span style={{ color: cell.b_color, fontWeight: 700 }}>{cell.b_value || '-'}</span>
+                                                                </span>
+                                                            ) : '-'}
+                                                        </td>
+                                                    );
+                                                })}
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
 
                         {/* Preview Area */}
                         <div style={{ flex: 1, position: 'relative', overflow: 'hidden', backgroundColor: '#f0f2f5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -924,9 +1074,9 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
                                             <X size={18} /> Schliessen
                                         </button>
                                     </div>
-                                    <div style={{ background: 'var(--text-main)', borderRadius: '12px', border: '1px solid var(--border)', boxShadow: '0 30px 80px rgba(0,0,0,0.1)', overflow: 'auto', flex: 1 }}>
+                                    <div style={{ background: 'var(--surface)', borderRadius: '12px', border: '1px solid var(--border)', boxShadow: '0 30px 80px rgba(0,0,0,0.1)', overflow: 'auto', flex: 1 }}>
                                         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
-                                            <thead style={{ position: 'sticky', top: 0, background: 'var(--text-main)', zIndex: 10, boxShadow: '0 1px 0 rgba(255,255,255,0.08)' }}>
+                                            <thead style={{ position: 'sticky', top: 0, background: 'var(--surface)', zIndex: 10, boxShadow: '0 1px 0 rgba(255,255,255,0.08)' }}>
                                                 <tr>
                                                     <th style={{ padding: '0.75rem 1rem', textAlign: 'left', color: '#94A3B8', whiteSpace: 'nowrap', width: '100px' }}>Messpunkt</th>
                                                     {[...historyRows].reverse().map(row => (
@@ -999,6 +1149,85 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
                     <div style={{ width: 340, flexShrink: 0, display: 'flex', flexDirection: 'column', backgroundColor: 'var(--surface)', position: 'relative' }}>
                         <div style={{ flex: 1, overflowY: 'auto', padding: '1rem', paddingBottom: '40vh', display: 'flex', flexDirection: 'column', gap: '0.85rem', WebkitOverflowScrolling: 'touch' }}>
                             {!readOnly && (<>
+                                {/* Wohnung – Bereich */}
+                                <div>
+                                    <label style={S.label}>Wohnung / Bereich</label>
+                                    <div style={{ position: 'relative', marginBottom: isCustomApartment ? '0.5rem' : '0' }}>
+                                        <select 
+                                            value={isCustomApartment ? 'Sonstiges' : (globalSettings.apartment || '')} 
+                                            onChange={e => {
+                                                const val = e.target.value;
+                                                if (val === 'Sonstiges') {
+                                                    setIsCustomApartment(true);
+                                                    setGlobalSettings({ ...globalSettings, apartment: '' });
+                                                } else {
+                                                    setIsCustomApartment(false);
+                                                    setGlobalSettings({ ...globalSettings, apartment: val });
+                                                }
+                                            }} 
+                                            style={{ ...S.input, paddingRight: '2rem', appearance: 'none', backgroundColor: 'transparent' }}
+                                        >
+                                            <option value="" style={{ background: 'var(--surface)', color: 'var(--text-main)' }}>Bitte wählen...</option>
+                                            <option value="Allgemeiner Bereich" style={{ background: 'var(--surface)', color: 'var(--text-main)' }}>Allgemeiner Bereich</option>
+                                            {(apartments || []).map((a, i) => <option key={i} value={a} style={{ background: 'var(--surface)', color: 'var(--text-main)' }}>{a}</option>)}
+                                            <option value="Sonstiges" style={{ background: 'var(--surface)', color: 'var(--text-main)' }}>+ Neuer Bereich</option>
+                                        </select>
+                                        <ChevronDown size={14} style={{ position: 'absolute', right: '0.7rem', top: '50%', transform: 'translateY(-50%)', color: '#475569', pointerEvents: 'none' }} />
+                                    </div>
+                                    {isCustomApartment && (
+                                        <div style={{ marginTop: '0.5rem' }}>
+                                            <label style={{ ...S.label, color: '#60A5FA' }}>Neuer Bereich</label>
+                                            <input
+                                                type="text"
+                                                value={globalSettings.apartment || ''}
+                                                onChange={e => setGlobalSettings({ ...globalSettings, apartment: e.target.value })}
+                                                style={S.input}
+                                                placeholder="z.B. Treppenhaus EG"
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Raum */}
+                                <div>
+                                    <label style={S.label}>Raum</label>
+                                    <div style={{ position: 'relative', marginBottom: isCustomRoom ? '0.5rem' : '0' }}>
+                                        <select
+                                            value={isCustomRoom ? 'Sonstiges' : (globalSettings.room || 'Sonstiges')}
+                                            onChange={e => {
+                                                const val = e.target.value;
+                                                if (val === 'Sonstiges') {
+                                                    setIsCustomRoom(true);
+                                                    setGlobalSettings({ ...globalSettings, room: '' });
+                                                } else {
+                                                    setIsCustomRoom(false);
+                                                    setGlobalSettings({ ...globalSettings, room: val });
+                                                }
+                                            }}
+                                            style={{ ...S.input, appearance: 'none', paddingRight: '2rem', backgroundColor: 'transparent' }}
+                                        >
+                                            <option value="Sonstiges" style={{ background: 'var(--surface)', color: 'var(--text-main)' }}>Eigene Eingabe</option>
+                                            <option value="Ganze Wohnung" style={{ background: 'var(--surface)', color: 'var(--text-main)' }}>Ganze Wohnung</option>
+                                            {dynamicRoomOptions.map((opt, i) => <option key={i} value={opt} style={{ background: 'var(--surface)', color: 'var(--text-main)' }}>{opt}</option>)}
+                                        </select>
+                                        <ChevronDown size={14} style={{ position: 'absolute', right: '0.7rem', top: '50%', transform: 'translateY(-50%)', color: '#475569', pointerEvents: 'none' }} />
+                                    </div>
+                                    {isCustomRoom && (
+                                        <div style={{ marginTop: '0.5rem' }}>
+                                            <label style={{ ...S.label, color: '#60A5FA' }}>Eigener Raum</label>
+                                            <input
+                                                type="text"
+                                                value={globalSettings.room || ''}
+                                                onChange={e => setGlobalSettings({ ...globalSettings, room: e.target.value })}
+                                                style={S.input}
+                                                placeholder="z.B. Dusche, Bad, Garage"
+                                                autoFocus
+                                                autoComplete="off"
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+
                                 {/* Messmittel */}
                                 <div>
                                     <label style={S.label}>Messmittel</label>
@@ -1009,90 +1238,12 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
                                     </div>
                                 </div>
 
-                                {/* Wohnung – Bereich (nur bei komplett neuem Raum) */}
-                                {isNewRoom && (
-                                    <div>
-                                        <label style={S.label}>Wohnung / Bereich</label>
-                                        <div style={{ position: 'relative', marginBottom: isCustomApartment ? '0.5rem' : '0' }}>
-                                            <select 
-                                                value={isCustomApartment ? 'Sonstiges' : (globalSettings.apartment || '')} 
-                                                onChange={e => {
-                                                    const val = e.target.value;
-                                                    if (val === 'Sonstiges') {
-                                                        setIsCustomApartment(true);
-                                                        setGlobalSettings({ ...globalSettings, apartment: '' });
-                                                    } else {
-                                                        setIsCustomApartment(false);
-                                                        setGlobalSettings({ ...globalSettings, apartment: val });
-                                                    }
-                                                }} 
-                                                style={{ ...S.input, paddingRight: '2rem', appearance: 'none', backgroundColor: 'transparent' }}
-                                            >
-                                                <option value="" style={{ background: 'var(--surface)', color: 'var(--text-main)' }}>Bitte wählen...</option>
-                                                <option value="Sonstiges" style={{ background: 'var(--surface)', color: 'var(--text-main)' }}>Sonstiges / Eigene Eingabe</option>
-                                                <option value="Allgemeiner Bereich" style={{ background: 'var(--surface)', color: 'var(--text-main)' }}>Allgemeiner Bereich</option>
-                                                {(apartments || []).map((a, i) => <option key={i} value={a} style={{ background: 'var(--surface)', color: 'var(--text-main)' }}>{a}</option>)}
-                                            </select>
-                                            <ChevronDown size={14} style={{ position: 'absolute', right: '0.7rem', top: '50%', transform: 'translateY(-50%)', color: '#475569', pointerEvents: 'none' }} />
-                                        </div>
-                                        {isCustomApartment && (
-                                            <input
-                                                type="text"
-                                                value={globalSettings.apartment || ''}
-                                                onChange={e => setGlobalSettings({ ...globalSettings, apartment: e.target.value })}
-                                                style={S.input}
-                                                placeholder="z.B. Treppenhaus EG"
-                                            />
-                                        )}
-                                    </div>
-                                )}
-
-                                {/* Raum (nur bei komplett neuem Raum) */}
-                                {isNewRoom && (
-                                    <div>
-                                        <label style={S.label}>Raum</label>
-                                        <div style={{ position: 'relative', marginBottom: isCustomRoom ? '0.5rem' : '0' }}>
-                                            <select
-                                                value={isCustomRoom ? 'Sonstiges' : (globalSettings.room || '')}
-                                                onChange={e => {
-                                                    const val = e.target.value;
-                                                    if (val === 'Sonstiges') {
-                                                        setIsCustomRoom(true);
-                                                        setGlobalSettings({ ...globalSettings, room: '' });
-                                                    } else {
-                                                        setIsCustomRoom(false);
-                                                        setGlobalSettings({ ...globalSettings, room: val });
-                                                    }
-                                                }}
-                                                style={{ ...S.input, appearance: 'none', paddingRight: '2rem', backgroundColor: 'transparent' }}
-                                            >
-                                                <option value="" style={{ background: 'var(--surface)', color: 'var(--text-main)' }}>Raum wählen...</option>
-                                                <option value="Sonstiges" style={{ background: 'var(--surface)', color: 'var(--text-main)' }}>Sonstiges / Eigener Name</option>
-                                                <option value="Ganze Wohnung" style={{ background: 'var(--surface)', color: 'var(--text-main)' }}>Ganze Wohnung</option>
-                                                {dynamicRoomOptions.map((opt, i) => <option key={i} value={opt} style={{ background: 'var(--surface)', color: 'var(--text-main)' }}>{opt}</option>)}
-                                            </select>
-                                            <ChevronDown size={14} style={{ position: 'absolute', right: '0.7rem', top: '50%', transform: 'translateY(-50%)', color: '#475569', pointerEvents: 'none' }} />
-                                        </div>
-                                        {isCustomRoom && (
-                                            <input
-                                                type="text"
-                                                value={globalSettings.room || ''}
-                                                onChange={e => setGlobalSettings({ ...globalSettings, room: e.target.value })}
-                                                style={S.input}
-                                                placeholder="Eigener Raumname"
-                                                autoFocus
-                                                autoComplete="off"
-                                            />
-                                        )}
-                                    </div>
-                                )}
-
                                 {/* Datum / Temp / Feuchte */}
                                 <div style={{ display: 'grid', gridTemplateColumns: '1.25fr 0.85fr 0.85fr', gap: '0.4rem' }}>
                                     {[
                                         { lbl: 'Datum', type: 'date', key: 'date', ph: '' },
-                                        { lbl: 'Temp °C', type: 'text', key: 'temp', ph: '20', isNumeric: true },
-                                        { lbl: 'Feuchte %', type: 'text', key: 'humidity', ph: '55', isNumeric: true },
+                                        { lbl: 'Temp °C', type: 'text', key: 'temp', ph: '', isNumeric: true },
+                                        { lbl: 'Feuchte %', type: 'text', key: 'humidity', ph: '', isNumeric: true },
                                     ].map(f => (
                                         <div key={f.key}>
                                             <label style={{ ...S.label, fontSize: '0.65rem', whiteSpace: 'nowrap' }}>{f.lbl}</label>
@@ -1198,10 +1349,19 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
                 <div style={{ position: 'fixed', inset: 0, zIndex: 99999, backgroundColor: 'var(--background)', display: 'flex', flexDirection: 'column', touchAction: 'none' }}>
                     <div style={{ flexShrink: 0, padding: '0.75rem 1rem', backgroundColor: 'var(--surface)', borderBottom: '1px solid var(--border)', display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap', position: 'relative', zIndex: 100 }}>
                         <button onClick={() => { activateTool('pen'); setColor('#000000'); setLineWidth(2); }} style={{ padding: '0.5rem 0.75rem', borderRadius: '6px', background: (activeTool === 'pen' && color === '#000000') ? 'var(--primary)' : 'rgba(255,255,255,0.05)', border: (activeTool === 'pen' && color === '#000000') ? '1px solid var(--primary)' : '1px solid rgba(255,255,255,0.15)', color: (activeTool === 'pen' && color === '#000000') ? 'white' : '#94A3B8', display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Pen size={16} /><span style={{ fontSize: '0.8rem', fontWeight: 600 }}>Stift</span></button>
-                        <button onClick={() => { activateTool('pen'); setColor('#ef4444'); setLineWidth(3); }} style={{ padding: '0.5rem', borderRadius: '6px', background: (activeTool === 'pen' && color === '#ef4444') ? 'rgba(239,68,68,0.2)' : 'rgba(255,255,255,0.05)', border: (activeTool === 'pen' && color === '#ef4444') ? '1px solid #ef4444' : '1px solid rgba(255,255,255,0.15)', color: '#ef4444' }}><Pen size={16} /></button>
-                        <button onClick={() => { activateTool('pen'); setColor('#3b82f6'); setLineWidth(3); }} style={{ padding: '0.5rem', borderRadius: '6px', background: (activeTool === 'pen' && color === '#3b82f6') ? 'rgba(59,130,246,0.2)' : 'rgba(255,255,255,0.05)', border: (activeTool === 'pen' && color === '#3b82f6') ? '1px solid #3b82f6' : '1px solid rgba(255,255,255,0.15)', color: '#3b82f6' }}><Pen size={16} /></button>
+                        <button onClick={() => { activateTool('pen'); setColor('#ef4444'); setLineWidth(3); }} style={{ padding: '0.5rem', borderRadius: '6px', background: (activeTool === 'pen' && color === '#ef4444') ? 'rgba(239,68,68,0.2)' : 'rgba(255,255,255,0.05)', border: (activeTool === 'pen' && color === '#ef4444') ? '1px solid #ef4444' : '1px solid rgba(255,255,255,0.15)', color: '#ef4444' }} title="Rot"><Pen size={16} /></button>
+                        <button onClick={() => { activateTool('pen'); setColor('#3b82f6'); setLineWidth(3); }} style={{ padding: '0.5rem', borderRadius: '6px', background: (activeTool === 'pen' && color === '#3b82f6') ? 'rgba(59,130,246,0.2)' : 'rgba(255,255,255,0.05)', border: (activeTool === 'pen' && color === '#3b82f6') ? '1px solid #3b82f6' : '1px solid rgba(255,255,255,0.15)', color: '#3b82f6' }} title="Blau"><Pen size={16} /></button>
+                        <button onClick={() => { activateTool('pen'); setColor('#22c55e'); setLineWidth(3); }} style={{ padding: '0.5rem', borderRadius: '6px', background: (activeTool === 'pen' && color === '#22c55e') ? 'rgba(34,197,94,0.2)' : 'rgba(255,255,255,0.05)', border: (activeTool === 'pen' && color === '#22c55e') ? '1px solid #22c55e' : '1px solid rgba(255,255,255,0.15)', color: '#22c55e' }} title="Grün"><Pen size={16} /></button>
+                        <button onClick={() => { activateTool('pen'); setColor('#eab308'); setLineWidth(3); }} style={{ padding: '0.5rem', borderRadius: '6px', background: (activeTool === 'pen' && color === '#eab308') ? 'rgba(234,179,8,0.2)' : 'rgba(255,255,255,0.05)', border: (activeTool === 'pen' && color === '#eab308') ? '1px solid #eab308' : '1px solid rgba(255,255,255,0.15)', color: '#eab308' }} title="Gelb"><Pen size={16} /></button>
                         <button onClick={() => activateTool('eraser')} style={{ padding: '0.5rem 0.75rem', borderRadius: '6px', background: (activeTool === 'eraser') ? 'var(--color-panel-bg)' : 'rgba(255,255,255,0.05)', border: (activeTool === 'eraser') ? '1px solid var(--border)' : '1px solid rgba(255,255,255,0.15)', color: '#94A3B8', display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Eraser size={16} /><span style={{ fontSize: '0.8rem', fontWeight: 600 }}>Radierer</span></button>
-                        <button onClick={() => document.getElementById('sketch-photo-upload-fs').click()} style={{ padding: '0.5rem', borderRadius: '6px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.15)', color: '#94A3B8', display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Image size={16} /><span style={{ fontSize: '0.8rem', fontWeight: 600 }}>Bilder</span></button>
+                        
+                        <div style={{ width: '1px', height: '24px', background: 'var(--border)', margin: '0 0.5rem' }} />
+
+                        <button onClick={() => activateTool('photo')} style={{ padding: '0.5rem 0.75rem', borderRadius: '6px', background: (activeTool === 'photo') ? 'rgba(59,130,246,0.2)' : 'rgba(255,255,255,0.05)', border: (activeTool === 'photo') ? '1px solid #3b82f6' : '1px solid rgba(255,255,255,0.15)', color: activeTool === 'photo' ? '#60A5FA' : '#94A3B8', display: 'flex', alignItems: 'center', gap: '0.4rem' }} title="Bilder verschieben">
+                            <Image size={16} /><span style={{ fontSize: '0.8rem', fontWeight: 600 }}>Verschieben</span>
+                        </button>
+
+                        <button onClick={() => document.getElementById('sketch-photo-upload-fs').click()} style={{ padding: '0.5rem 0.75rem', borderRadius: '6px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.15)', color: '#94A3B8', display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Camera size={16} /><span style={{ fontSize: '0.8rem', fontWeight: 600 }}>+ Bilder</span></button>
                         <input id="sketch-photo-upload-fs" type="file" accept="image/*,.heic,.heif" multiple style={{ display: 'none' }} onChange={(e) => { const files = Array.from(e.target.files || []); files.forEach(file => { const reader = new FileReader(); reader.onload = (ev) => { setGalleryPhotos(prev => [...prev, { id: Date.now() + Math.random(), src: ev.target.result }]); activateTool('photo'); }; reader.readAsDataURL(file); }); e.target.value = ''; }} />
                         <button onClick={handleUndo} disabled={historyStep <= 0} style={{ padding: '0.5rem', borderRadius: '4px', background: 'transparent', border: '1px solid rgba(255,255,255,0.15)', color: historyStep <= 0 ? 'rgba(255,255,255,0.2)' : '#94A3B8', opacity: historyStep <= 0 ? 0.5 : 1 }}><Undo size={16} /></button>
 
@@ -1213,7 +1373,7 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
                         <canvas ref={gridCanvasRef} width={960} height={600} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 1, pointerEvents: 'none', display: 'block' }} />
                         <canvas ref={photoCanvasRef} width={960} height={600} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 2, pointerEvents: 'none', display: 'block' }} />
                         <canvas ref={canvasRef} width={960} height={600} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 60, display: 'block', backgroundColor: 'transparent', pointerEvents: 'none', touchAction: 'none' }} />
-                        <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 30, backgroundColor: 'transparent', touchAction: 'none', cursor: isDrawMode ? 'crosshair' : 'default' }}
+                        <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 30, backgroundColor: 'transparent', touchAction: 'none', cursor: isDrawMode ? 'crosshair' : (activeTool === 'photo' ? 'move' : 'default') }}
                             onPointerDown={(e) => { if (e.pointerType !== 'pen') return; setSelectedPhotoId(null); startDrawing(e); }}
                             onPointerMove={(e) => { if (e.pointerType === 'pen') draw(e); }}
                             onPointerUp={(e) => { if (e.pointerType === 'pen') stopDrawing(e); }}

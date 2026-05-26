@@ -5,9 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host --open chrome",
+    "autosave": "node scripts/autosave-watch.cjs",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
+    "savepoint": "node scripts/savepoint.cjs",
     "test": "playwright test",
     "test:ui": "playwright test --ui",
     "test:debug": "playwright test --debug",

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Camera, Phone, MapPin, Save, ArrowLeft, Plus, X, Settings, CheckCircle } from 'lucide-react';
 import AddRoomForm from './AddRoomForm';
+import { RoomService } from '../services/RoomService';
 
 const TABS = [
   { id: 'uebersicht', label: 'Übersicht',  icon: '🏠', color: '#3B82F6' },
@@ -229,7 +230,7 @@ export default function TechnicianModeView({
               />
             )}
             {(formData.rooms||[]).map((room,ri)=>{
-              const photos=(formData.images||[]).filter(img=>img.roomId===room.id||img.assignedTo===room.name);
+              const photos = RoomService.getRoomImages(room, formData.images);
               const lvlColor=room.damageLevel==='Sehr nass'?'#EF4444':room.damageLevel==='Nass'?'#F97316':room.damageLevel==='Feucht'?'#FBBF24':'#22C55E';
               return (
                 <div key={room.id||ri} style={{marginBottom:'0.6rem',background:'rgba(255,255,255,0.02)',border:'1px solid rgba(255,255,255,0.07)',borderRadius:'12px',padding:'0.75rem'}}>
