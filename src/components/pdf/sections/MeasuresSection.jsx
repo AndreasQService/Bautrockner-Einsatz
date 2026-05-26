@@ -12,7 +12,7 @@ const MeasuresSection = ({ data }) => {
     if (!hasMeasures) return null;
 
     return (
-        <View style={{ marginBottom: 15 }} break={true}>
+        <View style={{ marginBottom: 15 }} break={true} wrap={false}>
             <View wrap={false}>
                 <View style={styles.divider} />
                 <Text style={styles.sectionTitle}>MASSNAHMEN</Text>
