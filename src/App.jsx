@@ -395,6 +395,13 @@ function App() {
 
           if (loadedReports.length > 0) {
             setReports(loadedReports);
+            setSelectedReport(prev => {
+              if (prev && prev.id) {
+                const fresh = loadedReports.find(r => r.id === prev.id);
+                return fresh ? fresh : prev;
+              }
+              return prev;
+            });
             try {
               const cachedReports = loadedReports.slice(0, 10).map(r => ({
                 ...r,
