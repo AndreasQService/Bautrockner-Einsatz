@@ -2237,7 +2237,7 @@ END:VCARD`;
         if (supabase) {
             try {
                 const ext = file.name.split('.').pop();
-                const fileName = `cases/${formData.id || 'temp'}/exterior/${Date.now()}.${ext}`;
+                const fileName = `cases/${formData.id || 'temp'}/images/exterior_${Date.now()}.${ext}`;
                 const { error } = await supabase.storage.from('case-files').upload(fileName, file);
                 if (error) throw error;
                 const { data: { publicUrl } } = supabase.storage.from('case-files').getPublicUrl(fileName);
