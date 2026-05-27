@@ -765,12 +765,12 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         if (fields.phone) lines.push(`TEL;TYPE=CELL:${fields.phone}`);
         if (fields.email) lines.push(`EMAIL:${fields.email}`);
         if (fields.street) {
-            lines.push(`ADR;TYPE=HOME:;;${fields.street};;;;`);
+            lines.push(`ADR;TYPE=HOME:;;${fields.street || ''};;;;Schweiz`);
         }
         if (fields.note) lines.push(`NOTE:${fields.note}`);
         lines.push('END:VCARD');
         try {
-            const dataUrl = await QRCode.toDataURL(lines.join('\n'), {
+            const dataUrl = await QRCode.toDataURL(lines.join('\r\n'), {
                 width: 280, margin: 2,
                 color: { dark: '#0F172A', light: '#FFFFFF' }
             });
