@@ -109,18 +109,23 @@ export const PDFService = {
                     : formData.address;
                 if (mapAddress) {
                     const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || import.meta.env.VITE_GOOGLE_API_KEY;
-                    const params = new URLSearchParams({
+                    const baseParams = {
                         center: mapAddress,
                         zoom: '15',
                         size: '640x300',
                         scale: '2',
                         maptype: 'roadmap',
                         markers: `color:red|${mapAddress}`,
-                        key: apiKey,
                         language: 'de',
-                    });
-                    const directUrl = `https://maps.googleapis.com/maps/api/staticmap?${params.toString()}`;
-                    const proxyUrl = `/google-staticmap?${params.toString()}`;
+                    };
+                    const directParams = new URLSearchParams({ ...baseParams, key: apiKey });
+                    const proxyParams = import.meta.env.DEV
+                        ? new URLSearchParams({ ...baseParams, key: apiKey })
+                        : new URLSearchParams(baseParams);
+                    const directUrl = `https://maps.googleapis.com/maps/api/staticmap?${directParams.toString()}`;
+                    const proxyUrl = import.meta.env.DEV
+                        ? `/google-staticmap?${proxyParams.toString()}`
+                        : `/api/google-staticmap?${proxyParams.toString()}`;
                     
                     let loaded = false;
                     
@@ -346,18 +351,23 @@ export const PDFService = {
                 mapAddress = (mapAddress || '').trim().replace(/^,+/, '').replace(/,+$/, '').trim();
                 if (mapAddress) {
                     const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || import.meta.env.VITE_GOOGLE_API_KEY;
-                    const params = new URLSearchParams({
+                    const baseParams = {
                         center: mapAddress,
                         zoom: '15',
                         size: '640x300',
                         scale: '2',
                         maptype: 'roadmap',
                         markers: `color:red|${mapAddress}`,
-                        key: apiKey,
                         language: 'de',
-                    });
-                    const directUrl = `https://maps.googleapis.com/maps/api/staticmap?${params.toString()}`;
-                    const proxyUrl = `/google-staticmap?${params.toString()}`;
+                    };
+                    const directParams = new URLSearchParams({ ...baseParams, key: apiKey });
+                    const proxyParams = import.meta.env.DEV
+                        ? new URLSearchParams({ ...baseParams, key: apiKey })
+                        : new URLSearchParams(baseParams);
+                    const directUrl = `https://maps.googleapis.com/maps/api/staticmap?${directParams.toString()}`;
+                    const proxyUrl = import.meta.env.DEV
+                        ? `/google-staticmap?${proxyParams.toString()}`
+                        : `/api/google-staticmap?${proxyParams.toString()}`;
                     
                     let loaded = false;
                     
