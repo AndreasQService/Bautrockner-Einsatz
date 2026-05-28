@@ -384,7 +384,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         });
     }, [formData.measurementRooms]);
 
-    // Sync asynchronously loaded initialData fields (like exteriorPhoto) back to local state
+    // Sync asynchronously loaded initialData fields (like exteriorPhoto and images) back to local state
     useEffect(() => {
         if (initialData?.exteriorPhoto && !formData.exteriorPhoto) {
             setFormData(prev => ({ ...prev, exteriorPhoto: initialData.exteriorPhoto }));
@@ -395,7 +395,25 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         if (initialData?.damageTypeImage && !formData.damageTypeImage) {
             setFormData(prev => ({ ...prev, damageTypeImage: initialData.damageTypeImage }));
         }
-    }, [initialData?.exteriorPhoto, initialData?.customMapImage, initialData?.damageTypeImage]);
+
+        // Restore stripped image previews (Base64) from Supabase load
+        if (initialData?.images && Array.isArray(initialData.images)) {
+            setFormData(prev => {
+                let changed = false;
+                const nextImages = prev.images.map(img => {
+                    if (!img.preview) {
+                        const fresh = initialData.images.find(i => i.id === img.id);
+                        if (fresh && fresh.preview) {
+                            changed = true;
+                            return { ...img, preview: fresh.preview };
+                        }
+                    }
+                    return img;
+                });
+                return changed ? { ...prev, images: nextImages } : prev;
+            });
+        }
+    }, [initialData?.exteriorPhoto, initialData?.customMapImage, initialData?.damageTypeImage, initialData?.images]);
 
     const [isSaving, setIsSaving] = useState(false);
     const [lastSaved, setLastSaved] = useState(null);
