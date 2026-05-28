@@ -199,6 +199,42 @@ const getPointLabel = (p, index) => p.pointName || p.mp || p.point || p.label ||
 const getWValue = (p) => p.w_value ?? p.w ?? p.wand ?? p.wall ?? p.W ?? '';
 const getBValue = (p) => p.b_value ?? p.b ?? p.boden ?? p.floor ?? p.B ?? '';
 
+const compressAndResizeImage = (file, maxDimension = 1200, quality = 0.7) => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const img = new window.Image();
+            img.onload = () => {
+                let width = img.width;
+                let height = img.height;
+                
+                if (width > height) {
+                    if (width > maxDimension) {
+                        height = Math.round((height * maxDimension) / width);
+                        width = maxDimension;
+                    }
+                } else {
+                    if (height > maxDimension) {
+                        width = Math.round((width * maxDimension) / height);
+                        height = maxDimension;
+                    }
+                }
+                
+                const canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+                resolve(canvas.toDataURL('image/jpeg', quality));
+            };
+            img.onerror = (err) => reject(err);
+            img.src = event.target.result;
+        };
+        reader.onerror = (err) => reject(err);
+        reader.readAsDataURL(file);
+    });
+};
+
 
 export default function DamageForm({ onCancel, initialData, onSave, mode = 'desktop', isDarkMode = true }) {
     // Helper to parse address string if editing
@@ -1627,14 +1663,11 @@ END:VCARD`;
         if (!file) return;
 
         try {
-            const base64 = await new Promise((resolve) => {
-                const reader = new FileReader();
-                reader.onloadend = () => resolve(reader.result);
-                reader.readAsDataURL(file);
-            });
-            setFormData(prev => ({ ...prev, customMapImage: base64 }));
+            // Compress and resize the custom map image to prevent giant base64 payloads
+            const compressedBase64 = await compressAndResizeImage(file);
+            setFormData(prev => ({ ...prev, customMapImage: compressedBase64 }));
         } catch (err) {
-            console.error("Custom map image upload failed", err);
+            console.error("Custom map image compression failed", err);
         }
     };
 
@@ -2239,25 +2272,29 @@ END:VCARD`;
         const file = e.target.files[0];
         if (!file) return;
 
-        // Show base64 preview immediately
-        const reader = new FileReader();
-        reader.onloadend = () => {
-            setFormData(prev => ({ ...prev, exteriorPhoto: reader.result }));
-        };
-        reader.readAsDataURL(file);
+        try {
+            // Compress and resize the image first (typically down to 100-200KB)
+            const compressedBase64 = await compressAndResizeImage(file);
+            setFormData(prev => ({ ...prev, exteriorPhoto: compressedBase64 }));
 
-        // Upload to Supabase Storage and replace with public URL
-        if (supabase) {
-            try {
-                const ext = file.name.split('.').pop();
-                const fileName = `cases/${formData.id || 'temp'}/images/exterior_${Date.now()}.${ext}`;
-                const { error } = await supabase.storage.from('case-files').upload(fileName, file);
-                if (error) throw error;
-                const { data: { publicUrl } } = supabase.storage.from('case-files').getPublicUrl(fileName);
-                setFormData(prev => ({ ...prev, exteriorPhoto: publicUrl }));
-            } catch (err) {
-                console.warn('Exterior photo upload failed, keeping base64:', err);
+            // Upload to Supabase Storage and replace with public URL
+            if (supabase) {
+                try {
+                    // Convert base64 to Blob for Supabase Storage upload
+                    const res = await fetch(compressedBase64);
+                    const blob = await res.blob();
+                    const ext = 'jpg';
+                    const fileName = `cases/${formData.id || 'temp'}/images/exterior_${Date.now()}.${ext}`;
+                    const { error } = await supabase.storage.from('case-files').upload(fileName, blob);
+                    if (error) throw error;
+                    const { data: { publicUrl } } = supabase.storage.from('case-files').getPublicUrl(fileName);
+                    setFormData(prev => ({ ...prev, exteriorPhoto: publicUrl }));
+                } catch (err) {
+                    console.warn('Exterior photo upload failed, keeping compressed base64:', err);
+                }
             }
+        } catch (err) {
+            console.error('Exterior photo compression/upload failed:', err);
         }
     };
 

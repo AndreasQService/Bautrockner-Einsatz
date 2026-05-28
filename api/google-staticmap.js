@@ -55,7 +55,14 @@ export default async function handler(req, res) {
 
     const googleUrl = `https://maps.googleapis.com/maps/api/staticmap?${params.toString()}`;
 
-    const googleResponse = await fetch(googleUrl);
+    // Forward the client's Referer header or fallback to host to satisfy Google's HTTP Referrer restrictions
+    const referer = req.headers.referer || `https://${req.headers.host}/` || 'https://bautrockner-einsatz.vercel.app/';
+    
+    const googleResponse = await fetch(googleUrl, {
+      headers: {
+        'Referer': referer
+      }
+    });
     if (!googleResponse.ok) {
       res.status(googleResponse.status).send('Map fetching failed');
       return;
