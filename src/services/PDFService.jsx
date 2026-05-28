@@ -125,7 +125,7 @@ export const PDFService = {
                     const directUrl = `https://maps.googleapis.com/maps/api/staticmap?${directParams.toString()}`;
                     const proxyUrl = import.meta.env.DEV
                         ? `/google-staticmap?${proxyParams.toString()}`
-                        : `/api/google-staticmap?${proxyParams.toString()}`;
+                        : `${window.location.origin}/api/google-staticmap?${proxyParams.toString()}`;
                     
                     let loaded = false;
                     
@@ -133,7 +133,7 @@ export const PDFService = {
                     try {
                         const resp = await fetch(proxyUrl);
                         if (resp.ok) {
-                            const blob = await resp.ok ? await resp.blob() : null;
+                            const blob = await resp.blob();
                             if (blob && blob.type.startsWith('image/')) {
                                 staticMapUrl = await new Promise((resolve) => {
                                     const reader = new FileReader();
@@ -142,6 +142,9 @@ export const PDFService = {
                                 });
                                 loaded = true;
                             }
+                        } else {
+                            const errDetail = await resp.json().catch(() => ({}));
+                            console.error("[PDFService] Proxy returned error details:", errDetail);
                         }
                     } catch (proxyErr) {
                         console.warn("[PDFService] Proxy fetch failed, trying direct URL:", proxyErr.message);
@@ -367,7 +370,7 @@ export const PDFService = {
                     const directUrl = `https://maps.googleapis.com/maps/api/staticmap?${directParams.toString()}`;
                     const proxyUrl = import.meta.env.DEV
                         ? `/google-staticmap?${proxyParams.toString()}`
-                        : `/api/google-staticmap?${proxyParams.toString()}`;
+                        : `${window.location.origin}/api/google-staticmap?${proxyParams.toString()}`;
                     
                     let loaded = false;
                     
@@ -384,6 +387,9 @@ export const PDFService = {
                                 });
                                 loaded = true;
                             }
+                        } else {
+                            const errDetail = await resp.json().catch(() => ({}));
+                            console.error("[PDFService Master] Proxy returned error details:", errDetail);
                         }
                     } catch (proxyErr) {
                         console.warn("[PDFService Master] Proxy fetch failed, trying direct URL:", proxyErr.message);

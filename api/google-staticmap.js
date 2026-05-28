@@ -21,7 +21,11 @@ export default async function handler(req, res) {
                    process.env.VITE_GOOGLE_API_KEY;
 
     if (!apiKey) {
-      res.status(500).json({ error: 'Server configuration error' });
+      console.error('[google-staticmap proxy] ERROR: No Google Maps API Key found in environment variables!');
+      res.status(500).json({ 
+        error: 'Server configuration error', 
+        details: 'GOOGLE_MAPS_API_KEY environment variable is missing in Vercel settings. Please configure it in Vercel Dashboard -> Settings -> Environment Variables.' 
+      });
       return;
     }
 
@@ -58,13 +62,21 @@ export default async function handler(req, res) {
     // Forward the client's Referer header or fallback to host to satisfy Google's HTTP Referrer restrictions
     const referer = req.headers.referer || `https://${req.headers.host}/` || 'https://bautrockner-einsatz.vercel.app/';
     
+    console.log(`[google-staticmap proxy] Fetching map for center="${req.query.center}" zoom="${req.query.zoom}" using referer="${referer}"`);
+
     const googleResponse = await fetch(googleUrl, {
       headers: {
         'Referer': referer
       }
     });
     if (!googleResponse.ok) {
-      res.status(googleResponse.status).send('Map fetching failed');
+      const errText = await googleResponse.text().catch(() => 'No details');
+      console.error(`[google-staticmap proxy] Google API returned status ${googleResponse.status}: ${errText}`);
+      res.status(googleResponse.status).json({ 
+        error: 'Map fetching failed', 
+        status: googleResponse.status, 
+        details: errText 
+      });
       return;
     }
 
@@ -75,6 +87,7 @@ export default async function handler(req, res) {
     res.setHeader('Cache-Control', 'public, max-age=86400');
     res.status(200).send(Buffer.from(buffer));
   } catch (error) {
-    res.status(500).json({ error: 'Internal Server Error' });
+    console.error('[google-staticmap proxy] Critical handler error:', error);
+    res.status(500).json({ error: 'Internal Server Error', details: error.message });
   }
 }

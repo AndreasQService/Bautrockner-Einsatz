@@ -24,16 +24,24 @@ Im Fenster "Configure Project" musst du fast nichts ändern, **außer den Umgebu
 2.  **Framework Preset:** Vercel erkennt automatisch "Vite". Das ist korrekt.
 3.  **Root Directory:** `./` (Standard, nicht ändern).
 4.  **Environment Variables:** Hier musst du die Zugangsdaten für Supabase eintragen, da diese **nicht** auf GitHub gespeichert sind (Sicherheit).
-    *   Öffne deine lokale Datei `.env.local` (in VS Code).
-    *   Kopiere den Wert von `VITE_SUPABASE_URL`.
-    *   Füge ihn bei Vercel ein:
-        *   **Name:** `VITE_SUPABASE_URL`
-        *   **Value:** `https://....supabase.co` (dein Wert)
-        *   Klicke auf **"Add"**.
-    *   Wiederhole das für den Key:
-        *   **Name:** `VITE_SUPABASE_ANON_KEY`
-        *   **Value:** `eyJ...` (dein langer Key)
-        *   Klicke auf **"Add"**.
+    *   Öffne deine lokale Datei `.env` oder `.env.local` (in VS Code).
+    *   Kopiere die Werte und trage sie bei Vercel ein:
+        *   **Supabase URL**:
+            *   **Name:** `VITE_SUPABASE_URL`
+            *   **Value:** `https://....supabase.co` (dein Wert)
+            *   Klicke auf **"Add"**.
+        *   **Supabase Anon Key**:
+            *   **Name:** `VITE_SUPABASE_ANON_KEY`
+            *   **Value:** `eyJ...` (dein langer Key)
+            *   Klicke auf **"Add"**.
+        *   **Google Maps API Key (WICHTIG für PDF-Karte)**:
+            *   **Name:** `GOOGLE_MAPS_API_KEY`
+            *   **Value:** `AIzaSy...` (dein Google API-Key aus der `.env`)
+            *   Klicke auf **"Add"**.
+        *   **OpenAI API Key (für Diktat / Whisper / KI-Import)**:
+            *   **Name:** `OPENAI_API_KEY`
+            *   **Value:** `sk-proj-...` (dein OpenAI API-Key)
+            *   Klicke auf **"Add"**.
 
 ## 4. Starten ("Deploy")
 1.  Klicke auf den großen Button **"Deploy"**.
