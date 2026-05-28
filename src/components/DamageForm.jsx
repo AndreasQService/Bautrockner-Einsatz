@@ -348,6 +348,19 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         });
     }, [formData.measurementRooms]);
 
+    // Sync asynchronously loaded initialData fields (like exteriorPhoto) back to local state
+    useEffect(() => {
+        if (initialData?.exteriorPhoto && !formData.exteriorPhoto) {
+            setFormData(prev => ({ ...prev, exteriorPhoto: initialData.exteriorPhoto }));
+        }
+        if (initialData?.customMapImage && !formData.customMapImage) {
+            setFormData(prev => ({ ...prev, customMapImage: initialData.customMapImage }));
+        }
+        if (initialData?.damageTypeImage && !formData.damageTypeImage) {
+            setFormData(prev => ({ ...prev, damageTypeImage: initialData.damageTypeImage }));
+        }
+    }, [initialData?.exteriorPhoto, initialData?.customMapImage, initialData?.damageTypeImage]);
+
     const [isSaving, setIsSaving] = useState(false);
     const [lastSaved, setLastSaved] = useState(null);
     const [linkingImageId, setLinkingImageId] = useState(null);
