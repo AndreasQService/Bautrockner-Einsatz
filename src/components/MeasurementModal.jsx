@@ -564,7 +564,7 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
                 return;
             }
 
-            if (isNewMeasurementFlag) {
+            if (isNewMeasurementFlag && !roomData) {
                 const initial = [
                     { id: `p${Date.now()}`, pointName: 'MP 1', w_value: '', b_value: '', notes: '' },
                     { id: `p${Date.now() + 1}`, pointName: 'MP 2', w_value: '', b_value: '', notes: '' },

@@ -2979,13 +2979,34 @@ END:VCARD`;
                                         temp: latestHistory.temp || '',
                                         humidity: latestHistory.humidity || ''
                                     },
-                                    canvasImage: latestHistory.canvasImage || null
+                                    canvasImage: latestHistory.canvasImage || null,
+                                    galleryPhotos: latestHistory.galleryPhotos || []
                                 };
                             }
                         }
 
                         if (activeRoomForMeasurement && String(r.id) === String(activeRoomForMeasurement.id) && isNewMeasurement) {
-                            mData = null;
+                            if (mData) {
+                                mData = {
+                                    canvasImage: mData.canvasImage || null,
+                                    galleryPhotos: mData.galleryPhotos || [],
+                                    globalSettings: {
+                                        ...(mData.globalSettings || {}),
+                                        date: new Date().toISOString().split('T')[0],
+                                        temp: '',
+                                        humidity: ''
+                                    },
+                                    measurements: Array.isArray(mData.measurements) ? mData.measurements.map(m => ({
+                                        id: m.id,
+                                        pointName: m.pointName,
+                                        w_value: '',
+                                        b_value: '',
+                                        notes: ''
+                                    })) : []
+                                };
+                            } else {
+                                mData = null;
+                            }
                         }
                         return { ...acc, [r.id]: mData };
                     }, {})}
@@ -7710,23 +7731,55 @@ END:VCARD`;
                     apartments={[...new Set((formData.contacts || []).filter(c => c.role === 'Mieter' || c.role === 'Eigentümer').map(c => [c.name, c.apartment].filter(Boolean).join(' - ').trim()).filter(Boolean))]}
                     initialData={(formData.measurementRooms || []).reduce((acc, r) => {
                         let mData = r.measurementData;
-                        if (activeRoomForMeasurement && r.id === activeRoomForMeasurement.id && isNewMeasurement && mData && Array.isArray(mData.measurements)) {
-                            mData = {
-                                canvasImage: mData.canvasImage,
-                                globalSettings: {
-                                    ...(mData.globalSettings || {}),
-                                    date: new Date().toISOString().split('T')[0],
-                                    temp: '',
-                                    humidity: ''
-                                },
-                                measurements: mData.measurements.map(m => ({
-                                    id: m.id,
-                                    pointName: m.pointName,
-                                    w_value: '',
-                                    b_value: '',
-                                    notes: ''
-                                }))
-                            };
+                        if (!mData && Array.isArray(r.measurements) && r.measurements.length > 0) {
+                            mData = { measurements: r.measurements, globalSettings: r.globalSettings, canvasImage: r.canvasImage };
+                        }
+
+                        // History fallback for "Messung fortsetzen" when measurementData is missing
+                        if (!mData && Array.isArray(r.measurementHistory) && r.measurementHistory.length > 0) {
+                            const validHistory = r.measurementHistory.filter(h => h.date || h.datum || h.timestamp || h.createdAt || h.globalSettings?.date);
+                            if (validHistory.length > 0) {
+                                const latestHistory = [...validHistory].sort((a, b) => {
+                                    const da = a.date || a.datum || a.timestamp || a.createdAt || a.globalSettings?.date || 0;
+                                    const db = b.date || b.datum || b.timestamp || b.createdAt || b.globalSettings?.date || 0;
+                                    return new Date(db) - new Date(da);
+                                })[0];
+                                mData = {
+                                    measurements: latestHistory.measurements || latestHistory.points || latestHistory.measurementPoints || [],
+                                    globalSettings: latestHistory.globalSettings || {
+                                        date: latestHistory.date || latestHistory.datum || latestHistory.timestamp || latestHistory.createdAt,
+                                        device: latestHistory.device || latestHistory.measurementDevice || latestHistory.messmittel,
+                                        temp: latestHistory.temp || '',
+                                        humidity: latestHistory.humidity || ''
+                                    },
+                                    canvasImage: latestHistory.canvasImage || null,
+                                    galleryPhotos: latestHistory.galleryPhotos || []
+                                };
+                            }
+                        }
+
+                        if (activeRoomForMeasurement && String(r.id) === String(activeRoomForMeasurement.id) && isNewMeasurement) {
+                            if (mData) {
+                                mData = {
+                                    canvasImage: mData.canvasImage || null,
+                                    galleryPhotos: mData.galleryPhotos || [],
+                                    globalSettings: {
+                                        ...(mData.globalSettings || {}),
+                                        date: new Date().toISOString().split('T')[0],
+                                        temp: '',
+                                        humidity: ''
+                                    },
+                                    measurements: Array.isArray(mData.measurements) ? mData.measurements.map(m => ({
+                                        id: m.id,
+                                        pointName: m.pointName,
+                                        w_value: '',
+                                        b_value: '',
+                                        notes: ''
+                                    })) : []
+                                };
+                            } else {
+                                mData = null;
+                            }
                         }
                         return { ...acc, [r.id]: mData };
                     }, {})}
