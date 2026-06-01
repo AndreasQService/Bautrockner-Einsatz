@@ -213,6 +213,9 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
     const [activeNumpadField, setActiveNumpadField] = useState(null);
     const [numpadPos, setNumpadPos] = useState({ x: typeof window !== 'undefined' ? window.innerWidth - 350 : 100, y: typeof window !== 'undefined' ? 80 : 100 });
     const numpadDragRef = useRef(false);
+    const [autosaveStatus, setAutosaveStatus] = useState(null); // 'saving' | 'saved' | null
+    const [canvasStrokeCount, setCanvasStrokeCount] = useState(0);
+    const autosaveTimerRef = useRef(null);
     const numpadStartRef = useRef({ x: 0, y: 0 });
 
     useEffect(() => {
@@ -669,6 +672,90 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
         };
     }, [isOpen, rooms, initialData, isSuccess]);
 
+    // Debounced Auto-Save Effect
+    useEffect(() => {
+        if (!isOpen || readOnly) return;
+
+        // Skip the very first render where everything is initializing
+        if (canvasStrokeCount === 0 && measurements.length === 0 && !globalSettings.temp && !globalSettings.humidity) {
+            return;
+        }
+
+        // Set status to 'saving'
+        setAutosaveStatus('saving');
+
+        if (autosaveTimerRef.current) {
+            clearTimeout(autosaveTimerRef.current);
+        }
+
+        autosaveTimerRef.current = setTimeout(async () => {
+            try {
+                // Compile the canvas drawing snapshot
+                const canvasDataUrl = await (async () => {
+                    const canvas = hiddenCanvasRef.current;
+                    const fc = canvasRef.current;
+                    if (canvas && fc) {
+                        const comp = document.createElement('canvas');
+                        comp.width = fc.width; comp.height = fc.height;
+                        const cCtx = comp.getContext('2d');
+                        
+                        // Background White + Grid
+                        cCtx.fillStyle = '#ffffff';
+                        cCtx.fillRect(0, 0, comp.width, comp.height);
+                        cCtx.strokeStyle = '#e0e0e0';
+                        cCtx.lineWidth = 1;
+                        for (let x = 0; x <= comp.width; x += 40) { cCtx.beginPath(); cCtx.moveTo(x, 0); cCtx.lineTo(x, comp.height); cCtx.stroke(); }
+                        for (let y = 0; y <= comp.height; y += 40) { cCtx.beginPath(); cCtx.moveTo(0, y); cCtx.lineTo(comp.width, y); cCtx.stroke(); }
+                        
+                        // Photos
+                        galleryPhotos.forEach(photo => {
+                            const img = document.querySelector(`img[data-id="${photo.id}"]`);
+                            if (img && img.parentElement) {
+                                const parent = img.parentElement;
+                                const px = parseFloat(parent.style.left) / 100 * comp.width;
+                                const py = parseFloat(parent.style.top) / 100 * comp.height;
+                                const pw = parseFloat(parent.style.width) / 100 * comp.width;
+                                const ph = parseFloat(parent.style.height) / 100 * comp.height;
+                                cCtx.drawImage(img, px, py, pw, ph);
+                            }
+                        });
+                        
+                        // Drawing Layer
+                        cCtx.drawImage(fc, 0, 0);
+                        return comp.toDataURL();
+                    }
+                    return previewSnapshot;
+                })();
+
+                // Call parent save in background (silent = true)
+                await onSave({
+                    file: null, // No heavy PDF generation in background!
+                    measurements,
+                    globalSettings,
+                    canvasImage: canvasDataUrl,
+                    galleryPhotos
+                });
+
+                setAutosaveStatus('saved');
+                setHasUnsavedChanges(false);
+
+                // Clear the status text after 2 seconds
+                setTimeout(() => {
+                    setAutosaveStatus(prev => prev === 'saved' ? null : prev);
+                }, 2000);
+            } catch (err) {
+                console.error("Autosave failed inside modal:", err);
+                setAutosaveStatus(null);
+            }
+        }, 3000); // 3-second debounce
+
+        return () => {
+            if (autosaveTimerRef.current) {
+                clearTimeout(autosaveTimerRef.current);
+            }
+        };
+    }, [measurements, globalSettings, galleryPhotos, canvasStrokeCount, isOpen, readOnly, onSave]);
+
 
     const drawGridLayer = (gc) => {
         if (!gc) return;
@@ -713,6 +800,7 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
             const ctx = canvas.getContext('2d');
             ctx.putImageData(imageData, 0, 0);
             setHistoryStep(newStep);
+            setCanvasStrokeCount(c => c + 1);
         }
     };
 
@@ -951,6 +1039,7 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
         setIsDrawing(false);
         try { e?.target?.releasePointerCapture(e.pointerId); } catch (_) { }
         saveParamsToHistory(canvasRef.current);
+        setCanvasStrokeCount(c => c + 1);
     };
 
     // Fotos gehen IMMER als Overlays in galleryPhotos (nie direkt auf Canvas gemalt)
@@ -973,6 +1062,7 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
         const ctx = canvas.getContext('2d');
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         saveParamsToHistory(canvas);
+        setCanvasStrokeCount(c => c + 1);
     };
 
     const handleCameraCapture = (file) => {
@@ -1165,6 +1255,11 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
                     user-select: none !important;
                     -webkit-touch-callout: none !important;
                 }
+                @keyframes qtool-pulse {
+                    0% { transform: scale(0.95); opacity: 0.5; }
+                    50% { transform: scale(1.25); opacity: 1; }
+                    100% { transform: scale(0.95); opacity: 0.5; }
+                }
             `}</style>
             <div ref={containerRef} style={{ backgroundColor: 'var(--background)', borderRadius: '14px', width: '98vw', maxWidth: '1240px', height: '94vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', color: 'var(--text-main)', border: '1px solid var(--border)', boxShadow: forceDark ? '0 30px 80px rgba(0,0,0,0.7)' : '0 30px 80px rgba(0,0,0,0.1)' }}>
 
@@ -1191,6 +1286,32 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
                                         {activeRoom && (title || address) && <span style={{ color: 'var(--text-muted)' }}>|</span>}
                                         {title && <span style={{ color: 'var(--border)', fontWeight: 600 }}>{title}</span>}
                                         {address && <span style={{ color: '#94A3B8', fontWeight: 500 }}>{title ? '·' : ''} {address}</span>}
+                                        {autosaveStatus && (
+                                            <span style={{ 
+                                                marginLeft: '0.75rem', 
+                                                fontSize: '0.75rem', 
+                                                color: autosaveStatus === 'saving' ? '#F59E0B' : '#10B981', 
+                                                background: autosaveStatus === 'saving' ? 'rgba(245,158,11,0.1)' : 'rgba(16,185,129,0.1)',
+                                                padding: '0.2rem 0.5rem',
+                                                borderRadius: '6px',
+                                                fontWeight: 600,
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: '0.3rem',
+                                                transition: 'all 0.3s ease',
+                                                verticalAlign: 'middle'
+                                            }}>
+                                                <span style={{
+                                                    width: '6px',
+                                                    height: '6px',
+                                                    borderRadius: '50%',
+                                                    backgroundColor: autosaveStatus === 'saving' ? '#F59E0B' : '#10B981',
+                                                    display: 'inline-block',
+                                                    animation: autosaveStatus === 'saving' ? 'qtool-pulse 1.5s infinite' : 'none'
+                                                }} />
+                                                {autosaveStatus === 'saving' ? 'Auto-Save...' : 'Automatisch gespeichert'}
+                                            </span>
+                                        )}
                                     </>
                                 );
                             })()}
