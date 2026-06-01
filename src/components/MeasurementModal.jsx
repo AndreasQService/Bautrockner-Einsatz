@@ -675,6 +675,7 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
     // Debounced Auto-Save Effect
     useEffect(() => {
         if (!isOpen || readOnly) return;
+        if (!hasUnsavedChanges) return;
 
         // Skip the very first render where everything is initializing
         if (canvasStrokeCount === 0 && measurements.length === 0 && !globalSettings.temp && !globalSettings.humidity) {
@@ -754,7 +755,7 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
                 clearTimeout(autosaveTimerRef.current);
             }
         };
-    }, [measurements, globalSettings, galleryPhotos, canvasStrokeCount, isOpen, readOnly, onSave]);
+    }, [measurements, globalSettings, galleryPhotos, canvasStrokeCount, isOpen, readOnly, onSave, hasUnsavedChanges]);
 
 
     const drawGridLayer = (gc) => {
@@ -1197,11 +1198,6 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
             setTimeout(() => {
                 setIsSuccess(false);
                 setIsSaving(false);
-                // Clear data fields after saving as requested
-                setMeasurements(prev => prev.map(m => ({ ...m, w_value: '', b_value: '' })));
-                if (globalSettings) {
-                    setGlobalSettings(prev => ({ ...prev, temp: '', humidity: '' }));
-                }
             }, 1500);
 
         } catch (err) {
@@ -1220,10 +1216,6 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
                 setTimeout(() => {
                     setIsSuccess(false);
                     setIsSaving(false);
-                    setMeasurements(prev => prev.map(m => ({ ...m, w_value: '', b_value: '' })));
-                    if (globalSettings) {
-                        setGlobalSettings(prev => ({ ...prev, temp: '', humidity: '' }));
-                    }
                 }, 1500);
             } catch (fallbackErr) {
                 console.error("Fallback save also failed:", fallbackErr);

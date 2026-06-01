@@ -575,32 +575,59 @@ function App() {
 
       // ─── Konfliktschutz: Nur speichern wenn kein neueres Update existiert ───────
       if (loadedAt && finalReport.id && !finalReport.id.startsWith('TMP-')) {
-        const { data: updateResult, error } = await supabase
-          .from('damage_reports')
-          .update(rowData)
-          .eq('id', finalReport.id)
-          .lte('updated_at', loadedAt)  // Nur wenn DB-Version ≤ geladene Version
-          .select('id');
-
-        if (error) {
-          console.log('[MEASROOM TRACE] Supabase update result', { error, data: updateResult });
-          console.error('Error saving to Supabase:', error);
-          showToast(`⚠️ Speicherfehler: ${error.message || error.code || 'Supabase-Fehler'}. Daten nur lokal gesichert!`, 'error');
-        } else if (!updateResult || updateResult.length === 0) {
-          console.log('[MEASROOM TRACE] Supabase update result', { error: 'Conflict', data: null });
-          // Konflikt: Ein anderes Gerät hat neuere Daten → NICHT überschreiben
-          console.warn('[Sync-Konflikt] Neuere Version in Supabase – abgebrochen:', finalReport.id);
-          showToast('⚠️ Neuere Version auf anderem Gerät! Seite neu laden.', 'warning');
+        if (silent) {
+          // Silent/Autosave: Non-blocking background save to prevent UI/modal lagging or blocking on slow networks
+          supabase
+            .from('damage_reports')
+            .update(rowData)
+            .eq('id', finalReport.id)
+            .lte('updated_at', loadedAt)
+            .select('id')
+            .then(({ data: updateResult, error }) => {
+              if (!error && updateResult && updateResult.length > 0) {
+                setReports(prev => prev.map(r => r.id === finalReport.id ? { ...r, _supabase_updated_at: now } : r));
+                oneDriveBackup();
+              }
+            }).catch(err => console.warn('[Supabase] Silent update failed:', err.message));
         } else {
-          console.log('[MEASROOM TRACE] Supabase update result', { error: null, data: updateResult });
-          // Erfolgreich: _supabase_updated_at aktualisieren damit nächster Save erlaubt ist
-          setReports(prev => prev.map(r => r.id === finalReport.id ? { ...r, _supabase_updated_at: now } : r));
-          oneDriveBackup();
+          const { data: updateResult, error } = await supabase
+            .from('damage_reports')
+            .update(rowData)
+            .eq('id', finalReport.id)
+            .lte('updated_at', loadedAt)  // Nur wenn DB-Version ≤ geladene Version
+            .select('id');
+
+          if (error) {
+            console.log('[MEASROOM TRACE] Supabase update result', { error, data: updateResult });
+            console.error('Error saving to Supabase:', error);
+            showToast(`⚠️ Speicherfehler: ${error.message || error.code || 'Supabase-Fehler'}. Daten nur lokal gesichert!`, 'error');
+          } else if (!updateResult || updateResult.length === 0) {
+            console.log('[MEASROOM TRACE] Supabase update result', { error: 'Conflict', data: null });
+            // Konflikt: Ein anderes Gerät hat neuere Daten → NICHT überschreiben
+            console.warn('[Sync-Konflikt] Neuere Version in Supabase – abgebrochen:', finalReport.id);
+            showToast('⚠️ Neuere Version auf anderem Gerät! Seite neu laden.', 'warning');
+          } else {
+            console.log('[MEASROOM TRACE] Supabase update result', { error: null, data: updateResult });
+            // Erfolgreich: _supabase_updated_at aktualisieren damit nächster Save erlaubt ist
+            setReports(prev => prev.map(r => r.id === finalReport.id ? { ...r, _supabase_updated_at: now } : r));
+            oneDriveBackup();
+          }
         }
       } else {
-        // Neues Projekt oder kein bekannter Zeitstempel → einfaches Upsert
-        supabase.from('damage_reports').upsert(rowData).then(({ data, error }) => {
-          console.log('[MEASROOM TRACE] Supabase update result', { error, data });
+        if (silent) {
+          // Silent/Autosave: Non-blocking background upsert
+          supabase
+            .from('damage_reports')
+            .upsert(rowData)
+            .then(({ error }) => {
+              if (!error) {
+                setReports(prev => prev.map(r => r.id === finalReport.id ? { ...r, _supabase_updated_at: now } : r));
+                oneDriveBackup();
+              }
+            }).catch(err => console.warn('[Supabase] Silent upsert failed:', err.message));
+        } else {
+          // Neues Projekt oder kein bekannter Zeitstempel → einfaches Upsert
+          const { error } = await supabase.from('damage_reports').upsert(rowData);
           if (error) {
             console.error('Error saving to Supabase:', error);
             showToast(`⚠️ Speicherfehler: ${error.message || error.code || 'Supabase-Fehler'}. Daten nur lokal gesichert!`, 'error');
@@ -608,7 +635,7 @@ function App() {
             setReports(prev => prev.map(r => r.id === finalReport.id ? { ...r, _supabase_updated_at: now } : r));
             oneDriveBackup();
           }
-        });
+        }
       }
     }
 
