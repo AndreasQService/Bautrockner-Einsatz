@@ -365,9 +365,9 @@ function App() {
     const fetchReports = async () => {
       setSupabaseStatus({ ok: null, count: null, error: null }); // Laden...
       try {
-        // 6-Sekunden-Timeout für Supabase-Abfrage auf Mobilgeräten/iPads
+        // 25-Sekunden-Timeout für die initiale Supabase-Abfrage (große JSON-Datenmengen über Mobilfunk)
         const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Timeout nach 6 Sekunden')), 6000)
+          setTimeout(() => reject(new Error('Timeout nach 25 Sekunden')), 25000)
         );
 
         const fetchPromise = supabase
@@ -1149,8 +1149,9 @@ function App() {
           onReportsChanged={async () => {
             // Reload from Supabase after a status change with timeout protection
             try {
+              // 15-Sekunden-Timeout für Statusänderungen und Aktualisierungen
               const timeoutPromise = new Promise((_, reject) =>
-                setTimeout(() => reject(new Error('Timeout nach 6 Sekunden')), 6000)
+                setTimeout(() => reject(new Error('Timeout nach 15 Sekunden')), 15000)
               );
 
               const fetchPromise = supabase
