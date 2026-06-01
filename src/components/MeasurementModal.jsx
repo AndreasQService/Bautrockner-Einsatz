@@ -1083,7 +1083,36 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
             // Capture the entire modal content (sketch + table)
             const canvas = await html2canvas(containerRef.current, {
                 scale: 2, // Higher resolution
-                backgroundColor: '#ffffff'
+                backgroundColor: '#ffffff',
+                onclone: (clonedDoc) => {
+                    const container = clonedDoc.getElementById('measurement-modal-container');
+                    if (container) {
+                        container.style.backgroundColor = '#ffffff';
+                        container.style.color = '#0f172a';
+                        container.style.borderColor = '#cbd5e1';
+
+                        // Query all textual elements (spans, divs, labels, etc.)
+                        const textElements = container.querySelectorAll('span, div, label, th, td');
+                        textElements.forEach(el => {
+                            // Keep white text on blue for the active/highlighted numpad field
+                            const isBlueHighlight = el.style.backgroundColor === 'rgb(59, 130, 246)' || el.style.background === 'rgb(59, 130, 246)' || el.style.background === '#3B82F6';
+                            if (!isBlueHighlight) {
+                                el.style.setProperty('color', '#0f172a', 'important');
+                            }
+                            
+                            // Replace any dark theme backgrounds with light grey
+                            if (el.style.background && (el.style.background.includes('var(') || el.style.background.includes('rgba('))) {
+                                el.style.setProperty('background', '#f8fafc', 'important');
+                            }
+                            if (el.style.backgroundColor && (el.style.backgroundColor.includes('var(') || el.style.backgroundColor.includes('rgba('))) {
+                                el.style.setProperty('background-color', '#f8fafc', 'important');
+                            }
+                            if (el.style.borderColor && (el.style.borderColor.includes('var(') || el.style.borderColor.includes('rgba('))) {
+                                el.style.setProperty('border-color', '#e2e8f0', 'important');
+                            }
+                        });
+                    }
+                }
             });
 
             // Capture canvas state as DataURL for restoration
@@ -1261,7 +1290,7 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
                     100% { transform: scale(0.95); opacity: 0.5; }
                 }
             `}</style>
-            <div ref={containerRef} style={{ backgroundColor: 'var(--background)', borderRadius: '14px', width: '98vw', maxWidth: '1240px', height: '94vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', color: 'var(--text-main)', border: '1px solid var(--border)', boxShadow: forceDark ? '0 30px 80px rgba(0,0,0,0.7)' : '0 30px 80px rgba(0,0,0,0.1)' }}>
+            <div id="measurement-modal-container" ref={containerRef} style={{ backgroundColor: 'var(--background)', borderRadius: '14px', width: '98vw', maxWidth: '1240px', height: '94vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', color: 'var(--text-main)', border: '1px solid var(--border)', boxShadow: forceDark ? '0 30px 80px rgba(0,0,0,0.7)' : '0 30px 80px rgba(0,0,0,0.1)' }}>
 
                 {/* ── HEADER ── */}
                 <div style={{ flexShrink: 0, padding: '0.7rem 1.1rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'var(--surface)' }}>
