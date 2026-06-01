@@ -29,6 +29,9 @@ const DraggablePhoto = ({ photo, index, selected, onSelect, onDeselect, onDelete
     // GoodNotes-Style: direkte Funktion ohne useCallback
     // Kein stale-closure-Problem, immer frische pos/size/onUpdate Werte
     const handlePointerDown = (e) => {
+        if (isDrawMode) return;
+        if (activeTool !== 'photo') return;
+
         didMove.current = false;
         setIsDragging(true);
         const startX = e.clientX, startY = e.clientY;
@@ -38,6 +41,12 @@ const DraggablePhoto = ({ photo, index, selected, onSelect, onDeselect, onDelete
         const pw = parent.offsetWidth, ph = parent.offsetHeight;
 
         const onMove = (me) => {
+            if (isDrawMode) {
+                setIsDragging(false);
+                window.removeEventListener('pointermove', onMove);
+                window.removeEventListener('pointerup', onUp);
+                return;
+            }
             const dx = ((me.clientX - startX) / pw) * 100;
             const dy = ((me.clientY - startY) / ph) * 100;
             if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5) didMove.current = true;
@@ -109,6 +118,9 @@ const DraggablePhoto = ({ photo, index, selected, onSelect, onDeselect, onDelete
                     onDrawStart(e);
                     return;
                 }
+                if (isDrawMode) return;
+                if (activeTool !== 'photo') return;
+
                 // Finger / Maus: Foto-Interaktion
                 if (e.target.closest('[data-resize]') || e.target.closest('[data-action]')) return;
                 e.preventDefault(); e.stopPropagation();
@@ -132,7 +144,7 @@ const DraggablePhoto = ({ photo, index, selected, onSelect, onDeselect, onDelete
                     <X size={12} />
                 </button>
                 {/* Resize -- bottom-right */}
-                <div data-resize="true" onPointerDown={(e) => { if (stylusOnlyMode && e.pointerType === 'touch') return; startResize(e); }}
+                <div data-resize="true" onPointerDown={(e) => { if (isDrawMode) return; if (activeTool !== 'photo') return; if (stylusOnlyMode && e.pointerType === 'touch') return; startResize(e); }}
                     style={{ position: 'absolute', bottom: -12, right: -12, width: 26, height: 26, background: '#3B82F6', cursor: 'se-resize', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 25, borderRadius: '50%', border: '2px solid white', boxShadow: '0 2px 6px rgba(0,0,0,0.35)', touchAction: 'none' }}>
                     <Move size={12} color="white" />
                 </div>
@@ -144,7 +156,7 @@ const DraggablePhoto = ({ photo, index, selected, onSelect, onDeselect, onDelete
             {/* Auswahl-Tab -- nur im Foto-Modus sichtbar */}
             {!selected && (
                 <div
-                    onPointerDown={(e) => { if (stylusOnlyMode && e.pointerType === 'touch') return; e.preventDefault(); e.stopPropagation(); onSelect(); }}
+                    onPointerDown={(e) => { if (isDrawMode) return; if (activeTool !== 'photo') return; if (stylusOnlyMode && e.pointerType === 'touch') return; e.preventDefault(); e.stopPropagation(); onSelect(); }}
                     style={{ position: 'absolute', top: -1, left: -1, width: 28, height: 28, background: 'rgba(59,130,246,0.75)', borderRadius: '3px 0 6px 0', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: 25, pointerEvents: 'auto', touchAction: 'none', boxShadow: '0 2px 4px rgba(0,0,0,0.3)' }}
                     title="Foto auswählen">
                     <Move size={13} color="white" />
@@ -314,22 +326,21 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
         };
 
         const handleTouchStart = (e) => {
-            // Only lock finger touches if active tool is drawing (pen/eraser)
             const isDrawingTool = activeTool === 'pen' || activeTool === 'eraser';
             if (!isDrawingTool) return;
 
-            const isStylus = e.touches && e.touches[0] && e.touches[0].touchType === 'stylus';
-            if (isStylus) return; // Allow Apple Pencil
-
+            // Block ALL touches (direct finger, palm, or stylus) from triggering default browser gestures/scrolling when drawing is active
             if (!isInteractiveElement(e.target)) {
                 e.preventDefault();
             }
         };
 
         const handleTouchMove = (e) => {
-            // Block native scrolling and rubber-banding globally inside the portal container
             const isDrawingTool = activeTool === 'pen' || activeTool === 'eraser';
-            if (isDrawingTool && !isInteractiveElement(e.target)) {
+            if (!isDrawingTool) return;
+
+            // Block ALL touches (direct finger, palm, or stylus) from triggering default browser gestures/scrolling when drawing is active
+            if (!isInteractiveElement(e.target)) {
                 e.preventDefault();
             }
         };
@@ -753,7 +764,10 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
 
     const handleViewportPointerDown = (e) => {
         // If stylus is active, block ALL touch viewport interactions
-        if (isDrawingRef.current) return;
+        if (isDrawingRef.current) {
+            e.preventDefault();
+            return;
+        }
 
         // If active tool is drawing (pen/eraser), touch/finger should NEVER pan or zoom!
         // This is pure, absolute palm rejection.
@@ -791,7 +805,10 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
     };
 
     const handleViewportPointerMove = (e) => {
-        if (isDrawingRef.current) return;
+        if (isDrawingRef.current) {
+            e.preventDefault();
+            return;
+        }
 
         // If active tool is drawing (pen/eraser), touch/finger should NEVER pan or zoom!
         if (e.pointerType === 'touch' && (activeTool === 'pen' || activeTool === 'eraser')) {
@@ -889,6 +906,8 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
         // pointerType-Regel: Finger/touch -> immer Foto-Overlay, nie zeichnen
         if (e.pointerType === 'touch') return;
         if (stylusOnlyMode && e.pointerType !== 'pen') return;
+        
+        setSelectedPhotoId(null); // Reset photo selection!
         
         e.preventDefault(); // Stop mobile browser rubber-banding/scrolling
         
@@ -1644,9 +1663,6 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
                             <canvas ref={photoCanvasRef} width={960} height={600} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 2, pointerEvents: 'none', display: 'block' }} />
                             <canvas ref={canvasRef} width={960} height={600} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 60, display: 'block', backgroundColor: 'transparent', pointerEvents: 'none', touchAction: 'none' }} />
                             <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 30, backgroundColor: 'transparent', touchAction: 'none', cursor: isDrawMode ? 'crosshair' : (activeTool === 'photo' ? 'move' : 'default') }}
-                                onTouchStart={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                                onTouchMove={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                                onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); }}
                                 onPointerDown={(e) => {
                                     const isPen = e.pointerType === 'pen' || (e.pointerType === 'mouse' && activeTool !== 'pan');
                                     if (!isPen) return;
