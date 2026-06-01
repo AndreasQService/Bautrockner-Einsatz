@@ -466,7 +466,7 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
             {/* Pass Filtered Reports to Monitors (only when not in Archive OR Technician Mode) */}
             {!showArchive && mode !== 'technician' && (
                 <div>
-                    <WorkflowStatusOverview reports={reports} onSelectReport={onSelectReport} currentUser={currentUser} users={users || []} />
+                    <WorkflowStatusOverview reports={reports} onSelectReport={onSelectReport} currentUser={currentUser} users={users || []} searchTerm={searchTerm} />
                     <MeasurementControlOverview reports={filteredReports} onSelectReport={onSelectReport} />
                     <DryingMonitor reports={filteredReports} onSelectReport={onSelectReport} />
                 </div>

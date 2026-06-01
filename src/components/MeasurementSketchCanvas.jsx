@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Save, Eraser, Pen, Undo, Trash2, Camera, Image, Move, PenOff, ChevronDown } from 'lucide-react';
+import { X, Save, Eraser, Pen, Undo, Trash2, Camera, Image, Move, PenOff, ChevronDown, Hand } from 'lucide-react';
 
 const DEFAULT_POSITIONS = [
     { x: 2, y: 2 }, { x: 52, y: 2 },
@@ -148,7 +148,7 @@ export default function MeasurementSketchCanvas({
     initialGalleryPhotos = [],
     title = '',
     showTitleInput = false,
-    stylusOnlyMode = false
+    stylusOnlyMode = true
 }) {
     const [canvasTitle, setCanvasTitle] = useState(title);
     const [activeTool, setActiveTool] = useState('pen');
@@ -170,6 +170,12 @@ export default function MeasurementSketchCanvas({
     const isDrawingRef = useRef(false);
 
     const activeToolRef = useRef(activeTool);
+    const [viewport, setViewport] = useState({ scale: 1, x: 0, y: 0 });
+    const activePointersRef = useRef({});
+    const lastTouchDistanceRef = useRef(null);
+    const lastTouchCenterRef = useRef(null);
+    const isPanningRef = useRef(false);
+    const viewportRef = useRef(null);
     const colorRef = useRef(color);
     const lineWidthRef = useRef(lineWidth);
 
@@ -244,6 +250,7 @@ export default function MeasurementSketchCanvas({
         setCanvasTitle(title || '');
         setSelectedPhotoId(null);
         setActiveTool('pen');
+        setViewport({ scale: 1, x: 0, y: 0 });
         setColor('#000000');
         setLineWidth(2);
 
@@ -275,6 +282,51 @@ export default function MeasurementSketchCanvas({
         return () => clearTimeout(initTimer);
     }, [isOpen, initialCanvasImage]);
 
+    // Lock body scroll when fullscreen sketch modal is active
+    useEffect(() => {
+        if (isOpen) {
+            const originalOverflow = document.body.style.overflow;
+            const originalPosition = document.body.style.position;
+            const originalWidth = document.body.style.width;
+            const originalHeight = document.body.style.height;
+
+            document.body.style.overflow = 'hidden';
+            document.body.style.position = 'fixed';
+            document.body.style.width = '100%';
+            document.body.style.height = '100%';
+
+            return () => {
+                document.body.style.overflow = originalOverflow;
+                document.body.style.position = originalPosition;
+                document.body.style.width = originalWidth;
+                document.body.style.height = originalHeight;
+            };
+        }
+    }, [isOpen]);
+
+    // Neutralize iOS Safari native touch zoom, pan, and context menus completely in the viewport via vanilla non-passive listeners
+    useEffect(() => {
+        const el = viewportRef.current;
+        if (!el || !isOpen) return;
+
+        const handleTouch = (e) => {
+            // Block iOS default scrolling, rubber-banding and pinch-zoom on this div
+            e.preventDefault();
+        };
+
+        el.addEventListener('touchstart', handleTouch, { passive: false });
+        el.addEventListener('touchmove', handleTouch, { passive: false });
+        el.addEventListener('gesturestart', handleTouch, { passive: false });
+        el.addEventListener('gesturechange', handleTouch, { passive: false });
+
+        return () => {
+            el.removeEventListener('touchstart', handleTouch);
+            el.removeEventListener('touchmove', handleTouch);
+            el.removeEventListener('gesturestart', handleTouch);
+            el.removeEventListener('gesturechange', handleTouch);
+        };
+    }, [isOpen]);
+
     const getCoordinates = (e) => {
         const canvas = canvasRef.current;
         if (!canvas) return { x: 0, y: 0 };
@@ -303,6 +355,139 @@ export default function MeasurementSketchCanvas({
             ctx.lineWidth = lineWidthRef.current;
         }
         return ctx;
+    };
+
+    const handleViewportPointerDown = (e) => {
+        // If stylus is active, block ALL touch viewport interactions
+        if (isDrawingRef.current) return;
+
+        // If active tool is drawing (pen/eraser), touch/finger should NEVER pan or zoom!
+        // This is pure, absolute palm rejection.
+        if (e.pointerType === 'touch' && (activeTool === 'pen' || activeTool === 'eraser')) {
+            e.preventDefault();
+            return;
+        }
+
+        // Pen should always draw, not pan!
+        // Mouse draws when not in pan mode, so only pan when tool is 'pan' or if it is touch.
+        const isPen = e.pointerType === 'pen' || (e.pointerType === 'mouse' && activeTool !== 'pan');
+        if (isPen) return;
+
+        e.preventDefault();
+        try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) {}
+
+        activePointersRef.current[e.pointerId] = {
+            clientX: e.clientX,
+            clientY: e.clientY
+        };
+
+        const pointerIds = Object.keys(activePointersRef.current);
+        if (pointerIds.length === 1) {
+            // Single finger pan is ONLY allowed if activeTool is 'pan' or 'photo' (Verschieben)
+            isPanningRef.current = activeTool === 'pan' || activeTool === 'photo';
+        } else if (pointerIds.length === 2) {
+            const p1 = activePointersRef.current[pointerIds[0]];
+            const p2 = activePointersRef.current[pointerIds[1]];
+            lastTouchDistanceRef.current = Math.hypot(p1.clientX - p2.clientX, p1.clientY - p2.clientY);
+            lastTouchCenterRef.current = {
+                x: (p1.clientX + p2.clientX) / 2,
+                y: (p1.clientY + p2.clientY) / 2
+            };
+        }
+    };
+
+    const handleViewportPointerMove = (e) => {
+        if (isDrawingRef.current) return;
+
+        // If active tool is drawing (pen/eraser), touch/finger should NEVER pan or zoom!
+        if (e.pointerType === 'touch' && (activeTool === 'pen' || activeTool === 'eraser')) {
+            e.preventDefault();
+            return;
+        }
+
+        if (!activePointersRef.current[e.pointerId]) return;
+
+        // Pen should not pan/zoom
+        const isPen = e.pointerType === 'pen' || (e.pointerType === 'mouse' && activeTool !== 'pan');
+        if (isPen) return;
+
+        const currentPointer = activePointersRef.current[e.pointerId];
+        const dx = e.clientX - currentPointer.clientX;
+        const dy = e.clientY - currentPointer.clientY;
+
+        // Update active pointer coordinate
+        activePointersRef.current[e.pointerId] = {
+            clientX: e.clientX,
+            clientY: e.clientY
+        };
+
+        const pointerIds = Object.keys(activePointersRef.current);
+        if (pointerIds.length === 1 && isPanningRef.current) {
+            // Single finger pan is ONLY allowed if activeTool is 'pan' or 'photo' (Verschieben)
+            const canSingleFingerPan = activeTool === 'pan' || activeTool === 'photo';
+            if (!canSingleFingerPan) return;
+
+            // Pan
+            setViewport(prevV => ({
+                ...prevV,
+                x: prevV.x + dx,
+                y: prevV.y + dy
+            }));
+        } else if (pointerIds.length === 2) {
+            // Pinch to zoom and center-pan
+            const p1 = activePointersRef.current[pointerIds[0]];
+            const p2 = activePointersRef.current[pointerIds[1]];
+
+            const currentDist = Math.hypot(p1.clientX - p2.clientX, p1.clientY - p2.clientY);
+            const currentCenter = {
+                x: (p1.clientX + p2.clientX) / 2,
+                y: (p1.clientY + p2.clientY) / 2
+            };
+
+            if (lastTouchDistanceRef.current && lastTouchCenterRef.current) {
+                const scaleFactor = currentDist / lastTouchDistanceRef.current;
+                const newScale = Math.max(0.3, Math.min(5, viewport.scale * scaleFactor));
+
+                const centerDx = currentCenter.x - lastTouchCenterRef.current.x;
+                const centerDy = currentCenter.y - lastTouchCenterRef.current.y;
+
+                setViewport(prevV => ({
+                    scale: newScale,
+                    x: prevV.x + centerDx,
+                    y: prevV.y + centerDy
+                }));
+            }
+
+            lastTouchDistanceRef.current = currentDist;
+            lastTouchCenterRef.current = currentCenter;
+        }
+    };
+
+    const handleViewportPointerUp = (e) => {
+        delete activePointersRef.current[e.pointerId];
+        try { e.currentTarget.releasePointerCapture(e.pointerId); } catch (_) {}
+
+        const pointerIds = Object.keys(activePointersRef.current);
+        if (pointerIds.length < 2) {
+            lastTouchDistanceRef.current = null;
+            lastTouchCenterRef.current = null;
+        }
+        if (pointerIds.length === 0) {
+            isPanningRef.current = false;
+        }
+    };
+
+    const handleViewportWheel = (e) => {
+        e.preventDefault();
+        const zoomIntensity = 0.05;
+        const delta = e.deltaY < 0 ? 1 : -1;
+        setViewport(prevV => {
+            const newScale = Math.max(0.3, Math.min(5, prevV.scale + delta * zoomIntensity));
+            return {
+                ...prevV,
+                scale: parseFloat(newScale.toFixed(2))
+            };
+        });
     };
 
     const startDrawing = (e) => {
@@ -441,22 +626,35 @@ export default function MeasurementSketchCanvas({
     const dividerColor = isLightMode ? '#cbd5e1' : 'var(--border, #334155)';
 
     return createPortal(
-        <div style={{ 
-            position: 'fixed', 
-            inset: 0, 
-            zIndex: 99999, 
-            backgroundColor: 'var(--background, #0F172A)', 
-            display: 'flex', 
-            flexDirection: 'column', 
-            touchAction: 'none', 
-            color: 'var(--text-main, #E2E8F0)', 
-            fontFamily: 'sans-serif',
-            paddingTop: 'env(safe-area-inset-top, 0px)',
-            paddingBottom: 'env(safe-area-inset-bottom, 0px)',
-            paddingLeft: 'env(safe-area-inset-left, 0px)',
-            paddingRight: 'env(safe-area-inset-right, 0px)',
-            boxSizing: 'border-box'
-        }}>
+        <div 
+            className="qtool-sketch-lock"
+            onContextMenu={(e) => e.preventDefault()}
+            style={{ 
+                position: 'fixed', 
+                inset: 0, 
+                zIndex: 99999, 
+                backgroundColor: 'var(--background, #0F172A)', 
+                display: 'flex', 
+                flexDirection: 'column', 
+                touchAction: 'none', 
+                color: 'var(--text-main, #E2E8F0)', 
+                fontFamily: 'sans-serif',
+                paddingTop: 'env(safe-area-inset-top, 0px)',
+                paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+                paddingLeft: 'env(safe-area-inset-left, 0px)',
+                paddingRight: 'env(safe-area-inset-right, 0px)',
+                boxSizing: 'border-box',
+                userSelect: 'none',
+                WebkitUserSelect: 'none',
+                WebkitTouchCallout: 'none'
+            }}>
+            <style>{`
+                .qtool-sketch-lock, .qtool-sketch-lock * {
+                    -webkit-user-select: none !important;
+                    user-select: none !important;
+                    -webkit-touch-callout: none !important;
+                }
+            `}</style>
             {/* Header / Toolbar (Adaptive styling for high contrast in Light/Dark modes) */}
             <div style={{ flexShrink: 0, padding: '0.75rem 1rem', backgroundColor: toolbarBg, borderBottom: toolbarBorder, display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap', position: 'relative', zIndex: 100 }}>
                 {showTitleInput && (
@@ -489,7 +687,15 @@ export default function MeasurementSketchCanvas({
                 
                 <div style={{ width: '1px', height: '24px', background: dividerColor, margin: '0 0.5rem' }} />
 
-                <button onClick={() => activateTool('photo')} style={{ padding: '0.5rem 0.75rem', borderRadius: '6px', background: (activeTool === 'photo') ? 'rgba(59,130,246,0.2)' : btnBg, border: (activeTool === 'photo') ? '1px solid #3b82f6' : btnBorder, color: activeTool === 'photo' ? '#3B82F6' : btnTextColor, display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer' }} title="Bilder verschieben">
+                <button onClick={() => setViewport({ scale: 1, x: 0, y: 0 })} style={{ padding: '0.5rem 0.75rem', borderRadius: '6px', background: btnBg, border: btnBorder, color: btnTextColor, display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer' }} title="Zoom & Pan zurücksetzen">
+                    <Undo size={16} /><span style={{ fontSize: '0.8rem', fontWeight: 600 }}>Reset Zoom</span>
+                </button>
+
+                <button onClick={() => activateTool('pan')} style={{ padding: '0.5rem 0.75rem', borderRadius: '6px', background: (activeTool === 'pan') ? 'rgba(59,130,246,0.2)' : btnBg, border: btnBorder, color: activeTool === 'pan' ? '#3B82F6' : btnTextColor, display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer' }} title="Ausschnitt verschieben (Hand)">
+                    <Hand size={16} /><span style={{ fontSize: '0.8rem', fontWeight: 600 }}>Hand</span>
+                </button>
+
+                <button onClick={() => activateTool('photo')} style={{ padding: '0.5rem 0.75rem', borderRadius: '6px', background: (activeTool === 'photo') ? 'rgba(59,130,246,0.2)' : btnBg, border: btnBorder, color: activeTool === 'photo' ? '#3B82F6' : btnTextColor, display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer' }} title="Bilder verschieben">
                     <Image size={16} /><span style={{ fontSize: '0.8rem', fontWeight: 600 }}>Verschieben</span>
                 </button>
 
@@ -505,15 +711,22 @@ export default function MeasurementSketchCanvas({
             </div>
 
             {/* 3-Layer Canvas Stack (Centered & Aspect-Ratio locked to 960x600 to prevent any stretching/distortion on iPad) */}
-            <div style={{ 
+            <div ref={viewportRef} style={{ 
                 flex: 1, 
                 display: 'flex', 
                 alignItems: 'center', 
                 justifyContent: 'center', 
                 backgroundColor: '#f1f5f9', 
                 padding: '1rem', 
-                overflow: 'hidden' 
-            }}>
+                overflow: 'hidden',
+                touchAction: 'none'
+            }}
+                onPointerDown={handleViewportPointerDown}
+                onPointerMove={handleViewportPointerMove}
+                onPointerUp={handleViewportPointerUp}
+                onPointerCancel={handleViewportPointerUp}
+                onWheel={handleViewportWheel}
+            >
                 <div style={{ 
                     position: 'relative', 
                     width: 'min(calc(100vw - 2rem), calc((100vh - 120px) * 1.6))',
@@ -521,7 +734,10 @@ export default function MeasurementSketchCanvas({
                     boxShadow: '0 10px 30px rgba(0,0,0,0.15)',
                     backgroundColor: '#ffffff',
                     borderRadius: '8px',
-                    overflow: 'hidden'
+                    overflow: 'hidden',
+                    transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.scale})`,
+                    transformOrigin: 'center center',
+                    touchAction: 'none'
                 }}>
                     <canvas ref={gridCanvasRef} width={960} height={600} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 1, pointerEvents: 'none', display: 'block' }} />
                     <canvas ref={photoCanvasRef} width={960} height={600} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 2, pointerEvents: 'none', display: 'none' }} />
@@ -529,11 +745,42 @@ export default function MeasurementSketchCanvas({
                     
                     {/* Pointer interaction overlay */}
                     <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 30, backgroundColor: 'transparent', touchAction: 'none', cursor: isDrawMode ? (activeTool === 'eraser' ? 'cell' : 'crosshair') : (activeTool === 'photo' ? 'move' : 'default') }}
-                        onPointerDown={(e) => { setSelectedPhotoId(null); startDrawing(e); }}
-                        onPointerMove={(e) => { draw(e); }}
-                        onPointerUp={(e) => { stopDrawing(e); }}
-                        onPointerLeave={(e) => { stopDrawing(e); }}
-                        onPointerCancel={(e) => { stopDrawing(e); }}
+                        onTouchStart={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                        onTouchMove={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                        onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                        onPointerDown={(e) => {
+                            const isPen = e.pointerType === 'pen' || (e.pointerType === 'mouse' && activeTool !== 'pan');
+                            if (!isPen) return;
+                            e.stopPropagation();
+                            e.preventDefault();
+                            setSelectedPhotoId(null);
+                            startDrawing(e);
+                        }}
+                        onPointerMove={(e) => {
+                            const isPen = e.pointerType === 'pen' || (e.pointerType === 'mouse' && activeTool !== 'pan');
+                            if (!isPen) return;
+                            e.stopPropagation();
+                            e.preventDefault();
+                            draw(e);
+                        }}
+                        onPointerUp={(e) => {
+                            const isPen = e.pointerType === 'pen' || (e.pointerType === 'mouse' && activeTool !== 'pan');
+                            if (!isPen) return;
+                            e.stopPropagation();
+                            stopDrawing(e);
+                        }}
+                        onPointerLeave={(e) => {
+                            const isPen = e.pointerType === 'pen' || (e.pointerType === 'mouse' && activeTool !== 'pan');
+                            if (!isPen) return;
+                            e.stopPropagation();
+                            stopDrawing(e);
+                        }}
+                        onPointerCancel={(e) => {
+                            const isPen = e.pointerType === 'pen' || (e.pointerType === 'mouse' && activeTool !== 'pan');
+                            if (!isPen) return;
+                            e.stopPropagation();
+                            stopDrawing(e);
+                        }}
                     />
 
                     {galleryPhotos.slice(0, 4).map((photo, index) => (

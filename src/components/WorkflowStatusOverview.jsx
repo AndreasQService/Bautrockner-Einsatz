@@ -420,10 +420,9 @@ function ProjectRow({ rep, store, onSave, onSelect, openKey, onOpen }) {
 }
 
 // ─── Main Export ──────────────────────────────────────────────────────────────
-export default function WorkflowStatusOverview({ reports, onSelectReport, currentUser, users = [] }) {
+export default function WorkflowStatusOverview({ reports, onSelectReport, currentUser, users = [], searchTerm = "" }) {
   const [store, setStore] = useState(load)
   const [tab, setTab] = useState("alle")
-  const [search, setSearch] = useState("")
   const [collapsed, setCollapsed] = useState(false)
   const [popover, setPopover] = useState(null)
   const [userFilter, setUserFilter] = useState("alle")
@@ -447,10 +446,10 @@ export default function WorkflowStatusOverview({ reports, onSelectReport, curren
 
   const baseList = tab === "archiv" ? archived : tab === "ueberfaellig" ? overdue : tab === "trocknung" ? trocknungList : tab === "aktiv" ? aktiv : allActive
   const filtered = useMemo(() => {
-    if (!search.trim()) return baseList
-    const q = search.toLowerCase()
+    if (!searchTerm.trim()) return baseList
+    const q = searchTerm.toLowerCase()
     return baseList.filter(r => [r.street, r.address, r.city, r.zip, r.projectNumber, r.client, r.projectTitle].some(v => v?.toLowerCase().includes(q)))
-  }, [baseList, search])
+  }, [baseList, searchTerm])
 
   const tabs = [
     { id: "alle", label: "Alle Projekte", count: allActive.length, color: null },
@@ -483,11 +482,6 @@ export default function WorkflowStatusOverview({ reports, onSelectReport, curren
             <select value={userFilter} onChange={e => setUserFilter(e.target.value)} onClick={e => e.stopPropagation()} style={{ padding: "0.3rem 0.5rem", borderRadius: 8, border: "1px solid var(--color-border,rgba(255,255,255,0.08))", background: "var(--color-surface-alt,#1E293B)", color: "var(--text-main)", fontSize: "0.75rem", outline: "none", cursor: "pointer", maxWidth: 160 }}>
               {allUsers.map(u => <option key={u} value={u}>{u === "alle" ? "Alle Mitarbeiter" : u}</option>)}
             </select>
-            {/* Suche */}
-            <div style={{ position: "relative" }}>
-              <Search size={12} style={{ position: "absolute", left: 8, top: "50%", transform: "translateY(-50%)", color: "#475569", pointerEvents: "none" }} />
-              <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Suche…" onClick={e => e.stopPropagation()} style={{ paddingLeft: 26, paddingRight: 10, paddingTop: "0.3rem", paddingBottom: "0.3rem", borderRadius: 8, border: "1px solid var(--color-border,rgba(255,255,255,0.08))", background: "var(--color-surface-alt,#1E293B)", color: "var(--text-main)", fontSize: "0.75rem", width: 160, outline: "none" }} />
-            </div>
           </div>
         </div>
         <div style={{ display: "flex", gap: "0.2rem" }}>

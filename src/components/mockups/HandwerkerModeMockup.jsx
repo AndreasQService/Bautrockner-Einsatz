@@ -2253,6 +2253,7 @@ https://qtool.q-service.ch/project/${orderNumber}`;
                 showTitleInput={true}
                 initialGalleryPhotos={[]}
                 initialCanvasImage={editingSketchId ? sketches.find(s => s.id === editingSketchId)?.src : canvasBackgroundPhoto}
+                stylusOnlyMode={true}
             />
 
             {/* ── 5. ZOOM / FULLSCREEN MODAL ── */}
