@@ -236,6 +236,7 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
     const lastTouchCenterRef = useRef(null);
     const isPanningRef = useRef(false);
     const viewportRef = useRef(null);
+    const portalRef = useRef(null);
 
     const handleNumpadPress = (key) => {
         if (!activeNumpadField) return;
@@ -304,26 +305,47 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
 
     // Neutralize iOS Safari native touch zoom, pan, and context menus completely in the viewport via vanilla non-passive listeners
     useEffect(() => {
-        const el = viewportRef.current;
-        if (!el || !isSketchFullscreen) return;
+        const portalEl = portalRef.current;
+        if (!portalEl || !isSketchFullscreen) return;
 
-        const handleTouch = (e) => {
-            // Block iOS default scrolling, rubber-banding and pinch-zoom on this div
-            e.preventDefault();
+        const isInteractiveElement = (target) => {
+            if (!target) return false;
+            return target.closest('button, input, select, textarea, [data-action], [data-resize]') !== null;
         };
 
-        el.addEventListener('touchstart', handleTouch, { passive: false });
-        el.addEventListener('touchmove', handleTouch, { passive: false });
-        el.addEventListener('gesturestart', handleTouch, { passive: false });
-        el.addEventListener('gesturechange', handleTouch, { passive: false });
+        const handleTouchStart = (e) => {
+            // Only lock finger touches if active tool is drawing (pen/eraser)
+            const isDrawingTool = activeTool === 'pen' || activeTool === 'eraser';
+            if (!isDrawingTool) return;
+
+            const isStylus = e.touches && e.touches[0] && e.touches[0].touchType === 'stylus';
+            if (isStylus) return; // Allow Apple Pencil
+
+            if (!isInteractiveElement(e.target)) {
+                e.preventDefault();
+            }
+        };
+
+        const handleTouchMove = (e) => {
+            // Block native scrolling and rubber-banding globally inside the portal container
+            const isDrawingTool = activeTool === 'pen' || activeTool === 'eraser';
+            if (isDrawingTool && !isInteractiveElement(e.target)) {
+                e.preventDefault();
+            }
+        };
+
+        portalEl.addEventListener('touchstart', handleTouchStart, { passive: false });
+        portalEl.addEventListener('touchmove', handleTouchMove, { passive: false });
+        portalEl.addEventListener('gesturestart', handleTouchMove, { passive: false });
+        portalEl.addEventListener('gesturechange', handleTouchMove, { passive: false });
 
         return () => {
-            el.removeEventListener('touchstart', handleTouch);
-            el.removeEventListener('touchmove', handleTouch);
-            el.removeEventListener('gesturestart', handleTouch);
-            el.removeEventListener('gesturechange', handleTouch);
+            portalEl.removeEventListener('touchstart', handleTouchStart);
+            portalEl.removeEventListener('touchmove', handleTouchMove);
+            portalEl.removeEventListener('gesturestart', handleTouchMove);
+            portalEl.removeEventListener('gesturechange', handleTouchMove);
         };
-    }, [isSketchFullscreen]);
+    }, [isSketchFullscreen, activeTool]);
 
     // History overview helper
     const getHistoryEntries = () => {
@@ -1545,6 +1567,7 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
             {/* ── FULLSCREEN SKETCH OVERLAY (unverändert) ── */}
             {isSketchFullscreen && createPortal(
                 <div 
+                    ref={portalRef}
                     className="qtool-sketch-lock"
                     onContextMenu={(e) => e.preventDefault()}
                     style={{
