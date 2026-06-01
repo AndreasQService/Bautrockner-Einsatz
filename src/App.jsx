@@ -1120,14 +1120,20 @@ function App() {
               ? 'rgba(99,102,241,0.1)'
               : supabaseStatus.ok
                 ? 'rgba(16,185,129,0.1)'
-                : 'rgba(239,68,68,0.1)',
-            border: `1px solid ${supabaseStatus.ok === null ? '#6366f1' : supabaseStatus.ok ? '#10B981' : '#EF4444'}44`,
-            color: supabaseStatus.ok === null ? '#6366f1' : supabaseStatus.ok ? '#10B981' : '#EF4444',
+                : (supabaseStatus.error?.includes('Timeout') || supabaseStatus.error?.includes('fetch'))
+                  ? 'rgba(245,158,11,0.1)'
+                  : 'rgba(239,68,68,0.1)',
+            border: `1px solid ${supabaseStatus.ok === null ? '#6366f1' : supabaseStatus.ok ? '#10B981' : (supabaseStatus.error?.includes('Timeout') || supabaseStatus.error?.includes('fetch')) ? '#F59E0B' : '#EF4444'}44`,
+            color: supabaseStatus.ok === null ? '#6366f1' : supabaseStatus.ok ? '#10B981' : (supabaseStatus.error?.includes('Timeout') || supabaseStatus.error?.includes('fetch')) ? '#D97706' : '#EF4444',
           }}>
             <span>
               {supabaseStatus.ok === null && '⏳ Verbinde mit Supabase...'}
               {supabaseStatus.ok === true && `✅ ${supabaseStatus.count} Projekte geladen (${supabaseStatus.total} DB-Einträge)`}
-              {supabaseStatus.ok === false && `❌ Supabase Fehler: ${supabaseStatus.error}`}
+              {supabaseStatus.ok === false && (
+                (supabaseStatus.error?.includes('Timeout') || supabaseStatus.error?.includes('fetch'))
+                  ? '⚠️ Offline-Modus: Daten lokal aus dem Cache geladen (Verbindung zzt. offline/blockiert)'
+                  : `❌ Supabase Fehler: ${supabaseStatus.error}`
+              )}
             </span>
             <button
               onClick={() => setSupabaseStatus(null)}
