@@ -3115,7 +3115,7 @@ END:VCARD`;
                                 String(r.apartment || 'Allgemeiner Bereich').trim().toLowerCase().replace(/-/g, ' ').replace(/\s+/g, ' ') === normApt &&
                                 String(r.name || 'Unbenannter Raum').trim().toLowerCase().replace(/-/g, ' ').replace(/\s+/g, ' ') === normName
                             );
-                            let updatedRooms = [...roomsList];
+                            updatedRooms = [...roomsList];
                             if (roomIndexInList >= 0) {
                                 updatedRooms[roomIndexInList] = {
                                     ...updatedRooms[roomIndexInList],
@@ -7910,7 +7910,7 @@ END:VCARD`;
                                 String(r.apartment || 'Allgemeiner Bereich').trim().toLowerCase().replace(/-/g, ' ').replace(/\s+/g, ' ') === normApt &&
                                 String(r.name || 'Unbenannter Raum').trim().toLowerCase().replace(/-/g, ' ').replace(/\s+/g, ' ') === normName
                             );
-                            let updatedRooms = [...roomsList];
+                            updatedRooms = [...roomsList];
                             if (roomIndexInList >= 0) {
                                 updatedRooms[roomIndexInList] = {
                                     ...updatedRooms[roomIndexInList],
