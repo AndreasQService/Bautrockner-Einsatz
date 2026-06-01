@@ -594,7 +594,15 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
                     ...m,
                     pointName: m.pointName?.replace(/^Messpunkt\s+(\d+)$/i, 'MP $1') ?? m.pointName
                 }));
-                setMeasurements(migrateNames(roomData.measurements));
+                const initialPoints = [
+                    { id: `p${Date.now()}`, pointName: 'MP 1', w_value: '', b_value: '', notes: '' },
+                    { id: `p${Date.now() + 1}`, pointName: 'MP 2', w_value: '', b_value: '', notes: '' },
+                    { id: `p${Date.now() + 2}`, pointName: 'MP 3', w_value: '', b_value: '', notes: '' },
+                    { id: `p${Date.now() + 3}`, pointName: 'MP 4', w_value: '', b_value: '', notes: '' }
+                ];
+                const rawMs = roomData.measurements;
+                const msToUse = (Array.isArray(rawMs) && rawMs.length > 0) ? rawMs : initialPoints;
+                setMeasurements(migrateNames(msToUse));
                 const baseGs = roomData.globalSettings || {};
                 const gs = {
                     date: baseGs.date || new Date().toISOString().split('T')[0],

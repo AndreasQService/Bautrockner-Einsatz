@@ -3053,7 +3053,7 @@ END:VCARD`;
                                 const existingRoom = measurementRooms[existingRoomIndex];
                                 const history = existingRoom.measurementHistory ? [...existingRoom.measurementHistory] : [];
                                 
-                                const updatedHistory = (isNewMeasurement && existingRoom.measurementData && existingRoom.measurementData.measurements && existingRoom.measurementData.measurements.length > 0)
+                                const updatedHistory = (isNewMeasurement && existingRoom.measurementData && Array.isArray(existingRoom.measurementData.measurements) && existingRoom.measurementData.measurements.length > 0)
                                     ? [{
                                         id: `hist_${Date.now()}_prev`,
                                         date: existingRoom.measurementData.globalSettings?.date || new Date().toISOString(),
@@ -3081,7 +3081,7 @@ END:VCARD`;
                                 });
 
                                 const history = activeRoomForMeasurement.measurementHistory ? [...activeRoomForMeasurement.measurementHistory] : [];
-                                const updatedHistory = (isNewMeasurement && activeRoomForMeasurement.measurementData && activeRoomForMeasurement.measurementData.measurements && activeRoomForMeasurement.measurementData.measurements.length > 0)
+                                const updatedHistory = (isNewMeasurement && activeRoomForMeasurement.measurementData && Array.isArray(activeRoomForMeasurement.measurementData.measurements) && activeRoomForMeasurement.measurementData.measurements.length > 0)
                                     ? [{
                                         id: `hist_${Date.now()}_prev`,
                                         date: activeRoomForMeasurement.measurementData.globalSettings?.date || new Date().toISOString(),
@@ -7826,7 +7826,7 @@ END:VCARD`;
                                 const existingRoom = measurementRooms[existingRoomIndex];
                                 const history = existingRoom.measurementHistory ? [...existingRoom.measurementHistory] : [];
                                 
-                                const updatedHistory = (isNewMeasurement && existingRoom.measurementData && existingRoom.measurementData.measurements && existingRoom.measurementData.measurements.length > 0)
+                                const updatedHistory = (isNewMeasurement && existingRoom.measurementData && Array.isArray(existingRoom.measurementData.measurements) && existingRoom.measurementData.measurements.length > 0)
                                     ? [{
                                         id: `hist_${Date.now()}_prev`,
                                         date: existingRoom.measurementData.globalSettings?.date || new Date().toISOString(),
@@ -7854,7 +7854,7 @@ END:VCARD`;
                                 });
 
                                 const history = activeRoomForMeasurement.measurementHistory ? [...activeRoomForMeasurement.measurementHistory] : [];
-                                const updatedHistory = (isNewMeasurement && activeRoomForMeasurement.measurementData && activeRoomForMeasurement.measurementData.measurements && activeRoomForMeasurement.measurementData.measurements.length > 0)
+                                const updatedHistory = (isNewMeasurement && activeRoomForMeasurement.measurementData && Array.isArray(activeRoomForMeasurement.measurementData.measurements) && activeRoomForMeasurement.measurementData.measurements.length > 0)
                                     ? [{
                                         id: `hist_${Date.now()}_prev`,
                                         date: activeRoomForMeasurement.measurementData.globalSettings?.date || new Date().toISOString(),
