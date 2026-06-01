@@ -1935,8 +1935,12 @@ END:VCARD`;
             console.error("Error loading logo for Excel:", err);
         }
 
-        // Filter rooms that have measurement data
-        const roomsWithMeasurements = formData.rooms.filter(room => room.measurementData && room.measurementData.measurements && room.measurementData.measurements.length > 0);
+        // Filter rooms that have measurement data (prioritizing measurementRooms)
+        const roomsSource = Array.isArray(formData.measurementRooms) && formData.measurementRooms.length > 0
+            ? formData.measurementRooms
+            : (formData.rooms || []);
+
+        const roomsWithMeasurements = roomsSource.filter(room => room && room.measurementData && room.measurementData.measurements && room.measurementData.measurements.length > 0);
 
         if (roomsWithMeasurements.length === 0) {
             alert("Keine Messdaten gefunden. Bitte zuerst Messungen durchführen.");
@@ -2933,6 +2937,7 @@ END:VCARD`;
                 })()}
                 <MeasurementModal
                     isTechnicianMode={mode === 'technician'}
+                    isNewMeasurement={isNewMeasurement}
                     key={activeRoomForMeasurement?.measurementSessionId || `${activeRoomForMeasurement?.id || 'none'}_${activeRoomForMeasurement?.isNewMeasurement ? 'new' : 'open'}`}
                     isOpen={showMeasurementModal}
                     onClose={() => {
@@ -3104,13 +3109,34 @@ END:VCARD`;
                                 updatedMeasurementRooms.push(finalRoom);
                             }
 
+                            // --- ALSO UPDATE IN formData.rooms SO IT IS VISIBLE ON DESKTOP ---
+                            const roomsList = Array.isArray(prev.rooms) ? prev.rooms : [];
+                            const roomIndexInList = roomsList.findIndex(r => 
+                                String(r.apartment || 'Allgemeiner Bereich').trim().toLowerCase().replace(/-/g, ' ').replace(/\s+/g, ' ') === normApt &&
+                                String(r.name || 'Unbenannter Raum').trim().toLowerCase().replace(/-/g, ' ').replace(/\s+/g, ' ') === normName
+                            );
+                            let updatedRooms = [...roomsList];
+                            if (roomIndexInList >= 0) {
+                                updatedRooms[roomIndexInList] = {
+                                    ...updatedRooms[roomIndexInList],
+                                    name: finalRoom.name,
+                                    apartment: finalRoom.apartment,
+                                    measurementData: finalRoom.measurementData,
+                                    measurementHistory: finalRoom.measurementHistory
+                                };
+                            } else {
+                                updatedRooms.push(finalRoom);
+                            }
+
                             setTimeout(() => setActiveRoomForMeasurement(finalRoom), 0);
                             
                             const measuredAt = globalSettings.date ? new Date(globalSettings.date).toISOString() : new Date().toISOString();
                             const documentationComplete = !!(measurements && measurements.length > 0 && globalSettings.date);
-                            const dryingUpdate = applyDryingCheck({ ...prev, measurementRooms: updatedMeasurementRooms }, { measuredAt, documentationComplete });
+                            const dryingUpdate = applyDryingCheck({ ...prev, measurementRooms: updatedMeasurementRooms, rooms: updatedRooms }, { measuredAt, documentationComplete });
                             
-                            const updatedFormData = dryingUpdate ? { ...dryingUpdate, measurementRooms: updatedMeasurementRooms } : { ...prev, measurementRooms: updatedMeasurementRooms };
+                            const updatedFormData = dryingUpdate 
+                                ? { ...dryingUpdate, measurementRooms: updatedMeasurementRooms, rooms: updatedRooms } 
+                                : { ...prev, measurementRooms: updatedMeasurementRooms, rooms: updatedRooms };
                             
                             setFormData(updatedFormData);
                             
@@ -7707,6 +7733,7 @@ END:VCARD`;
                 })()}
                 <MeasurementModal
                     isTechnicianMode={mode === 'technician'}
+                    isNewMeasurement={isNewMeasurement}
                     key={activeRoomForMeasurement?.id || 'none'}
                     isOpen={showMeasurementModal}
                     onClose={() => {
@@ -7877,13 +7904,34 @@ END:VCARD`;
                                 updatedMeasurementRooms.push(finalRoom);
                             }
 
+                            // --- ALSO UPDATE IN formData.rooms SO IT IS VISIBLE ON DESKTOP ---
+                            const roomsList = Array.isArray(prev.rooms) ? prev.rooms : [];
+                            const roomIndexInList = roomsList.findIndex(r => 
+                                String(r.apartment || 'Allgemeiner Bereich').trim().toLowerCase().replace(/-/g, ' ').replace(/\s+/g, ' ') === normApt &&
+                                String(r.name || 'Unbenannter Raum').trim().toLowerCase().replace(/-/g, ' ').replace(/\s+/g, ' ') === normName
+                            );
+                            let updatedRooms = [...roomsList];
+                            if (roomIndexInList >= 0) {
+                                updatedRooms[roomIndexInList] = {
+                                    ...updatedRooms[roomIndexInList],
+                                    name: finalRoom.name,
+                                    apartment: finalRoom.apartment,
+                                    measurementData: finalRoom.measurementData,
+                                    measurementHistory: finalRoom.measurementHistory
+                                };
+                            } else {
+                                updatedRooms.push(finalRoom);
+                            }
+
                             setTimeout(() => setActiveRoomForMeasurement(finalRoom), 0);
                             
                             const measuredAt = globalSettings.date ? new Date(globalSettings.date).toISOString() : new Date().toISOString();
                             const documentationComplete = !!(measurements && measurements.length > 0 && globalSettings.date);
-                            const dryingUpdate = applyDryingCheck({ ...prev, measurementRooms: updatedMeasurementRooms }, { measuredAt, documentationComplete });
+                            const dryingUpdate = applyDryingCheck({ ...prev, measurementRooms: updatedMeasurementRooms, rooms: updatedRooms }, { measuredAt, documentationComplete });
                             
-                            const updatedFormData = dryingUpdate ? { ...dryingUpdate, measurementRooms: updatedMeasurementRooms } : { ...prev, measurementRooms: updatedMeasurementRooms };
+                            const updatedFormData = dryingUpdate 
+                                ? { ...dryingUpdate, measurementRooms: updatedMeasurementRooms, rooms: updatedRooms } 
+                                : { ...prev, measurementRooms: updatedMeasurementRooms, rooms: updatedRooms };
                             
                             setFormData(updatedFormData);
                             

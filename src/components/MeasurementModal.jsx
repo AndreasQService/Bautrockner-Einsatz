@@ -166,7 +166,7 @@ const DraggablePhoto = ({ photo, index, selected, onSelect, onDeselect, onDelete
     );
 };
 
-const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNew, onBackToDashboard, rooms, allRooms = [], projectTitle, address, apartments = [], initialData, readOnly, measurementHistory }) => {
+const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNew, onBackToDashboard, rooms, allRooms = [], projectTitle, address, apartments = [], initialData, readOnly, measurementHistory, isNewMeasurement }) => {
 
     const dynamicRoomOptions = Array.from(new Set([
         ...(ROOM_OPTIONS || []),
@@ -550,7 +550,7 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
         if (isSuccess) return;
 
         const currentRoomId = rooms && rooms.length > 0 ? rooms[0].id : null;
-        const isNewMeasurementFlag = rooms && rooms.length > 0 ? rooms[0].isNewMeasurement : false;
+        const isNewMeasurementFlag = isNewMeasurement !== undefined ? isNewMeasurement : (rooms && rooms.length > 0 ? rooms[0].isNewMeasurement : false);
         
         if (!currentRoomId) return;
 

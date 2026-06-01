@@ -22,10 +22,36 @@ export const generateMeasurementExcel = async (formData) => {
         console.error("Error loading logo for Excel:", err);
     }
 
-    // 2. Filter Rooms with Data
-    const roomsWithData = formData.rooms.filter(room =>
-        (room.measurementData && room.measurementData.canvasImage) ||
-        (room.measurementData && room.measurementData.measurements && room.measurementData.measurements.length > 0)
+    // 2. Support both full formData object AND a single room object
+    let actualFormData = formData || {};
+    let roomsSource = [];
+
+    // If it's a single room object
+    if (formData && !Array.isArray(formData.rooms) && !Array.isArray(formData.measurementRooms) && formData.name) {
+        actualFormData = {
+            projectTitle: formData.projectTitle || '',
+            locationDetails: formData.locationDetails || '',
+            street: formData.street || '',
+            zip: formData.zip || '',
+            city: formData.city || '',
+            rooms: [formData]
+        };
+        roomsSource = [formData];
+    } else {
+        roomsSource = Array.isArray(actualFormData.measurementRooms) && actualFormData.measurementRooms.length > 0
+            ? actualFormData.measurementRooms
+            : (actualFormData.rooms || []);
+    }
+
+    const roomsWithData = roomsSource.filter(room =>
+        room && (
+            (room.measurementData && room.measurementData.canvasImage) ||
+            (room.measurementData && room.measurementData.measurements && room.measurementData.measurements.length > 0) ||
+            (Array.isArray(room.measurementHistory) && room.measurementHistory.length > 0) ||
+            (Array.isArray(room.measurements) && room.measurements.length > 0) ||
+            (Array.isArray(room.measurementPoints) && room.measurementPoints.length > 0) ||
+            (Array.isArray(room.points) && room.points.length > 0)
+        )
     );
 
     if (roomsWithData.length === 0) {
@@ -84,9 +110,9 @@ export const generateMeasurementExcel = async (formData) => {
 
         // Define Project Info
         const infoData = [
-            { label: 'Projekt:', value: formData.projectTitle || '' },
-            { label: 'Schadenort:', value: formData.locationDetails || '' },
-            { label: 'Adresse:', value: `${formData.street || ''}, ${formData.zip} ${formData.city || ''}` },
+            { label: 'Projekt:', value: actualFormData.projectTitle || '' },
+            { label: 'Schadenort:', value: actualFormData.locationDetails || '' },
+            { label: 'Adresse:', value: `${actualFormData.street || ''}, ${actualFormData.zip || ''} ${actualFormData.city || ''}` },
             { label: 'Raum:', value: room.name },
             { label: 'Wohnung:', value: room.apartment || '' }
         ];
@@ -290,7 +316,7 @@ export const generateMeasurementExcel = async (formData) => {
 
     // 4. Save/Return
     const buffer = await workbook.xlsx.writeBuffer();
-    const fileName = `Messprotokoll_${formData.projectTitle || 'Export'}_${new Date().toISOString().slice(0, 10)}.xlsx`;
+    const fileName = `Messprotokoll_${actualFormData.projectTitle || 'Export'}_${new Date().toISOString().slice(0, 10)}.xlsx`;
     const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
 
     saveAs(blob, fileName);

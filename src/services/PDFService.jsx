@@ -85,6 +85,23 @@ export const PDFService = {
         }
 
         const processedImages = tempProcessedImages.filter(img => img.isRenderable);
+
+        // Add room measurement protocol sketches
+        const roomsSource = Array.isArray(formData.measurementRooms) && formData.measurementRooms.length > 0
+            ? formData.measurementRooms
+            : (formData.rooms || []);
+            
+        roomsSource.forEach(room => {
+            if (room && room.measurementData && room.measurementData.canvasImage) {
+                processedImages.push({
+                    id: `canvas_${room.id}`,
+                    preview: room.measurementData.canvasImage,
+                    assignedTo: 'Messprotokolle',
+                    includeInReport: true,
+                    name: `Messprotokoll - ${room.name}`
+                });
+            }
+        });
         const causePhotos = processedImages.filter(img => img.assignedTo === 'Schadenfotos');
         const processedHeroImages = causePhotos.map(img => img.preview);
 
@@ -466,6 +483,23 @@ export const PDFService = {
 
         // Final list for the PDF Document (only images)
         const processedImages = tempProcessedImages.filter(img => img.isRenderable);
+
+        // Add room measurement protocol sketches
+        const roomsSource = Array.isArray(dataToUse.measurementRooms) && dataToUse.measurementRooms.length > 0
+            ? dataToUse.measurementRooms
+            : (dataToUse.rooms || []);
+            
+        roomsSource.forEach(room => {
+            if (room && room.measurementData && room.measurementData.canvasImage) {
+                processedImages.push({
+                    id: `canvas_${room.id}`,
+                    preview: room.measurementData.canvasImage,
+                    assignedTo: 'Messprotokolle',
+                    includeInReport: true,
+                    name: `Messprotokoll - ${room.name}`
+                });
+            }
+        });
         console.log(`[PDFService Master] Bild-Filterung abgeschlossen: ${processedImages.length} Bilder renderbar.`);
 
         // 3. Process Hero Images (Cause Photos marked for report)
