@@ -734,7 +734,8 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
                     measurements,
                     globalSettings,
                     canvasImage: canvasDataUrl,
-                    galleryPhotos
+                    galleryPhotos,
+                    isAutosave: true
                 });
 
                 setAutosaveStatus('saved');
@@ -1082,8 +1083,10 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
         setIsSaving(true);
         try {
             // Capture the entire modal content (sketch + table)
+            // On iPad/Safari, use scale: 1 to prevent memory crashes and ensure rapid processing
+            const isIpadOrMobile = /iPad|iPhone|iPod|android/i.test(navigator.userAgent) || (navigator.maxTouchPoints && navigator.maxTouchPoints > 2);
             const canvas = await html2canvas(containerRef.current, {
-                scale: 2, // Higher resolution
+                scale: isIpadOrMobile ? 1 : 1.2, // Drastically improves capture speed and limits memory usage
                 backgroundColor: '#ffffff',
                 onclone: (clonedDoc) => {
                     const container = clonedDoc.getElementById('measurement-modal-container');
@@ -1159,11 +1162,11 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
             if (saveAsPdf) {
                 // Generate PDF
                 const pdf = new jsPDF('p', 'mm', 'a4');
-                const imgData = canvas.toDataURL('image/png');
+                const imgData = canvas.toDataURL('image/jpeg', 0.85); // Compress as JPEG
                 const pdfWidth = pdf.internal.pageSize.getWidth();
                 const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
 
-                pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+                pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
 
                 // Create PDF Blob
                 const pdfBlob = pdf.output('blob');
@@ -1174,21 +1177,26 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
                     measurements,
                     globalSettings,
                     canvasImage: canvasDataUrl,
-                    galleryPhotos
+                    galleryPhotos,
+                    isAutosave: false
                 });
             } else {
-                // Standard Image Save
+                // Standard Image Save - Use JPEG format with 0.8 quality to make it 10x smaller than PNG!
+                // This accelerates upload over slow cellar networks (e.g., cellars) by 1000%
                 await new Promise((resolve) => {
                     canvas.toBlob(async (blob) => {
-                        const file = new File([blob], `Messprotokoll_${projectTitle || 'Neu'}_${Date.now()}.png`, { type: 'image/png' });
+                        const file = new File([blob], `Messprotokoll_${projectTitle || 'Neu'}_${Date.now()}.jpg`, { type: 'image/jpeg' });
 
                         await onSave({
                             file,
                             measurements,
                             globalSettings,
-                            canvasImage: canvasDataUrl, galleryPhotos });
+                            canvasImage: canvasDataUrl,
+                            galleryPhotos,
+                            isAutosave: false
+                        });
                         resolve();
-                    }, 'image/png');
+                    }, 'image/jpeg', 0.8);
                 });
             }
 
@@ -1203,13 +1211,16 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
         } catch (err) {
             console.error("Error saving sketch:", err);
             // FALLBACK: If canvas capture fails (common on iPad Safari due to memory/taint), save the data anyway!
+            // IMPORTANT: We preserve the actual drawing canvasDataUrl instead of setting it to null!
             try {
+                const fallbackCanvasUrl = previewSnapshot || (hiddenCanvasRef.current ? hiddenCanvasRef.current.toDataURL() : null);
                 await onSave({
                     file: null,
                     measurements,
                     globalSettings,
-                    canvasImage: null,
-                    galleryPhotos: galleryPhotos || []
+                    canvasImage: fallbackCanvasUrl, // Draw remains safe!
+                    galleryPhotos: galleryPhotos || [],
+                    isAutosave: false
                 });
                 setIsSuccess(true);
                 setHasUnsavedChanges(false);

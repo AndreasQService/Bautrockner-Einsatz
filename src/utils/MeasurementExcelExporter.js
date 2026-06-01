@@ -200,10 +200,31 @@ export const generateMeasurementExcel = async (formData) => {
         currentRow += infoData.length + 2; // Space after info block
 
         // --- Sketch Image ---
+        let sketchImage = null;
         if (room.measurementData && room.measurementData.canvasImage) {
+            sketchImage = room.measurementData.canvasImage;
+        } else if (room.canvasImage) {
+            sketchImage = room.canvasImage;
+        } else if (Array.isArray(room.measurementHistory) && room.measurementHistory.length > 0) {
+            // Find the latest history entry that has a canvasImage
+            const sortedHist = [...room.measurementHistory].sort((a, b) => {
+                const da = a.date || a.datum || a.timestamp || a.createdAt || a.globalSettings?.date || 0;
+                const db = b.date || b.datum || b.timestamp || b.createdAt || b.globalSettings?.date || 0;
+                return new Date(db) - new Date(da);
+            });
+            const entryWithSketch = sortedHist.find(h => h.canvasImage || h.globalSettings?.canvasImage);
+            if (entryWithSketch) {
+                sketchImage = entryWithSketch.canvasImage || entryWithSketch.globalSettings?.canvasImage;
+            }
+        }
+
+        if (sketchImage) {
             try {
+                // Ensure raw base64 is passed to exceljs (strip data url header if present)
+                const base64Raw = sketchImage.includes(';base64,') ? sketchImage.split(';base64,')[1] : sketchImage;
+                
                 const imageId = workbook.addImage({
-                    base64: room.measurementData.canvasImage,
+                    base64: base64Raw,
                     extension: 'png',
                 });
 

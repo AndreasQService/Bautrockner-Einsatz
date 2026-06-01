@@ -145,6 +145,21 @@ const addAnnotationToImage = (imgSrc, type = 'circle') => {
 const getMeasurementEntries = (room) => {
   const entries = [];
 
+  // 1. Current active measurement (measurementData) is the newest
+  if (room.measurementData && Array.isArray(room.measurementData.measurements) && room.measurementData.measurements.length > 0) {
+    entries.push({
+      source: 'measurementData',
+      date: room.measurementData.globalSettings?.date || room.measurementData.date || room.measurementData.timestamp || new Date().toISOString(),
+      device: room.measurementData.globalSettings?.device || room.measurementData.device,
+      temperature: room.measurementData.globalSettings?.temperature || room.measurementData.temperature,
+      humidity: room.measurementData.globalSettings?.humidity || room.measurementData.humidity,
+      measurements: room.measurementData.measurements,
+      canvasImage: room.measurementData.canvasImage || room.canvasImage,
+      protocolUrl: room.measurementData.protocolUrl || room.protocolUrl
+    });
+  }
+
+  // 2. Measurement history (historical entries)
   if (Array.isArray(room.measurementHistory)) {
     entries.push(...room.measurementHistory.map(h => ({
       source: 'history',
@@ -158,38 +173,31 @@ const getMeasurementEntries = (room) => {
     })));
   }
 
-  if (room.measurementData && Array.isArray(room.measurementData.measurements)) {
-    entries.push({
-      source: 'measurementData',
-      date: room.measurementData.globalSettings?.date,
-      device: room.measurementData.globalSettings?.device,
-      temperature: room.measurementData.globalSettings?.temperature,
-      humidity: room.measurementData.globalSettings?.humidity,
-      measurements: room.measurementData.measurements,
-      canvasImage: room.measurementData.canvasImage,
-      protocolUrl: room.measurementData.protocolUrl
-    });
-  }
+  // 3. Basic fallback arrays (only if no entries collected yet, or as raw data)
+  if (entries.length === 0) {
+    if (Array.isArray(room.measurements)) {
+      entries.push({
+        source: 'measurements',
+        measurements: room.measurements,
+        canvasImage: room.canvasImage
+      });
+    }
 
-  if (Array.isArray(room.measurements)) {
-    entries.push({
-      source: 'measurements',
-      measurements: room.measurements
-    });
-  }
+    if (Array.isArray(room.measurementPoints)) {
+      entries.push({
+        source: 'measurementPoints',
+        measurements: room.measurementPoints,
+        canvasImage: room.canvasImage
+      });
+    }
 
-  if (Array.isArray(room.measurementPoints)) {
-    entries.push({
-      source: 'measurementPoints',
-      measurements: room.measurementPoints
-    });
-  }
-
-  if (Array.isArray(room.points)) {
-    entries.push({
-      source: 'points',
-      measurements: room.points
-    });
+    if (Array.isArray(room.points)) {
+      entries.push({
+        source: 'points',
+        measurements: room.points,
+        canvasImage: room.canvasImage
+      });
+    }
   }
 
   return entries.filter(e => Array.isArray(e.measurements) && e.measurements.length > 0);
@@ -320,7 +328,67 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         selectedMeasures: Array.isArray(initialData.selectedMeasures) ? initialData.selectedMeasures : [],
         measureNotes: initialData.measureNotes || {},
         includeDescriptionInReport: initialData.includeDescriptionInReport !== false, // Default to true
-        rooms: Array.isArray(initialData.rooms) ? initialData.rooms : [],
+        rooms: (() => {
+            const rList = Array.isArray(initialData.rooms) ? [...initialData.rooms] : [];
+            const mList = Array.isArray(initialData.measurementRooms) ? initialData.measurementRooms : [];
+            
+            // Merge measurementRooms into rooms to ensure they are all visible in the room list on the PC/Desktop
+            mList.forEach(mr => {
+                const normApt = String(mr.apartment || 'Allgemeiner Bereich').trim().toLowerCase().replace(/-/g, ' ').replace(/\s+/g, ' ');
+                const normName = String(mr.name || 'Unbenannter Raum').trim().toLowerCase().replace(/-/g, ' ').replace(/\s+/g, ' ');
+
+                const existingIdx = rList.findIndex(r => 
+                    r.id === mr.id || (
+                        String(r.apartment || 'Allgemeiner Bereich').trim().toLowerCase().replace(/-/g, ' ').replace(/\s+/g, ' ') === normApt &&
+                        String(r.name || 'Unbenannter Raum').trim().toLowerCase().replace(/-/g, ' ').replace(/\s+/g, ' ') === normName
+                    )
+                );
+                if (existingIdx >= 0) {
+                    // Update existing room with measurement properties
+                    const oldMData = rList[existingIdx].measurementData || {};
+                    const newMData = mr.measurementData || {};
+                    
+                    const existingCanvas = rList[existingIdx].canvasImage || rList[existingIdx].measurementData?.canvasImage || mr.canvasImage || mr.measurementData?.canvasImage || null;
+                    const existingSketch = rList[existingIdx].sketch || rList[existingIdx].measurementData?.sketch || mr.sketch || mr.measurementData?.sketch || null;
+                    
+                    const mergedMData = mr.measurementData ? {
+                        ...oldMData,
+                        ...newMData,
+                        canvasImage: newMData.canvasImage || oldMData.canvasImage || existingCanvas,
+                        sketch: newMData.sketch || oldMData.sketch || existingSketch
+                    } : {
+                        ...oldMData,
+                        canvasImage: oldMData.canvasImage || existingCanvas,
+                        sketch: oldMData.sketch || existingSketch
+                    };
+
+                    rList[existingIdx] = {
+                        ...mr, // mr has measurement properties
+                        ...rList[existingIdx], // preserve real room data from rooms list
+                        id: rList[existingIdx].id || mr.id,
+                        measurementData: mergedMData,
+                        measurementHistory: mr.measurementHistory || rList[existingIdx].measurementHistory,
+                        canvasImage: existingCanvas,
+                        sketch: existingSketch
+                    };
+                } else {
+                    // Room only has measurement data, add it to the rooms list
+                    const sketchImg = mr.canvasImage || mr.measurementData?.canvasImage || null;
+                    const sketchField = mr.sketch || mr.measurementData?.sketch || null;
+                    rList.push({
+                        ...mr,
+                        canvasImage: sketchImg,
+                        sketch: sketchField,
+                        measurementData: mr.measurementData ? {
+                            ...mr.measurementData,
+                            canvasImage: mr.measurementData.canvasImage || sketchImg,
+                            sketch: mr.measurementData.sketch || sketchField
+                        } : (sketchImg || sketchField ? { canvasImage: sketchImg, sketch: sketchField } : null)
+                    });
+                }
+            });
+            return rList;
+        })(),
         measurementRooms: Array.isArray(initialData.measurementRooms) ? initialData.measurementRooms : []
     } : {
         id: null,
@@ -384,7 +452,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         });
     }, [formData.measurementRooms]);
 
-    // Sync asynchronously loaded initialData fields (like exteriorPhoto and images) back to local state
+    // Sync asynchronously loaded initialData fields (like exteriorPhoto, images, rooms, and measurementRooms) back to local state
     useEffect(() => {
         if (initialData?.exteriorPhoto && !formData.exteriorPhoto) {
             setFormData(prev => ({ ...prev, exteriorPhoto: initialData.exteriorPhoto }));
@@ -394,6 +462,81 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         }
         if (initialData?.damageTypeImage && !formData.damageTypeImage) {
             setFormData(prev => ({ ...prev, damageTypeImage: initialData.damageTypeImage }));
+        }
+
+        // Sync asynchronously loaded rooms and measurementRooms when transitioning from lightweight to fully loaded
+        if (initialData && !initialData.isLightweight) {
+            const localHasMeasurements = formData.measurementRooms && formData.measurementRooms.length > 0;
+            const incomingHasMeasurements = initialData.measurementRooms && initialData.measurementRooms.length > 0;
+            
+            if (!localHasMeasurements && incomingHasMeasurements) {
+                console.log('[SYNC] Populating rooms and measurementRooms from fully loaded initialData');
+                setFormData(prev => {
+                    if (prev.measurementRooms && prev.measurementRooms.length > 0) return prev;
+                    
+                    const rList = Array.isArray(initialData.rooms) ? [...initialData.rooms] : [];
+                    const mList = Array.isArray(initialData.measurementRooms) ? initialData.measurementRooms : [];
+                    
+                    mList.forEach(mr => {
+                        const normApt = String(mr.apartment || 'Allgemeiner Bereich').trim().toLowerCase().replace(/-/g, ' ').replace(/\s+/g, ' ');
+                        const normName = String(mr.name || 'Unbenannter Raum').trim().toLowerCase().replace(/-/g, ' ').replace(/\s+/g, ' ');
+
+                        const existingIdx = rList.findIndex(r => 
+                            r.id === mr.id || (
+                                String(r.apartment || 'Allgemeiner Bereich').trim().toLowerCase().replace(/-/g, ' ').replace(/\s+/g, ' ') === normApt &&
+                                String(r.name || 'Unbenannter Raum').trim().toLowerCase().replace(/-/g, ' ').replace(/\s+/g, ' ') === normName
+                            )
+                        );
+                        if (existingIdx >= 0) {
+                            const oldMData = rList[existingIdx].measurementData || {};
+                            const newMData = mr.measurementData || {};
+                            
+                            const existingCanvas = rList[existingIdx].canvasImage || rList[existingIdx].measurementData?.canvasImage || mr.canvasImage || mr.measurementData?.canvasImage || null;
+                            const existingSketch = rList[existingIdx].sketch || rList[existingIdx].measurementData?.sketch || mr.sketch || mr.measurementData?.sketch || null;
+                            
+                            const mergedMData = mr.measurementData ? {
+                                ...oldMData,
+                                ...newMData,
+                                canvasImage: newMData.canvasImage || oldMData.canvasImage || existingCanvas,
+                                sketch: newMData.sketch || oldMData.sketch || existingSketch
+                            } : {
+                                ...oldMData,
+                                canvasImage: oldMData.canvasImage || existingCanvas,
+                                sketch: oldMData.sketch || existingSketch
+                            };
+
+                            rList[existingIdx] = {
+                                ...mr,
+                                ...rList[existingIdx],
+                                id: rList[existingIdx].id || mr.id,
+                                measurementData: mergedMData,
+                                measurementHistory: mr.measurementHistory || rList[existingIdx].measurementHistory,
+                                canvasImage: existingCanvas,
+                                sketch: existingSketch
+                            };
+                        } else {
+                            const sketchImg = mr.canvasImage || mr.measurementData?.canvasImage || null;
+                            const sketchField = mr.sketch || mr.measurementData?.sketch || null;
+                            rList.push({
+                                ...mr,
+                                canvasImage: sketchImg,
+                                sketch: sketchField,
+                                measurementData: mr.measurementData ? {
+                                    ...mr.measurementData,
+                                    canvasImage: mr.measurementData.canvasImage || sketchImg,
+                                    sketch: mr.measurementData.sketch || sketchField
+                                } : (sketchImg || sketchField ? { canvasImage: sketchImg, sketch: sketchField } : null)
+                            });
+                        }
+                    });
+
+                    return {
+                        ...prev,
+                        rooms: rList,
+                        measurementRooms: mList
+                    };
+                });
+            }
         }
 
         // Restore stripped image previews (Base64) from Supabase load
@@ -413,7 +556,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                 return changed ? { ...prev, images: nextImages } : prev;
             });
         }
-    }, [initialData?.exteriorPhoto, initialData?.customMapImage, initialData?.damageTypeImage, initialData?.images]);
+    }, [initialData?.exteriorPhoto, initialData?.customMapImage, initialData?.damageTypeImage, initialData?.images, initialData?.isLightweight, initialData?.measurementRooms, initialData?.rooms]);
 
     const [isSaving, setIsSaving] = useState(false);
     const [lastSaved, setLastSaved] = useState(null);
@@ -2957,15 +3100,15 @@ END:VCARD`;
                     readOnly={isMeasurementReadOnly}
                     measurementHistory={activeRoomForMeasurement?.measurementHistory || []}
                     rooms={activeRoomForMeasurement ? [activeRoomForMeasurement] : []}
-                    allRooms={[...(formData.rooms || []), ...(formData.measurementRooms || [])]}
+                    allRooms={[...(formData.measurementRooms || []), ...(formData.rooms || [])]}
                     projectTitle={formData.projectTitle}
                     address={[formData.street, formData.zip && formData.city ? `${formData.zip} ${formData.city}` : formData.city].filter(Boolean).join(', ')}
                     apartments={[...new Set((formData.contacts || []).filter(c => c.role === 'Mieter' || c.role === 'Eigentümer').map(c => [c.name, c.apartment].filter(Boolean).join(' - ').trim()).filter(Boolean))]}
-                    initialData={[...(formData.rooms || []), ...(formData.measurementRooms || [])].reduce((acc, r) => {
+                    initialData={[...(formData.measurementRooms || []), ...(formData.rooms || [])].reduce((acc, r) => {
                         if (!r) return acc;
                         let mData = r.measurementData;
                         if (!mData && Array.isArray(r.measurements) && r.measurements.length > 0) {
-                            mData = { measurements: r.measurements, globalSettings: r.globalSettings, canvasImage: r.canvasImage };
+                            mData = { measurements: r.measurements, globalSettings: r.globalSettings, canvasImage: r.canvasImage || r.sketch || null };
                         }
 
                         // History fallback for "Messung fortsetzen" when measurementData is missing
@@ -2985,16 +3128,24 @@ END:VCARD`;
                                         temp: latestHistory.temp || '',
                                         humidity: latestHistory.humidity || ''
                                     },
-                                    canvasImage: latestHistory.canvasImage || null,
+                                    canvasImage: latestHistory.canvasImage || latestHistory.sketch || null,
                                     galleryPhotos: latestHistory.galleryPhotos || []
                                 };
                             }
                         }
 
+                        // Defensive fallback: Make sure if room has canvasImage/sketch, we merge it into mData
+                        if (mData) {
+                            mData = {
+                                ...mData,
+                                canvasImage: mData.canvasImage || r.canvasImage || r.sketch || null
+                            };
+                        }
+
                         if (activeRoomForMeasurement && String(r.id) === String(activeRoomForMeasurement.id) && isNewMeasurement) {
                             if (mData) {
                                 mData = {
-                                    canvasImage: mData.canvasImage || null,
+                                    canvasImage: mData.canvasImage || r.canvasImage || r.sketch || null,
                                     galleryPhotos: mData.galleryPhotos || [],
                                     globalSettings: {
                                         ...(mData.globalSettings || {}),
@@ -3062,13 +3213,16 @@ END:VCARD`;
                                 const existingRoom = measurementRooms[existingRoomIndex];
                                 const history = existingRoom.measurementHistory ? [...existingRoom.measurementHistory] : [];
                                 
+                                const finalCanvasImage = canvasImage || existingRoom.canvasImage || existingRoom.measurementData?.canvasImage || null;
+                                const finalSketch = finalCanvasImage;
+
                                 const updatedHistory = (isNewMeasurement && existingRoom.measurementData && Array.isArray(existingRoom.measurementData.measurements) && existingRoom.measurementData.measurements.length > 0)
                                     ? [{
                                         id: `hist_${Date.now()}_prev`,
                                         date: existingRoom.measurementData.globalSettings?.date || new Date().toISOString(),
                                         measurements: existingRoom.measurementData.measurements.map(m => ({ ...m })),
                                         globalSettings: { ...(existingRoom.measurementData.globalSettings || {}) },
-                                        canvasImage: existingRoom.measurementData.canvasImage,
+                                        canvasImage: existingRoom.measurementData.canvasImage || existingRoom.canvasImage || null,
                                         protocolUrl: existingRoom.measurementData.protocolUrl,
                                         galleryPhotos: existingRoom.measurementData.galleryPhotos || []
                                     }, ...history]
@@ -3078,8 +3232,10 @@ END:VCARD`;
                                     ...existingRoom,
                                     name: globalSettings.room || existingRoom.name,
                                     apartment: globalSettings.apartment || existingRoom.apartment,
-                                    measurementData: { measurements, globalSettings, canvasImage, protocolUrl, galleryPhotos: galleryPhotos || [] },
-                                    measurementHistory: updatedHistory
+                                    measurementData: { measurements, globalSettings, canvasImage: finalCanvasImage, sketch: finalSketch, protocolUrl, galleryPhotos: galleryPhotos || [] },
+                                    measurementHistory: updatedHistory,
+                                    canvasImage: finalCanvasImage,
+                                    sketch: finalSketch
                                 };
                                 updatedMeasurementRooms[existingRoomIndex] = finalRoom;
                             } else {
@@ -3090,13 +3246,17 @@ END:VCARD`;
                                 });
 
                                 const history = activeRoomForMeasurement.measurementHistory ? [...activeRoomForMeasurement.measurementHistory] : [];
+                                
+                                const finalCanvasImage = canvasImage || activeRoomForMeasurement.canvasImage || activeRoomForMeasurement.measurementData?.canvasImage || null;
+                                const finalSketch = finalCanvasImage;
+
                                 const updatedHistory = (isNewMeasurement && activeRoomForMeasurement.measurementData && Array.isArray(activeRoomForMeasurement.measurementData.measurements) && activeRoomForMeasurement.measurementData.measurements.length > 0)
                                     ? [{
                                         id: `hist_${Date.now()}_prev`,
                                         date: activeRoomForMeasurement.measurementData.globalSettings?.date || new Date().toISOString(),
                                         measurements: activeRoomForMeasurement.measurementData.measurements.map(m => ({ ...m })),
                                         globalSettings: { ...(activeRoomForMeasurement.measurementData.globalSettings || {}) },
-                                        canvasImage: activeRoomForMeasurement.measurementData.canvasImage,
+                                        canvasImage: activeRoomForMeasurement.measurementData.canvasImage || activeRoomForMeasurement.canvasImage || null,
                                         protocolUrl: activeRoomForMeasurement.measurementData.protocolUrl,
                                         galleryPhotos: activeRoomForMeasurement.measurementData.galleryPhotos || []
                                     }, ...history]
@@ -3106,8 +3266,10 @@ END:VCARD`;
                                     ...activeRoomForMeasurement,
                                     ...baseRoom,
                                     id: `room_${Date.now()}`,
-                                    measurementData: { measurements, globalSettings, canvasImage, protocolUrl, galleryPhotos: galleryPhotos || [] },
-                                    measurementHistory: updatedHistory
+                                    measurementData: { measurements, globalSettings, canvasImage: finalCanvasImage, sketch: finalSketch, protocolUrl, galleryPhotos: galleryPhotos || [] },
+                                    measurementHistory: updatedHistory,
+                                    canvasImage: finalCanvasImage,
+                                    sketch: finalSketch
                                 };
                                 updatedMeasurementRooms.push(finalRoom);
                             }
@@ -3125,7 +3287,9 @@ END:VCARD`;
                                     name: finalRoom.name,
                                     apartment: finalRoom.apartment,
                                     measurementData: finalRoom.measurementData,
-                                    measurementHistory: finalRoom.measurementHistory
+                                    measurementHistory: finalRoom.measurementHistory,
+                                    canvasImage: finalRoom.canvasImage,
+                                    sketch: finalRoom.sketch
                                 };
                             } else {
                                 updatedRooms.push(finalRoom);
@@ -3144,7 +3308,7 @@ END:VCARD`;
                             setFormData(updatedFormData);
                             
                             if (typeof onSave === 'function') {
-                                onSave(updatedFormData, true);
+                                onSave(updatedFormData, data?.isAutosave ?? false);
                             }
 
                             setIsNewMeasurement(false); // So subsequent saves don't duplicate history
@@ -6749,7 +6913,7 @@ END:VCARD`;
                         {isMeasurementsExpanded && (() => {
                             const allUniqueRooms = [];
                             const seenRoomIds = new Set();
-                            [...(formData.rooms || []), ...(formData.measurementRooms || [])].forEach(r => {
+                            [...(formData.measurementRooms || []), ...(formData.rooms || [])].forEach(r => {
                                 if (r && !seenRoomIds.has(r.id)) {
                                     seenRoomIds.add(r.id);
                                     allUniqueRooms.push(r);
@@ -6761,7 +6925,7 @@ END:VCARD`;
                                 room,
                                 entries: getMeasurementEntries(room)
                               }))
-                              .filter(x => x.entries.length > 0);
+                                    .filter(x => x.entries.length > 0);
 
                             if (measuredRooms.length === 0) {
                                 return (
@@ -6776,13 +6940,37 @@ END:VCARD`;
                                     {measuredRooms.map(({ room, entries }) => {
                                         const latestEntry = entries[0];
                                         const dateStr = latestEntry.date ? new Date(latestEntry.date).toLocaleDateString('de-CH') : 'Kein Datum';
-                                        
-                                        const canvasImage = latestEntry.canvasImage || room.canvasImage;
                                         const protocolUrl = latestEntry.protocolUrl || room.protocolUrl;
 
-                                        const allImages = [
-                                            ...(canvasImage ? [{ id: 'current', src: canvasImage, label: `Aktuell · ${dateStr}`, isCurrent: true }] : [])
-                                        ];
+                                        const allImages = [];
+                                        const seenCanvasImages = new Set();
+                                        
+                                        // 1. Gather canvas images from entries
+                                        entries.forEach((entry, idx) => {
+                                            const entryImage = entry.canvasImage;
+                                            if (entryImage && !seenCanvasImages.has(entryImage)) {
+                                                seenCanvasImages.add(entryImage);
+                                                const entryDate = entry.date ? new Date(entry.date).toLocaleDateString('de-CH') : 'Messung';
+                                                const isCurrent = entry.source === 'measurementData' || (idx === 0 && entry.source !== 'history');
+                                                allImages.push({
+                                                    id: entry.id || `sketch_${idx}_${entry.date}`,
+                                                    src: entryImage,
+                                                    label: isCurrent ? `Aktuell · ${entryDate}` : `Verlauf · ${entryDate}`,
+                                                    isCurrent: isCurrent
+                                                 });
+                                             }
+                                         });
+
+                                         // 2. Fallback to room-level canvasImage
+                                         if (room.canvasImage && !seenCanvasImages.has(room.canvasImage)) {
+                                             seenCanvasImages.add(room.canvasImage);
+                                             allImages.push({
+                                                 id: 'room_fallback',
+                                                 src: room.canvasImage,
+                                                 label: `Skizze · ${dateStr}`,
+                                                 isCurrent: true
+                                             });
+                                         }
 
                                         let maxW = '-';
                                         let maxB = '-';
@@ -7746,7 +7934,7 @@ END:VCARD`;
                 <MeasurementModal
                     isTechnicianMode={mode === 'technician'}
                     isNewMeasurement={isNewMeasurement}
-                    key={activeRoomForMeasurement?.id || 'none'}
+                    key={activeRoomForMeasurement?.measurementSessionId || `${activeRoomForMeasurement?.id || 'none'}_${activeRoomForMeasurement?.isNewMeasurement ? 'new' : 'open'}`}
                     isOpen={showMeasurementModal}
                     onClose={() => {
                         setShowMeasurementModal(false);
@@ -7765,14 +7953,14 @@ END:VCARD`;
                     readOnly={isMeasurementReadOnly}
                     measurementHistory={activeRoomForMeasurement?.measurementHistory || []}
                     rooms={activeRoomForMeasurement ? [activeRoomForMeasurement] : []}
-                    allRooms={[...(formData.rooms || []), ...(formData.measurementRooms || [])]}
+                    allRooms={[...(formData.measurementRooms || []), ...(formData.rooms || [])]}
                     projectTitle={formData.projectTitle}
                     address={[formData.street, formData.zip && formData.city ? `${formData.zip} ${formData.city}` : formData.city].filter(Boolean).join(', ')}
                     apartments={[...new Set((formData.contacts || []).filter(c => c.role === 'Mieter' || c.role === 'Eigentümer').map(c => [c.name, c.apartment].filter(Boolean).join(' - ').trim()).filter(Boolean))]}
-                    initialData={[...(formData.rooms || []), ...(formData.measurementRooms || [])].reduce((acc, r) => {
+                    initialData={[...(formData.measurementRooms || []), ...(formData.rooms || [])].reduce((acc, r) => {
                         let mData = r.measurementData;
                         if (!mData && Array.isArray(r.measurements) && r.measurements.length > 0) {
-                            mData = { measurements: r.measurements, globalSettings: r.globalSettings, canvasImage: r.canvasImage };
+                            mData = { measurements: r.measurements, globalSettings: r.globalSettings, canvasImage: r.canvasImage || r.sketch || null };
                         }
 
                         // History fallback for "Messung fortsetzen" when measurementData is missing
@@ -7792,16 +7980,24 @@ END:VCARD`;
                                         temp: latestHistory.temp || '',
                                         humidity: latestHistory.humidity || ''
                                     },
-                                    canvasImage: latestHistory.canvasImage || null,
+                                    canvasImage: latestHistory.canvasImage || latestHistory.sketch || null,
                                     galleryPhotos: latestHistory.galleryPhotos || []
                                 };
                             }
                         }
 
+                        // Defensive fallback: Make sure if room has canvasImage/sketch, we merge it into mData
+                        if (mData) {
+                            mData = {
+                                ...mData,
+                                canvasImage: mData.canvasImage || r.canvasImage || r.sketch || null
+                            };
+                        }
+
                         if (activeRoomForMeasurement && String(r.id) === String(activeRoomForMeasurement.id) && isNewMeasurement) {
                             if (mData) {
                                 mData = {
-                                    canvasImage: mData.canvasImage || null,
+                                    canvasImage: mData.canvasImage || r.canvasImage || r.sketch || null,
                                     galleryPhotos: mData.galleryPhotos || [],
                                     globalSettings: {
                                         ...(mData.globalSettings || {}),
@@ -7869,13 +8065,16 @@ END:VCARD`;
                                 const existingRoom = measurementRooms[existingRoomIndex];
                                 const history = existingRoom.measurementHistory ? [...existingRoom.measurementHistory] : [];
                                 
+                                const finalCanvasImage = canvasImage || existingRoom.canvasImage || existingRoom.measurementData?.canvasImage || null;
+                                const finalSketch = finalCanvasImage;
+
                                 const updatedHistory = (isNewMeasurement && existingRoom.measurementData && Array.isArray(existingRoom.measurementData.measurements) && existingRoom.measurementData.measurements.length > 0)
                                     ? [{
                                         id: `hist_${Date.now()}_prev`,
                                         date: existingRoom.measurementData.globalSettings?.date || new Date().toISOString(),
                                         measurements: existingRoom.measurementData.measurements.map(m => ({ ...m })),
                                         globalSettings: { ...(existingRoom.measurementData.globalSettings || {}) },
-                                        canvasImage: existingRoom.measurementData.canvasImage,
+                                        canvasImage: existingRoom.measurementData.canvasImage || existingRoom.canvasImage || null,
                                         protocolUrl: existingRoom.measurementData.protocolUrl,
                                         galleryPhotos: existingRoom.measurementData.galleryPhotos || []
                                     }, ...history]
@@ -7885,8 +8084,10 @@ END:VCARD`;
                                     ...existingRoom,
                                     name: globalSettings.room || existingRoom.name,
                                     apartment: globalSettings.apartment || existingRoom.apartment,
-                                    measurementData: { measurements, globalSettings, canvasImage, protocolUrl, galleryPhotos: galleryPhotos || [] },
-                                    measurementHistory: updatedHistory
+                                    measurementData: { measurements, globalSettings, canvasImage: finalCanvasImage, sketch: finalSketch, protocolUrl, galleryPhotos: galleryPhotos || [] },
+                                    measurementHistory: updatedHistory,
+                                    canvasImage: finalCanvasImage,
+                                    sketch: finalSketch
                                 };
                                 updatedMeasurementRooms[existingRoomIndex] = finalRoom;
                             } else {
@@ -7897,13 +8098,17 @@ END:VCARD`;
                                 });
 
                                 const history = activeRoomForMeasurement.measurementHistory ? [...activeRoomForMeasurement.measurementHistory] : [];
+                                
+                                const finalCanvasImage = canvasImage || activeRoomForMeasurement.canvasImage || activeRoomForMeasurement.measurementData?.canvasImage || null;
+                                const finalSketch = finalCanvasImage;
+
                                 const updatedHistory = (isNewMeasurement && activeRoomForMeasurement.measurementData && Array.isArray(activeRoomForMeasurement.measurementData.measurements) && activeRoomForMeasurement.measurementData.measurements.length > 0)
                                     ? [{
                                         id: `hist_${Date.now()}_prev`,
                                         date: activeRoomForMeasurement.measurementData.globalSettings?.date || new Date().toISOString(),
                                         measurements: activeRoomForMeasurement.measurementData.measurements.map(m => ({ ...m })),
                                         globalSettings: { ...(activeRoomForMeasurement.measurementData.globalSettings || {}) },
-                                        canvasImage: activeRoomForMeasurement.measurementData.canvasImage,
+                                        canvasImage: activeRoomForMeasurement.measurementData.canvasImage || activeRoomForMeasurement.canvasImage || null,
                                         protocolUrl: activeRoomForMeasurement.measurementData.protocolUrl,
                                         galleryPhotos: activeRoomForMeasurement.measurementData.galleryPhotos || []
                                     }, ...history]
@@ -7913,8 +8118,10 @@ END:VCARD`;
                                     ...activeRoomForMeasurement,
                                     ...baseRoom,
                                     id: `room_${Date.now()}`,
-                                    measurementData: { measurements, globalSettings, canvasImage, protocolUrl, galleryPhotos: galleryPhotos || [] },
-                                    measurementHistory: updatedHistory
+                                    measurementData: { measurements, globalSettings, canvasImage: finalCanvasImage, sketch: finalSketch, protocolUrl, galleryPhotos: galleryPhotos || [] },
+                                    measurementHistory: updatedHistory,
+                                    canvasImage: finalCanvasImage,
+                                    sketch: finalSketch
                                 };
                                 updatedMeasurementRooms.push(finalRoom);
                             }
@@ -7932,7 +8139,9 @@ END:VCARD`;
                                     name: finalRoom.name,
                                     apartment: finalRoom.apartment,
                                     measurementData: finalRoom.measurementData,
-                                    measurementHistory: finalRoom.measurementHistory
+                                    measurementHistory: finalRoom.measurementHistory,
+                                    canvasImage: finalRoom.canvasImage,
+                                    sketch: finalRoom.sketch
                                 };
                             } else {
                                 updatedRooms.push(finalRoom);
@@ -7951,7 +8160,7 @@ END:VCARD`;
                             setFormData(updatedFormData);
                             
                             if (typeof onSave === 'function') {
-                                onSave(updatedFormData, true);
+                                onSave(updatedFormData, data?.isAutosave ?? false);
                             }
 
                             setIsNewMeasurement(false); // So subsequent saves don't duplicate history

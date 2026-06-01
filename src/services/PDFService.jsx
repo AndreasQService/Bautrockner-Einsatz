@@ -92,10 +92,28 @@ export const PDFService = {
             : (formData.rooms || []);
             
         roomsSource.forEach(room => {
-            if (room && room.measurementData && room.measurementData.canvasImage) {
+            if (!room) return;
+            let sketchImage = null;
+            if (room.measurementData && room.measurementData.canvasImage) {
+                sketchImage = room.measurementData.canvasImage;
+            } else if (room.canvasImage) {
+                sketchImage = room.canvasImage;
+            } else if (Array.isArray(room.measurementHistory) && room.measurementHistory.length > 0) {
+                const sortedHist = [...room.measurementHistory].sort((a, b) => {
+                    const da = a.date || a.datum || a.timestamp || a.createdAt || a.globalSettings?.date || 0;
+                    const db = b.date || b.datum || b.timestamp || b.createdAt || b.globalSettings?.date || 0;
+                    return new Date(db) - new Date(da);
+                });
+                const entryWithSketch = sortedHist.find(h => h.canvasImage || h.globalSettings?.canvasImage);
+                if (entryWithSketch) {
+                    sketchImage = entryWithSketch.canvasImage || entryWithSketch.globalSettings?.canvasImage;
+                }
+            }
+
+            if (sketchImage) {
                 processedImages.push({
                     id: `canvas_${room.id}`,
-                    preview: room.measurementData.canvasImage,
+                    preview: sketchImage,
                     assignedTo: 'Messprotokolle',
                     includeInReport: true,
                     name: `Messprotokoll - ${room.name}`
@@ -490,10 +508,28 @@ export const PDFService = {
             : (dataToUse.rooms || []);
             
         roomsSource.forEach(room => {
-            if (room && room.measurementData && room.measurementData.canvasImage) {
+            if (!room) return;
+            let sketchImage = null;
+            if (room.measurementData && room.measurementData.canvasImage) {
+                sketchImage = room.measurementData.canvasImage;
+            } else if (room.canvasImage) {
+                sketchImage = room.canvasImage;
+            } else if (Array.isArray(room.measurementHistory) && room.measurementHistory.length > 0) {
+                const sortedHist = [...room.measurementHistory].sort((a, b) => {
+                    const da = a.date || a.datum || a.timestamp || a.createdAt || a.globalSettings?.date || 0;
+                    const db = b.date || b.datum || b.timestamp || b.createdAt || b.globalSettings?.date || 0;
+                    return new Date(db) - new Date(da);
+                });
+                const entryWithSketch = sortedHist.find(h => h.canvasImage || h.globalSettings?.canvasImage);
+                if (entryWithSketch) {
+                    sketchImage = entryWithSketch.canvasImage || entryWithSketch.globalSettings?.canvasImage;
+                }
+            }
+
+            if (sketchImage) {
                 processedImages.push({
                     id: `canvas_${room.id}`,
-                    preview: room.measurementData.canvasImage,
+                    preview: sketchImage,
                     assignedTo: 'Messprotokolle',
                     includeInReport: true,
                     name: `Messprotokoll - ${room.name}`

@@ -39,23 +39,41 @@ function sanitizeMeasurementStorage(reportData) {
       );
 
       if (existingIdx >= 0) {
-        const existingRoom = updatedMeasurementRooms[existingIdx];
-        if (!existingRoom.measurementHistory && r.measurementHistory) existingRoom.measurementHistory = r.measurementHistory;
-        if (!existingRoom.measurementData && r.measurementData) existingRoom.measurementData = r.measurementData;
-        if (!existingRoom.canvasImage && r.canvasImage) existingRoom.canvasImage = r.canvasImage;
+        const oldMData = updatedMeasurementRooms[existingIdx].measurementData || {};
+        const newMData = r.measurementData || {};
+        const mergedMData = r.measurementData ? {
+          ...oldMData,
+          ...newMData,
+          canvasImage: newMData.canvasImage || oldMData.canvasImage || r.canvasImage || updatedMeasurementRooms[existingIdx].canvasImage || null,
+          sketch: newMData.sketch || oldMData.sketch || r.sketch || updatedMeasurementRooms[existingIdx].sketch || null
+        } : oldMData;
+
+        updatedMeasurementRooms[existingIdx] = {
+          ...updatedMeasurementRooms[existingIdx],
+          measurementData: mergedMData,
+          measurementHistory: r.measurementHistory || updatedMeasurementRooms[existingIdx].measurementHistory,
+          canvasImage: r.canvasImage || newMData.canvasImage || oldMData.canvasImage || updatedMeasurementRooms[existingIdx].canvasImage || null,
+          sketch: r.sketch || newMData.sketch || oldMData.sketch || updatedMeasurementRooms[existingIdx].sketch || null
+        };
       } else {
+        const sketchImg = r.canvasImage || r.measurementData?.canvasImage || null;
+        const sketchField = r.sketch || r.measurementData?.sketch || null;
         updatedMeasurementRooms.push({
           id: r.id || `room_${Date.now()}`,
           name: r.name,
           apartment: r.apartment,
           stockwerk: r.stockwerk,
-          measurementData: r.measurementData,
+          measurementData: r.measurementData ? {
+            ...r.measurementData,
+            canvasImage: r.measurementData.canvasImage || sketchImg,
+            sketch: r.measurementData.sketch || sketchField
+          } : (sketchImg || sketchField ? { canvasImage: sketchImg, sketch: sketchField } : null),
           measurementHistory: r.measurementHistory,
           measurements: r.measurements,
           measurementPoints: r.measurementPoints,
           points: r.points,
-          canvasImage: r.canvasImage,
-          sketch: r.sketch
+          canvasImage: sketchImg,
+          sketch: sketchField
         });
       }
     }
@@ -114,6 +132,7 @@ function App() {
   const isSessionActiveRef = useRef(true);
   const selectedReportRef = useRef(null);
   const sessionStartedAtRef = useRef(Date.now());
+  const silentSaveDebounceTimers = useRef({});
 
   // Session-Token: einmalig pro Tab (sessionStorage)
   const [mySessionToken] = useState(() => {
@@ -372,11 +391,23 @@ function App() {
 
         const fetchPromise = supabase
           .from('damage_reports')
-          .select('report_data, updated_at');
+          .select('id, updated_at, created_at, project_title, client, address, status, assigned_to, date, drying_started, deleted_at');
 
-        const result = await Promise.race([fetchPromise, timeoutPromise]);
-        const data = result.data;
-        const error = result.error;
+        let result = await Promise.race([fetchPromise, timeoutPromise]);
+        let data = result.data;
+        let error = result.error;
+
+        // Robustes Fallback bei fehlender deleted_at Spalte (Fehler 42703)
+        if (error && error.code === '42703' && String(error.message || '').includes('deleted_at')) {
+          console.warn('[Supabase] Spalte "deleted_at" fehlt in DB. Starte Fallback-Abfrage ohne "deleted_at"...');
+          const fallbackPromise = supabase
+            .from('damage_reports')
+            .select('id, updated_at, created_at, project_title, client, address, status, assigned_to, date, drying_started');
+          result = await Promise.race([fallbackPromise, timeoutPromise]);
+          data = result.data;
+          error = result.error;
+        }
+
         // HINWEIS: Client-seitige Sortierung um Statement Timeout bei großen JSONs zu verhindern
 
         if (error) {
@@ -384,22 +415,30 @@ function App() {
           setSupabaseStatus({ ok: false, count: 0, error: `${error.code}: ${error.message}` });
         } else if (data) {
           const loadedReports = data
-            // Filter out malformed records where report_data is null or not an object
-            .filter(row => row.report_data && typeof row.report_data === 'object')
             // Sortierung auf dem Client um DB Statement Timeouts zu vermeiden
-            .sort((a, b) => new Date(b.report_data?.date || b.updated_at).getTime() - new Date(a.report_data?.date || a.updated_at).getTime())
+            .sort((a, b) => new Date(b.date || b.updated_at).getTime() - new Date(a.date || a.updated_at).getTime())
             .map(row => {
-              const report = row.report_data;
               return {
-                ...report,
-                id: report.id || row.id,
+                id: row.id,
                 _supabase_updated_at: row.updated_at,
-                images: (Array.isArray(report.images) ? report.images : []).map(img => ({
-                  ...img,
-                  includeInReport: img.includeInReport !== false
-                }))
+                created_at: row.created_at,
+                projectTitle: row.project_title || '',
+                client: row.client || '',
+                address: row.address || '',
+                status: row.status || 'Schadenaufnahme',
+                assignedTo: row.assigned_to || '',
+                date: row.date || new Date().toISOString(),
+                dryingStarted: row.drying_started || null,
+                deletedAt: row.deleted_at || null,
+                rooms: [],
+                images: [],
+                equipment: [],
+                contacts: [],
+                isLightweight: true
               };
-            }).filter(r => r && !r._isSession && !r.deleted_at); // Session + soft-deleted ausblenden
+            })
+            // Robuster Filter: Session-Einträge der DB (__session__) sowie gelöschte Projekte herausfiltern
+            .filter(r => r && r.id !== '__session__' && !r.id.startsWith('session_') && r.projectTitle !== '__session__' && !r.deletedAt); // Session + soft-deleted ausblenden
 
           console.log(`[Supabase] ${loadedReports.length} Projekte geladen (${data.length} DB-Einträge gesamt).`);
           console.log('[MEASROOM TRACE] fetchReports loaded', {
@@ -443,16 +482,66 @@ function App() {
   }, []);
 
   const handleSelectReport = async (report) => {
-    setSelectedReport(report);
+    let activeReport = report;
+    if (supabase && report.isLightweight) {
+      try {
+        const { data, error } = await supabase
+          .from('damage_reports')
+          .select('report_data, updated_at')
+          .eq('id', report.id)
+          .single();
+        
+        if (data && !error && data.report_data) {
+          activeReport = {
+            ...data.report_data,
+            id: report.id,
+            _supabase_updated_at: data.updated_at,
+            isLightweight: false
+          };
+          setReports(prev => prev.map(r => r.id === report.id ? activeReport : r));
+        }
+      } catch (err) {
+        console.error("Failed to fetch full report details:", err);
+      }
+    }
+    setSelectedReport(activeReport);
     setView('details');
     setIsSessionActive(true);
     // Projektspezifischen Modus laden
-    const savedMode = report?._projectMode;
+    const savedMode = activeReport?._projectMode;
     const initialMode = (savedMode === 'technician' || savedMode === 'desktop')
       ? savedMode
       : (isTechnicianMode ? 'technician' : 'desktop');
     setProjectMode(initialMode);
   }
+
+  // Automatisches Nachladen der vollständigen Projektdaten im Hintergrund, wenn ein Projekt geöffnet wird/ist
+  useEffect(() => {
+    if (supabase && selectedReport && selectedReport.isLightweight) {
+      const loadFullReport = async () => {
+        try {
+          const { data, error } = await supabase
+            .from('damage_reports')
+            .select('report_data, updated_at')
+            .eq('id', selectedReport.id)
+            .single();
+          if (data && !error && data.report_data) {
+            const fullReport = {
+              ...data.report_data,
+              id: selectedReport.id,
+              _supabase_updated_at: data.updated_at,
+              isLightweight: false
+            };
+            setReports(prev => prev.map(r => r.id === selectedReport.id ? fullReport : r));
+            setSelectedReport(fullReport);
+          }
+        } catch (err) {
+          console.error("Background loading of full report failed:", err);
+        }
+      };
+      loadFullReport();
+    }
+  }, [selectedReport, supabase]);
 
   const handleCancelEntry = () => {
     setView('dashboard');
@@ -530,112 +619,122 @@ function App() {
       if (!silent) setView('details');
     }
 
+    // Cancel any pending debounced silent save for this project ID
+    if (silentSaveDebounceTimers.current[finalReport.id]) {
+      clearTimeout(silentSaveDebounceTimers.current[finalReport.id]);
+      delete silentSaveDebounceTimers.current[finalReport.id];
+    }
+
     if (supabase) {
       // ── Sitzungsschutz: Kein Supabase-Save wenn anderes Gerät aktiv ist ───────────
-      if (!isSessionActiveRef.current) {
+      // Techniker-Modus darf IMMER in die Cloud speichern, selbst bei Modus-Konflikt
+      const isTechSave = projectMode === 'technician' || isTechnicianMode;
+      if (!isSessionActiveRef.current && !isTechSave) {
         console.warn('[Session] Sitzung inaktiv – Supabase-Save blockiert für:', finalReport.id);
         return finalReport; // Nur lokal im Memory, kein Supabase-Write
       }
 
-      const now = new Date().toISOString();
-      // _supabase_updated_at ist ein internes Feld – nicht in die DB speichern
-      const { _supabase_updated_at: loadedAt, ...reportForStorage } = finalReport;
+      const performCloudSave = async () => {
+        const now = new Date().toISOString();
+        // _supabase_updated_at ist ein internes Feld – nicht in die DB speichern
+        const { _supabase_updated_at: loadedAt, ...reportForStorage } = finalReport;
 
-      const rowData = {
-        id: finalReport.id,
-        project_title: finalReport.projectTitle,
-        client: finalReport.client,
-        address: finalReport.address,
-        status: finalReport.status,
-        assigned_to: finalReport.assignedTo,
-        date: finalReport.date,
-        drying_started: finalReport.dryingStarted,
-        report_data: reportForStorage,  // ohne _supabase_updated_at
-        updated_at: now
-      };
+        const rowData = {
+          id: finalReport.id,
+          project_title: finalReport.projectTitle,
+          client: finalReport.client,
+          address: finalReport.address,
+          status: finalReport.status,
+          assigned_to: finalReport.assignedTo,
+          date: finalReport.date,
+          drying_started: finalReport.dryingStarted,
+          report_data: reportForStorage,  // ohne _supabase_updated_at
+          updated_at: now
+        };
 
-      console.log('[MEASROOM TRACE] App final report_data', {
-          measurementRoomsLength: reportForStorage.measurementRooms?.length,
-          keys: Object.keys(reportForStorage)
-      });
+        const oneDriveBackup = () => {
+          try {
+            const odFolder = buildProjectFolderName(
+              finalReport.projectNumber || finalReport.id || 'Unbekannt',
+              finalReport
+            );
+            uploadProjectJson(odFolder, finalReport).catch(e =>
+              console.warn('[OneDrive] JSON-Backup fehlgeschlagen:', e.message)
+            );
+          } catch (e) {
+            console.warn('[OneDrive] JSON-Backup fehlgeschlagen:', e.message);
+          }
+        };
 
-      const oneDriveBackup = () => {
-        try {
-          const odFolder = buildProjectFolderName(
-            finalReport.projectNumber || finalReport.id || 'Unbekannt',
-            finalReport
-          );
-          uploadProjectJson(odFolder, finalReport).catch(e =>
-            console.warn('[OneDrive] JSON-Backup fehlgeschlagen:', e.message)
-          );
-        } catch (e) {
-          console.warn('[OneDrive] JSON-Backup fehlgeschlagen:', e.message);
-        }
-      };
-
-      // ─── Konfliktschutz: Nur speichern wenn kein neueres Update existiert ───────
-      if (loadedAt && finalReport.id && !finalReport.id.startsWith('TMP-')) {
-        if (silent) {
-          // Silent/Autosave: Non-blocking background save to prevent UI/modal lagging or blocking on slow networks
-          supabase
-            .from('damage_reports')
-            .update(rowData)
-            .eq('id', finalReport.id)
-            .lte('updated_at', loadedAt)
-            .select('id')
-            .then(({ data: updateResult, error }) => {
-              if (!error && updateResult && updateResult.length > 0) {
-                setReports(prev => prev.map(r => r.id === finalReport.id ? { ...r, _supabase_updated_at: now } : r));
-                oneDriveBackup();
-              }
-            }).catch(err => console.warn('[Supabase] Silent update failed:', err.message));
-        } else {
-          const { data: updateResult, error } = await supabase
-            .from('damage_reports')
-            .update(rowData)
-            .eq('id', finalReport.id)
-            .lte('updated_at', loadedAt)  // Nur wenn DB-Version ≤ geladene Version
-            .select('id');
-
-          if (error) {
-            console.log('[MEASROOM TRACE] Supabase update result', { error, data: updateResult });
-            console.error('Error saving to Supabase:', error);
-            showToast(`⚠️ Speicherfehler: ${error.message || error.code || 'Supabase-Fehler'}. Daten nur lokal gesichert!`, 'error');
-          } else if (!updateResult || updateResult.length === 0) {
-            console.log('[MEASROOM TRACE] Supabase update result', { error: 'Conflict', data: null });
-            // Konflikt: Ein anderes Gerät hat neuere Daten → NICHT überschreiben
-            console.warn('[Sync-Konflikt] Neuere Version in Supabase – abgebrochen:', finalReport.id);
-            showToast('⚠️ Neuere Version auf anderem Gerät! Seite neu laden.', 'warning');
+        // ─── Konfliktschutz: Nur speichern wenn kein neueres Update existiert ───────
+        if (loadedAt && finalReport.id && !finalReport.id.startsWith('TMP-')) {
+          if (silent) {
+            // Silent/Autosave: Non-blocking background save to prevent UI/modal lagging or blocking on slow networks
+            supabase
+              .from('damage_reports')
+              .update(rowData)
+              .eq('id', finalReport.id)
+              .lte('updated_at', loadedAt)
+              .select('id')
+              .then(({ data: updateResult, error }) => {
+                if (!error && updateResult && updateResult.length > 0) {
+                  setReports(prev => prev.map(r => r.id === finalReport.id ? { ...r, _supabase_updated_at: now } : r));
+                  oneDriveBackup();
+                }
+              }).catch(err => console.warn('[Supabase] Silent update failed:', err.message));
           } else {
-            console.log('[MEASROOM TRACE] Supabase update result', { error: null, data: updateResult });
-            // Erfolgreich: _supabase_updated_at aktualisieren damit nächster Save erlaubt ist
-            setReports(prev => prev.map(r => r.id === finalReport.id ? { ...r, _supabase_updated_at: now } : r));
-            oneDriveBackup();
+            const { data: updateResult, error } = await supabase
+              .from('damage_reports')
+              .update(rowData)
+              .eq('id', finalReport.id)
+              .lte('updated_at', loadedAt)  // Nur wenn DB-Version ≤ geladene Version
+              .select('id');
+
+            if (error) {
+              console.error('Error saving to Supabase:', error);
+              showToast(`⚠️ Speicherfehler: ${error.message || error.code || 'Supabase-Fehler'}. Daten nur lokal gesichert!`, 'error');
+            } else if (!updateResult || updateResult.length === 0) {
+              console.warn('[Sync-Konflikt] Neuere Version in Supabase – abgebrochen:', finalReport.id);
+              showToast('⚠️ Neuere Version auf anderem Gerät! Seite neu laden.', 'warning');
+            } else {
+              setReports(prev => prev.map(r => r.id === finalReport.id ? { ...r, _supabase_updated_at: now } : r));
+              oneDriveBackup();
+            }
+          }
+        } else {
+          if (silent) {
+            // Silent/Autosave: Non-blocking background upsert
+            supabase
+              .from('damage_reports')
+              .upsert(rowData)
+              .then(({ error }) => {
+                if (!error) {
+                  setReports(prev => prev.map(r => r.id === finalReport.id ? { ...r, _supabase_updated_at: now } : r));
+                  oneDriveBackup();
+                }
+              }).catch(err => console.warn('[Supabase] Silent upsert failed:', err.message));
+          } else {
+            const { error } = await supabase.from('damage_reports').upsert(rowData);
+            if (error) {
+              console.error('Error saving to Supabase:', error);
+              showToast(`⚠️ Speicherfehler: ${error.message || error.code || 'Supabase-Fehler'}. Daten nur lokal gesichert!`, 'error');
+            } else {
+              setReports(prev => prev.map(r => r.id === finalReport.id ? { ...r, _supabase_updated_at: now } : r));
+              oneDriveBackup();
+            }
           }
         }
+      };
+
+      if (silent) {
+        // Debounce cloud autosave by 20 seconds to dramatically reduce Supabase Disk IO and OneDrive bandwidth consumption
+        silentSaveDebounceTimers.current[finalReport.id] = setTimeout(() => {
+          performCloudSave();
+          delete silentSaveDebounceTimers.current[finalReport.id];
+        }, 20000);
       } else {
-        if (silent) {
-          // Silent/Autosave: Non-blocking background upsert
-          supabase
-            .from('damage_reports')
-            .upsert(rowData)
-            .then(({ error }) => {
-              if (!error) {
-                setReports(prev => prev.map(r => r.id === finalReport.id ? { ...r, _supabase_updated_at: now } : r));
-                oneDriveBackup();
-              }
-            }).catch(err => console.warn('[Supabase] Silent upsert failed:', err.message));
-        } else {
-          // Neues Projekt oder kein bekannter Zeitstempel → einfaches Upsert
-          const { error } = await supabase.from('damage_reports').upsert(rowData);
-          if (error) {
-            console.error('Error saving to Supabase:', error);
-            showToast(`⚠️ Speicherfehler: ${error.message || error.code || 'Supabase-Fehler'}. Daten nur lokal gesichert!`, 'error');
-          } else {
-            setReports(prev => prev.map(r => r.id === finalReport.id ? { ...r, _supabase_updated_at: now } : r));
-            oneDriveBackup();
-          }
-        }
+        // Explicit manual save is executed instantly
+        await performCloudSave();
       }
     }
 
