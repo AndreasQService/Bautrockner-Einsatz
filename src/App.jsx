@@ -365,26 +365,41 @@ function App() {
     const fetchReports = async () => {
       setSupabaseStatus({ ok: null, count: null, error: null }); // Laden...
       try {
-        const { data, error } = await supabase
+        // 6-Sekunden-Timeout für Supabase-Abfrage auf Mobilgeräten/iPads
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Timeout nach 6 Sekunden')), 6000)
+        );
+
+        const fetchPromise = supabase
           .from('damage_reports')
           .select('report_data, updated_at');
-          // HINWEIS: Client-seitige Sortierung um Statement Timeout bei großen JSONs zu verhindern
+
+        const result = await Promise.race([fetchPromise, timeoutPromise]);
+        const data = result.data;
+        const error = result.error;
+        // HINWEIS: Client-seitige Sortierung um Statement Timeout bei großen JSONs zu verhindern
 
         if (error) {
           console.error('[Supabase] Fehler beim Laden:', error);
           setSupabaseStatus({ ok: false, count: 0, error: `${error.code}: ${error.message}` });
         } else if (data) {
           const loadedReports = data
+            // Filter out malformed records where report_data is null or not an object
+            .filter(row => row.report_data && typeof row.report_data === 'object')
             // Sortierung auf dem Client um DB Statement Timeouts zu vermeiden
             .sort((a, b) => new Date(b.report_data?.date || b.updated_at).getTime() - new Date(a.report_data?.date || a.updated_at).getTime())
-            .map(row => ({
-            ...row.report_data,
-            _supabase_updated_at: row.updated_at,
-            images: (row.report_data.images || []).map(img => ({
-              ...img,
-              includeInReport: img.includeInReport !== false
-            }))
-          })).filter(r => !r._isSession && !r.deleted_at); // Session + soft-deleted ausblenden
+            .map(row => {
+              const report = row.report_data;
+              return {
+                ...report,
+                id: report.id || row.id,
+                _supabase_updated_at: row.updated_at,
+                images: (Array.isArray(report.images) ? report.images : []).map(img => ({
+                  ...img,
+                  includeInReport: img.includeInReport !== false
+                }))
+              };
+            }).filter(r => r && !r._isSession && !r.deleted_at); // Session + soft-deleted ausblenden
 
           console.log(`[Supabase] ${loadedReports.length} Projekte geladen (${data.length} DB-Einträge gesamt).`);
           console.log('[MEASROOM TRACE] fetchReports loaded', {
@@ -1132,9 +1147,43 @@ function App() {
           lockedProjectIds={lockedProjectIds}
           onLogout={handleLogout}
           onReportsChanged={async () => {
-            // Reload from Supabase after a status change
-            const { data } = await supabase.from('damage_reports').select('report_data, updated_at').order('created_at', { ascending: false });
-            if (data) setReports(data.map(r => ({ ...r.report_data, _supabase_updated_at: r.updated_at })).filter(r => !r._isSession && !r.deleted_at));
+            // Reload from Supabase after a status change with timeout protection
+            try {
+              const timeoutPromise = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('Timeout nach 6 Sekunden')), 6000)
+              );
+
+              const fetchPromise = supabase
+                .from('damage_reports')
+                .select('report_data, updated_at')
+                .order('created_at', { ascending: false });
+
+              const result = await Promise.race([fetchPromise, timeoutPromise]);
+              const data = result.data;
+              const error = result.error;
+
+              if (data && !error) {
+                setReports(
+                  data
+                    .filter(r => r.report_data && typeof r.report_data === 'object')
+                    .map(r => {
+                      const report = r.report_data;
+                      return {
+                        ...report,
+                        id: report.id || r.id,
+                        _supabase_updated_at: r.updated_at,
+                        images: (Array.isArray(report.images) ? report.images : []).map(img => ({
+                          ...img,
+                          includeInReport: img.includeInReport !== false
+                        }))
+                      };
+                    })
+                    .filter(r => r && !r._isSession && !r.deleted_at)
+                );
+              }
+            } catch (e) {
+              console.warn('[Supabase] Fehler beim onReportsChanged Reload:', e);
+            }
           }}
         />}
         {view === 'devices' && <DeviceManager reports={reports} onBack={() => setView('dashboard')} onNavigateToReport={handleNavigateToReport} />}

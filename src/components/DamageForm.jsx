@@ -2957,6 +2957,7 @@ END:VCARD`;
                     address={[formData.street, formData.zip && formData.city ? `${formData.zip} ${formData.city}` : formData.city].filter(Boolean).join(', ')}
                     apartments={[...new Set((formData.contacts || []).filter(c => c.role === 'Mieter' || c.role === 'Eigentümer').map(c => [c.name, c.apartment].filter(Boolean).join(' - ').trim()).filter(Boolean))]}
                     initialData={(formData.measurementRooms || []).reduce((acc, r) => {
+                        if (!r) return acc;
                         let mData = r.measurementData;
                         if (!mData && Array.isArray(r.measurements) && r.measurements.length > 0) {
                             mData = { measurements: r.measurements, globalSettings: r.globalSettings, canvasImage: r.canvasImage };
@@ -2996,9 +2997,9 @@ END:VCARD`;
                                         temp: '',
                                         humidity: ''
                                     },
-                                    measurements: Array.isArray(mData.measurements) ? mData.measurements.map(m => ({
-                                        id: m.id,
-                                        pointName: m.pointName,
+                                    measurements: Array.isArray(mData.measurements) ? mData.measurements.filter(Boolean).map(m => ({
+                                        id: m.id || '',
+                                        pointName: m.pointName || '',
                                         w_value: '',
                                         b_value: '',
                                         notes: ''
