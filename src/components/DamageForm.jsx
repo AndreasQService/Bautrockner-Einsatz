@@ -2957,11 +2957,11 @@ END:VCARD`;
                     readOnly={isMeasurementReadOnly}
                     measurementHistory={activeRoomForMeasurement?.measurementHistory || []}
                     rooms={activeRoomForMeasurement ? [activeRoomForMeasurement] : []}
-                    allRooms={formData.measurementRooms || []}
+                    allRooms={[...(formData.rooms || []), ...(formData.measurementRooms || [])]}
                     projectTitle={formData.projectTitle}
                     address={[formData.street, formData.zip && formData.city ? `${formData.zip} ${formData.city}` : formData.city].filter(Boolean).join(', ')}
                     apartments={[...new Set((formData.contacts || []).filter(c => c.role === 'Mieter' || c.role === 'Eigentümer').map(c => [c.name, c.apartment].filter(Boolean).join(' - ').trim()).filter(Boolean))]}
-                    initialData={(formData.measurementRooms || []).reduce((acc, r) => {
+                    initialData={[...(formData.rooms || []), ...(formData.measurementRooms || [])].reduce((acc, r) => {
                         if (!r) return acc;
                         let mData = r.measurementData;
                         if (!mData && Array.isArray(r.measurements) && r.measurements.length > 0) {
@@ -3013,6 +3013,9 @@ END:VCARD`;
                             } else {
                                 mData = null;
                             }
+                        }
+                        if (acc[r.id] && !mData) {
+                            return acc;
                         }
                         return { ...acc, [r.id]: mData };
                     }, {})}
@@ -6744,7 +6747,16 @@ END:VCARD`;
                         </div>
                         {console.log('[MEASUREMENT-ROOMS TRACE] 6. Render Messprotokolle:', { length: (formData.measurementRooms || []).length, names: (formData.measurementRooms || []).map(r=>r.name) })}
                         {isMeasurementsExpanded && (() => {
-                            const measuredRooms = (formData.measurementRooms || [])
+                            const allUniqueRooms = [];
+                            const seenRoomIds = new Set();
+                            [...(formData.rooms || []), ...(formData.measurementRooms || [])].forEach(r => {
+                                if (r && !seenRoomIds.has(r.id)) {
+                                    seenRoomIds.add(r.id);
+                                    allUniqueRooms.push(r);
+                                }
+                            });
+
+                            const measuredRooms = allUniqueRooms
                               .map(room => ({
                                 room,
                                 entries: getMeasurementEntries(room)
@@ -7753,11 +7765,11 @@ END:VCARD`;
                     readOnly={isMeasurementReadOnly}
                     measurementHistory={activeRoomForMeasurement?.measurementHistory || []}
                     rooms={activeRoomForMeasurement ? [activeRoomForMeasurement] : []}
-                    allRooms={formData.measurementRooms || []}
+                    allRooms={[...(formData.rooms || []), ...(formData.measurementRooms || [])]}
                     projectTitle={formData.projectTitle}
                     address={[formData.street, formData.zip && formData.city ? `${formData.zip} ${formData.city}` : formData.city].filter(Boolean).join(', ')}
                     apartments={[...new Set((formData.contacts || []).filter(c => c.role === 'Mieter' || c.role === 'Eigentümer').map(c => [c.name, c.apartment].filter(Boolean).join(' - ').trim()).filter(Boolean))]}
-                    initialData={(formData.measurementRooms || []).reduce((acc, r) => {
+                    initialData={[...(formData.rooms || []), ...(formData.measurementRooms || [])].reduce((acc, r) => {
                         let mData = r.measurementData;
                         if (!mData && Array.isArray(r.measurements) && r.measurements.length > 0) {
                             mData = { measurements: r.measurements, globalSettings: r.globalSettings, canvasImage: r.canvasImage };
@@ -7808,6 +7820,9 @@ END:VCARD`;
                             } else {
                                 mData = null;
                             }
+                        }
+                        if (acc[r.id] && !mData) {
+                            return acc;
                         }
                         return { ...acc, [r.id]: mData };
                     }, {})}
