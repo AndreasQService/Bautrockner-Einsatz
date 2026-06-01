@@ -33,7 +33,7 @@ QRCode.toFile('qtool-ipad-qr.png', url, {
     console.log(`QR Code generated for URL: ${url} and saved to qtool-ipad-qr.png`);
     
     // Copy to brain artifacts folder
-    const destDir = "C:\\Users\\Andreas Q-Service\\.gemini\\antigravity\\brain\\6f407a49-a7a7-4699-87a2-80a5fa7ea946";
+    const destDir = "C:\\Users\\Andreas Q-Service\\.gemini\\antigravity\\brain\\e42c67c6-fe1d-497e-8d93-f4827a9b1c68";
     if (fs.existsSync(destDir)) {
         fs.copyFileSync('qtool-ipad-qr.png', path.join(destDir, 'qtool-ipad-qr.png'));
         console.log(`QR Code copied to brain directory successfully!`);
