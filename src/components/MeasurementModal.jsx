@@ -214,6 +214,8 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
     const [numpadPos, setNumpadPos] = useState({ x: typeof window !== 'undefined' ? window.innerWidth - 350 : 100, y: typeof window !== 'undefined' ? 80 : 100 });
     const numpadDragRef = useRef(false);
     const [autosaveStatus, setAutosaveStatus] = useState(null); // 'saving' | 'saved' | null
+    const [editingHistoricalEntryId, setEditingHistoricalEntryId] = useState(null);
+    const [originalHistoricalData, setOriginalHistoricalData] = useState(null);
     const [canvasStrokeCount, setCanvasStrokeCount] = useState(0);
     const autosaveTimerRef = useRef(null);
     const numpadStartRef = useRef({ x: 0, y: 0 });
@@ -404,7 +406,9 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
     // Calculate History View Data
     // Calculate History View Data - PIVOT
     const { historyColumns, historyRows } = React.useMemo(() => {
-        if (!measurementHistory || measurementHistory.length === 0) return { historyColumns: [], historyRows: [] };
+        const hasHistory = Array.isArray(measurementHistory) && measurementHistory.length > 0;
+        const hasCurrent = Array.isArray(measurements) && measurements.length > 0;
+        if (!hasHistory && !hasCurrent) return { historyColumns: [], historyRows: [] };
 
         // 1. Get all unique MP names
         const allPointNames = new Set(); // Only show points that were actually used
@@ -419,25 +423,52 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
             });
         }
 
-        measurementHistory.forEach(entry => {
-            if (entry && Array.isArray(entry.measurements)) {
-                entry.measurements.forEach((m, idx) => {
-                    if (m) {
-                        const name = m.pointName || `MP ${idx + 1}`;
-                        allPointNames.add(normalizeName(name));
+        const virtualHistory = [];
+
+        // Add actual history from props
+        if (hasHistory) {
+            measurementHistory.forEach(entry => {
+                if (entry) {
+                    virtualHistory.push({
+                        ...entry,
+                        source: 'history'
+                    });
+                    if (Array.isArray(entry.measurements)) {
+                        entry.measurements.forEach((m, idx) => {
+                            if (m) {
+                                const name = m.pointName || `MP ${idx + 1}`;
+                                allPointNames.add(normalizeName(name));
+                            }
+                        });
                     }
-                });
-            }
-        });
+                }
+            });
+        }
+
+        // Add today's active day measurements in real-time as a column
+        // We only add it if we are NOT currently editing a historical day, or if we have a backup of the active day
+        const activeMs = originalHistoricalData ? originalHistoricalData.measurements : measurements;
+        const activeGs = originalHistoricalData ? originalHistoricalData.globalSettings : globalSettings;
+        if (activeMs && activeMs.length > 0) {
+            virtualHistory.push({
+                id: 'current_data',
+                source: 'current',
+                date: activeGs?.date || new Date().toISOString().split('T')[0],
+                measurements: activeMs,
+                globalSettings: activeGs
+            });
+        }
 
         // Sort columns naturally (MP 1, MP 2, MP 10)
         const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
         const sortedColumns = Array.from(allPointNames).sort(collator.compare);
 
         // 2. Sort history by Date Descending (Newest first)
-        const sortedHistory = [...measurementHistory].sort((a, b) =>
-            new Date(b.date || 0) - new Date(a.date || 0)
-        );
+        const sortedHistory = [...virtualHistory].sort((a, b) => {
+            const da = a.date || a.globalSettings?.date || 0;
+            const db = b.date || b.globalSettings?.date || 0;
+            return new Date(db) - new Date(da);
+        });
 
         // 3. Build Rows
         const rows = sortedHistory.map((entry, idx) => {
@@ -450,6 +481,7 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
 
             const rowData = {
                 id: entry.id || `hist_${idx}`,
+                source: entry.source,
                 date: entryDate,
                 points: {},
                 protocolUrl: entry.protocolUrl
@@ -505,7 +537,7 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
 
         return { historyColumns: sortedColumns, historyRows: rows };
 
-    }, [measurementHistory, measurements]);
+    }, [measurementHistory, measurements, globalSettings, originalHistoricalData]);
 
 
 
@@ -674,7 +706,7 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
 
     // Debounced Auto-Save Effect
     useEffect(() => {
-        if (!isOpen || readOnly) return;
+        if (!isOpen || readOnly || editingHistoricalEntryId) return; // Disable auto-save when editing historical measurements
         if (!hasUnsavedChanges) return;
 
         // Skip the very first render where everything is initializing
@@ -1077,6 +1109,94 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
         reader.readAsDataURL(file);
     };
 
+    const handleStartEditHistorical = (rowId) => {
+        const h = measurementHistory.find((entry, idx) => (entry.id || `hist_${idx}`) === rowId);
+        if (!h) return;
+
+        if (!editingHistoricalEntryId) {
+            setOriginalHistoricalData({
+                measurements: [...measurements],
+                globalSettings: { ...globalSettings },
+                canvasImage: previewSnapshot,
+                galleryPhotos: [...galleryPhotos]
+            });
+        }
+
+        setEditingHistoricalEntryId(rowId);
+
+        const migrateNames = (ms) => (ms || []).map(m => ({
+            ...m,
+            pointName: m.pointName?.replace(/^Messpunkt\s+(\d+)$/i, 'MP $1') ?? m.pointName
+        }));
+        setMeasurements(migrateNames(h.measurements || []));
+
+        setGlobalSettings({
+            date: h.date || h.globalSettings?.date || new Date().toISOString().split('T')[0],
+            temp: h.globalSettings?.temp || h.temp || '',
+            humidity: h.globalSettings?.humidity || h.humidity || '',
+            device: h.globalSettings?.device || h.device || '',
+            apartment: h.globalSettings?.apartment || rooms[0]?.apartment || '',
+            room: h.globalSettings?.room || rooms[0]?.name || ''
+        });
+
+        setGalleryPhotos(h.galleryPhotos || []);
+
+        const canvas = hiddenCanvasRef.current;
+        const activeCanvas = canvasRef.current;
+        if (canvas && activeCanvas) {
+            const ctx = canvas.getContext('2d');
+            const activeCtx = activeCanvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            activeCtx.clearRect(0, 0, activeCanvas.width, activeCanvas.height);
+
+            const imgData = h.canvasImage || h.sketch;
+            if (imgData) {
+                setPreviewSnapshot(imgData);
+                const img = new window.Image();
+                img.onload = () => {
+                    const stripped = stripWhiteBackground(img, canvas.width, canvas.height);
+                    ctx.drawImage(stripped, 0, 0);
+                    activeCtx.drawImage(stripped, 0, 0);
+                    saveParamsToHistory(canvas);
+                };
+                img.src = imgData;
+            } else {
+                setPreviewSnapshot(null);
+            }
+        } else {
+            setPreviewSnapshot(h.canvasImage || h.sketch || null);
+        }
+    };
+
+    const handleCancelEditHistorical = () => {
+        if (originalHistoricalData) {
+            setMeasurements(originalHistoricalData.measurements);
+            setGlobalSettings(originalHistoricalData.globalSettings);
+            setGalleryPhotos(originalHistoricalData.galleryPhotos);
+            setPreviewSnapshot(originalHistoricalData.canvasImage);
+
+            const canvas = hiddenCanvasRef.current;
+            const activeCanvas = canvasRef.current;
+            if (canvas && activeCanvas) {
+                const ctx = canvas.getContext('2d');
+                const activeCtx = activeCanvas.getContext('2d');
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                activeCtx.clearRect(0, 0, activeCanvas.width, activeCanvas.height);
+
+                if (originalHistoricalData.canvasImage) {
+                    const img = new window.Image();
+                    img.onload = () => {
+                        ctx.drawImage(img, 0, 0);
+                        activeCtx.drawImage(img, 0, 0);
+                    };
+                    img.src = originalHistoricalData.canvasImage;
+                }
+            }
+        }
+        setEditingHistoricalEntryId(null);
+        setOriginalHistoricalData(null);
+    };
+
     const handleSave = async () => {
         if (!containerRef.current || isSaving) return;
 
@@ -1159,6 +1279,33 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
             })();
 
 
+            let updatedHistory = null;
+            if (editingHistoricalEntryId) {
+                const updatedEntry = {
+                    id: editingHistoricalEntryId,
+                    date: globalSettings.date,
+                    measurements: measurements.map(m => ({ ...m })),
+                    globalSettings: { ...globalSettings },
+                    canvasImage: canvasDataUrl,
+                    galleryPhotos: [...galleryPhotos]
+                };
+
+                updatedHistory = measurementHistory.map((entry, idx) => {
+                    if ((entry.id || `hist_${idx}`) === editingHistoricalEntryId) {
+                        return {
+                            ...entry,
+                            ...updatedEntry
+                        };
+                    }
+                    return entry;
+                });
+            }
+
+            const saveMeasurements = originalHistoricalData ? originalHistoricalData.measurements : measurements;
+            const saveGlobalSettings = originalHistoricalData ? originalHistoricalData.globalSettings : globalSettings;
+            const saveCanvasImage = originalHistoricalData ? originalHistoricalData.canvasImage : canvasDataUrl;
+            const saveGalleryPhotos = originalHistoricalData ? originalHistoricalData.galleryPhotos : galleryPhotos;
+
             if (saveAsPdf) {
                 // Generate PDF
                 const pdf = new jsPDF('p', 'mm', 'a4');
@@ -1174,10 +1321,11 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
 
                 await onSave({
                     file,
-                    measurements,
-                    globalSettings,
-                    canvasImage: canvasDataUrl,
-                    galleryPhotos,
+                    measurements: saveMeasurements,
+                    globalSettings: saveGlobalSettings,
+                    canvasImage: saveCanvasImage,
+                    galleryPhotos: saveGalleryPhotos,
+                    measurementHistory: updatedHistory || undefined,
                     isAutosave: false
                 });
             } else {
@@ -1202,10 +1350,11 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
 
                                 await onSave({
                                     file,
-                                    measurements,
-                                    globalSettings,
-                                    canvasImage: canvasDataUrl,
-                                    galleryPhotos,
+                                    measurements: saveMeasurements,
+                                    globalSettings: saveGlobalSettings,
+                                    canvasImage: saveCanvasImage,
+                                    galleryPhotos: saveGalleryPhotos,
+                                    measurementHistory: updatedHistory || undefined,
                                     isAutosave: false
                                 });
                                 resolve();
@@ -1218,6 +1367,10 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
                     }
                 });
             }
+
+            // Reset editing state after saving
+            setEditingHistoricalEntryId(null);
+            setOriginalHistoricalData(null);
 
             // Show success state briefly
             setIsSuccess(true);
@@ -1405,6 +1558,54 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
                     </div>
                 </div>
 
+                {/* --- WARNING BANNER FOR HISTORICAL EDITING --- */}
+                {editingHistoricalEntryId && (
+                    <div style={{
+                        flexShrink: 0,
+                        backgroundColor: '#FEF3C7', // Amber-100
+                        borderBottom: '1px solid #F59E0B', // Amber-500
+                        padding: '0.6rem 1.1rem',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        color: '#92400E', // Amber-800
+                        fontSize: '0.85rem',
+                        fontWeight: 600,
+                        boxSizing: 'border-box'
+                    }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <span style={{ fontSize: '1rem' }}>⚠️</span>
+                            <span>
+                                Sie bearbeiten die historische Messung vom{' '}
+                                <strong style={{ textDecoration: 'underline' }}>
+                                    {(() => {
+                                        const h = measurementHistory.find((entry, idx) => (entry.id || `hist_${idx}`) === editingHistoricalEntryId);
+                                        const hDate = h?.date || h?.globalSettings?.date;
+                                        return hDate ? new Date(hDate).toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'Unbekannt';
+                                    })()}
+                                </strong>
+                                .
+                            </span>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={handleCancelEditHistorical}
+                            style={{
+                                background: '#D97706', // Amber-600
+                                color: 'white',
+                                border: 'none',
+                                padding: '0.25rem 0.6rem',
+                                borderRadius: '4px',
+                                fontSize: '0.75rem',
+                                fontWeight: 700,
+                                cursor: 'pointer'
+                            }}
+                        >
+                            Abbrechen
+                        </button>
+                    </div>
+                )}
+
                 {/* ── BODY: SPLIT VIEW ── */}
                 <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
 
@@ -1441,7 +1642,28 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
                                             <th style={{ padding: '0.4rem', textAlign: 'left', color: 'var(--text-muted)', borderBottom: '1px solid var(--border)', width: '70px' }}>MP</th>
                                             {[...historyRows].reverse().map(row => (
                                                 <th key={row.id} style={{ padding: '0.4rem', textAlign: 'center', color: 'var(--text-muted)', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>
-                                                    {row.date ? new Date(row.date).toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit' }) : '-'}
+                                                    <div>{row.date ? new Date(row.date).toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit' }) : '-'}</div>
+                                                    {row.source === 'current' ? (
+                                                        <span style={{ fontSize: '0.65rem', color: '#60A5FA', fontWeight: 700 }}>(Aktuell)</span>
+                                                    ) : (
+                                                        <button 
+                                                            type="button" 
+                                                            onClick={() => handleStartEditHistorical(row.id)}
+                                                            style={{ 
+                                                                fontSize: '0.65rem', 
+                                                                color: '#e2e8f0', 
+                                                                background: 'rgba(255,255,255,0.08)', 
+                                                                border: '1px solid rgba(255,255,255,0.1)', 
+                                                                borderRadius: '4px', 
+                                                                padding: '1px 5px', 
+                                                                cursor: 'pointer',
+                                                                marginTop: '3px',
+                                                                fontWeight: 700
+                                                            }}
+                                                        >
+                                                            ✏️ Bearbeiten
+                                                        </button>
+                                                    )}
                                                 </th>
                                             ))}
                                         </tr>

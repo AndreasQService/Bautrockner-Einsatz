@@ -3184,7 +3184,7 @@ END:VCARD`;
                           activeRoomForMeasurementId: activeRoomForMeasurement?.id,
                           showMeasurementModal
                         });
-                        const { file, measurements, globalSettings, canvasImage, galleryPhotos } = data;
+                        const { file, measurements, globalSettings, canvasImage, galleryPhotos, measurementHistory: updatedHistoryFromModal } = data;
                         let protocolUrl = null;
                         if (supabase && file) {
                             try {
@@ -3220,17 +3220,19 @@ END:VCARD`;
                                 const finalCanvasImage = canvasImage || existingRoom.canvasImage || existingRoom.measurementData?.canvasImage || null;
                                 const finalSketch = finalCanvasImage;
 
-                                const updatedHistory = (isNewMeasurement && existingRoom.measurementData && Array.isArray(existingRoom.measurementData.measurements) && existingRoom.measurementData.measurements.length > 0)
-                                    ? [{
-                                        id: `hist_${Date.now()}_prev`,
-                                        date: existingRoom.measurementData.globalSettings?.date || new Date().toISOString(),
-                                        measurements: existingRoom.measurementData.measurements.map(m => ({ ...m })),
-                                        globalSettings: { ...(existingRoom.measurementData.globalSettings || {}) },
-                                        canvasImage: existingRoom.measurementData.canvasImage || existingRoom.canvasImage || null,
-                                        protocolUrl: existingRoom.measurementData.protocolUrl,
-                                        galleryPhotos: existingRoom.measurementData.galleryPhotos || []
-                                    }, ...history]
-                                    : history;
+                                const updatedHistory = updatedHistoryFromModal !== undefined
+                                    ? updatedHistoryFromModal
+                                    : ((isNewMeasurement && existingRoom.measurementData && Array.isArray(existingRoom.measurementData.measurements) && existingRoom.measurementData.measurements.length > 0)
+                                        ? [{
+                                            id: `hist_${Date.now()}_prev`,
+                                            date: existingRoom.measurementData.globalSettings?.date || new Date().toISOString(),
+                                            measurements: existingRoom.measurementData.measurements.map(m => ({ ...m })),
+                                            globalSettings: { ...(existingRoom.measurementData.globalSettings || {}) },
+                                            canvasImage: existingRoom.measurementData.canvasImage || existingRoom.canvasImage || null,
+                                            protocolUrl: existingRoom.measurementData.protocolUrl,
+                                            galleryPhotos: existingRoom.measurementData.galleryPhotos || []
+                                        }, ...history]
+                                        : history);
 
                                 finalRoom = {
                                     ...existingRoom,
@@ -3254,17 +3256,19 @@ END:VCARD`;
                                 const finalCanvasImage = canvasImage || activeRoomForMeasurement.canvasImage || activeRoomForMeasurement.measurementData?.canvasImage || null;
                                 const finalSketch = finalCanvasImage;
 
-                                const updatedHistory = (isNewMeasurement && activeRoomForMeasurement.measurementData && Array.isArray(activeRoomForMeasurement.measurementData.measurements) && activeRoomForMeasurement.measurementData.measurements.length > 0)
-                                    ? [{
-                                        id: `hist_${Date.now()}_prev`,
-                                        date: activeRoomForMeasurement.measurementData.globalSettings?.date || new Date().toISOString(),
-                                        measurements: activeRoomForMeasurement.measurementData.measurements.map(m => ({ ...m })),
-                                        globalSettings: { ...(activeRoomForMeasurement.measurementData.globalSettings || {}) },
-                                        canvasImage: activeRoomForMeasurement.measurementData.canvasImage || activeRoomForMeasurement.canvasImage || null,
-                                        protocolUrl: activeRoomForMeasurement.measurementData.protocolUrl,
-                                        galleryPhotos: activeRoomForMeasurement.measurementData.galleryPhotos || []
-                                    }, ...history]
-                                    : history;
+                                const updatedHistory = updatedHistoryFromModal !== undefined
+                                    ? updatedHistoryFromModal
+                                    : ((isNewMeasurement && activeRoomForMeasurement.measurementData && Array.isArray(activeRoomForMeasurement.measurementData.measurements) && activeRoomForMeasurement.measurementData.measurements.length > 0)
+                                        ? [{
+                                            id: `hist_${Date.now()}_prev`,
+                                            date: activeRoomForMeasurement.measurementData.globalSettings?.date || new Date().toISOString(),
+                                            measurements: activeRoomForMeasurement.measurementData.measurements.map(m => ({ ...m })),
+                                            globalSettings: { ...(activeRoomForMeasurement.measurementData.globalSettings || {}) },
+                                            canvasImage: activeRoomForMeasurement.measurementData.canvasImage || activeRoomForMeasurement.canvasImage || null,
+                                            protocolUrl: activeRoomForMeasurement.measurementData.protocolUrl,
+                                            galleryPhotos: activeRoomForMeasurement.measurementData.galleryPhotos || []
+                                        }, ...history]
+                                        : history);
 
                                 finalRoom = {
                                     ...activeRoomForMeasurement,
@@ -8045,7 +8049,7 @@ END:VCARD`;
                           activeRoomForMeasurementId: activeRoomForMeasurement?.id,
                           showMeasurementModal
                         });
-                        const { file, measurements, globalSettings, canvasImage, galleryPhotos } = data;
+                        const { file, measurements, globalSettings, canvasImage, galleryPhotos, measurementHistory: updatedHistoryFromModal } = data;
                         let protocolUrl = null;
                         if (supabase && file) {
                             try {
@@ -8081,17 +8085,19 @@ END:VCARD`;
                                 const finalCanvasImage = canvasImage || existingRoom.canvasImage || existingRoom.measurementData?.canvasImage || null;
                                 const finalSketch = finalCanvasImage;
 
-                                const updatedHistory = (isNewMeasurement && existingRoom.measurementData && Array.isArray(existingRoom.measurementData.measurements) && existingRoom.measurementData.measurements.length > 0)
-                                    ? [{
-                                        id: `hist_${Date.now()}_prev`,
-                                        date: existingRoom.measurementData.globalSettings?.date || new Date().toISOString(),
-                                        measurements: existingRoom.measurementData.measurements.map(m => ({ ...m })),
-                                        globalSettings: { ...(existingRoom.measurementData.globalSettings || {}) },
-                                        canvasImage: existingRoom.measurementData.canvasImage || existingRoom.canvasImage || null,
-                                        protocolUrl: existingRoom.measurementData.protocolUrl,
-                                        galleryPhotos: existingRoom.measurementData.galleryPhotos || []
-                                    }, ...history]
-                                    : history;
+                                const updatedHistory = updatedHistoryFromModal !== undefined
+                                    ? updatedHistoryFromModal
+                                    : ((isNewMeasurement && existingRoom.measurementData && Array.isArray(existingRoom.measurementData.measurements) && existingRoom.measurementData.measurements.length > 0)
+                                        ? [{
+                                            id: `hist_${Date.now()}_prev`,
+                                            date: existingRoom.measurementData.globalSettings?.date || new Date().toISOString(),
+                                            measurements: existingRoom.measurementData.measurements.map(m => ({ ...m })),
+                                            globalSettings: { ...(existingRoom.measurementData.globalSettings || {}) },
+                                            canvasImage: existingRoom.measurementData.canvasImage || existingRoom.canvasImage || null,
+                                            protocolUrl: existingRoom.measurementData.protocolUrl,
+                                            galleryPhotos: existingRoom.measurementData.galleryPhotos || []
+                                        }, ...history]
+                                        : history);
 
                                 finalRoom = {
                                     ...existingRoom,
@@ -8115,17 +8121,19 @@ END:VCARD`;
                                 const finalCanvasImage = canvasImage || activeRoomForMeasurement.canvasImage || activeRoomForMeasurement.measurementData?.canvasImage || null;
                                 const finalSketch = finalCanvasImage;
 
-                                const updatedHistory = (isNewMeasurement && activeRoomForMeasurement.measurementData && Array.isArray(activeRoomForMeasurement.measurementData.measurements) && activeRoomForMeasurement.measurementData.measurements.length > 0)
-                                    ? [{
-                                        id: `hist_${Date.now()}_prev`,
-                                        date: activeRoomForMeasurement.measurementData.globalSettings?.date || new Date().toISOString(),
-                                        measurements: activeRoomForMeasurement.measurementData.measurements.map(m => ({ ...m })),
-                                        globalSettings: { ...(activeRoomForMeasurement.measurementData.globalSettings || {}) },
-                                        canvasImage: activeRoomForMeasurement.measurementData.canvasImage || activeRoomForMeasurement.canvasImage || null,
-                                        protocolUrl: activeRoomForMeasurement.measurementData.protocolUrl,
-                                        galleryPhotos: activeRoomForMeasurement.measurementData.galleryPhotos || []
-                                    }, ...history]
-                                    : history;
+                                const updatedHistory = updatedHistoryFromModal !== undefined
+                                    ? updatedHistoryFromModal
+                                    : ((isNewMeasurement && activeRoomForMeasurement.measurementData && Array.isArray(activeRoomForMeasurement.measurementData.measurements) && activeRoomForMeasurement.measurementData.measurements.length > 0)
+                                        ? [{
+                                            id: `hist_${Date.now()}_prev`,
+                                            date: activeRoomForMeasurement.measurementData.globalSettings?.date || new Date().toISOString(),
+                                            measurements: activeRoomForMeasurement.measurementData.measurements.map(m => ({ ...m })),
+                                            globalSettings: { ...(activeRoomForMeasurement.measurementData.globalSettings || {}) },
+                                            canvasImage: activeRoomForMeasurement.measurementData.canvasImage || activeRoomForMeasurement.canvasImage || null,
+                                            protocolUrl: activeRoomForMeasurement.measurementData.protocolUrl,
+                                            galleryPhotos: activeRoomForMeasurement.measurementData.galleryPhotos || []
+                                        }, ...history]
+                                        : history);
 
                                 finalRoom = {
                                     ...activeRoomForMeasurement,
