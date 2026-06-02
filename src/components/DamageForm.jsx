@@ -444,6 +444,61 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         measurementRooms: []
     }));
 
+    const uniqueCities = React.useMemo(() => {
+        const seen = new Set();
+        const list = [];
+        (swissPLZ || []).forEach(item => {
+            if (item.city && !seen.has(item.city)) {
+                seen.add(item.city);
+                list.push(item);
+            }
+        });
+        return list.sort((a, b) => a.city.localeCompare(b.city));
+    }, []);
+
+    const extractAddressDetails = (inputVal, streetField, zipField, cityField) => {
+        // 1. Look for a Swiss ZIP (4 digits, optionally preceded by "CH-" or "CH ")
+        const zipRegex = /(?:CH[- ]?)?\b([1-9]\d{3})\b/;
+        const zipMatch = inputVal.match(zipRegex);
+        
+        if (zipMatch) {
+            const zip = zipMatch[1];
+            const idx = inputVal.indexOf(zipMatch[0]);
+            const cityPart = inputVal.substring(idx + zipMatch[0].length).replace(/^[,\s]+|[,\s]+$/g, '').trim();
+            const streetPart = inputVal.substring(0, idx).replace(/^[,\s]+|[,\s]+$/g, '').trim();
+            
+            if (cityPart) {
+                setFormData(prev => ({
+                    ...prev,
+                    [streetField]: streetPart,
+                    [zipField]: prev[zipField] || zip,
+                    [cityField]: prev[cityField] || cityPart
+                }));
+                return;
+            }
+        }
+        
+        // 2. Fallback: If no 4-digit zip is found, but there is a comma followed by a word (which could be a known city)
+        const commaParts = inputVal.split(',');
+        if (commaParts.length > 1) {
+            const lastPart = commaParts[commaParts.length - 1].trim();
+            const knownCity = (swissPLZ || []).find(entry => entry.city.toLowerCase() === lastPart.toLowerCase());
+            if (knownCity) {
+                const streetPart = commaParts.slice(0, -1).join(',').trim();
+                setFormData(prev => ({
+                    ...prev,
+                    [streetField]: streetPart,
+                    [cityField]: prev[cityField] || knownCity.city,
+                    [zipField]: prev[zipField] || knownCity.plz
+                }));
+                return;
+            }
+        }
+        
+        // Default: update street normally
+        setFormData(prev => ({ ...prev, [streetField]: inputVal }));
+    };
+
     useEffect(() => {
         console.log('[MEASUREMENT-ROOMS TRACE] 2. DamageForm formData updated:', {
             measurementRoomsLength: (formData.measurementRooms || []).length,
@@ -3688,7 +3743,7 @@ END:VCARD`;
                                     type="text"
                                     className="form-input"
                                     value={formData.clientStreet || ''}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, clientStreet: e.target.value }))}
+                                    onChange={(e) => extractAddressDetails(e.target.value, 'clientStreet', 'clientZip', 'clientCity')}
                                     placeholder="Strasse / Nr."
                                     style={{ width: '100%' }}
                                 />
@@ -3700,7 +3755,15 @@ END:VCARD`;
                                     list="plz-list-ag"
                                     className="form-input"
                                     value={formData.clientZip || ''}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, clientZip: e.target.value }))}
+                                    onChange={(e) => {
+                                        const val = e.target.value;
+                                        const match = swissPLZ.find(entry => entry.plz === val.trim());
+                                        if (match) {
+                                            setFormData(prev => ({ ...prev, clientZip: val, clientCity: match.city }));
+                                        } else {
+                                            setFormData(prev => ({ ...prev, clientZip: val }));
+                                        }
+                                    }}
                                     placeholder="PLZ"
                                     style={{ width: '100%' }}
                                 />
@@ -3714,12 +3777,31 @@ END:VCARD`;
                                 <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 600, marginBottom: '0.5rem', display: 'block' }}>Ort (AG)</label>
                                 <input
                                     type="text"
+                                    list="ort-list-client"
                                     className="form-input"
                                     value={formData.clientCity || ''}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, clientCity: e.target.value }))}
+                                    onChange={(e) => {
+                                        const val = e.target.value;
+                                        const matchParsed = val.trim().match(/^(.*?)\s*\((\d{4})\)$/);
+                                        if (matchParsed) {
+                                            setFormData(prev => ({ ...prev, clientCity: matchParsed[1].trim(), clientZip: matchParsed[2].trim() }));
+                                        } else {
+                                            const match = swissPLZ.find(entry => entry.city.toLowerCase() === val.trim().toLowerCase());
+                                            if (match && !formData.clientZip) {
+                                                setFormData(prev => ({ ...prev, clientCity: val, clientZip: match.plz }));
+                                            } else {
+                                                setFormData(prev => ({ ...prev, clientCity: val }));
+                                            }
+                                        }
+                                    }}
                                     placeholder="Ort"
                                     style={{ width: '100%' }}
                                 />
+                                <datalist id="ort-list-client">
+                                    {swissPLZ.map((entry, idx) => (
+                                        <option key={idx} value={`${entry.city} (${entry.plz})`} />
+                                    ))}
+                                </datalist>
                             </div>
                         </div>
 
@@ -3846,7 +3928,7 @@ END:VCARD`;
                                         className="form-input"
                                         placeholder="Strasse / Nr."
                                         value={formData.ownerStreet || ''}
-                                        onChange={(e) => setFormData(prev => ({ ...prev, ownerStreet: e.target.value }))}
+                                        onChange={(e) => extractAddressDetails(e.target.value, 'ownerStreet', 'ownerZip', 'ownerCity')}
                                         style={{ width: '100%' }}
                                     />
                                 </div>
@@ -3856,22 +3938,55 @@ END:VCARD`;
                                     <div style={{ flex: 1 }}>
                                         <label style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '0.25rem' }}>PLZ</label>
                                         <input
+                                            list="plz-list-owner"
                                             className="form-input"
                                             placeholder="PLZ"
                                             value={formData.ownerZip || ''}
-                                            onChange={(e) => setFormData(prev => ({ ...prev, ownerZip: e.target.value }))}
+                                            onChange={(e) => {
+                                                const val = e.target.value;
+                                                const match = swissPLZ.find(entry => entry.plz === val.trim());
+                                                if (match) {
+                                                    setFormData(prev => ({ ...prev, ownerZip: val, ownerCity: match.city }));
+                                                } else {
+                                                    setFormData(prev => ({ ...prev, ownerZip: val }));
+                                                }
+                                            }}
                                             style={{ width: '100%' }}
                                         />
+                                        <datalist id="plz-list-owner">
+                                            {swissPLZ.map((entry, idx) => (
+                                                <option key={idx} value={entry.plz}>{entry.city}</option>
+                                            ))}
+                                        </datalist>
                                     </div>
                                     <div style={{ flex: 2 }}>
                                         <label style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '0.25rem' }}>Ort</label>
                                         <input
+                                            list="ort-list-owner"
                                             className="form-input"
                                             placeholder="Ort"
                                             value={formData.ownerCity || ''}
-                                            onChange={(e) => setFormData(prev => ({ ...prev, ownerCity: e.target.value }))}
+                                            onChange={(e) => {
+                                                const val = e.target.value;
+                                                const matchParsed = val.trim().match(/^(.*?)\s*\((\d{4})\)$/);
+                                                if (matchParsed) {
+                                                    setFormData(prev => ({ ...prev, ownerCity: matchParsed[1].trim(), ownerZip: matchParsed[2].trim() }));
+                                                } else {
+                                                    const match = swissPLZ.find(entry => entry.city.toLowerCase() === val.trim().toLowerCase());
+                                                    if (match && !formData.ownerZip) {
+                                                        setFormData(prev => ({ ...prev, ownerCity: val, ownerZip: match.plz }));
+                                                    } else {
+                                                        setFormData(prev => ({ ...prev, ownerCity: val }));
+                                                    }
+                                                }
+                                            }}
                                             style={{ width: '100%' }}
                                         />
+                                        <datalist id="ort-list-owner">
+                                            {swissPLZ.map((entry, idx) => (
+                                                <option key={idx} value={`${entry.city} (${entry.plz})`} />
+                                            ))}
+                                        </datalist>
                                     </div>
                                 </div>
                             </div>
@@ -3948,7 +4063,7 @@ END:VCARD`;
                                 className="form-input"
                                 placeholder="Strasse & Nr."
                                 value={formData.street || ''}
-                                onChange={(e) => setFormData(prev => ({ ...prev, street: e.target.value }))}
+                                onChange={(e) => extractAddressDetails(e.target.value, 'street', 'zip', 'city')}
                                 style={{ width: '100%', fontSize: '0.95rem' }}
                             />
                         </div>
@@ -3983,12 +4098,31 @@ END:VCARD`;
                             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                                 <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 600 }}>Ort</label>
                                 <input
+                                    list="ort-list-mobile"
                                     className="form-input"
                                     placeholder="Ort"
                                     value={formData.city || ''}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, city: e.target.value }))}
+                                    onChange={(e) => {
+                                        const val = e.target.value;
+                                        const matchParsed = val.trim().match(/^(.*?)\s*\((\d{4})\)$/);
+                                        if (matchParsed) {
+                                            setFormData(prev => ({ ...prev, city: matchParsed[1].trim(), zip: matchParsed[2].trim() }));
+                                        } else {
+                                            const match = swissPLZ.find(entry => entry.city.toLowerCase() === val.trim().toLowerCase());
+                                            if (match && !formData.zip) {
+                                                setFormData(prev => ({ ...prev, city: val, zip: match.plz }));
+                                            } else {
+                                                setFormData(prev => ({ ...prev, city: val }));
+                                            }
+                                        }
+                                    }}
                                     style={{ width: '100%', fontSize: '0.95rem' }}
                                 />
+                                <datalist id="ort-list-mobile">
+                                    {swissPLZ.map((entry, idx) => (
+                                        <option key={idx} value={`${entry.city} (${entry.plz})`} />
+                                    ))}
+                                </datalist>
                             </div>
                         </div>
 
