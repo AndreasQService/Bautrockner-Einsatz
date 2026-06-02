@@ -6918,6 +6918,147 @@ END:VCARD`;
                             </div>
                         </div>
                         {console.log('[MEASUREMENT-ROOMS TRACE] 6. Render Messprotokolle:', { length: (formData.measurementRooms || []).length, names: (formData.measurementRooms || []).map(r=>r.name) })}
+                        
+                        {!isMeasurementsExpanded && (() => {
+                            const allUniqueRooms = [];
+                            const seenRoomIds = new Set();
+                            [...(formData.measurementRooms || []), ...(formData.rooms || [])].forEach(r => {
+                                if (r && !seenRoomIds.has(r.id)) {
+                                    seenRoomIds.add(r.id);
+                                    allUniqueRooms.push(r);
+                                }
+                            });
+
+                            const measuredRooms = allUniqueRooms
+                              .map(room => ({
+                                room,
+                                entries: getMeasurementEntries(room)
+                              }))
+                              .filter(x => x.entries.length > 0);
+
+                            if (measuredRooms.length === 0) return null;
+
+                            return (
+                                <div style={{ 
+                                    display: 'grid', 
+                                    gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', 
+                                    gap: '0.75rem', 
+                                    marginTop: '0.75rem',
+                                    borderTop: '1px solid var(--border)',
+                                    paddingTop: '0.75rem'
+                                }}>
+                                    {measuredRooms.map(({ room, entries }) => {
+                                        const latestEntry = entries[0];
+                                        const canvasImage = latestEntry.canvasImage || room.canvasImage || room.sketch || null;
+                                        
+                                        const rName = room.name || 'Unbenannter Raum';
+                                        const floor = room.stockwerk ? `${room.stockwerk} ` : '';
+                                        const apt = room.apartment || '';
+                                        const hasKeyword = apt && (apt.toLowerCase().includes('wohnung') || apt.toLowerCase().includes('whg'));
+                                        const displayApt = apt ? (hasKeyword ? apt : `Whg ${apt}`) : '';
+                                        const roomTitle = `${rName} ${floor}${displayApt}`.trim();
+
+                                        return (
+                                            <div 
+                                                key={room.id}
+                                                onClick={() => {
+                                                    setActiveRoomForMeasurement({
+                                                        ...room,
+                                                        isNewMeasurement: false,
+                                                        isContinueMeasurement: true,
+                                                        measurementSessionId: `details_${room.id}_${Date.now()}`
+                                                    });
+                                                    setIsNewMeasurement(false);
+                                                    setShowMeasurementModal(true);
+                                                }}
+                                                className="card"
+                                                style={{
+                                                    display: 'flex',
+                                                    alignItems: 'flex-start',
+                                                    gap: '0.85rem',
+                                                    padding: '0.6rem 0.8rem',
+                                                    cursor: 'pointer',
+                                                    userSelect: 'none',
+                                                    borderRadius: '4px',
+                                                    border: '1px solid var(--border)',
+                                                    backgroundColor: 'var(--surface)',
+                                                    margin: 0,
+                                                    transition: 'border-color 0.15s'
+                                                }}
+                                            >
+                                                {/* Sketch Thumbnail */}
+                                                <div style={{
+                                                    width: '76px',
+                                                    height: '48px',
+                                                    borderRadius: '2px',
+                                                    border: '1px solid var(--border)',
+                                                    backgroundColor: '#ffffff',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    flexShrink: 0,
+                                                    marginTop: '0.15rem'
+                                                }}>
+                                                    {canvasImage ? (
+                                                        <img src={canvasImage} alt="Skizze" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+                                                    ) : (
+                                                        <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>Kein Bild</span>
+                                                    )}
+                                                </div>
+
+                                                {/* Details */}
+                                                <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                                                    <div style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                        {roomTitle}
+                                                     </div>
+                                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                                                         {entries.slice(0, 3).map((entry, entryIdx) => {
+                                                             const isCurrent = entry.source === 'measurementData' || (entryIdx === 0 && entry.source !== 'history');
+                                                             
+                                                             let dateLabel = 'Messung';
+                                                             if (entry.date) {
+                                                                 const parsedDate = new Date(entry.date);
+                                                                 if (!isNaN(parsedDate.getTime())) {
+                                                                     dateLabel = parsedDate.toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit' });
+                                                                 } else {
+                                                                     dateLabel = String(entry.date).substring(0, 5);
+                                                                 }
+                                                             }
+
+                                                             return (
+                                                                 <div key={entry.id || entryIdx} style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                                                                     <div style={{ fontWeight: 700, fontSize: '0.72rem', color: isCurrent ? 'var(--text-main)' : 'var(--text-muted)' }}>
+                                                                         {dateLabel} {isCurrent ? '(Aktuell)' : '(Verlauf)'}
+                                                                     </div>
+                                                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem', paddingLeft: '0.4rem', borderLeft: `1.5px solid ${isCurrent ? '#3B82F6' : 'var(--border)'}` }}>
+                                                                         {entry.measurements && entry.measurements.length > 0 ? (
+                                                                             entry.measurements.slice(0, 4).map((m, idx) => (
+                                                                                 <div key={m.id || idx} style={{ fontSize: '0.72rem', color: isCurrent ? 'var(--text-main)' : 'var(--text-muted)', display: 'flex', gap: '0.3rem', lineHeight: 1.25 }}>
+                                                                                     <strong style={{ fontWeight: 600 }}>MP {idx + 1}:</strong>
+                                                                                     <span>{getWValue(m) || '-'}/{getBValue(m) || '-'}</span>
+                                                                                 </div>
+                                                                             ))
+                                                                         ) : (
+                                                                             <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>Keine Messpunkte</div>
+                                                                         )}
+                                                                         {entry.measurements && entry.measurements.length > 4 && (
+                                                                             <div style={{ fontSize: '0.7rem', color: isCurrent ? '#3B82F6' : 'var(--text-muted)', fontWeight: 600, marginTop: '0.05rem' }}>
+                                                                                 +{entry.measurements.length - 4} weitere
+                                                                             </div>
+                                                                         )}
+                                                                     </div>
+                                                                 </div>
+                                                             );
+                                                         })}
+                                                     </div>
+                                                 </div>
+                                             </div>
+                                         );
+                                     })}
+                                </div>
+                            );
+                        })()}
+
                         {isMeasurementsExpanded && (() => {
                             const allUniqueRooms = [];
                             const seenRoomIds = new Set();
