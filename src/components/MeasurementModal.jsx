@@ -1378,7 +1378,8 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
             setTimeout(() => {
                 setIsSuccess(false);
                 setIsSaving(false);
-            }, 1500);
+                onClose(); // Automatically close modal on completion!
+            }, 800);
 
         } catch (err) {
             console.error("Error saving sketch:", err);
@@ -1399,7 +1400,8 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
                 setTimeout(() => {
                     setIsSuccess(false);
                     setIsSaving(false);
-                }, 1500);
+                    onClose(); // Automatically close modal on completion!
+                }, 800);
             } catch (fallbackErr) {
                 console.error("Fallback save also failed:", fallbackErr);
                 alert("Fehler beim Speichern der Messung.");
@@ -1525,8 +1527,8 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
 
 
                         <button onClick={handleSave} disabled={isSaving} style={{ padding: '0.55rem 1.2rem', borderRadius: '8px', background: isSuccess ? '#10B981' : '#2563EB', border: 'none', color: 'white', fontWeight: 700, fontSize: '0.875rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem', minHeight: '42px', boxShadow: isSuccess ? '0 0 0 3px rgba(16,185,129,0.25)' : '0 0 0 3px rgba(37,99,235,0.25)' }}>
-                            {isSaving ? <Loader size={16} className="animate-spin" /> : isSuccess ? <Check size={16} /> : <Save size={16} />}
-                            {isSaving ? 'Speichert…' : isSuccess ? 'Gespeichert!' : (readOnly ? 'Schliessen' : 'Speichern')}
+                            {isSaving ? <Loader size={16} className="animate-spin" /> : <Check size={16} />}
+                            {isSaving ? 'Speichert…' : isSuccess ? 'Gespeichert!' : (readOnly ? 'Schliessen' : 'Fertig')}
                         </button>
                         <button 
                             onClick={() => setShowHistoryTable(!showHistoryTable)} 
