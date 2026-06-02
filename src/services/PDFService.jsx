@@ -305,8 +305,8 @@ export const PDFService = {
                         canvas.height = height;
                         const ctx = canvas.getContext('2d');
                         ctx.drawImage(img, 0, 0, width, height);
-                        // Use PNG to avoid pdfkit JPEG parsing bugs with objectPosition
-                        resolve(canvas.toDataURL('image/png'));
+                        // Use JPEG with 0.8 quality to keep file sizes extremely compact (typically 10-15x smaller than lossless PNG)
+                        resolve(canvas.toDataURL('image/jpeg', 0.8));
                     };
                     img.onerror = () => {
                         if (dataUrl.startsWith('data:image/')) {

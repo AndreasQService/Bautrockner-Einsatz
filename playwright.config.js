@@ -31,7 +31,7 @@ export default defineConfig({
         baseURL: 'http://localhost:5173',
 
         // Browser-Einstellungen
-        headless: false,          // Auf true setzen für CI/CD
+        headless: true,          // Auf true setzen für CI/CD
         viewport: { width: 1280, height: 800 },
 
         // ✅ Mikrofon & Kamera automatisch erlauben

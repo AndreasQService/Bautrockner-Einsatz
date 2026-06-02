@@ -19,14 +19,46 @@ import i18n from './i18n'
 import { buildProjectFolderName, uploadProjectJson } from "./services/OneDriveService";
 
 function sanitizeMeasurementStorage(reportData) {
-  if (!reportData || !Array.isArray(reportData.rooms)) return reportData;
+  if (!reportData) return reportData;
 
   const normalize = (val) => String(val || '').trim().toLowerCase().replace(/-/g, ' ').replace(/\s+/g, ' ');
 
-  let updatedMeasurementRooms = Array.isArray(reportData.measurementRooms) ? [...reportData.measurementRooms] : [];
+  // 1. Recover rooms that are in measurementRooms but missing from rooms (self-healing)
+  let rooms = Array.isArray(reportData.rooms) ? [...reportData.rooms] : [];
+  const measurementRooms = Array.isArray(reportData.measurementRooms) ? reportData.measurementRooms : [];
+
+  measurementRooms.forEach(mr => {
+    if (!mr) return;
+    const normApt = normalize(mr.apartment || 'Allgemeiner Bereich');
+    const normName = normalize(mr.name || 'Unbenannter Raum');
+
+    const exists = rooms.some(r =>
+      normalize(r.apartment || 'Allgemeiner Bereich') === normApt &&
+      normalize(r.name || 'Unbenannter Raum') === normName
+    );
+
+    if (!exists) {
+      rooms.push({
+        id: mr.id || `room_${Date.now()}_healed`,
+        name: mr.name,
+        apartment: mr.apartment,
+        stockwerk: mr.stockwerk,
+        photos: [],
+        damages: [],
+        equipment: []
+      });
+    }
+  });
+
+  const healedReportData = {
+    ...reportData,
+    rooms
+  };
+
+  let updatedMeasurementRooms = Array.isArray(healedReportData.measurementRooms) ? [...healedReportData.measurementRooms] : [];
   let updatedRooms = [];
 
-  for (const r of reportData.rooms) {
+  for (const r of healedReportData.rooms) {
     const hasMeasurementData = r.measurementData || r.measurementHistory || r.measurements || r.measurementPoints || r.points;
 
     if (hasMeasurementData) {
@@ -78,21 +110,18 @@ function sanitizeMeasurementStorage(reportData) {
       }
     }
 
-    const hasRealRoomData = (r.photos && r.photos.length > 0) || (r.damages && r.damages.length > 0) || (r.equipment && r.equipment.length > 0) || r.construction || r.notes;
-
-    if (hasRealRoomData || !hasMeasurementData) {
-      const cleanRoom = { ...r };
-      delete cleanRoom.measurementData;
-      delete cleanRoom.measurementHistory;
-      delete cleanRoom.measurements;
-      delete cleanRoom.measurementPoints;
-      delete cleanRoom.points;
-      updatedRooms.push(cleanRoom);
-    }
+    // Keep ALL rooms in updatedRooms so rooms with only measurements never disappear from the UI!
+    const cleanRoom = { ...r };
+    delete cleanRoom.measurementData;
+    delete cleanRoom.measurementHistory;
+    delete cleanRoom.measurements;
+    delete cleanRoom.measurementPoints;
+    delete cleanRoom.points;
+    updatedRooms.push(cleanRoom);
   }
 
   return {
-    ...reportData,
+    ...healedReportData,
     rooms: updatedRooms,
     measurementRooms: updatedMeasurementRooms
   };
@@ -391,7 +420,7 @@ function App() {
 
         const fetchPromise = supabase
           .from('damage_reports')
-          .select('id, updated_at, created_at, project_title, client, address, status, assigned_to, date, drying_started, deleted_at');
+          .select('id, updated_at, created_at, project_title, client, address, status, assigned_to, date, drying_started, deleted_at, projectNumber:report_data->>projectNumber');
 
         let result = await Promise.race([fetchPromise, timeoutPromise]);
         let data = result.data;
@@ -402,7 +431,7 @@ function App() {
           console.warn('[Supabase] Spalte "deleted_at" fehlt in DB. Starte Fallback-Abfrage ohne "deleted_at"...');
           const fallbackPromise = supabase
             .from('damage_reports')
-            .select('id, updated_at, created_at, project_title, client, address, status, assigned_to, date, drying_started');
+            .select('id, updated_at, created_at, project_title, client, address, status, assigned_to, date, drying_started, projectNumber:report_data->>projectNumber');
           result = await Promise.race([fallbackPromise, timeoutPromise]);
           data = result.data;
           error = result.error;
@@ -423,6 +452,7 @@ function App() {
                 _supabase_updated_at: row.updated_at,
                 created_at: row.created_at,
                 projectTitle: row.project_title || '',
+                projectNumber: row.projectNumber || '',
                 client: row.client || '',
                 address: row.address || '',
                 status: row.status || 'Schadenaufnahme',
@@ -493,7 +523,7 @@ function App() {
         
         if (data && !error && data.report_data) {
           activeReport = {
-            ...data.report_data,
+            ...sanitizeMeasurementStorage(data.report_data),
             id: report.id,
             _supabase_updated_at: data.updated_at,
             isLightweight: false
@@ -527,7 +557,7 @@ function App() {
             .single();
           if (data && !error && data.report_data) {
             const fullReport = {
-              ...data.report_data,
+              ...sanitizeMeasurementStorage(data.report_data),
               id: selectedReport.id,
               _supabase_updated_at: data.updated_at,
               isLightweight: false

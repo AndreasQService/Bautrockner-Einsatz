@@ -3274,6 +3274,7 @@ END:VCARD`;
                                 
                                 const finalCanvasImage = canvasImage || existingRoom.canvasImage || existingRoom.measurementData?.canvasImage || null;
                                 const finalSketch = finalCanvasImage;
+                                const finalProtocolUrl = protocolUrl || existingRoom.measurementData?.protocolUrl || existingRoom.protocolUrl || null;
 
                                 const updatedHistory = updatedHistoryFromModal !== undefined
                                     ? updatedHistoryFromModal
@@ -3293,7 +3294,7 @@ END:VCARD`;
                                     ...existingRoom,
                                     name: globalSettings.room || existingRoom.name,
                                     apartment: globalSettings.apartment || existingRoom.apartment,
-                                    measurementData: { measurements, globalSettings, canvasImage: finalCanvasImage, sketch: finalSketch, protocolUrl, galleryPhotos: galleryPhotos || [] },
+                                    measurementData: { measurements, globalSettings, canvasImage: finalCanvasImage, sketch: finalSketch, protocolUrl: finalProtocolUrl, galleryPhotos: galleryPhotos || [] },
                                     measurementHistory: updatedHistory,
                                     canvasImage: finalCanvasImage,
                                     sketch: finalSketch
@@ -3310,6 +3311,7 @@ END:VCARD`;
                                 
                                 const finalCanvasImage = canvasImage || activeRoomForMeasurement.canvasImage || activeRoomForMeasurement.measurementData?.canvasImage || null;
                                 const finalSketch = finalCanvasImage;
+                                const finalProtocolUrl = protocolUrl || activeRoomForMeasurement.measurementData?.protocolUrl || activeRoomForMeasurement.protocolUrl || null;
 
                                 const updatedHistory = updatedHistoryFromModal !== undefined
                                     ? updatedHistoryFromModal
@@ -3329,7 +3331,7 @@ END:VCARD`;
                                     ...activeRoomForMeasurement,
                                     ...baseRoom,
                                     id: `room_${Date.now()}`,
-                                    measurementData: { measurements, globalSettings, canvasImage: finalCanvasImage, sketch: finalSketch, protocolUrl, galleryPhotos: galleryPhotos || [] },
+                                    measurementData: { measurements, globalSettings, canvasImage: finalCanvasImage, sketch: finalSketch, protocolUrl: finalProtocolUrl, galleryPhotos: galleryPhotos || [] },
                                     measurementHistory: updatedHistory,
                                     canvasImage: finalCanvasImage,
                                     sketch: finalSketch
@@ -6941,6 +6943,38 @@ END:VCARD`;
                                 }).map((img, idx) => renderDocCard(img, idx))}
                             </div>
 
+                            {/* Drag and Drop Zone for Schadensberichte */}
+                            <div
+                                className="btn-glass"
+                                style={{
+                                    border: '2px dashed var(--border)',
+                                    borderRadius: '16px',
+                                    padding: '1.5rem',
+                                    textAlign: 'center',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                    marginBottom: '1.25rem',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    color: 'var(--text-muted)'
+                                }}
+                                onClick={() => document.getElementById('file-upload-Schadensberichte-desktop').click()}
+                                onDragOver={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.background = 'rgba(14, 165, 233, 0.08)'; }}
+                                onDragLeave={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.background = 'none'; }}
+                                onDrop={(e) => handleCategoryDrop(e, 'Schadensberichte')}
+                            >
+                                <div style={{
+                                    width: '40px', height: '40px', borderRadius: '50%', backgroundColor: 'rgba(255,255,255,0.05)',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '0.75rem'
+                                }}>
+                                    <Plus size={20} />
+                                </div>
+                                <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>Schadensbericht hochladen / Drop (PDF / Bild)</span>
+                                <input id="file-upload-Schadensberichte-desktop" type="file" multiple accept="image/*,.heic,.heif,application/pdf" style={{ display: 'none' }} onChange={(e) => handleCategorySelect(e, 'Schadensberichte')} />
+                            </div>
+
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                                 {formData.images.filter(img => img.assignedTo === 'Schadensberichte').map((item, idx) => (
                                     <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem', backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
@@ -8359,6 +8393,7 @@ END:VCARD`;
                                 
                                 const finalCanvasImage = canvasImage || existingRoom.canvasImage || existingRoom.measurementData?.canvasImage || null;
                                 const finalSketch = finalCanvasImage;
+                                const finalProtocolUrl = protocolUrl || existingRoom.measurementData?.protocolUrl || existingRoom.protocolUrl || null;
 
                                 const updatedHistory = updatedHistoryFromModal !== undefined
                                     ? updatedHistoryFromModal
@@ -8378,7 +8413,7 @@ END:VCARD`;
                                     ...existingRoom,
                                     name: globalSettings.room || existingRoom.name,
                                     apartment: globalSettings.apartment || existingRoom.apartment,
-                                    measurementData: { measurements, globalSettings, canvasImage: finalCanvasImage, sketch: finalSketch, protocolUrl, galleryPhotos: galleryPhotos || [] },
+                                    measurementData: { measurements, globalSettings, canvasImage: finalCanvasImage, sketch: finalSketch, protocolUrl: finalProtocolUrl, galleryPhotos: galleryPhotos || [] },
                                     measurementHistory: updatedHistory,
                                     canvasImage: finalCanvasImage,
                                     sketch: finalSketch
@@ -8395,6 +8430,7 @@ END:VCARD`;
                                 
                                 const finalCanvasImage = canvasImage || activeRoomForMeasurement.canvasImage || activeRoomForMeasurement.measurementData?.canvasImage || null;
                                 const finalSketch = finalCanvasImage;
+                                const finalProtocolUrl = protocolUrl || activeRoomForMeasurement.measurementData?.protocolUrl || activeRoomForMeasurement.protocolUrl || null;
 
                                 const updatedHistory = updatedHistoryFromModal !== undefined
                                     ? updatedHistoryFromModal
@@ -8414,7 +8450,7 @@ END:VCARD`;
                                     ...activeRoomForMeasurement,
                                     ...baseRoom,
                                     id: `room_${Date.now()}`,
-                                    measurementData: { measurements, globalSettings, canvasImage: finalCanvasImage, sketch: finalSketch, protocolUrl, galleryPhotos: galleryPhotos || [] },
+                                    measurementData: { measurements, globalSettings, canvasImage: finalCanvasImage, sketch: finalSketch, protocolUrl: finalProtocolUrl, galleryPhotos: galleryPhotos || [] },
                                     measurementHistory: updatedHistory,
                                     canvasImage: finalCanvasImage,
                                     sketch: finalSketch
