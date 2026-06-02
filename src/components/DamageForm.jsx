@@ -2962,9 +2962,21 @@ END:VCARD`;
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '40vh', overflowY: 'auto', paddingBottom: '1rem' }}>
                                         {allRooms.filter(r => (r.apartment || 'Allgemeiner Bereich').trim() === activeApt).map(r => (
                                             <button key={r.id} onClick={() => {
+                                                const history = Array.isArray(r.measurementHistory) ? r.measurementHistory : [];
+                                                const updatedHistory = (r.measurementData && Array.isArray(r.measurementData.measurements) && r.measurementData.measurements.length > 0)
+                                                    ? [{
+                                                        id: `hist_${Date.now()}_prev`,
+                                                        date: r.measurementData.globalSettings?.date || new Date().toISOString(),
+                                                        measurements: r.measurementData.measurements.map(m => ({ ...m })),
+                                                        globalSettings: { ...(r.measurementData.globalSettings || {}) },
+                                                        canvasImage: r.measurementData.canvasImage || r.canvasImage || null,
+                                                        protocolUrl: r.measurementData.protocolUrl,
+                                                        galleryPhotos: r.measurementData.galleryPhotos || []
+                                                    }, ...history]
+                                                    : history;
                                                 setActiveRoomForMeasurement({
                                                     ...r,
-                                                    measurementHistory: Array.isArray(r.measurementHistory) ? r.measurementHistory : [],
+                                                    measurementHistory: updatedHistory,
                                                     measurementData: null,
                                                     currentMeasurementData: null,
                                                     measurements: [],
@@ -3030,9 +3042,21 @@ END:VCARD`;
                     measurementRooms={formData.measurementRooms || []}
                     onBackToTiles={() => setTechTab(null)}
                     onContinueMeasurement={(room) => {
+                        const history = Array.isArray(room.measurementHistory) ? room.measurementHistory : [];
+                        const updatedHistory = (room.measurementData && Array.isArray(room.measurementData.measurements) && room.measurementData.measurements.length > 0)
+                            ? [{
+                                id: `hist_${Date.now()}_prev`,
+                                date: room.measurementData.globalSettings?.date || new Date().toISOString(),
+                                measurements: room.measurementData.measurements.map(m => ({ ...m })),
+                                globalSettings: { ...(room.measurementData.globalSettings || {}) },
+                                canvasImage: room.measurementData.canvasImage || room.canvasImage || null,
+                                protocolUrl: room.measurementData.protocolUrl,
+                                galleryPhotos: room.measurementData.galleryPhotos || []
+                            }, ...history]
+                            : history;
                         setActiveRoomForMeasurement({
                             ...room,
-                            measurementHistory: Array.isArray(room.measurementHistory) ? room.measurementHistory : [],
+                            measurementHistory: updatedHistory,
                             measurementData: null,
                             currentMeasurementData: null,
                             measurements: [],
@@ -7008,7 +7032,35 @@ END:VCARD`;
                                                         type="button" 
                                                         className="btn-glass" 
                                                         style={{ padding: '0.4rem 0.8rem', fontSize: '0.75rem', borderRadius: '8px', color: 'var(--primary)' }} 
-                                                        onClick={() => { setActiveRoomForMeasurement({...room, measurementHistory: Array.isArray(room.measurementHistory) ? room.measurementHistory : [], measurementData: null, currentMeasurementData: null, measurements: [], canvasImage: null, protocolUrl: null, galleryPhotos: [], isNewMeasurement: true, isContinueMeasurement: true, measurementSessionId: `continue_empty_${room.id}_${Date.now()}`}); setIsNewMeasurement(true); setShowMeasurementModal(true); }}
+                                                        onClick={() => { 
+                                                             const history = Array.isArray(room.measurementHistory) ? room.measurementHistory : [];
+                                                             const updatedHistory = (room.measurementData && Array.isArray(room.measurementData.measurements) && room.measurementData.measurements.length > 0)
+                                                                 ? [{
+                                                                     id: `hist_${Date.now()}_prev`,
+                                                                     date: room.measurementData.globalSettings?.date || new Date().toISOString(),
+                                                                     measurements: room.measurementData.measurements.map(m => ({ ...m })),
+                                                                     globalSettings: { ...(room.measurementData.globalSettings || {}) },
+                                                                     canvasImage: room.measurementData.canvasImage || room.canvasImage || null,
+                                                                     protocolUrl: room.measurementData.protocolUrl,
+                                                                     galleryPhotos: room.measurementData.galleryPhotos || []
+                                                                 }, ...history]
+                                                                 : history;
+                                                             setActiveRoomForMeasurement({
+                                                                 ...room, 
+                                                                 measurementHistory: updatedHistory, 
+                                                                 measurementData: null, 
+                                                                 currentMeasurementData: null, 
+                                                                 measurements: [], 
+                                                                 canvasImage: null, 
+                                                                 protocolUrl: null, 
+                                                                 galleryPhotos: [], 
+                                                                 isNewMeasurement: true, 
+                                                                 isContinueMeasurement: true, 
+                                                                 measurementSessionId: `continue_empty_${room.id}_${Date.now()}`
+                                                             }); 
+                                                             setIsNewMeasurement(true); 
+                                                             setShowMeasurementModal(true); 
+                                                         }}
                                                     >
                                                         Details öffnen
                                                     </button>

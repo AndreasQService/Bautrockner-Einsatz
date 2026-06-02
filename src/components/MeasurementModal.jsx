@@ -1183,20 +1183,39 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
             } else {
                 // Standard Image Save - Use JPEG format with 0.8 quality to make it 10x smaller than PNG!
                 // This accelerates upload over slow cellar networks (e.g., cellars) by 1000%
-                await new Promise((resolve) => {
-                    canvas.toBlob(async (blob) => {
-                        const file = new File([blob], `Messprotokoll_${projectTitle || 'Neu'}_${Date.now()}.jpg`, { type: 'image/jpeg' });
+                await new Promise((resolve, reject) => {
+                    try {
+                        canvas.toBlob(async (blob) => {
+                            try {
+                                if (!blob) {
+                                    throw new Error("Canvas toBlob yielded null blob");
+                                }
+                                let file;
+                                try {
+                                    file = new File([blob], `Messprotokoll_${projectTitle || 'Neu'}_${Date.now()}.jpg`, { type: 'image/jpeg' });
+                                } catch (fileErr) {
+                                    // Safari/iOS Fallback
+                                    file = new Blob([blob], { type: 'image/jpeg' });
+                                    file.name = `Messprotokoll_${projectTitle || 'Neu'}_${Date.now()}.jpg`;
+                                    file.lastModifiedDate = new Date();
+                                }
 
-                        await onSave({
-                            file,
-                            measurements,
-                            globalSettings,
-                            canvasImage: canvasDataUrl,
-                            galleryPhotos,
-                            isAutosave: false
-                        });
-                        resolve();
-                    }, 'image/jpeg', 0.8);
+                                await onSave({
+                                    file,
+                                    measurements,
+                                    globalSettings,
+                                    canvasImage: canvasDataUrl,
+                                    galleryPhotos,
+                                    isAutosave: false
+                                });
+                                resolve();
+                            } catch (err) {
+                                reject(err);
+                            }
+                        }, 'image/jpeg', 0.8);
+                    } catch (err) {
+                        reject(err);
+                    }
                 });
             }
 
