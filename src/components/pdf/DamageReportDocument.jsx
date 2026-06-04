@@ -84,61 +84,32 @@ const DamageReportDocument = ({ data }) => {
                     <View>
                         <View style={styles.divider} />
                         <View style={{ gap: 6, marginBottom: 6, marginTop: 6 }}>
-                            {/* Row 1: Google Map and/or Custom Map */}
-                            {(data.staticMapUrl || data.customMapImage) && (
-                                <View style={{ flexDirection: 'row', gap: 6 }}>
-                                    {data.staticMapUrl && (
-                                        <Image
-                                            src={data.staticMapUrl}
-                                            style={{
-                                                flex: (data.customMapImage || (data.exteriorPhoto && !data.customMapImage)) ? 1 : undefined,
-                                                width: (data.customMapImage || (data.exteriorPhoto && !data.customMapImage)) ? undefined : '100%',
-                                                height: 160,
-                                                objectFit: 'cover',
-                                                borderRadius: 4,
-                                            }}
-                                        />
-                                    )}
-                                    {data.customMapImage && (
-                                        <Image
-                                            src={data.customMapImage}
-                                            style={{
-                                                flex: data.staticMapUrl ? 1 : undefined,
-                                                width: data.staticMapUrl ? undefined : '100%',
-                                                height: 160,
-                                                objectFit: 'cover',
-                                                borderRadius: 4,
-                                            }}
-                                        />
-                                    )}
-                                    {/* Show exterior photo here ONLY if no customMapImage is present (legacy behavior) */}
-                                    {!data.customMapImage && data.exteriorPhoto && (
-                                        <Image
-                                            src={data.exteriorPhoto}
-                                            style={{
-                                                flex: data.staticMapUrl ? 1 : undefined,
-                                                width: data.staticMapUrl ? undefined : '100%',
-                                                height: 160,
-                                                objectFit: 'cover',
-                                                borderRadius: 4,
-                                            }}
-                                        />
-                                    )}
-                                </View>
-                            )}
-
-                            {/* Row 2: Exterior Photo (Full width if customMapImage is present) */}
-                            {data.customMapImage && data.exteriorPhoto && (
-                                <Image
-                                    src={data.exteriorPhoto}
-                                    style={{
-                                        width: '100%',
-                                        height: 160,
-                                        objectFit: 'cover',
-                                        borderRadius: 4,
-                                    }}
-                                />
-                            )}
+                            <View style={{ flexDirection: 'row', gap: 6 }}>
+                                {(data.staticMapUrl || data.customMapImage) && (
+                                    <Image
+                                        src={data.staticMapUrl || data.customMapImage}
+                                        style={{
+                                            flex: data.exteriorPhoto ? 1 : undefined,
+                                            width: data.exteriorPhoto ? undefined : '100%',
+                                            height: 160,
+                                            objectFit: 'cover',
+                                            borderRadius: 4,
+                                        }}
+                                    />
+                                )}
+                                {data.exteriorPhoto && (
+                                    <Image
+                                        src={data.exteriorPhoto}
+                                        style={{
+                                            flex: (data.staticMapUrl || data.customMapImage) ? 1 : undefined,
+                                            width: (data.staticMapUrl || data.customMapImage) ? undefined : '100%',
+                                            height: 160,
+                                            objectFit: 'cover',
+                                            borderRadius: 4,
+                                        }}
+                                    />
+                                )}
+                            </View>
                         </View>
                         <View style={styles.divider} />
                     </View>
