@@ -160,6 +160,7 @@ function App() {
   const sessionTokenRef = useRef(null);
   const isSessionActiveRef = useRef(true);
   const selectedReportRef = useRef(null);
+  const reportsRef = useRef([]);
   const sessionStartedAtRef = useRef(Date.now());
   const silentSaveDebounceTimers = useRef({});
 
@@ -390,6 +391,9 @@ function App() {
     return [];
   });
 
+  // Keep reportsRef in sync with reports state
+  useEffect(() => { reportsRef.current = reports; }, [reports]);
+
   // Persist view and selected report state
   useEffect(() => {
     localStorage.setItem('qservice_current_view', view);
@@ -581,6 +585,28 @@ function App() {
 
   const handleSaveReport = useCallback(async (updatedReport, silent = false) => {
     let finalReport = sanitizeMeasurementStorage({ ...updatedReport });
+
+    const incomingExteriorPhoto = finalReport.exteriorPhoto;
+    const deleteRequested = finalReport.exteriorPhotoDeleted === true;
+    const existingRecord = (selectedReportRef.current && selectedReportRef.current.id === finalReport.id)
+      ? selectedReportRef.current
+      : reportsRef.current.find(r => r.id === finalReport.id);
+    const existingExteriorPhoto = existingRecord?.exteriorPhoto || existingRecord?.report_data?.exteriorPhoto || null;
+
+    let safeExteriorPhoto;
+    if (deleteRequested) {
+      safeExteriorPhoto = null;
+    } else if (incomingExteriorPhoto) {
+      safeExteriorPhoto = incomingExteriorPhoto;
+    } else {
+      safeExteriorPhoto = existingExteriorPhoto;
+    }
+
+    finalReport = {
+      ...finalReport,
+      exteriorPhoto: safeExteriorPhoto,
+      exteriorPhotoDeleted: false
+    };
     
     console.log('[MEAS STORAGE GUARD]', {
         roomsLength: finalReport.rooms?.length,
@@ -656,6 +682,16 @@ function App() {
     }
 
     if (supabase) {
+      // ── Schutz vor unvollständigem Speichern: Kein Supabase-Save wenn Report noch lädt ──
+      const isCurrentlyLightweight = selectedReport && selectedReport.id === finalReport.id && selectedReport.isLightweight;
+      const cachedRep = reports.find(r => r.id === finalReport.id);
+      const isLightweightInState = cachedRep && cachedRep.isLightweight;
+
+      if (isCurrentlyLightweight || isLightweightInState || finalReport.isLightweight) {
+        console.error('[Supabase-Guard] SAVE BLOCKED: lightweight report must not be saved to Supabase:', finalReport.id);
+        throw new Error('SAVE BLOCKED: report is not fully loaded from Supabase.');
+      }
+
       // ── Sitzungsschutz: Kein Supabase-Save wenn anderes Gerät aktiv ist ───────────
       // Techniker-Modus darf IMMER in die Cloud speichern, selbst bei Modus-Konflikt
       const isTechSave = projectMode === 'technician' || isTechnicianMode;
@@ -1419,18 +1455,46 @@ function App() {
                 </div>
               </div>
             )}
-            <DamageForm
-              key={selectedReport ? selectedReport.id : 'new'}
-              onCancel={handleCancelEntry}
-              onSave={handleSaveReport}
-              initialData={selectedReport}
-              mode={projectMode}
-              readOnly={isReadOnly}
-              isDarkMode={isDarkMode}
-              onModeChange={(newMode) => {
-                setProjectModeExclusive(newMode);
-              }}
-            />
+            {selectedReport && selectedReport.isLightweight === true ? (
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                height: '60vh',
+                gap: '1rem',
+                color: 'var(--text-muted)'
+              }}>
+                <style>{`
+                  @keyframes spin {
+                    0% { transform: rotate(0deg); }
+                    100% { transform: rotate(360deg); }
+                  }
+                `}</style>
+                <div style={{
+                  width: '40px',
+                  height: '40px',
+                  border: '4px solid var(--border)',
+                  borderTopColor: 'var(--q-primary)',
+                  borderRadius: '50%',
+                  animation: 'spin 1s linear infinite'
+                }} />
+                <span>Projektdaten werden vollständig geladen...</span>
+              </div>
+            ) : (
+              <DamageForm
+                key={selectedReport ? selectedReport.id : 'new'}
+                onCancel={handleCancelEntry}
+                onSave={handleSaveReport}
+                initialData={selectedReport}
+                mode={projectMode}
+                readOnly={isReadOnly}
+                isDarkMode={isDarkMode}
+                onModeChange={(newMode) => {
+                  setProjectModeExclusive(newMode);
+                }}
+              />
+            )}
           </div>
         )}
       </main>

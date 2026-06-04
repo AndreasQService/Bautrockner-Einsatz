@@ -266,6 +266,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
     }
     const [caseId, setCaseId] = useState(null);
     const [isCauseExpanded, setIsCauseExpanded] = useState(false);
+    const [exteriorPhotoDeleted, setExteriorPhotoDeleted] = useState(false);
 
     const initialAddressParts = parseAddress(initialData?.address);
 
@@ -276,6 +277,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         locationDetails: initialData.locationDetails || '', // New field for Schadenort (e.g. "Wohnung ...")
         extractedData: initialData?.extractedData || null, // Keep track of AI data if re-editing (unlikely but safe)
         exteriorPhoto: initialData.exteriorPhoto || null, // New field for Exterior Photo
+        exteriorPhotoDeleted: initialData.exteriorPhotoDeleted || false,
         clientSource: initialData.clientSource || '',
         propertyType: initialData.propertyType || '',
         damageCategory: initialData.damageCategory || 'Wasserschaden',
@@ -435,6 +437,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         equipment: [],
         images: [],
         exteriorPhoto: null,
+        exteriorPhotoDeleted: false,
         customMapImage: null,
         measures: '',
         selectedMeasures: [],
@@ -509,8 +512,26 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
 
     // Sync asynchronously loaded initialData fields (like exteriorPhoto, images, rooms, and measurementRooms) back to local state
     useEffect(() => {
-        if (initialData?.exteriorPhoto && !formData.exteriorPhoto) {
+        if (
+            initialData?.exteriorPhoto &&
+            !formData.exteriorPhoto &&
+            formData.exteriorPhotoDeleted !== true
+        ) {
             setFormData(prev => ({ ...prev, exteriorPhoto: initialData.exteriorPhoto }));
+        }
+        if (initialData && typeof initialData.exteriorPhotoDeleted !== 'undefined') {
+            setFormData(prev => {
+                if (prev.exteriorPhotoDeleted !== initialData.exteriorPhotoDeleted) {
+                    return { ...prev, exteriorPhotoDeleted: initialData.exteriorPhotoDeleted };
+                }
+                return prev;
+            });
+            setExteriorPhotoDeleted(prev => {
+                if (prev !== initialData.exteriorPhotoDeleted) {
+                    return initialData.exteriorPhotoDeleted;
+                }
+                return prev;
+            });
         }
         if (initialData?.customMapImage && !formData.customMapImage) {
             setFormData(prev => ({ ...prev, customMapImage: initialData.customMapImage }));
@@ -611,7 +632,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                 return changed ? { ...prev, images: nextImages } : prev;
             });
         }
-    }, [initialData?.exteriorPhoto, initialData?.customMapImage, initialData?.damageTypeImage, initialData?.images, initialData?.isLightweight, initialData?.measurementRooms, initialData?.rooms]);
+    }, [initialData?.exteriorPhoto, initialData?.exteriorPhotoDeleted, initialData?.customMapImage, initialData?.damageTypeImage, initialData?.images, initialData?.isLightweight, initialData?.measurementRooms, initialData?.rooms]);
 
     const [isSaving, setIsSaving] = useState(false);
     const [lastSaved, setLastSaved] = useState(null);
@@ -2495,7 +2516,12 @@ END:VCARD`;
         try {
             // Compress and resize the image first (typically down to 100-200KB)
             const compressedBase64 = await compressAndResizeImage(file);
-            setFormData(prev => ({ ...prev, exteriorPhoto: compressedBase64 }));
+            setFormData(prev => ({
+                ...prev,
+                exteriorPhoto: compressedBase64,
+                exteriorPhotoDeleted: false
+            }));
+            setExteriorPhotoDeleted(false);
 
             // Upload to Supabase Storage and replace with public URL
             if (supabase) {
@@ -2508,7 +2534,12 @@ END:VCARD`;
                     const { error } = await supabase.storage.from('case-files').upload(fileName, blob);
                     if (error) throw error;
                     const { data: { publicUrl } } = supabase.storage.from('case-files').getPublicUrl(fileName);
-                    setFormData(prev => ({ ...prev, exteriorPhoto: publicUrl }));
+                    setFormData(prev => ({
+                        ...prev,
+                        exteriorPhoto: publicUrl,
+                        exteriorPhotoDeleted: false
+                    }));
+                    setExteriorPhotoDeleted(false);
                 } catch (err) {
                     console.warn('Exterior photo upload failed, keeping compressed base64:', err);
                 }
@@ -2521,8 +2552,10 @@ END:VCARD`;
     const removeExteriorPhoto = () => {
         setFormData(prev => ({
             ...prev,
-            exteriorPhoto: null
+            exteriorPhoto: null,
+            exteriorPhotoDeleted: true
         }));
+        setExteriorPhotoDeleted(true);
     };
 
 
