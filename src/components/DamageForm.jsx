@@ -266,6 +266,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
     }
     const [caseId, setCaseId] = useState(null);
     const [desktopTab, setDesktopTab] = useState('auftrag');
+    const [hoveredTab, setHoveredTab] = useState(null);
     const [isCauseExpanded, setIsCauseExpanded] = useState(false);
     const [exteriorPhotoDeleted, setExteriorPhotoDeleted] = useState(false);
 
@@ -3446,14 +3447,16 @@ END:VCARD`;
                                     key={tab.id}
                                     type="button"
                                     onClick={() => setDesktopTab(tab.id)}
+                                    onMouseEnter={() => setHoveredTab(tab.id)}
+                                    onMouseLeave={() => setHoveredTab(null)}
                                     style={{
                                         padding: '0.75rem 1.25rem',
                                         fontSize: '0.95rem',
                                         fontWeight: isActive ? 800 : 600,
-                                        color: isActive ? 'var(--primary)' : 'var(--text-muted)',
+                                        color: isActive ? 'var(--primary)' : (hoveredTab === tab.id ? 'var(--text-main)' : 'var(--text-muted)'),
                                         background: 'transparent',
                                         border: 'none',
-                                        borderBottom: isActive ? '3px solid var(--primary)' : '3px solid transparent',
+                                        borderBottom: isActive ? '3px solid var(--primary)' : (hoveredTab === tab.id ? '3px solid var(--border)' : '3px solid transparent'),
                                         cursor: 'pointer',
                                         transition: 'all 0.15s ease',
                                         marginBottom: '-3px',
