@@ -50,8 +50,13 @@ try {
 try {
     console.log('\nCommitting changes...');
     // Add only tracked changes
+    const fs = require('fs');
     trackedChanges.forEach(file => {
-        execSync(`git add "${file}"`);
+        if (fs.existsSync(file)) {
+            execSync(`git add "${file}"`);
+        } else {
+            execSync(`git rm "${file}"`);
+        }
     });
 
     const commitMsg = `SAVEPOINT: ${description}`;

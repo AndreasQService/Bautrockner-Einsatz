@@ -265,6 +265,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         return { street, zip, city };
     }
     const [caseId, setCaseId] = useState(null);
+    const [desktopTab, setDesktopTab] = useState('auftrag');
     const [isCauseExpanded, setIsCauseExpanded] = useState(false);
     const [exteriorPhotoDeleted, setExteriorPhotoDeleted] = useState(false);
 
@@ -3421,6 +3422,50 @@ END:VCARD`;
     return (
         <>
             <div className="card" style={{ maxWidth: mode === 'desktop' ? '1000px' : '800px', margin: '0 auto', padding: mode === 'desktop' ? '1.5rem' : '1rem' }}>
+                {/* Desktop Tabs Header Selector (Visual Mockup Only) */}
+                {mode === 'desktop' && (
+                    <div style={{
+                        display: 'flex',
+                        borderBottom: '2px solid var(--border)',
+                        marginBottom: '2rem',
+                        gap: '1rem',
+                        overflowX: 'auto',
+                        paddingBottom: '2px',
+                        flexWrap: 'wrap'
+                    }}>
+                        {[
+                            { id: 'auftrag', label: 'Auftrag und Schadenort' },
+                            { id: 'kontakte', label: 'Kontakte' },
+                            { id: 'raeume', label: 'Räume und Schadensberichte' },
+                            { id: 'messungen', label: 'Messprotokolle' },
+                            { id: 'geraete', label: 'Geräte' }
+                        ].map(tab => {
+                            const isActive = desktopTab === tab.id;
+                            return (
+                                <button
+                                    key={tab.id}
+                                    type="button"
+                                    onClick={() => setDesktopTab(tab.id)}
+                                    style={{
+                                        padding: '0.75rem 1.25rem',
+                                        fontSize: '0.95rem',
+                                        fontWeight: isActive ? 800 : 600,
+                                        color: isActive ? 'var(--primary)' : 'var(--text-muted)',
+                                        background: 'transparent',
+                                        border: 'none',
+                                        borderBottom: isActive ? '3px solid var(--primary)' : '3px solid transparent',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.15s ease',
+                                        marginBottom: '-3px',
+                                        whiteSpace: 'nowrap'
+                                    }}
+                                >
+                                    {tab.label}
+                                </button>
+                            );
+                        })}
+                    </div>
+                )}
                 {/* REMOVED DUPLICATE EmailImportModal FROM HERE */}
 
                 {/* Project & Order Numbers Row */}
