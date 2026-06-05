@@ -1,11 +1,11 @@
-import React from 'react';
-import { ArrowLeft, Plus } from 'lucide-react';
+import { ArrowLeft, Plus, Trash } from 'lucide-react';
 
 export default function TechnicianMeasurementPage({
     measurementRooms,
     onBackToTiles,
     onContinueMeasurement,
-    onNewRoom
+    onNewRoom,
+    onDeleteRoom
 }) {
     return (
         <div style={{ marginBottom: '2rem' }}>
@@ -71,7 +71,7 @@ export default function TechnicianMeasurementPage({
                                         </div>
                                     </div>
 
-                                    <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
+                                    <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem', width: '100%' }}>
                                         <button
                                             className="btn-glass"
                                             onClick={() => onContinueMeasurement(room)}
@@ -91,6 +91,32 @@ export default function TechnicianMeasurementPage({
                                         >
                                             Messung fortsetzen
                                         </button>
+                                        {onDeleteRoom && (
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    if (window.confirm(`Sind Sie sicher, dass Sie den Raum "${room.name || 'Unbenannter Raum'}" löschen möchten? Alle zugehörigen Bilder und Messdaten gehen verloren.`)) {
+                                                        onDeleteRoom(room.id);
+                                                    }
+                                                }}
+                                                title="Raum löschen"
+                                                style={{
+                                                    padding: '0.85rem',
+                                                    borderRadius: '8px',
+                                                    border: '1px solid #b91c1c',
+                                                    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                                                    color: '#f87171',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    cursor: 'pointer',
+                                                    width: '44px',
+                                                    flexShrink: 0
+                                                }}
+                                            >
+                                                <Trash size={16} />
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
                             );
