@@ -173,29 +173,54 @@ const getMeasurementEntries = (room) => {
     })));
   }
 
-  // 3. Basic fallback arrays (only if no entries collected yet, or as raw data)
-  if (entries.length === 0) {
-    if (Array.isArray(room.measurements)) {
+  // 3. Basic fallback arrays (only if not already included in entries by date)
+  if (Array.isArray(room.measurements) && room.measurements.length > 0) {
+    const legacyDate = room.globalSettings?.date || room.date || room.datum || room.createdAt || new Date(room.id?.split('_')[1] || Date.now()).toISOString().split('T')[0];
+    const isDuplicate = entries.some(e => e.date === legacyDate);
+    if (!isDuplicate) {
       entries.push({
         source: 'measurements',
+        date: legacyDate,
+        device: room.globalSettings?.device || room.device,
+        temperature: room.globalSettings?.temperature || room.temperature,
+        humidity: room.globalSettings?.humidity || room.humidity,
         measurements: room.measurements,
-        canvasImage: room.canvasImage
+        canvasImage: room.canvasImage,
+        protocolUrl: room.protocolUrl
       });
     }
+  }
 
-    if (Array.isArray(room.measurementPoints)) {
+  if (Array.isArray(room.measurementPoints) && room.measurementPoints.length > 0) {
+    const legacyDate = room.globalSettings?.date || room.date || room.datum || room.createdAt || new Date(room.id?.split('_')[1] || Date.now()).toISOString().split('T')[0];
+    const isDuplicate = entries.some(e => e.date === legacyDate);
+    if (!isDuplicate) {
       entries.push({
         source: 'measurementPoints',
+        date: legacyDate,
+        device: room.globalSettings?.device || room.device,
+        temperature: room.globalSettings?.temperature || room.temperature,
+        humidity: room.globalSettings?.humidity || room.humidity,
         measurements: room.measurementPoints,
-        canvasImage: room.canvasImage
+        canvasImage: room.canvasImage,
+        protocolUrl: room.protocolUrl
       });
     }
+  }
 
-    if (Array.isArray(room.points)) {
+  if (Array.isArray(room.points) && room.points.length > 0) {
+    const legacyDate = room.globalSettings?.date || room.date || room.datum || room.createdAt || new Date(room.id?.split('_')[1] || Date.now()).toISOString().split('T')[0];
+    const isDuplicate = entries.some(e => e.date === legacyDate);
+    if (!isDuplicate) {
       entries.push({
         source: 'points',
+        date: legacyDate,
+        device: room.globalSettings?.device || room.device,
+        temperature: room.globalSettings?.temperature || room.temperature,
+        humidity: room.globalSettings?.humidity || room.humidity,
         measurements: room.points,
-        canvasImage: room.canvasImage
+        canvasImage: room.canvasImage,
+        protocolUrl: room.protocolUrl
       });
     }
   }
@@ -2395,7 +2420,8 @@ END:VCARD`;
     const handleRemoveRoom = (id) => {
         setFormData(prev => ({
             ...prev,
-            rooms: prev.rooms.filter(r => r.id !== id)
+            rooms: (prev.rooms || []).filter(r => r.id !== id),
+            measurementRooms: (prev.measurementRooms || []).filter(r => r.id !== id)
         }));
     }
 
@@ -3052,31 +3078,13 @@ END:VCARD`;
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '40vh', overflowY: 'auto', paddingBottom: '1rem' }}>
                                         {allRooms.filter(r => (r.apartment || 'Allgemeiner Bereich').trim() === activeApt).map(r => (
                                             <button key={r.id} onClick={() => {
-                                                const hasActiveData = r.measurementData && Array.isArray(r.measurementData.measurements) && r.measurementData.measurements.length > 0;
-                                                if (hasActiveData) {
-                                                    setActiveRoomForMeasurement({
-                                                        ...r,
-                                                        isNewMeasurement: false,
-                                                        isContinueMeasurement: true,
-                                                        measurementSessionId: `continue_${r.id}_${Date.now()}`
-                                                    });
-                                                    setIsNewMeasurement(false);
-                                                } else {
-                                                    setActiveRoomForMeasurement({
-                                                        ...r,
-                                                        measurementHistory: Array.isArray(r.measurementHistory) ? r.measurementHistory : [],
-                                                        measurementData: null,
-                                                        currentMeasurementData: null,
-                                                        measurements: [],
-                                                        canvasImage: null,
-                                                        protocolUrl: null,
-                                                        galleryPhotos: [],
-                                                        isNewMeasurement: true,
-                                                        isContinueMeasurement: true,
-                                                        measurementSessionId: `continue_empty_${r.id}_${Date.now()}`
-                                                    });
-                                                    setIsNewMeasurement(true);
-                                                }
+                                                setActiveRoomForMeasurement({
+                                                    ...r,
+                                                    isNewMeasurement: true,
+                                                    isContinueMeasurement: false,
+                                                    measurementSessionId: `new_tech_${r.id}_${Date.now()}`
+                                                });
+                                                setIsNewMeasurement(true);
                                                 setShowTechRoomSelector(false);
                                                 setTechSelectedApartment(null);
                                                 setShowMeasurementModal(true);
@@ -3130,14 +3138,15 @@ END:VCARD`;
                 <TechnicianMeasurementPage
                     measurementRooms={formData.measurementRooms || []}
                     onBackToTiles={() => setTechTab(null)}
+                    onDeleteRoom={handleRemoveRoom}
                     onContinueMeasurement={(room) => {
                         setActiveRoomForMeasurement({
                             ...room,
-                            isNewMeasurement: false,
-                            isContinueMeasurement: true,
+                            isNewMeasurement: true,
+                            isContinueMeasurement: false,
                             measurementSessionId: `continue_${room.id}_${Date.now()}`
                         });
-                        setIsNewMeasurement(false);
+                        setIsNewMeasurement(true);
                         setShowMeasurementModal(true);
                     }}
                     onNewRoom={() => {
@@ -3311,25 +3320,63 @@ END:VCARD`;
                                 const finalSketch = finalCanvasImage;
                                 const finalProtocolUrl = protocolUrl || existingRoom.measurementData?.protocolUrl || existingRoom.protocolUrl || null;
 
-                                const updatedHistory = updatedHistoryFromModal !== undefined
-                                    ? updatedHistoryFromModal
-                                    : ((isNewMeasurement && existingRoom.measurementData && Array.isArray(existingRoom.measurementData.measurements) && existingRoom.measurementData.measurements.length > 0)
-                                        ? [{
+                                const incomingHasValues = Array.isArray(measurements) && measurements.some(m => 
+                                    String(m.w_value || '').trim() !== '' || String(m.b_value || '').trim() !== ''
+                                );
+
+                                // 1. Migrate old active measurementData to history if starting a new measurement visit
+                                let baseHistory = history;
+                                if (isNewMeasurement && existingRoom.measurementData && Array.isArray(existingRoom.measurementData.measurements) && existingRoom.measurementData.measurements.length > 0) {
+                                    const mDataDate = existingRoom.measurementData.globalSettings?.date || existingRoom.measurementData.date || new Date().toISOString();
+                                    const isDuplicate = baseHistory.some(h => (h.date || h.globalSettings?.date) === mDataDate);
+                                    if (!isDuplicate) {
+                                        baseHistory = [{
                                             id: `hist_${Date.now()}_prev`,
-                                            date: existingRoom.measurementData.globalSettings?.date || new Date().toISOString(),
+                                            date: mDataDate,
                                             measurements: existingRoom.measurementData.measurements.map(m => ({ ...m })),
                                             globalSettings: { ...(existingRoom.measurementData.globalSettings || {}) },
                                             canvasImage: existingRoom.measurementData.canvasImage || existingRoom.canvasImage || null,
-                                            protocolUrl: existingRoom.measurementData.protocolUrl,
+                                            protocolUrl: existingRoom.measurementData.protocolUrl || existingRoom.protocolUrl || null,
                                             galleryPhotos: existingRoom.measurementData.galleryPhotos || []
-                                        }, ...history]
-                                        : history);
+                                        }, ...baseHistory];
+                                    }
+                                }
+
+                                // 2. Determine new history and new active measurementData
+                                let updatedHistory = baseHistory;
+                                let newMeasurementData = null;
+
+                                if (data?.isAutosave) {
+                                    newMeasurementData = {
+                                        measurements,
+                                        globalSettings,
+                                        canvasImage: finalCanvasImage,
+                                        sketch: finalSketch,
+                                        protocolUrl: finalProtocolUrl,
+                                        galleryPhotos: galleryPhotos || []
+                                    };
+                                } else {
+                                    if (updatedHistoryFromModal !== undefined) {
+                                        updatedHistory = updatedHistoryFromModal;
+                                    } else if (incomingHasValues) {
+                                        updatedHistory = [{
+                                            id: `hist_${Date.now()}`,
+                                            date: globalSettings?.date || new Date().toISOString(),
+                                            measurements: measurements.map(m => ({ ...m })),
+                                            globalSettings: { ...(globalSettings || {}) },
+                                            canvasImage: finalCanvasImage,
+                                            protocolUrl: finalProtocolUrl,
+                                            galleryPhotos: galleryPhotos || []
+                                        }, ...baseHistory];
+                                    }
+                                    newMeasurementData = null;
+                                }
 
                                 finalRoom = {
                                     ...existingRoom,
                                     name: globalSettings.room || existingRoom.name,
                                     apartment: globalSettings.apartment || existingRoom.apartment,
-                                    measurementData: { measurements, globalSettings, canvasImage: finalCanvasImage, sketch: finalSketch, protocolUrl: finalProtocolUrl, galleryPhotos: galleryPhotos || [] },
+                                    measurementData: newMeasurementData,
                                     measurementHistory: updatedHistory,
                                     canvasImage: finalCanvasImage,
                                     sketch: finalSketch
@@ -3348,25 +3395,63 @@ END:VCARD`;
                                 const finalSketch = finalCanvasImage;
                                 const finalProtocolUrl = protocolUrl || activeRoomForMeasurement.measurementData?.protocolUrl || activeRoomForMeasurement.protocolUrl || null;
 
-                                const updatedHistory = updatedHistoryFromModal !== undefined
-                                    ? updatedHistoryFromModal
-                                    : ((isNewMeasurement && activeRoomForMeasurement.measurementData && Array.isArray(activeRoomForMeasurement.measurementData.measurements) && activeRoomForMeasurement.measurementData.measurements.length > 0)
-                                        ? [{
+                                const incomingHasValues = Array.isArray(measurements) && measurements.some(m => 
+                                    String(m.w_value || '').trim() !== '' || String(m.b_value || '').trim() !== ''
+                                );
+
+                                // 1. Migrate old active measurementData to history if starting a new measurement visit
+                                let baseHistory = history;
+                                if (isNewMeasurement && activeRoomForMeasurement.measurementData && Array.isArray(activeRoomForMeasurement.measurementData.measurements) && activeRoomForMeasurement.measurementData.measurements.length > 0) {
+                                    const mDataDate = activeRoomForMeasurement.measurementData.globalSettings?.date || activeRoomForMeasurement.measurementData.date || new Date().toISOString();
+                                    const isDuplicate = baseHistory.some(h => (h.date || h.globalSettings?.date) === mDataDate);
+                                    if (!isDuplicate) {
+                                        baseHistory = [{
                                             id: `hist_${Date.now()}_prev`,
-                                            date: activeRoomForMeasurement.measurementData.globalSettings?.date || new Date().toISOString(),
+                                            date: mDataDate,
                                             measurements: activeRoomForMeasurement.measurementData.measurements.map(m => ({ ...m })),
                                             globalSettings: { ...(activeRoomForMeasurement.measurementData.globalSettings || {}) },
                                             canvasImage: activeRoomForMeasurement.measurementData.canvasImage || activeRoomForMeasurement.canvasImage || null,
-                                            protocolUrl: activeRoomForMeasurement.measurementData.protocolUrl,
+                                            protocolUrl: activeRoomForMeasurement.measurementData.protocolUrl || activeRoomForMeasurement.protocolUrl || null,
                                             galleryPhotos: activeRoomForMeasurement.measurementData.galleryPhotos || []
-                                        }, ...history]
-                                        : history);
+                                        }, ...baseHistory];
+                                    }
+                                }
+
+                                // 2. Determine new history and new active measurementData
+                                let updatedHistory = baseHistory;
+                                let newMeasurementData = null;
+
+                                if (data?.isAutosave) {
+                                    newMeasurementData = {
+                                        measurements,
+                                        globalSettings,
+                                        canvasImage: finalCanvasImage,
+                                        sketch: finalSketch,
+                                        protocolUrl: finalProtocolUrl,
+                                        galleryPhotos: galleryPhotos || []
+                                    };
+                                } else {
+                                    if (updatedHistoryFromModal !== undefined) {
+                                        updatedHistory = updatedHistoryFromModal;
+                                    } else if (incomingHasValues) {
+                                        updatedHistory = [{
+                                            id: `hist_${Date.now()}`,
+                                            date: globalSettings?.date || new Date().toISOString(),
+                                            measurements: measurements.map(m => ({ ...m })),
+                                            globalSettings: { ...(globalSettings || {}) },
+                                            canvasImage: finalCanvasImage,
+                                            protocolUrl: finalProtocolUrl,
+                                            galleryPhotos: galleryPhotos || []
+                                        }, ...baseHistory];
+                                    }
+                                    newMeasurementData = null;
+                                }
 
                                 finalRoom = {
                                     ...activeRoomForMeasurement,
                                     ...baseRoom,
                                     id: `room_${Date.now()}`,
-                                    measurementData: { measurements, globalSettings, canvasImage: finalCanvasImage, sketch: finalSketch, protocolUrl: finalProtocolUrl, galleryPhotos: galleryPhotos || [] },
+                                    measurementData: newMeasurementData,
                                     measurementHistory: updatedHistory,
                                     canvasImage: finalCanvasImage,
                                     sketch: finalSketch
@@ -7213,11 +7298,11 @@ END:VCARD`;
                                                 onClick={() => {
                                                     setActiveRoomForMeasurement({
                                                         ...room,
-                                                        isNewMeasurement: false,
-                                                        isContinueMeasurement: true,
+                                                        isNewMeasurement: true,
+                                                        isContinueMeasurement: false,
                                                         measurementSessionId: `details_${room.id}_${Date.now()}`
                                                     });
-                                                    setIsNewMeasurement(false);
+                                                    setIsNewMeasurement(true);
                                                     setShowMeasurementModal(true);
                                                 }}
                                                 className="card"
@@ -7257,9 +7342,37 @@ END:VCARD`;
 
                                                 {/* Details */}
                                                 <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                                                    <div style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                                        {roomTitle}
-                                                     </div>
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', width: '100%' }}>
+                                                        <div style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }}>
+                                                            {roomTitle}
+                                                        </div>
+                                                        <button
+                                                            type="button"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                if (window.confirm(`Sind Sie sicher, dass Sie den Raum "${rName}" löschen möchten? Alle zugehörigen Bilder und Messdaten gehen verloren.`)) {
+                                                                    handleRemoveRoom(room.id);
+                                                                }
+                                                            }}
+                                                            title="Raum löschen"
+                                                            style={{
+                                                                background: 'transparent',
+                                                                border: 'none',
+                                                                color: '#ef4444',
+                                                                cursor: 'pointer',
+                                                                padding: '0.2rem',
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                justifyContent: 'center',
+                                                                opacity: 0.7,
+                                                                transition: 'opacity 0.2s'
+                                                             }}
+                                                             onMouseEnter={(e) => e.currentTarget.style.opacity = 1}
+                                                             onMouseLeave={(e) => e.currentTarget.style.opacity = 0.7}
+                                                        >
+                                                            <Trash size={13} />
+                                                        </button>
+                                                    </div>
                                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                                                          {entries.slice(0, 3).map((entry, entryIdx) => {
                                                              const isCurrent = entry.source === 'measurementData' || (entryIdx === 0 && entry.source !== 'history');
@@ -7402,23 +7515,50 @@ END:VCARD`;
                                                             {dateStr}
                                                         </div>
                                                     </div>
-                                                    <button 
-                                                        type="button" 
-                                                        className="btn-glass" 
-                                                        style={{ padding: '0.4rem 0.8rem', fontSize: '0.75rem', borderRadius: '8px', color: 'var(--primary)' }} 
-                                                        onClick={() => { 
-                                                             setActiveRoomForMeasurement({
-                                                                 ...room, 
-                                                                 isNewMeasurement: false, 
-                                                                 isContinueMeasurement: true, 
-                                                                 measurementSessionId: `details_${room.id}_${Date.now()}`
-                                                             }); 
-                                                             setIsNewMeasurement(false); 
-                                                             setShowMeasurementModal(true); 
-                                                         }}
-                                                    >
-                                                        Details öffnen
-                                                    </button>
+                                                    <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                                                        <button 
+                                                            type="button" 
+                                                            className="btn-glass" 
+                                                            style={{ padding: '0.4rem 0.8rem', fontSize: '0.75rem', borderRadius: '8px', color: 'var(--primary)' }} 
+                                                            onClick={() => { 
+                                                                 setActiveRoomForMeasurement({
+                                                                     ...room, 
+                                                                     isNewMeasurement: true, 
+                                                                     isContinueMeasurement: false, 
+                                                                     measurementSessionId: `details_${room.id}_${Date.now()}`
+                                                                 }); 
+                                                                 setIsNewMeasurement(true); 
+                                                                 setShowMeasurementModal(true); 
+                                                             }}
+                                                        >
+                                                            Details öffnen
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                const rName = room.name || 'Unbenannter Raum';
+                                                                if (window.confirm(`Sind Sie sicher, dass Sie den Raum "${rName}" löschen möchten? Alle zugehörigen Bilder und Messdaten gehen verloren.`)) {
+                                                                    handleRemoveRoom(room.id);
+                                                                }
+                                                            }}
+                                                            title="Raum löschen"
+                                                            style={{
+                                                                padding: '0.4rem',
+                                                                borderRadius: '8px',
+                                                                border: '1px solid #b91c1c',
+                                                                backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                                                                color: '#f87171',
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                justifyContent: 'center',
+                                                                cursor: 'pointer',
+                                                                minHeight: '29px',
+                                                                width: '29px'
+                                                            }}
+                                                        >
+                                                            <Trash size={14} />
+                                                        </button>
+                                                    </div>
                                                 </div>
 
                                                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', fontSize: '0.85rem', color: 'var(--text-main)' }}>
@@ -8476,25 +8616,63 @@ END:VCARD`;
                                 const finalSketch = finalCanvasImage;
                                 const finalProtocolUrl = protocolUrl || existingRoom.measurementData?.protocolUrl || existingRoom.protocolUrl || null;
 
-                                const updatedHistory = updatedHistoryFromModal !== undefined
-                                    ? updatedHistoryFromModal
-                                    : ((isNewMeasurement && existingRoom.measurementData && Array.isArray(existingRoom.measurementData.measurements) && existingRoom.measurementData.measurements.length > 0)
-                                        ? [{
+                                const incomingHasValues = Array.isArray(measurements) && measurements.some(m => 
+                                    String(m.w_value || '').trim() !== '' || String(m.b_value || '').trim() !== ''
+                                );
+
+                                // 1. Migrate old active measurementData to history if starting a new measurement visit
+                                let baseHistory = history;
+                                if (isNewMeasurement && existingRoom.measurementData && Array.isArray(existingRoom.measurementData.measurements) && existingRoom.measurementData.measurements.length > 0) {
+                                    const mDataDate = existingRoom.measurementData.globalSettings?.date || existingRoom.measurementData.date || new Date().toISOString();
+                                    const isDuplicate = baseHistory.some(h => (h.date || h.globalSettings?.date) === mDataDate);
+                                    if (!isDuplicate) {
+                                        baseHistory = [{
                                             id: `hist_${Date.now()}_prev`,
-                                            date: existingRoom.measurementData.globalSettings?.date || new Date().toISOString(),
+                                            date: mDataDate,
                                             measurements: existingRoom.measurementData.measurements.map(m => ({ ...m })),
                                             globalSettings: { ...(existingRoom.measurementData.globalSettings || {}) },
                                             canvasImage: existingRoom.measurementData.canvasImage || existingRoom.canvasImage || null,
-                                            protocolUrl: existingRoom.measurementData.protocolUrl,
+                                            protocolUrl: existingRoom.measurementData.protocolUrl || existingRoom.protocolUrl || null,
                                             galleryPhotos: existingRoom.measurementData.galleryPhotos || []
-                                        }, ...history]
-                                        : history);
+                                        }, ...baseHistory];
+                                    }
+                                }
+
+                                // 2. Determine new history and new active measurementData
+                                let updatedHistory = baseHistory;
+                                let newMeasurementData = null;
+
+                                if (data?.isAutosave) {
+                                    newMeasurementData = {
+                                        measurements,
+                                        globalSettings,
+                                        canvasImage: finalCanvasImage,
+                                        sketch: finalSketch,
+                                        protocolUrl: finalProtocolUrl,
+                                        galleryPhotos: galleryPhotos || []
+                                    };
+                                } else {
+                                    if (updatedHistoryFromModal !== undefined) {
+                                        updatedHistory = updatedHistoryFromModal;
+                                    } else if (incomingHasValues) {
+                                        updatedHistory = [{
+                                            id: `hist_${Date.now()}`,
+                                            date: globalSettings?.date || new Date().toISOString(),
+                                            measurements: measurements.map(m => ({ ...m })),
+                                            globalSettings: { ...(globalSettings || {}) },
+                                            canvasImage: finalCanvasImage,
+                                            protocolUrl: finalProtocolUrl,
+                                            galleryPhotos: galleryPhotos || []
+                                        }, ...baseHistory];
+                                    }
+                                    newMeasurementData = null;
+                                }
 
                                 finalRoom = {
                                     ...existingRoom,
                                     name: globalSettings.room || existingRoom.name,
                                     apartment: globalSettings.apartment || existingRoom.apartment,
-                                    measurementData: { measurements, globalSettings, canvasImage: finalCanvasImage, sketch: finalSketch, protocolUrl: finalProtocolUrl, galleryPhotos: galleryPhotos || [] },
+                                    measurementData: newMeasurementData,
                                     measurementHistory: updatedHistory,
                                     canvasImage: finalCanvasImage,
                                     sketch: finalSketch
@@ -8513,25 +8691,63 @@ END:VCARD`;
                                 const finalSketch = finalCanvasImage;
                                 const finalProtocolUrl = protocolUrl || activeRoomForMeasurement.measurementData?.protocolUrl || activeRoomForMeasurement.protocolUrl || null;
 
-                                const updatedHistory = updatedHistoryFromModal !== undefined
-                                    ? updatedHistoryFromModal
-                                    : ((isNewMeasurement && activeRoomForMeasurement.measurementData && Array.isArray(activeRoomForMeasurement.measurementData.measurements) && activeRoomForMeasurement.measurementData.measurements.length > 0)
-                                        ? [{
+                                const incomingHasValues = Array.isArray(measurements) && measurements.some(m => 
+                                    String(m.w_value || '').trim() !== '' || String(m.b_value || '').trim() !== ''
+                                );
+
+                                // 1. Migrate old active measurementData to history if starting a new measurement visit
+                                let baseHistory = history;
+                                if (isNewMeasurement && activeRoomForMeasurement.measurementData && Array.isArray(activeRoomForMeasurement.measurementData.measurements) && activeRoomForMeasurement.measurementData.measurements.length > 0) {
+                                    const mDataDate = activeRoomForMeasurement.measurementData.globalSettings?.date || activeRoomForMeasurement.measurementData.date || new Date().toISOString();
+                                    const isDuplicate = baseHistory.some(h => (h.date || h.globalSettings?.date) === mDataDate);
+                                    if (!isDuplicate) {
+                                        baseHistory = [{
                                             id: `hist_${Date.now()}_prev`,
-                                            date: activeRoomForMeasurement.measurementData.globalSettings?.date || new Date().toISOString(),
+                                            date: mDataDate,
                                             measurements: activeRoomForMeasurement.measurementData.measurements.map(m => ({ ...m })),
                                             globalSettings: { ...(activeRoomForMeasurement.measurementData.globalSettings || {}) },
                                             canvasImage: activeRoomForMeasurement.measurementData.canvasImage || activeRoomForMeasurement.canvasImage || null,
-                                            protocolUrl: activeRoomForMeasurement.measurementData.protocolUrl,
+                                            protocolUrl: activeRoomForMeasurement.measurementData.protocolUrl || activeRoomForMeasurement.protocolUrl || null,
                                             galleryPhotos: activeRoomForMeasurement.measurementData.galleryPhotos || []
-                                        }, ...history]
-                                        : history);
+                                        }, ...baseHistory];
+                                    }
+                                }
+
+                                // 2. Determine new history and new active measurementData
+                                let updatedHistory = baseHistory;
+                                let newMeasurementData = null;
+
+                                if (data?.isAutosave) {
+                                    newMeasurementData = {
+                                        measurements,
+                                        globalSettings,
+                                        canvasImage: finalCanvasImage,
+                                        sketch: finalSketch,
+                                        protocolUrl: finalProtocolUrl,
+                                        galleryPhotos: galleryPhotos || []
+                                    };
+                                } else {
+                                    if (updatedHistoryFromModal !== undefined) {
+                                        updatedHistory = updatedHistoryFromModal;
+                                    } else if (incomingHasValues) {
+                                        updatedHistory = [{
+                                            id: `hist_${Date.now()}`,
+                                            date: globalSettings?.date || new Date().toISOString(),
+                                            measurements: measurements.map(m => ({ ...m })),
+                                            globalSettings: { ...(globalSettings || {}) },
+                                            canvasImage: finalCanvasImage,
+                                            protocolUrl: finalProtocolUrl,
+                                            galleryPhotos: galleryPhotos || []
+                                        }, ...baseHistory];
+                                    }
+                                    newMeasurementData = null;
+                                }
 
                                 finalRoom = {
                                     ...activeRoomForMeasurement,
                                     ...baseRoom,
                                     id: `room_${Date.now()}`,
-                                    measurementData: { measurements, globalSettings, canvasImage: finalCanvasImage, sketch: finalSketch, protocolUrl: finalProtocolUrl, galleryPhotos: galleryPhotos || [] },
+                                    measurementData: newMeasurementData,
                                     measurementHistory: updatedHistory,
                                     canvasImage: finalCanvasImage,
                                     sketch: finalSketch

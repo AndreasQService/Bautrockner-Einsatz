@@ -174,6 +174,7 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
     ]));
 
     const isNewRoom = rooms && rooms.length > 0 && String(rooms[0].id).startsWith('temp_');
+    const isNewMeasurementFlag = isNewMeasurement !== undefined ? isNewMeasurement : (rooms && rooms.length > 0 ? rooms[0].isNewMeasurement : false);
 
     const canvasRef = useRef(null);       // Layer 2: Zeichnungen (Radierer wirkt NUR hier)
     const gridCanvasRef = useRef(null);   // Layer 1: Grid + weiss (permanent, unzerstoerbar)
@@ -378,23 +379,99 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
             })));
         }
 
-        if (
-            activeRoomForMeasurement?.measurementData &&
-            Array.isArray(activeRoomForMeasurement.measurementData.measurements) &&
-            activeRoomForMeasurement.measurementData.measurements.length > 0
-        ) {
-            const dDate = activeRoomForMeasurement.measurementData.globalSettings?.date;
-            // Dedupe check
-            const isDuplicate = entries.length > 0 && entries.some(e => e.date === dDate && e.measurements.length === activeRoomForMeasurement.measurementData.measurements.length);
+        if (activeRoomForMeasurement) {
+            if (Array.isArray(activeRoomForMeasurement.measurements) && activeRoomForMeasurement.measurements.length > 0) {
+                const legacyDate = activeRoomForMeasurement.globalSettings?.date || activeRoomForMeasurement.date || activeRoomForMeasurement.datum || activeRoomForMeasurement.createdAt || new Date(activeRoomForMeasurement.id?.split('_')[1] || Date.now()).toISOString().split('T')[0];
+                const isDuplicate = entries.some(e => e.date === legacyDate);
+                if (!isDuplicate) {
+                    entries.push({
+                        id: 'legacy_measurements',
+                        source: 'history',
+                        date: legacyDate,
+                        measurements: activeRoomForMeasurement.measurements,
+                        device: activeRoomForMeasurement.globalSettings?.device || activeRoomForMeasurement.device || activeRoomForMeasurement.messmittel
+                    });
+                }
+            }
+            if (Array.isArray(activeRoomForMeasurement.measurementPoints) && activeRoomForMeasurement.measurementPoints.length > 0) {
+                const legacyDate = activeRoomForMeasurement.globalSettings?.date || activeRoomForMeasurement.date || activeRoomForMeasurement.datum || activeRoomForMeasurement.createdAt || new Date(activeRoomForMeasurement.id?.split('_')[1] || Date.now()).toISOString().split('T')[0];
+                const isDuplicate = entries.some(e => e.date === legacyDate);
+                if (!isDuplicate) {
+                    entries.push({
+                        id: 'legacy_measurement_points',
+                        source: 'history',
+                        date: legacyDate,
+                        measurements: activeRoomForMeasurement.measurementPoints,
+                        device: activeRoomForMeasurement.globalSettings?.device || activeRoomForMeasurement.device || activeRoomForMeasurement.messmittel
+                    });
+                }
+            }
+            if (Array.isArray(activeRoomForMeasurement.points) && activeRoomForMeasurement.points.length > 0) {
+                const legacyDate = activeRoomForMeasurement.globalSettings?.date || activeRoomForMeasurement.date || activeRoomForMeasurement.datum || activeRoomForMeasurement.createdAt || new Date(activeRoomForMeasurement.id?.split('_')[1] || Date.now()).toISOString().split('T')[0];
+                const isDuplicate = entries.some(e => e.date === legacyDate);
+                if (!isDuplicate) {
+                    entries.push({
+                        id: 'legacy_points',
+                        source: 'history',
+                        date: legacyDate,
+                        measurements: activeRoomForMeasurement.points,
+                        device: activeRoomForMeasurement.globalSettings?.device || activeRoomForMeasurement.device || activeRoomForMeasurement.messmittel
+                    });
+                }
+            }
+        }
 
-            if (!isDuplicate) {
-                entries.unshift({
-                    id: 'current_data',
-                    source: 'current',
-                    date: dDate,
-                    measurements: activeRoomForMeasurement.measurementData.measurements,
-                    device: activeRoomForMeasurement.measurementData.globalSettings?.device
-                });
+        if (isNewMeasurementFlag) {
+            // Add previous active measurement as a history entry if we started a new one
+            if (
+                activeRoomForMeasurement?.measurementData &&
+                Array.isArray(activeRoomForMeasurement.measurementData.measurements) &&
+                activeRoomForMeasurement.measurementData.measurements.length > 0
+            ) {
+                const prevDate = activeRoomForMeasurement.measurementData.globalSettings?.date;
+                const isDuplicate = entries.some(e => e.date === prevDate && e.measurements.length === activeRoomForMeasurement.measurementData.measurements.length);
+                if (!isDuplicate) {
+                    entries.push({
+                        id: 'prev_active_data',
+                        source: 'history',
+                        date: prevDate,
+                        measurements: activeRoomForMeasurement.measurementData.measurements,
+                        device: activeRoomForMeasurement.measurementData.globalSettings?.device
+                    });
+                }
+            }
+            // Add the new/current active measurements being edited
+            if (measurements && measurements.length > 0) {
+                const curDate = globalSettings?.date || new Date().toISOString().split('T')[0];
+                const isDuplicate = entries.some(e => e.date === curDate && e.source === 'current');
+                if (!isDuplicate) {
+                    entries.unshift({
+                        id: 'current_data',
+                        source: 'current',
+                        date: curDate,
+                        measurements: measurements,
+                        device: globalSettings?.device
+                    });
+                }
+            }
+        } else {
+            // If continuing/editing last measurement, treat the measurementData as current
+            if (
+                activeRoomForMeasurement?.measurementData &&
+                Array.isArray(activeRoomForMeasurement.measurementData.measurements) &&
+                activeRoomForMeasurement.measurementData.measurements.length > 0
+            ) {
+                const dDate = activeRoomForMeasurement.measurementData.globalSettings?.date;
+                const isDuplicate = entries.some(e => e.date === dDate && e.measurements.length === activeRoomForMeasurement.measurementData.measurements.length);
+                if (!isDuplicate) {
+                    entries.unshift({
+                        id: 'current_data',
+                        source: 'current',
+                        date: dDate,
+                        measurements: activeRoomForMeasurement.measurementData.measurements,
+                        device: activeRoomForMeasurement.measurementData.globalSettings?.device
+                    });
+                }
             }
         }
 
@@ -443,6 +520,32 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
                     }
                 }
             });
+        }
+
+        // Add previous active measurement as a history entry if we started a new one
+        const activeRoomForMeasurement = rooms && rooms.length > 0 ? rooms[0] : null;
+        if (isNewMeasurementFlag && activeRoomForMeasurement?.measurementData && Array.isArray(activeRoomForMeasurement.measurementData.measurements) && activeRoomForMeasurement.measurementData.measurements.length > 0) {
+            const prevDate = activeRoomForMeasurement.measurementData.globalSettings?.date || activeRoomForMeasurement.measurementData.date || new Date().toISOString().split('T')[0];
+            
+            // Deduplicate to avoid repeating if it's already in history
+            const isDuplicateInHistory = virtualHistory.some(e => e.date === prevDate && e.measurements?.length === activeRoomForMeasurement.measurementData.measurements.length);
+            if (!isDuplicateInHistory) {
+                virtualHistory.push({
+                    id: 'prev_active_data',
+                    source: 'history',
+                    date: prevDate,
+                    measurements: activeRoomForMeasurement.measurementData.measurements,
+                    globalSettings: activeRoomForMeasurement.measurementData.globalSettings
+                });
+                
+                // Add its point names to the unique list
+                activeRoomForMeasurement.measurementData.measurements.forEach((m, idx) => {
+                    if (m) {
+                        const name = m.pointName || `MP ${idx + 1}`;
+                        allPointNames.add(normalizeName(name));
+                    }
+                });
+            }
         }
 
         // Add today's active day measurements in real-time as a column
@@ -537,7 +640,7 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
 
         return { historyColumns: sortedColumns, historyRows: rows };
 
-    }, [measurementHistory, measurements, globalSettings, originalHistoricalData]);
+    }, [measurementHistory, measurements, globalSettings, originalHistoricalData, isNewMeasurementFlag, rooms]);
 
 
 
@@ -582,7 +685,6 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
         if (isSuccess) return;
 
         const currentRoomId = rooms && rooms.length > 0 ? rooms[0].id : null;
-        const isNewMeasurementFlag = isNewMeasurement !== undefined ? isNewMeasurement : (rooms && rooms.length > 0 ? rooms[0].isNewMeasurement : false);
         
         if (!currentRoomId) return;
 
@@ -599,13 +701,16 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
                 return;
             }
 
-            if (isNewMeasurementFlag && !roomData) {
-                const initial = [
-                    { id: `p${Date.now()}`, pointName: 'MP 1', w_value: '', b_value: '', notes: '' },
-                    { id: `p${Date.now() + 1}`, pointName: 'MP 2', w_value: '', b_value: '', notes: '' },
-                    { id: `p${Date.now() + 2}`, pointName: 'MP 3', w_value: '', b_value: '', notes: '' },
-                    { id: `p${Date.now() + 3}`, pointName: 'MP 4', w_value: '', b_value: '', notes: '' }
-                ];
+            if (isNewMeasurementFlag) {
+                const oldMs = roomData ? roomData.measurements : [];
+                const initial = oldMs.length > 0 
+                    ? oldMs.map((m, idx) => ({ id: `p${Date.now()}_${idx}`, pointName: m.pointName, w_value: '', b_value: '', notes: '' }))
+                    : [
+                        { id: `p${Date.now()}`, pointName: 'MP 1', w_value: '', b_value: '', notes: '' },
+                        { id: `p${Date.now() + 1}`, pointName: 'MP 2', w_value: '', b_value: '', notes: '' },
+                        { id: `p${Date.now() + 2}`, pointName: 'MP 3', w_value: '', b_value: '', notes: '' },
+                        { id: `p${Date.now() + 3}`, pointName: 'MP 4', w_value: '', b_value: '', notes: '' }
+                    ];
                 setMeasurements(initial);
                 const gs = {
                     date: new Date().toISOString().split('T')[0],
@@ -1110,7 +1215,40 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
     };
 
     const handleStartEditHistorical = (rowId) => {
-        const h = measurementHistory.find((entry, idx) => (entry.id || `hist_${idx}`) === rowId);
+        let h = (Array.isArray(measurementHistory) ? measurementHistory : []).find((entry, idx) => (entry.id || `hist_${idx}`) === rowId);
+        if (!h && rowId?.startsWith('legacy_')) {
+            const activeRoom = rooms && rooms.length > 0 ? rooms[0] : null;
+            if (activeRoom) {
+                if (rowId === 'legacy_measurements' && Array.isArray(activeRoom.measurements)) {
+                    h = {
+                        id: 'legacy_measurements',
+                        date: activeRoom.globalSettings?.date || activeRoom.date || activeRoom.datum || activeRoom.createdAt || new Date(activeRoom.id?.split('_')[1] || Date.now()).toISOString().split('T')[0],
+                        measurements: activeRoom.measurements,
+                        globalSettings: activeRoom.globalSettings || {},
+                        canvasImage: activeRoom.canvasImage || activeRoom.sketch,
+                        galleryPhotos: activeRoom.galleryPhotos || []
+                    };
+                } else if (rowId === 'legacy_measurement_points' && Array.isArray(activeRoom.measurementPoints)) {
+                    h = {
+                        id: 'legacy_measurement_points',
+                        date: activeRoom.globalSettings?.date || activeRoom.date || activeRoom.datum || activeRoom.createdAt || new Date(activeRoom.id?.split('_')[1] || Date.now()).toISOString().split('T')[0],
+                        measurements: activeRoom.measurementPoints,
+                        globalSettings: activeRoom.globalSettings || {},
+                        canvasImage: activeRoom.canvasImage || activeRoom.sketch,
+                        galleryPhotos: activeRoom.galleryPhotos || []
+                    };
+                } else if (rowId === 'legacy_points' && Array.isArray(activeRoom.points)) {
+                    h = {
+                        id: 'legacy_points',
+                        date: activeRoom.globalSettings?.date || activeRoom.date || activeRoom.datum || activeRoom.createdAt || new Date(activeRoom.id?.split('_')[1] || Date.now()).toISOString().split('T')[0],
+                        measurements: activeRoom.points,
+                        globalSettings: activeRoom.globalSettings || {},
+                        canvasImage: activeRoom.canvasImage || activeRoom.sketch,
+                        galleryPhotos: activeRoom.galleryPhotos || []
+                    };
+                }
+            }
+        }
         if (!h) return;
 
         if (!editingHistoricalEntryId) {
@@ -1290,15 +1428,22 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
                     galleryPhotos: [...galleryPhotos]
                 };
 
-                updatedHistory = measurementHistory.map((entry, idx) => {
-                    if ((entry.id || `hist_${idx}`) === editingHistoricalEntryId) {
-                        return {
-                            ...entry,
-                            ...updatedEntry
-                        };
-                    }
-                    return entry;
-                });
+                if (editingHistoricalEntryId.startsWith('legacy_')) {
+                    const hist = Array.isArray(measurementHistory) ? [...measurementHistory] : [];
+                    updatedEntry.id = `hist_${Date.now()}`;
+                    updatedHistory = [updatedEntry, ...hist];
+                } else {
+                    const hist = Array.isArray(measurementHistory) ? measurementHistory : [];
+                    updatedHistory = hist.map((entry, idx) => {
+                        if ((entry.id || `hist_${idx}`) === editingHistoricalEntryId) {
+                            return {
+                                ...entry,
+                                ...updatedEntry
+                            };
+                        }
+                        return entry;
+                    });
+                }
             }
 
             const saveMeasurements = originalHistoricalData ? originalHistoricalData.measurements : measurements;
@@ -1393,6 +1538,7 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
                     globalSettings,
                     canvasImage: fallbackCanvasUrl, // Draw remains safe!
                     galleryPhotos: galleryPhotos || [],
+                    measurementHistory: updatedHistory || undefined,
                     isAutosave: false
                 });
                 setIsSuccess(true);
@@ -1616,20 +1762,28 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
                         {/* Hidden canvas always in DOM for init/save */}
                         <canvas ref={hiddenCanvasRef} width={960} height={600} style={{ display: 'none' }} />
 
-                        {/* --- READ-ONLY HISTORY BAR --- */}
-                        {historyEntries.length > 0 && (
-                            <div style={{ flexShrink: 0, padding: '0.6rem 1rem', background: 'var(--surface)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '0.6rem', overflowX: 'auto' }}>
-                                <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', marginRight: '0.5rem', flexShrink: 0 }}>Messverlauf:</span>
-                                {historyEntries.map(entry => (
-                                    <div key={entry.id} style={{ display: 'flex', alignItems: 'center', background: entry.source === 'current' ? 'rgba(59,130,246,0.1)' : 'rgba(255,255,255,0.03)', border: entry.source === 'current' ? '1px solid rgba(59,130,246,0.3)' : '1px solid var(--border)', padding: '0.35rem 0.6rem', borderRadius: '6px', fontSize: '0.8rem', whiteSpace: 'nowrap', color: entry.source === 'current' ? '#60A5FA' : 'var(--text-main)', flexShrink: 0 }}>
-                                        <span style={{ fontWeight: 600 }}>{entry.date ? new Date(entry.date).toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'Unbekannt'}</span>
-                                        <span style={{ margin: '0 0.4rem', color: 'var(--text-muted)' }}>•</span>
-                                        <span>{entry.measurements.length} MP</span>
-                                        {entry.source === 'current' && <span style={{ marginLeft: '0.4rem', fontSize: '0.7rem', backgroundColor: '#3B82F6', color: 'white', padding: '0.1rem 0.3rem', borderRadius: '4px', fontWeight: 700 }}>Aktuell</span>}
-                                    </div>
-                                ))}
-                            </div>
-                        )}
+                        {(() => {
+                            const historyOnly = historyEntries.filter(entry => 
+                                entry.source === 'history' || 
+                                (entry.source === 'current' && entry.measurements && entry.measurements.some(m => 
+                                    String(m.w_value || '').trim() !== '' || String(m.b_value || '').trim() !== ''
+                                ))
+                            );
+                            if (historyOnly.length === 0) return null;
+                            return (
+                                <div style={{ flexShrink: 0, padding: '0.6rem 1rem', background: 'var(--surface)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '0.6rem', overflowX: 'auto' }}>
+                                    <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', marginRight: '0.5rem', flexShrink: 0 }}>Messverlauf:</span>
+                                    {historyOnly.map(entry => (
+                                        <div key={entry.id} style={{ display: 'flex', alignItems: 'center', background: entry.source === 'current' ? 'rgba(59,130,246,0.1)' : 'rgba(255,255,255,0.03)', border: entry.source === 'current' ? '1px solid rgba(59,130,246,0.3)' : '1px solid var(--border)', padding: '0.35rem 0.6rem', borderRadius: '6px', fontSize: '0.8rem', whiteSpace: 'nowrap', color: entry.source === 'current' ? '#60A5FA' : 'var(--text-main)', flexShrink: 0 }}>
+                                            <span style={{ fontWeight: 600 }}>{entry.date ? new Date(entry.date).toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'Unbekannt'}</span>
+                                            <span style={{ margin: '0 0.4rem', color: 'var(--text-muted)' }}>•</span>
+                                            <span>{entry.measurements.length} MP</span>
+                                            {entry.source === 'current' && <span style={{ marginLeft: '0.4rem', fontSize: '0.7rem', backgroundColor: '#3B82F6', color: 'white', padding: '0.1rem 0.3rem', borderRadius: '4px', fontWeight: 700 }}>Aktuell</span>}
+                                        </div>
+                                    ))}
+                                </div>
+                            );
+                        })()}
 
                         {/* --- INTEGRATED HISTORY TABLE --- */}
                         {showHistoryTable && (
