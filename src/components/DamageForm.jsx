@@ -3507,7 +3507,7 @@ END:VCARD`;
 
     return (
         <>
-            <div className="card" style={{ maxWidth: mode === 'desktop' ? '1000px' : '800px', margin: '0 auto', padding: mode === 'desktop' ? '1.5rem' : '1rem' }}>
+            <div className="card" style={{ maxWidth: mode === 'desktop' ? '1350px' : '800px', margin: '0 auto', padding: mode === 'desktop' ? '1.5rem' : '1rem' }}>
                 {/* Desktop Tabs Header Selector (Visual Mockup Only) */}
                 {mode === 'desktop' && (
                     <div style={{
