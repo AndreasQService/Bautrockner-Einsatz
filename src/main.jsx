@@ -19,11 +19,9 @@ import('./lib/sync/supabaseSyncWorker.js')
 import('./App.jsx').then(({ default: App }) => {
   const root = createRoot(document.getElementById('root'));
   root.render(
-    <StrictMode>
-      <ErrorBoundary>
-        <App />
-      </ErrorBoundary>
-    </StrictMode>
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
   );
 }).catch(err => {
   console.error('[QTool] Ladefehler:', err);
