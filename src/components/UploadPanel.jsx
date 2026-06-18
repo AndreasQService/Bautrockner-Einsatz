@@ -14,7 +14,7 @@ function safeName(filename) {
  * - Verarbeitet alles automatisch (Client-Side AI Analysis)
  * - memo(): verhindert Re-renders wenn Props unverändert (SessionLock-Heartbeat)
  */
-function UploadPanel({ caseId, onCaseCreated, onExtractionComplete, onImagesUploaded }) {
+function UploadPanel({ caseId, onCaseCreated, onExtractionComplete, onImagesUploaded, isNewOrder }) {
   const [files, setFiles] = useState([]);
   const [textInput, setTextInput] = useState("");
   const [status, setStatus] = useState("");
@@ -692,103 +692,105 @@ ${textContext}`;
       {renderPreview()}
       <div style={{ display: "flex", flexDirection: "column", gap: "1rem", marginTop: 16 }}>
         {/* --- Text Input Area --- */}
-        <div className="card" style={{ padding: "1.25rem", border: "1.5px solid var(--color-border-strong)", borderRadius: "8px", backgroundColor: "var(--color-surface-alt)" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", marginBottom: "1rem" }}>
-            <FileText size={18} style={{ color: "var(--q-primary)" }} />
-            <strong style={{ fontSize: "0.85rem", color: "var(--text-main)", textTransform: 'uppercase', letterSpacing: '0.05em' }}>PROJEKTIMPORT & KI-ANALYSE</strong>
-          </div>
-
-          {/* PDF Drop Zone */}
-          <div
-            onDragOver={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = 'var(--q-primary)'; e.currentTarget.style.backgroundColor = 'var(--color-primary-soft)'; }}
-            onDragLeave={(e) => { e.currentTarget.style.borderColor = 'var(--color-border)'; e.currentTarget.style.backgroundColor = 'var(--surface)'; }}
-            onDrop={async (e) => {
-              e.preventDefault();
-              e.currentTarget.style.borderColor = 'var(--color-border)';
-              e.currentTarget.style.backgroundColor = 'var(--surface)';
-              const file = e.dataTransfer.files[0];
-              if (!file || !file.name.toLowerCase().endsWith('.pdf')) return;
-              setStatus('⏳ PDF wird gelesen...');
-              try {
-                const text = await processPdfFile(file);
-                setTextInput(prev => prev ? prev + '\n\n' + text : text);
-                setStatus('✅ PDF extrahiert');
-              } catch {
-                setStatus('❌ Fehler beim Lesen');
-              }
-            }}
-            onClick={() => document.getElementById('pdf-text-input').click()}
-            style={{
-              border: '1.5px dashed var(--color-border)',
-              borderRadius: '6px',
-              padding: '0.75rem 1rem',
-              display: 'flex', alignItems: 'center', gap: '0.75rem',
-              backgroundColor: 'var(--surface)',
-              cursor: 'pointer', marginBottom: '1rem',
-              fontSize: '0.85rem', color: 'var(--text-muted)',
-              transition: 'all 0.15s ease',
-              boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)'
-            }}
-          >
-            <input id="pdf-text-input" type="file" accept=".pdf" style={{ display: 'none' }} onChange={async (e) => {
-              const file = e.target.files?.[0];
-              if (!file) return;
-              setStatus('⏳ PDF wird gelesen...');
-              try {
-                const text = await processPdfFile(file);
-                setTextInput(prev => prev ? prev + '\n\n' + text : text);
-                setStatus('✅ PDF extrahiert');
-              } catch {
-                setStatus('❌ Fehler beim Lesen');
-              }
-              e.target.value = '';
-            }} />
-            <Upload size={18} style={{ color: 'var(--q-primary)' }} />
-            <span style={{ fontWeight: 500 }}>PDF-Dokument hier ablegen oder anklicken</span>
-          </div>
-
-          <label style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 800, marginBottom: '0.4rem', display: 'block' }}>Beschreibung</label>
-          <textarea
-            value={textInput}
-            onChange={(e) => setTextInput(e.target.value)}
-            placeholder="E-Mail Text, Notizen oder Schadensmeldung hier einfügen..."
-            className="form-input"
-            style={{
-              width: "100%",
-              minHeight: "120px",
-              padding: "0.75rem",
-              borderRadius: "4px",
-              border: "1.5px solid var(--color-input-border)",
-              backgroundColor: "var(--surface)",
-              color: "var(--text-main)",
-              resize: "vertical",
-              fontFamily: "var(--font-desktop)",
-              fontSize: "0.85rem",
-              fontWeight: 500,
-              lineHeight: '1.5',
-              boxShadow: 'none'
-            }}
-          />
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "1rem" }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <div style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: status.startsWith('❌') ? '#ef4444' : (status.startsWith('✅') ? '#10b981' : 'transparent') }}></div>
-                <span style={{ fontSize: "0.8rem", color: status.startsWith('❌') ? '#ef4444' : 'var(--text-muted)', fontWeight: 600 }}>{status || 'Bereit für Analyse'}</span>
+        {isNewOrder && (
+          <div className="card" style={{ padding: "1.25rem", border: "1.5px solid var(--color-border-strong)", borderRadius: "8px", backgroundColor: "var(--color-surface-alt)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", marginBottom: "1rem" }}>
+              <FileText size={18} style={{ color: "var(--q-primary)" }} />
+              <strong style={{ fontSize: "0.85rem", color: "var(--text-main)", textTransform: 'uppercase', letterSpacing: '0.05em' }}>PROJEKTIMPORT & KI-ANALYSE</strong>
             </div>
-            <button
-              onClick={handleAnalyzeText}
-              disabled={loading || !textInput.trim()}
-              className="btn btn-primary"
+
+            {/* PDF Drop Zone */}
+            <div
+              onDragOver={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = 'var(--q-primary)'; e.currentTarget.style.backgroundColor = 'var(--color-primary-soft)'; }}
+              onDragLeave={(e) => { e.currentTarget.style.borderColor = 'var(--color-border)'; e.currentTarget.style.backgroundColor = 'var(--surface)'; }}
+              onDrop={async (e) => {
+                e.preventDefault();
+                e.currentTarget.style.borderColor = 'var(--color-border)';
+                e.currentTarget.style.backgroundColor = 'var(--surface)';
+                const file = e.dataTransfer.files[0];
+                if (!file || !file.name.toLowerCase().endsWith('.pdf')) return;
+                setStatus('⏳ PDF wird gelesen...');
+                try {
+                  const text = await processPdfFile(file);
+                  setTextInput(prev => prev ? prev + '\n\n' + text : text);
+                  setStatus('✅ PDF extrahiert');
+                } catch {
+                  setStatus('❌ Fehler beim Lesen');
+                }
+              }}
+              onClick={() => document.getElementById('pdf-text-input').click()}
               style={{
-                minWidth: "160px",
-                height: "36px",
-                backgroundColor: !textInput.trim() ? "var(--color-border)" : "var(--q-primary)",
-                opacity: !textInput.trim() ? 0.6 : 1
+                border: '1.5px dashed var(--color-border)',
+                borderRadius: '6px',
+                padding: '0.75rem 1rem',
+                display: 'flex', alignItems: 'center', gap: '0.75rem',
+                backgroundColor: 'var(--surface)',
+                cursor: 'pointer', marginBottom: '1rem',
+                fontSize: '0.85rem', color: 'var(--text-muted)',
+                transition: 'all 0.15s ease',
+                boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)'
               }}
             >
-              {loading ? "Analysiere..." : "KI-Analyse starten"}
-            </button>
+              <input id="pdf-text-input" type="file" accept=".pdf" style={{ display: 'none' }} onChange={async (e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                setStatus('⏳ PDF wird gelesen...');
+                try {
+                  const text = await processPdfFile(file);
+                  setTextInput(prev => prev ? prev + '\n\n' + text : text);
+                  setStatus('✅ PDF extrahiert');
+                } catch {
+                  setStatus('❌ Fehler beim Lesen');
+                }
+                e.target.value = '';
+              }} />
+              <Upload size={18} style={{ color: 'var(--q-primary)' }} />
+              <span style={{ fontWeight: 500 }}>PDF-Dokument hier ablegen oder anklicken</span>
+            </div>
+
+            <label style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 800, marginBottom: '0.4rem', display: 'block' }}>Beschreibung</label>
+            <textarea
+              value={textInput}
+              onChange={(e) => setTextInput(e.target.value)}
+              placeholder="E-Mail Text, Notizen oder Schadensmeldung hier einfügen..."
+              className="form-input"
+              style={{
+                width: "100%",
+                minHeight: "120px",
+                padding: "0.75rem",
+                borderRadius: "4px",
+                border: "1.5px solid var(--color-input-border)",
+                backgroundColor: "var(--surface)",
+                color: "var(--text-main)",
+                resize: "vertical",
+                fontFamily: "var(--font-desktop)",
+                fontSize: "0.85rem",
+                fontWeight: 500,
+                lineHeight: '1.5',
+                boxShadow: 'none'
+              }}
+            />
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "1rem" }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <div style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: status.startsWith('❌') ? '#ef4444' : (status.startsWith('✅') ? '#10b981' : 'transparent') }}></div>
+                  <span style={{ fontSize: "0.8rem", color: status.startsWith('❌') ? '#ef4444' : 'var(--text-muted)', fontWeight: 600 }}>{status || 'Bereit für Analyse'}</span>
+              </div>
+              <button
+                onClick={handleAnalyzeText}
+                disabled={loading || !textInput.trim()}
+                className="btn btn-primary"
+                style={{
+                  minWidth: "160px",
+                  height: "36px",
+                  backgroundColor: !textInput.trim() ? "var(--color-border)" : "var(--q-primary)",
+                  opacity: !textInput.trim() ? 0.6 : 1
+                }}
+              >
+                {loading ? "Analysiere..." : "KI-Analyse starten"}
+              </button>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
     </>

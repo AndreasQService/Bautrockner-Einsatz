@@ -206,7 +206,7 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
         date: new Date().toISOString().split('T')[0],
         temp: '',
         humidity: '',
-        device: ''
+        device: 'Trotec T 3000'
     });
     const [isCustomRoom, setIsCustomRoom] = useState(false);
     const [isCustomApartment, setIsCustomApartment] = useState(false);
@@ -504,16 +504,23 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
 
         // Add actual history from props
         if (hasHistory) {
-            measurementHistory.forEach(entry => {
+            measurementHistory.forEach((entry, idx) => {
                 if (entry) {
-                    virtualHistory.push({
-                        ...entry,
-                        source: 'history'
+                    const ms = entry.measurements || entry.points || entry.measurementPoints || [];
+                    const hasNonEmptyVal = ms.some(m => {
+                        const w = String(m.w_value ?? m.w ?? m.wand ?? m.wall ?? m.W ?? '').trim();
+                        const b = String(m.b_value ?? m.b ?? m.boden ?? m.floor ?? m.B ?? '').trim();
+                        return w !== '' || b !== '';
                     });
-                    if (Array.isArray(entry.measurements)) {
-                        entry.measurements.forEach((m, idx) => {
+                    if (hasNonEmptyVal) {
+                        virtualHistory.push({
+                            ...entry,
+                            id: entry.id || `hist_${idx}`,
+                            source: 'history'
+                        });
+                        ms.forEach((m, idx2) => {
                             if (m) {
-                                const name = m.pointName || `MP ${idx + 1}`;
+                                const name = m.pointName || `MP ${idx2 + 1}`;
                                 allPointNames.add(normalizeName(name));
                             }
                         });
@@ -530,21 +537,29 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
             // Deduplicate to avoid repeating if it's already in history
             const isDuplicateInHistory = virtualHistory.some(e => e.date === prevDate && e.measurements?.length === activeRoomForMeasurement.measurementData.measurements.length);
             if (!isDuplicateInHistory) {
-                virtualHistory.push({
-                    id: 'prev_active_data',
-                    source: 'history',
-                    date: prevDate,
-                    measurements: activeRoomForMeasurement.measurementData.measurements,
-                    globalSettings: activeRoomForMeasurement.measurementData.globalSettings
+                const prevMs = activeRoomForMeasurement.measurementData.measurements;
+                const hasNonEmptyVal = prevMs.some(m => {
+                    const w = String(m.w_value ?? m.w ?? m.wand ?? m.wall ?? m.W ?? '').trim();
+                    const b = String(m.b_value ?? m.b ?? m.boden ?? m.floor ?? m.B ?? '').trim();
+                    return w !== '' || b !== '';
                 });
-                
-                // Add its point names to the unique list
-                activeRoomForMeasurement.measurementData.measurements.forEach((m, idx) => {
-                    if (m) {
-                        const name = m.pointName || `MP ${idx + 1}`;
-                        allPointNames.add(normalizeName(name));
-                    }
-                });
+                if (hasNonEmptyVal) {
+                    virtualHistory.push({
+                        id: 'prev_active_data',
+                        source: 'history',
+                        date: prevDate,
+                        measurements: prevMs,
+                        globalSettings: activeRoomForMeasurement.measurementData.globalSettings
+                    });
+                    
+                    // Add its point names to the unique list
+                    prevMs.forEach((m, idx) => {
+                        if (m) {
+                            const name = m.pointName || `MP ${idx + 1}`;
+                            allPointNames.add(normalizeName(name));
+                        }
+                    });
+                }
             }
         }
 
@@ -716,16 +731,33 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
                     date: new Date().toISOString().split('T')[0],
                     temp: '',
                     humidity: '',
-                    device: '',
+                    device: 'Trotec T 3000',
                     apartment: rooms && rooms.length > 0 ? (rooms[0].apartment || '') : '',
                     room: rooms && rooms.length > 0 ? (rooms[0].name || '') : ''
                 };
                 setGlobalSettings(gs);
                 const rm = gs.room || '';
-                setIsCustomRoom(rm === '' || (rm !== 'Ganze Wohnung' && !dynamicRoomOptions.includes(rm)));
-                setGalleryPhotos([]);
-                setPreviewSnapshot(null);
-                initCanvas();
+                setIsCustomRoom(rm !== '' && rm !== 'Ganze Wohnung' && !dynamicRoomOptions.includes(rm));
+                if (roomData && roomData.galleryPhotos) {
+                    setGalleryPhotos(roomData.galleryPhotos);
+                } else {
+                    setGalleryPhotos([]);
+                }
+                if (roomData && roomData.canvasImage) {
+                    setPreviewSnapshot(roomData.canvasImage);
+                    const img = new window.Image();
+                    img.onload = () => {
+                        const ctx = canvas.getContext('2d');
+                        ctx.clearRect(0, 0, canvas.width, canvas.height);
+                        const stripped = stripWhiteBackground(img, canvas.width, canvas.height);
+                        ctx.drawImage(stripped, 0, 0);
+                        saveParamsToHistory(canvas);
+                    };
+                    img.src = roomData.canvasImage;
+                } else {
+                    setPreviewSnapshot(null);
+                    initCanvas();
+                }
                 return;
             }
 
@@ -748,13 +780,13 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
                     date: baseGs.date || new Date().toISOString().split('T')[0],
                     temp: baseGs.temp || '',
                     humidity: baseGs.humidity || '',
-                    device: baseGs.device || '',
+                    device: baseGs.device || 'Trotec T 3000',
                     apartment: baseGs.apartment || (rooms && rooms.length > 0 ? (rooms[0].apartment || '') : ''),
                     room: baseGs.room || (rooms && rooms.length > 0 ? (rooms[0].name || '') : '')
                 };
                 setGlobalSettings(gs);
                 const rm = gs.room || '';
-                setIsCustomRoom(rm === '' || (rm !== 'Ganze Wohnung' && !dynamicRoomOptions.includes(rm)));
+                setIsCustomRoom(rm !== '' && rm !== 'Ganze Wohnung' && !dynamicRoomOptions.includes(rm));
                 if (roomData.galleryPhotos) setGalleryPhotos(roomData.galleryPhotos);
 
                 if (roomData.canvasImage) {
@@ -787,13 +819,13 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
                     date: new Date().toISOString().split('T')[0],
                     temp: '',
                     humidity: '',
-                    device: '',
+                    device: 'Trotec T 3000',
                     apartment: rooms && rooms.length > 0 ? (rooms[0].apartment || '') : '',
                     room: rooms && rooms.length > 0 ? (rooms[0].name || '') : ''
                 };
                 setGlobalSettings(gs);
                 const rm = gs.room || '';
-                setIsCustomRoom(rm === '' || (rm !== 'Ganze Wohnung' && !dynamicRoomOptions.includes(rm)));
+                setIsCustomRoom(rm !== '' && rm !== 'Ganze Wohnung' && !dynamicRoomOptions.includes(rm));
                 setGalleryPhotos([]);
                 setPreviewSnapshot(null);
                 initCanvas();
@@ -811,7 +843,7 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
 
     // Debounced Auto-Save Effect
     useEffect(() => {
-        if (!isOpen || readOnly || editingHistoricalEntryId) return; // Disable auto-save when editing historical measurements
+        if (!isOpen || readOnly || editingHistoricalEntryId || !globalSettings.room || globalSettings.room.trim() === '') return; // Disable auto-save when editing historical measurements or if room is not chosen
         if (!hasUnsavedChanges) return;
 
         // Skip the very first render where everything is initializing
@@ -1338,6 +1370,11 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
     const handleSave = async () => {
         if (!containerRef.current || isSaving) return;
 
+        if (!readOnly && (!globalSettings.room || globalSettings.room.trim() === '')) {
+            alert("Bitte wählen Sie einen Raum aus.");
+            return;
+        }
+
         setIsSaving(true);
         try {
             // Capture the entire modal content (sketch + table)
@@ -1442,6 +1479,17 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
                             };
                         }
                         return entry;
+                    });
+                }
+
+                if (Array.isArray(updatedHistory)) {
+                    updatedHistory = updatedHistory.filter(h => {
+                        const ms = h.measurements || h.points || h.measurementPoints || [];
+                        return ms.some(m => {
+                            const w = String(m.w_value ?? m.w ?? m.wand ?? m.wall ?? m.W ?? '').trim();
+                            const b = String(m.b_value ?? m.b ?? m.boden ?? m.floor ?? m.B ?? '').trim();
+                            return w !== '' || b !== '';
+                        });
                     });
                 }
             }
@@ -1696,6 +1744,10 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
                         </button>
                         <button onClick={async () => {
                             if (hasUnsavedChanges) {
+                                if (!readOnly && (!globalSettings.room || globalSettings.room.trim() === '')) {
+                                    alert("Bitte wählen Sie einen Raum aus.");
+                                    return;
+                                }
                                 await handleSave();
                             }
                             if (onBackToDashboard) onBackToDashboard();
@@ -1990,11 +2042,14 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
                                     <label style={S.label}>Raum</label>
                                     <div style={{ position: 'relative', marginBottom: isCustomRoom ? '0.5rem' : '0' }}>
                                         <select
-                                            value={isCustomRoom ? 'Sonstiges' : (globalSettings.room || 'Sonstiges')}
+                                            value={isCustomRoom ? 'Sonstiges' : (globalSettings.room || '')}
                                             onChange={e => {
                                                 const val = e.target.value;
                                                 if (val === 'Sonstiges') {
                                                     setIsCustomRoom(true);
+                                                    setGlobalSettings({ ...globalSettings, room: '' });
+                                                } else if (val === '') {
+                                                    setIsCustomRoom(false);
                                                     setGlobalSettings({ ...globalSettings, room: '' });
                                                 } else {
                                                     setIsCustomRoom(false);
@@ -2003,6 +2058,7 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
                                             }}
                                             style={{ ...S.input, appearance: 'none', paddingRight: '2rem', backgroundColor: 'transparent' }}
                                         >
+                                            <option value="" disabled style={{ background: 'var(--surface)', color: 'var(--text-main)' }}>Raum wählen</option>
                                             <option value="Sonstiges" style={{ background: 'var(--surface)', color: 'var(--text-main)' }}>Eigene Eingabe</option>
                                             <option value="Ganze Wohnung" style={{ background: 'var(--surface)', color: 'var(--text-main)' }}>Ganze Wohnung</option>
                                             {dynamicRoomOptions.map((opt, i) => <option key={i} value={opt} style={{ background: 'var(--surface)', color: 'var(--text-main)' }}>{opt}</option>)}

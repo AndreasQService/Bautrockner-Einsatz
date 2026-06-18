@@ -1,9 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
     Plus, Trash, Edit, X, Search, Monitor, Fan, Wind,
-    Thermometer, Wrench, Download, Loader2, LogOut,
-    ExternalLink, CheckCircle2, AlertCircle, Package,
-    Zap, Hash, Activity, MapPin
+    Thermometer, Wrench, Download, Loader2, Package, Zap, Activity
 } from 'lucide-react';
 import generatedDevices from '../data/imported_devices.json';
 import { supabase } from '../supabaseClient';
@@ -39,19 +37,51 @@ const DEVICE_ICONS = {
     'Sonstiges': <Wrench size={18} />
 };
 
+const KNOWN_MANUFACTURERS = ['Corroventa', 'Trotec', 'Heylo', 'Gann', 'Wilms', 'El-Björn', 'Munters', 'Drieaz'];
+
+function parseModel(modelStr) {
+    if (!modelStr) return { hersteller: 'Sonstiges', typ: 'Standard' };
+    const trimmed = modelStr.trim();
+    
+    // Check known manufacturers
+    for (const man of KNOWN_MANUFACTURERS) {
+        if (new RegExp('^' + man + '\\b', 'i').test(trimmed)) {
+            const typPart = trimmed.substring(man.length).trim();
+            return {
+                hersteller: man,
+                typ: typPart || 'Standard'
+            };
+        }
+    }
+    
+    // Fallback: Split by first space
+    const spaceIdx = trimmed.indexOf(' ');
+    if (spaceIdx > 0) {
+        return {
+            hersteller: trimmed.substring(0, spaceIdx).trim(),
+            typ: trimmed.substring(spaceIdx + 1).trim()
+        };
+    }
+    
+    return {
+        hersteller: trimmed,
+        typ: 'Standard'
+    };
+}
+
 export default function DeviceManager({ onBack, onNavigateToReport, reports = [] }) {
-    const [devices, setDevices] = useState([]);
+    const [catalog, setCatalog] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [isEditing, setIsEditing] = useState(false);
-    const [currentDevice, setCurrentDevice] = useState(null);
+    const [currentModel, setCurrentModel] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
 
     useEffect(() => {
-        fetchDevices();
+        fetchCatalog();
     }, []);
 
-    const fetchDevices = async () => {
+    const fetchCatalog = async () => {
         if (!supabase) {
             setError("Supabase ist nicht konfiguriert.");
             return;
@@ -60,51 +90,62 @@ export default function DeviceManager({ onBack, onNavigateToReport, reports = []
         setError(null);
         try {
             const { data, error } = await supabase
-                .from('devices')
+                .from('device_catalog')
                 .select('*')
-                .order('number', { ascending: true });
+                .order('hersteller', { ascending: true });
 
             if (error) throw error;
-            setDevices(data || []);
+            setCatalog(data || []);
         } catch (e) {
-            console.error("Error loading devices:", e);
-            setError("Fehler beim Laden der Geräte: " + e.message);
+            console.error("Error loading catalog:", e);
+            setError("Fehler beim Laden des Gerätekatalogs: " + e.message);
         } finally {
             setIsLoading(false);
         }
     };
 
     const handleSave = async () => {
-        if (!currentDevice || !currentDevice.number || !currentDevice.type) return;
+        if (!currentModel) return;
+
+        const finalGeraetetyp = currentModel.geraetetyp === 'Sonstiges' ? currentModel.customGeraetetyp : currentModel.geraetetyp;
+        if (!finalGeraetetyp || !finalGeraetetyp.trim()) {
+            setError("Bitte geben Sie eine Geräteart (Gerätetyp) ein.");
+            return;
+        }
+        if (!currentModel.hersteller || !currentModel.hersteller.trim()) {
+            setError("Bitte geben Sie einen Hersteller ein.");
+            return;
+        }
+        if (!currentModel.modell || !currentModel.modell.trim()) {
+            setError("Bitte geben Sie ein Modell ein.");
+            return;
+        }
+
         setIsLoading(true);
+        setError(null);
         try {
-            if (currentDevice.id) {
+            const row = {
+                geraetetyp: finalGeraetetyp.trim(),
+                hersteller: currentModel.hersteller.trim(),
+                modell: currentModel.modell.trim(),
+                anschlusswert: currentModel.anschlusswert ? parseFloat(currentModel.anschlusswert) : 0
+            };
+
+            if (currentModel.id) {
                 const { error } = await supabase
-                    .from('devices')
-                    .update({
-                        number: currentDevice.number,
-                        type: currentDevice.type,
-                        model: currentDevice.model,
-                        status: currentDevice.status,
-                        energy_consumption: currentDevice.energy_consumption || null
-                    })
-                    .eq('id', currentDevice.id);
+                    .from('device_catalog')
+                    .update(row)
+                    .eq('id', currentModel.id);
                 if (error) throw error;
             } else {
                 const { error } = await supabase
-                    .from('devices')
-                    .insert([{
-                        number: currentDevice.number,
-                        type: currentDevice.type,
-                        model: currentDevice.model,
-                        status: currentDevice.status || 'Aktiv',
-                        energy_consumption: currentDevice.energy_consumption || null
-                    }]);
+                    .from('device_catalog')
+                    .insert([row]);
                 if (error) throw error;
             }
-            await fetchDevices();
+            await fetchCatalog();
             setIsEditing(false);
-            setCurrentDevice(null);
+            setCurrentModel(null);
         } catch (e) {
             setError("Fehler beim Speichern: " + e.message);
         } finally {
@@ -113,15 +154,15 @@ export default function DeviceManager({ onBack, onNavigateToReport, reports = []
     };
 
     const handleDelete = async (id) => {
-        if (window.confirm('Gerät wirklich löschen?')) {
+        if (window.confirm('Gerätetyp wirklich löschen?')) {
             setIsLoading(true);
             try {
                 const { error } = await supabase
-                    .from('devices')
+                    .from('device_catalog')
                     .delete()
                     .eq('id', id);
                 if (error) throw error;
-                await fetchDevices();
+                await fetchCatalog();
             } catch (e) {
                 setError("Fehler beim Löschen: " + e.message);
                 setIsLoading(false);
@@ -129,47 +170,41 @@ export default function DeviceManager({ onBack, onNavigateToReport, reports = []
         }
     };
 
-    const handleReleaseDevice = async (id, projectName) => {
-        if (window.confirm(`Möchten Sie das Gerät wirklich aus dem Projekt "${projectName}" freigeben ? `)) {
-            setIsLoading(true);
-            try {
-                const { error } = await supabase
-                    .from('devices')
-                    .update({ current_project: null, current_report_id: null })
-                    .eq('id', id);
-
-                if (error) throw error;
-                await fetchDevices();
-            } catch (e) {
-                setError("Fehler beim Freigeben: " + e.message);
-                setIsLoading(false);
-            }
-        }
-    };
-
     const handleImportStandard = async () => {
-        if (window.confirm('Möchten Sie die Standard-Geräteliste importieren?')) {
+        if (window.confirm('Möchten Sie die Standard-Gerätetypen in den Katalog importieren?')) {
             setIsLoading(true);
             try {
-                const { data: existingData } = await supabase.from('devices').select('number');
-                const existingNumbers = new Set(existingData?.map(d => d.number));
+                const { data: existingCatalog } = await supabase.from('device_catalog').select('geraetetyp, hersteller, modell');
+                const existingKeys = new Set(existingCatalog?.map(c => 
+                    `${c.geraetetyp.toLowerCase()}|${c.hersteller.toLowerCase()}|${c.modell.toLowerCase()}`
+                ));
 
-                const devicesToImport = generatedDevices
-                    .filter(d => !existingNumbers.has(d.number))
-                    .map(d => ({
-                        number: d.number,
-                        type: d.type,
-                        model: d.model,
-                        status: d.status
-                    }));
+                const itemsToInsert = [];
+                for (const d of generatedDevices) {
+                    const geraetetyp = d.type || 'Sonstiges';
+                    const { hersteller, typ } = parseModel(d.model);
+                    const modell = typ;
+                    const anschlusswert = 0;
 
-                if (devicesToImport.length === 0) {
-                    alert('Keine neuen Geräte zum Importieren gefunden.');
+                    const key = `${geraetetyp.toLowerCase()}|${hersteller.toLowerCase()}|${modell.toLowerCase()}`;
+                    if (!existingKeys.has(key)) {
+                        itemsToInsert.push({
+                            geraetetyp,
+                            hersteller,
+                            modell,
+                            anschlusswert
+                        });
+                        existingKeys.add(key);
+                    }
+                }
+
+                if (itemsToInsert.length === 0) {
+                    alert('Keine neuen Gerätetypen zum Importieren gefunden.');
                 } else {
-                    const { error } = await supabase.from('devices').insert(devicesToImport);
+                    const { error } = await supabase.from('device_catalog').insert(itemsToInsert);
                     if (error) throw error;
-                    alert(`${devicesToImport.length} Geräte erfolgreich importiert.`);
-                    await fetchDevices();
+                    alert(`${itemsToInsert.length} Gerätetypen erfolgreich in den Katalog importiert.`);
+                    await fetchCatalog();
                 }
             } catch (e) {
                 setError("Fehler beim Import: " + e.message);
@@ -179,13 +214,13 @@ export default function DeviceManager({ onBack, onNavigateToReport, reports = []
         }
     };
 
-    const filteredDevices = devices.filter(d => {
-        if (!d) return false;
-        const num = d.number ? String(d.number).toLowerCase() : '';
-        const mod = d.model ? String(d.model).toLowerCase() : '';
-        const typ = d.type ? String(d.type).toLowerCase() : '';
+    const filteredCatalog = catalog.filter(c => {
+        if (!c) return false;
+        const typ = c.geraetetyp ? String(c.geraetetyp).toLowerCase() : '';
+        const hersteller = c.hersteller ? String(c.hersteller).toLowerCase() : '';
+        const modell = c.modell ? String(c.modell).toLowerCase() : '';
         const search = searchTerm.toLowerCase();
-        return num.includes(search) || mod.includes(search) || typ.includes(search);
+        return typ.includes(search) || hersteller.includes(search) || modell.includes(search);
     });
 
     return (
@@ -203,10 +238,10 @@ export default function DeviceManager({ onBack, onNavigateToReport, reports = []
             }}>
                 <div>
                     <h1 style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--primary)', letterSpacing: '-0.02em', margin: 0 }}>
-                        Geräteverwaltung
+                        Gerätetypen verwalten
                     </h1>
                     <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '0.25rem' }}>
-                        Zentrale Übersicht und Statuskontrolle des Inventars
+                        Zentrale Übersicht und Pflege der Gerätemodelle im Katalog
                     </p>
                 </div>
                 <button onClick={onBack} className="btn btn-outline" style={{ borderRadius: '9999px', padding: '0.6rem 1.5rem' }}>
@@ -232,7 +267,7 @@ export default function DeviceManager({ onBack, onNavigateToReport, reports = []
                                 background: 'rgba(15, 23, 42, 0.5)',
                                 border: '1px solid var(--border)'
                             }}
-                            placeholder="Inventar-Nr., Modell oder Typ durchsuchen..."
+                            placeholder="Gerätetyp, Hersteller oder Modell durchsuchen..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
@@ -245,12 +280,12 @@ export default function DeviceManager({ onBack, onNavigateToReport, reports = []
                             disabled={isLoading}
                         >
                             <Download size={18} />
-                            Import
+                            Standard-Modelle importieren
                         </button>
                         <button
                             className="btn btn-primary"
                             onClick={() => {
-                                setCurrentDevice({ number: '', type: 'Kondenstrockner', model: '', status: 'Aktiv', energy_consumption: '' });
+                                setCurrentModel({ geraetetyp: 'Kondenstrockner', customGeraetetyp: '', hersteller: '', modell: '', anschlusswert: '' });
                                 setIsEditing(true);
                             }}
                             style={{ borderRadius: '9999px', fontSize: '0.9rem', boxShadow: '0 4px 12px rgba(15, 110, 163, 0.3)' }}
@@ -274,7 +309,6 @@ export default function DeviceManager({ onBack, onNavigateToReport, reports = []
                         alignItems: 'center',
                         gap: '0.75rem'
                     }}>
-                        <AlertCircle size={20} />
                         {error}
                     </div>
                 )}
@@ -283,178 +317,92 @@ export default function DeviceManager({ onBack, onNavigateToReport, reports = []
                     {isLoading ? (
                         <div style={{ padding: '5rem', textAlign: 'center', color: 'var(--text-muted)' }}>
                             <Loader2 className="animate-spin" size={40} style={{ margin: '0 auto 1rem', color: 'var(--primary)' }} />
-                            <p style={{ fontWeight: 500 }}>Aktualisiere Inventarliste...</p>
+                            <p style={{ fontWeight: 500 }}>Aktualisiere Katalogliste...</p>
                         </div>
                     ) : (
                         <table className="data-table">
                             <thead>
                                 <tr>
-                                    <th style={{ background: 'transparent', color: 'var(--text-muted)', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Nr.</th>
-                                    <th style={{ background: 'transparent', color: 'var(--text-muted)', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Typ</th>
-                                    <th style={{ background: 'transparent', color: 'var(--text-muted)', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Modell / kW</th>
-                                    <th style={{ background: 'transparent', color: 'var(--text-muted)', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.1em', textAlign: 'center' }}>Status</th>
-                                    <th style={{ background: 'transparent', color: 'var(--text-muted)', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Aktueller Einsatz</th>
+                                    <th style={{ background: 'transparent', color: 'var(--text-muted)', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Gerätetyp</th>
+                                    <th style={{ background: 'transparent', color: 'var(--text-muted)', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Hersteller</th>
+                                    <th style={{ background: 'transparent', color: 'var(--text-muted)', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Modell</th>
+                                    <th style={{ background: 'transparent', color: 'var(--text-muted)', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.1em', textAlign: 'center' }}>Anschlusswert</th>
                                     <th style={{ background: 'transparent', textAlign: 'right' }}></th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {filteredDevices.map(device => {
-                                    const report = device.current_project ? reports.find(r => r.id === device.current_project || r.projectTitle === device.current_project) : null;
-
-                                    return (
-                                        <tr key={device.id} style={{ transition: 'background 0.2s' }} className="report-row">
-                                            <td style={{ fontWeight: 700, color: 'var(--primary)', fontSize: '1rem' }}>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                                    <Hash size={14} style={{ opacity: 0.5 }} />
-                                                    {device.number}
-                                                </div>
-                                            </td>
-                                            <td>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                                                    <div style={{
-                                                        width: '32px',
-                                                        height: '32px',
-                                                        borderRadius: '8px',
-                                                        background: 'rgba(255,255,255,0.05)',
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        justifyContent: 'center',
-                                                        color: 'var(--primary)'
-                                                    }}>
-                                                        {DEVICE_ICONS[device.type] || <Package size={18} />}
-                                                    </div>
-                                                    <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{device.type}</div>
-                                                </div>
-                                            </td>
-                                            <td>
-                                                <div style={{ fontSize: '0.9rem', fontWeight: 500 }}>{device.model || '-'}</div>
-                                                {!['Datenlogger', 'Messgeräte'].includes(device.type) && (
-                                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                                        <Zap size={12} /> {device.energy_consumption || '0.0'} kW
-                                                    </div>
-                                                )}
-                                            </td>
-                                            <td style={{ textAlign: 'center' }}>
-                                                <span style={{
-                                                    display: 'inline-flex',
+                                {filteredCatalog.map(item => (
+                                    <tr key={item.id} style={{ transition: 'background 0.2s' }} className="report-row">
+                                        <td>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                                <div style={{
+                                                    width: '32px',
+                                                    height: '32px',
+                                                    borderRadius: '8px',
+                                                    background: 'rgba(255,255,255,0.05)',
+                                                    display: 'flex',
                                                     alignItems: 'center',
-                                                    padding: '0.35rem 1rem',
-                                                    borderRadius: '9999px',
-                                                    background: device.current_project ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)',
-                                                    color: device.current_project ? '#FCA5A5' : '#10B981',
-                                                    border: `1px solid ${device.current_project ? 'rgba(239, 68, 68, 0.2)' : 'rgba(16, 185, 129, 0.2)'} `,
-                                                    fontSize: '0.75rem',
-                                                    fontWeight: 600,
-                                                    letterSpacing: '0.02em'
+                                                    justifyContent: 'center',
+                                                    color: 'var(--primary)'
                                                 }}>
-                                                    <div style={{
-                                                        width: '6px',
-                                                        height: '6px',
-                                                        borderRadius: '50%',
-                                                        background: 'currentColor',
-                                                        marginRight: '0.5rem',
-                                                        boxShadow: '0 0 8px currentColor'
-                                                    }}></div>
-                                                    {device.current_project ? 'IM EINSATZ' : 'VERFÜGBAR'}
-                                                </span>
-                                            </td>
-                                            <td>
-                                                {device.current_project ? (
-                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-                                                        {report ? (
-                                                            <button
-                                                                onClick={() => onNavigateToReport && onNavigateToReport(device.current_project)}
-                                                                style={{
-                                                                    color: 'var(--text-main)',
-                                                                    fontWeight: 700,
-                                                                    fontSize: '0.85rem',
-                                                                    display: 'flex',
-                                                                    alignItems: 'center',
-                                                                    gap: '0.5rem',
-                                                                    padding: 0,
-                                                                    background: 'transparent',
-                                                                    border: 'none',
-                                                                    cursor: 'pointer',
-                                                                    textAlign: 'left'
-                                                                }}
-                                                                title="Zum Projekt springen"
-                                                            >
-                                                                {report.projectTitle || device.current_project}
-                                                                <ExternalLink size={12} style={{ opacity: 0.6 }} />
-                                                            </button>
-                                                        ) : (
-                                                            <div style={{
-                                                                color: '#FCA5A5',
-                                                                fontWeight: 700,
-                                                                fontSize: '0.85rem',
-                                                                display: 'flex',
-                                                                alignItems: 'center',
-                                                                gap: '0.5rem'
-                                                            }}>
-                                                                {device.current_project} <span style={{fontSize: '0.7rem', opacity: 0.8}}>(Nicht gefunden)</span>
-                                                            </div>
-                                                        )}
-                                                        <div style={{
-                                                            fontSize: '0.75rem',
-                                                            color: 'var(--primary)',
-                                                            fontWeight: 600,
-                                                            display: 'flex',
-                                                            alignItems: 'center',
-                                                            gap: '0.3rem'
-                                                        }}>
-                                                            <MapPin size={10} />
-                                                            {report?.locationDetails || 'Schadenort nicht definiert'}
-                                                        </div>
-                                                        <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '0.1rem' }}>
-                                                            {report?.client || 'Kein Kunde'}
-                                                        </div>
-                                                    </div>
-                                                ) : (
-                                                    <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem', opacity: 0.6 }}>Lager</span>
-                                                )}
-                                            </td>
-                                            <td style={{ textAlign: 'right' }}>
-                                                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
-                                                    {device.current_project && (
-                                                        <button
-                                                            className="btn btn-ghost"
-                                                            style={{ color: '#F59E0B', padding: '0.5rem', borderRadius: '8px' }}
-                                                            onClick={(e) => { e.stopPropagation(); handleReleaseDevice(device.id, device.current_project); }}
-                                                            title="Freigeben"
-                                                        >
-                                                            <LogOut size={18} />
-                                                        </button>
-                                                    )}
-                                                    <button
-                                                        className="btn btn-ghost"
-                                                        style={{ color: 'var(--primary)', padding: '0.5rem', borderRadius: '8px' }}
-                                                        onClick={(e) => { e.stopPropagation(); setCurrentDevice(device); setIsEditing(true); }}
-                                                        title="Bearbeiten"
-                                                    >
-                                                        <Edit size={18} />
-                                                    </button>
-                                                    <button
-                                                        className="btn btn-ghost"
-                                                        style={{ color: 'rgba(239, 68, 68, 0.7)', padding: '0.5rem', borderRadius: '8px' }}
-                                                        onClick={(e) => { e.stopPropagation(); handleDelete(device.id); }}
-                                                        title="Löschen"
-                                                    >
-                                                        <Trash size={18} />
-                                                    </button>
+                                                    {DEVICE_ICONS[item.geraetetyp] || <Package size={18} />}
                                                 </div>
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                                {filteredDevices.length === 0 && !isLoading && (
+                                                <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{item.geraetetyp}</div>
+                                            </div>
+                                        </td>
+                                        <td style={{ fontWeight: 500, fontSize: '0.9rem' }}>
+                                            {item.hersteller}
+                                        </td>
+                                        <td style={{ fontWeight: 500, fontSize: '0.9rem' }}>
+                                            {item.modell}
+                                        </td>
+                                        <td style={{ textAlign: 'center', fontWeight: 600, fontSize: '0.9rem' }}>
+                                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', color: 'var(--primary)' }}>
+                                                <Zap size={14} /> {item.anschlusswert !== null && item.anschlusswert !== undefined ? item.anschlusswert : '0.0'} kWh
+                                            </span>
+                                        </td>
+                                        <td style={{ textAlign: 'right' }}>
+                                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+                                                <button
+                                                    className="btn btn-ghost"
+                                                    style={{ color: 'var(--primary)', padding: '0.5rem', borderRadius: '8px' }}
+                                                    onClick={(e) => { 
+                                                        e.stopPropagation(); 
+                                                        setCurrentModel({
+                                                            id: item.id,
+                                                            geraetetyp: DEVICE_TYPES.includes(item.geraetetyp) ? item.geraetetyp : 'Sonstiges',
+                                                            customGeraetetyp: DEVICE_TYPES.includes(item.geraetetyp) ? '' : item.geraetetyp,
+                                                            hersteller: item.hersteller,
+                                                            modell: item.modell,
+                                                            anschlusswert: String(item.anschlusswert || '')
+                                                        }); 
+                                                        setIsEditing(true); 
+                                                    }}
+                                                    title="Bearbeiten"
+                                                >
+                                                    <Edit size={18} />
+                                                </button>
+                                                <button
+                                                    className="btn btn-ghost"
+                                                    style={{ color: 'rgba(239, 68, 68, 0.7)', padding: '0.5rem', borderRadius: '8px' }}
+                                                    onClick={(e) => { e.stopPropagation(); handleDelete(item.id); }}
+                                                    title="Löschen"
+                                                >
+                                                    <Trash size={18} />
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                                {filteredCatalog.length === 0 && !isLoading && (
                                     <tr>
-                                        <td colSpan={6} style={{ textAlign: 'center', padding: '5rem' }}>
+                                        <td colSpan={5} style={{ textAlign: 'center', padding: '5rem' }}>
                                             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.25rem' }}>
                                                 <div style={{ padding: '1.5rem', background: 'rgba(255,255,255,0.03)', borderRadius: '50%' }}>
                                                     <Package size={48} style={{ color: 'var(--text-muted)', opacity: 0.3 }} />
                                                 </div>
                                                 <div style={{ color: 'var(--text-muted)', fontSize: '1rem', fontWeight: 500 }}>
-                                                    Keine Geräte in diesem Filter gefunden.
+                                                    Keine Gerätetypen in diesem Filter gefunden.
                                                 </div>
                                                 <button
                                                     className="btn btn-outline"
@@ -473,7 +421,6 @@ export default function DeviceManager({ onBack, onNavigateToReport, reports = []
                 </div>
             </div>
 
-            {/* Modal for Edit/Create */}
             {isEditing && (
                 <div style={{
                     position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
@@ -492,7 +439,10 @@ export default function DeviceManager({ onBack, onNavigateToReport, reports = []
                         position: 'relative'
                     }}>
                         <button
-                            onClick={() => setIsEditing(false)}
+                            onClick={() => {
+                                setIsEditing(false);
+                                setCurrentModel(null);
+                            }}
                             style={{
                                 position: 'absolute', top: '1.5rem', right: '1.5rem',
                                 background: 'rgba(255,255,255,0.05)', border: 'none', cursor: 'pointer',
@@ -507,76 +457,101 @@ export default function DeviceManager({ onBack, onNavigateToReport, reports = []
 
                         <div style={{ marginBottom: '2rem' }}>
                             <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--primary)', marginBottom: '0.5rem' }}>
-                                {currentDevice.id ? 'Gerätedaten anpassen' : 'Neues Inventar anlegen'}
+                                {currentModel.id ? 'Gerätetyp bearbeiten' : 'Neuen Gerätetyp anlegen'}
                             </h2>
                             <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
                                 Erfassen Sie die technischen Details für das Inventarsystem.
                             </p>
                         </div>
 
+                        {error && (
+                            <div style={{
+                                padding: '0.75rem 1rem',
+                                backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                                color: '#FCA5A5',
+                                borderRadius: 'var(--radius)',
+                                marginBottom: '1.25rem',
+                                border: '1px solid rgba(239, 68, 68, 0.2)',
+                                fontSize: '0.85rem'
+                            }}>
+                                {error}
+                            </div>
+                        )}
+
                         <div style={{ display: 'grid', gap: '1.25rem' }}>
                             <div className="form-group" style={{ marginBottom: 0 }}>
-                                <label className="form-label" style={{ opacity: 0.8 }}>Inventar-Nr.</label>
-                                <input
-                                    type="text"
-                                    className="form-input"
-                                    value={currentDevice.number}
-                                    onChange={(e) => setCurrentDevice(prev => ({ ...prev, number: e.target.value }))}
-                                    placeholder="z.B. QS-101"
-                                    style={{ background: 'rgba(15, 23, 42, 0.3)' }}
-                                />
-                            </div>
-
-                            <div className="form-group" style={{ marginBottom: 0 }}>
-                                <label className="form-label" style={{ opacity: 0.8 }}>Gerätetyp</label>
+                                <label className="form-label" style={{ opacity: 0.8 }}>Geräteart (Gerätetyp)</label>
                                 <select
                                     className="form-input"
-                                    value={currentDevice.type}
-                                    onChange={(e) => setCurrentDevice(prev => ({ ...prev, type: e.target.value }))}
+                                    value={currentModel.geraetetyp}
+                                    onChange={(e) => setCurrentModel(prev => ({ ...prev, geraetetyp: e.target.value }))}
                                     style={{ background: 'rgba(15, 23, 42, 0.3)' }}
                                 >
                                     {DEVICE_TYPES.map(type => (
                                         <option key={type} value={type}>{type}</option>
                                     ))}
+                                    <option value="Sonstiges">Eigene Eingabe...</option>
                                 </select>
                             </div>
 
+                            {currentModel.geraetetyp === 'Sonstiges' && (
+                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                    <label className="form-label" style={{ opacity: 0.8, color: '#60A5FA' }}>Eigene Geräteart</label>
+                                    <input
+                                        type="text"
+                                        className="form-input"
+                                        value={currentModel.customGeraetetyp}
+                                        onChange={(e) => setCurrentModel(prev => ({ ...prev, customGeraetetyp: e.target.value }))}
+                                        placeholder="z.B. Spezial-Trockner"
+                                        style={{ background: 'rgba(15, 23, 42, 0.3)' }}
+                                    />
+                                </div>
+                            )}
+
                             <div className="form-group" style={{ marginBottom: 0 }}>
-                                <label className="form-label" style={{ opacity: 0.8 }}>Hersteller / Modell</label>
+                                <label className="form-label" style={{ opacity: 0.8 }}>Hersteller</label>
                                 <input
                                     type="text"
                                     className="form-input"
-                                    value={currentDevice.model}
-                                    onChange={(e) => setCurrentDevice(prev => ({ ...prev, model: e.target.value }))}
-                                    placeholder="z.B. Trotec TTK 100"
+                                    value={currentModel.hersteller}
+                                    onChange={(e) => setCurrentModel(prev => ({ ...prev, hersteller: e.target.value }))}
+                                    placeholder="z.B. Corroventa"
                                     style={{ background: 'rgba(15, 23, 42, 0.3)' }}
                                 />
                             </div>
 
-                            {!['Datenlogger', 'Messgeräte'].includes(currentDevice.type) && (
-                                <div className="form-group" style={{ marginBottom: 0 }}>
-                                    <label className="form-label" style={{ opacity: 0.8 }}>Anschlusswert (kW)</label>
-                                    <select
-                                        className="form-input"
-                                        value={currentDevice.energy_consumption || ''}
-                                        onChange={(e) => setCurrentDevice(prev => ({ ...prev, energy_consumption: e.target.value }))}
-                                        style={{ background: 'rgba(15, 23, 42, 0.3)' }}
-                                    >
-                                        <option value="">Nicht definiert</option>
-                                        {[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.2, 1.5, 2.0, 2.5, 3.0].map(kw => (
-                                            <option key={kw} value={kw}>{kw} kW</option>
-                                        ))}
-                                    </select>
-                                </div>
-                            )}
+                            <div className="form-group" style={{ marginBottom: 0 }}>
+                                <label className="form-label" style={{ opacity: 0.8 }}>Modell</label>
+                                <input
+                                    type="text"
+                                    className="form-input"
+                                    value={currentModel.modell}
+                                    onChange={(e) => setCurrentModel(prev => ({ ...prev, modell: e.target.value }))}
+                                    placeholder="z.B. K3 mit Pumpe"
+                                    style={{ background: 'rgba(15, 23, 42, 0.3)' }}
+                                />
+                            </div>
+
+                            <div className="form-group" style={{ marginBottom: 0 }}>
+                                <label className="form-label" style={{ opacity: 0.8 }}>Anschlusswert (kWh)</label>
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    className="form-input"
+                                    value={currentModel.anschlusswert}
+                                    onChange={(e) => setCurrentModel(prev => ({ ...prev, anschlusswert: e.target.value }))}
+                                    placeholder="z.B. 0.45"
+                                    style={{ background: 'rgba(15, 23, 42, 0.3)' }}
+                                />
+                            </div>
                         </div>
 
                         <div style={{ display: 'flex', gap: '1rem', marginTop: '3rem' }}>
-                            <button className="btn btn-outline" onClick={() => setIsEditing(false)} style={{ flex: 1, borderRadius: '9999px' }}>
+                            <button className="btn btn-outline" onClick={() => { setIsEditing(false); setCurrentModel(null); }} style={{ flex: 1, borderRadius: '9999px' }}>
                                 Abbrechen
                             </button>
                             <button className="btn btn-primary" onClick={handleSave} disabled={isLoading} style={{ flex: 2, borderRadius: '9999px', fontWeight: 700 }}>
-                                {isLoading ? <Loader2 className="animate-spin" size={20} /> : (currentDevice.id ? 'Speichern' : 'Hinzufügen')}
+                                {isLoading ? <Loader2 className="animate-spin" size={20} /> : (currentModel.id ? 'Speichern' : 'Hinzufügen')}
                             </button>
                         </div>
                     </div>

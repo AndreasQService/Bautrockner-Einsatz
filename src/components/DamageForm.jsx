@@ -225,7 +225,14 @@ const getMeasurementEntries = (room) => {
     }
   }
 
-  return entries.filter(e => Array.isArray(e.measurements) && e.measurements.length > 0);
+  return entries.filter(e => {
+    if (!Array.isArray(e.measurements) || e.measurements.length === 0) return false;
+    return e.measurements.some(m => {
+      const w = String(m.w_value ?? m.w ?? m.wand ?? m.wall ?? m.W ?? '').trim();
+      const b = String(m.b_value ?? m.b ?? m.boden ?? m.floor ?? m.B ?? '').trim();
+      return w !== '' || b !== '';
+    });
+  });
 };
 
 const getPointLabel = (p, index) => p.pointName || p.mp || p.point || p.label || p.id || `MP ${index + 1}`;
@@ -3216,7 +3223,16 @@ END:VCARD`;
 
                         // History fallback for "Messung fortsetzen" when measurementData is missing
                         if (!mData && Array.isArray(r.measurementHistory) && r.measurementHistory.length > 0) {
-                            const validHistory = r.measurementHistory.filter(h => h.date || h.datum || h.timestamp || h.createdAt || h.globalSettings?.date);
+                            const validHistory = r.measurementHistory.filter(h => {
+                                const hasDate = h.date || h.datum || h.timestamp || h.createdAt || h.globalSettings?.date;
+                                if (!hasDate) return false;
+                                const ms = h.measurements || h.points || h.measurementPoints || [];
+                                return ms.some(m => {
+                                    const w = String(m.w_value ?? m.w ?? m.wand ?? m.wall ?? m.W ?? '').trim();
+                                    const b = String(m.b_value ?? m.b ?? m.boden ?? m.floor ?? m.B ?? '').trim();
+                                    return w !== '' || b !== '';
+                                });
+                            });
                             if (validHistory.length > 0) {
                                 const latestHistory = [...validHistory].sort((a, b) => {
                                     const da = a.date || a.datum || a.timestamp || a.createdAt || a.globalSettings?.date || 0;
@@ -3316,6 +3332,10 @@ END:VCARD`;
                                 const existingRoom = measurementRooms[existingRoomIndex];
                                 const history = existingRoom.measurementHistory ? [...existingRoom.measurementHistory] : [];
                                 
+                                const prevActiveDate = existingRoom.measurementData?.globalSettings?.date || existingRoom.measurementData?.date;
+                                const isNewDate = prevActiveDate && globalSettings.date && prevActiveDate !== globalSettings.date;
+                                const shouldArchive = isNewMeasurement || isNewDate;
+
                                 const finalCanvasImage = canvasImage || existingRoom.canvasImage || existingRoom.measurementData?.canvasImage || null;
                                 const finalSketch = finalCanvasImage;
                                 const finalProtocolUrl = protocolUrl || existingRoom.measurementData?.protocolUrl || existingRoom.protocolUrl || null;
@@ -3324,9 +3344,9 @@ END:VCARD`;
                                     String(m.w_value || '').trim() !== '' || String(m.b_value || '').trim() !== ''
                                 );
 
-                                // 1. Migrate old active measurementData to history if starting a new measurement visit
+                                // 1. Migrate old active measurementData to history if starting a new measurement visit or date changed
                                 let baseHistory = history;
-                                if (isNewMeasurement && existingRoom.measurementData && Array.isArray(existingRoom.measurementData.measurements) && existingRoom.measurementData.measurements.length > 0) {
+                                if (shouldArchive && existingRoom.measurementData && Array.isArray(existingRoom.measurementData.measurements) && existingRoom.measurementData.measurements.length > 0) {
                                     const mDataDate = existingRoom.measurementData.globalSettings?.date || existingRoom.measurementData.date || new Date().toISOString();
                                     const isDuplicate = baseHistory.some(h => (h.date || h.globalSettings?.date) === mDataDate);
                                     if (!isDuplicate) {
@@ -3383,6 +3403,10 @@ END:VCARD`;
                                 };
                                 updatedMeasurementRooms[existingRoomIndex] = finalRoom;
                             } else {
+                                const prevActiveDate = activeRoomForMeasurement.measurementData?.globalSettings?.date || activeRoomForMeasurement.measurementData?.date;
+                                const isNewDate = prevActiveDate && globalSettings.date && prevActiveDate !== globalSettings.date;
+                                const shouldArchive = isNewMeasurement || isNewDate;
+
                                 const baseRoom = RoomService.createRoom({
                                     name: globalSettings.room || activeRoomForMeasurement.name || 'Unbenannter Raum',
                                     apartment: globalSettings.apartment || activeRoomForMeasurement.apartment || '',
@@ -3399,9 +3423,9 @@ END:VCARD`;
                                     String(m.w_value || '').trim() !== '' || String(m.b_value || '').trim() !== ''
                                 );
 
-                                // 1. Migrate old active measurementData to history if starting a new measurement visit
+                                // 1. Migrate old active measurementData to history if starting a new measurement visit or date changed
                                 let baseHistory = history;
-                                if (isNewMeasurement && activeRoomForMeasurement.measurementData && Array.isArray(activeRoomForMeasurement.measurementData.measurements) && activeRoomForMeasurement.measurementData.measurements.length > 0) {
+                                if (shouldArchive && activeRoomForMeasurement.measurementData && Array.isArray(activeRoomForMeasurement.measurementData.measurements) && activeRoomForMeasurement.measurementData.measurements.length > 0) {
                                     const mDataDate = activeRoomForMeasurement.measurementData.globalSettings?.date || activeRoomForMeasurement.measurementData.date || new Date().toISOString();
                                     const isDuplicate = baseHistory.some(h => (h.date || h.globalSettings?.date) === mDataDate);
                                     if (!isDuplicate) {
@@ -8512,7 +8536,16 @@ END:VCARD`;
 
                         // History fallback for "Messung fortsetzen" when measurementData is missing
                         if (!mData && Array.isArray(r.measurementHistory) && r.measurementHistory.length > 0) {
-                            const validHistory = r.measurementHistory.filter(h => h.date || h.datum || h.timestamp || h.createdAt || h.globalSettings?.date);
+                            const validHistory = r.measurementHistory.filter(h => {
+                                const hasDate = h.date || h.datum || h.timestamp || h.createdAt || h.globalSettings?.date;
+                                if (!hasDate) return false;
+                                const ms = h.measurements || h.points || h.measurementPoints || [];
+                                return ms.some(m => {
+                                    const w = String(m.w_value ?? m.w ?? m.wand ?? m.wall ?? m.W ?? '').trim();
+                                    const b = String(m.b_value ?? m.b ?? m.boden ?? m.floor ?? m.B ?? '').trim();
+                                    return w !== '' || b !== '';
+                                });
+                            });
                             if (validHistory.length > 0) {
                                 const latestHistory = [...validHistory].sort((a, b) => {
                                     const da = a.date || a.datum || a.timestamp || a.createdAt || a.globalSettings?.date || 0;
@@ -8612,6 +8645,10 @@ END:VCARD`;
                                 const existingRoom = measurementRooms[existingRoomIndex];
                                 const history = existingRoom.measurementHistory ? [...existingRoom.measurementHistory] : [];
                                 
+                                const prevActiveDate = existingRoom.measurementData?.globalSettings?.date || existingRoom.measurementData?.date;
+                                const isNewDate = prevActiveDate && globalSettings.date && prevActiveDate !== globalSettings.date;
+                                const shouldArchive = isNewMeasurement || isNewDate;
+
                                 const finalCanvasImage = canvasImage || existingRoom.canvasImage || existingRoom.measurementData?.canvasImage || null;
                                 const finalSketch = finalCanvasImage;
                                 const finalProtocolUrl = protocolUrl || existingRoom.measurementData?.protocolUrl || existingRoom.protocolUrl || null;
@@ -8620,9 +8657,9 @@ END:VCARD`;
                                     String(m.w_value || '').trim() !== '' || String(m.b_value || '').trim() !== ''
                                 );
 
-                                // 1. Migrate old active measurementData to history if starting a new measurement visit
+                                // 1. Migrate old active measurementData to history if starting a new measurement visit or date changed
                                 let baseHistory = history;
-                                if (isNewMeasurement && existingRoom.measurementData && Array.isArray(existingRoom.measurementData.measurements) && existingRoom.measurementData.measurements.length > 0) {
+                                if (shouldArchive && existingRoom.measurementData && Array.isArray(existingRoom.measurementData.measurements) && existingRoom.measurementData.measurements.length > 0) {
                                     const mDataDate = existingRoom.measurementData.globalSettings?.date || existingRoom.measurementData.date || new Date().toISOString();
                                     const isDuplicate = baseHistory.some(h => (h.date || h.globalSettings?.date) === mDataDate);
                                     if (!isDuplicate) {
@@ -8679,6 +8716,10 @@ END:VCARD`;
                                 };
                                 updatedMeasurementRooms[existingRoomIndex] = finalRoom;
                             } else {
+                                const prevActiveDate = activeRoomForMeasurement.measurementData?.globalSettings?.date || activeRoomForMeasurement.measurementData?.date;
+                                const isNewDate = prevActiveDate && globalSettings.date && prevActiveDate !== globalSettings.date;
+                                const shouldArchive = isNewMeasurement || isNewDate;
+
                                 const baseRoom = RoomService.createRoom({
                                     name: globalSettings.room || activeRoomForMeasurement.name || 'Unbenannter Raum',
                                     apartment: globalSettings.apartment || activeRoomForMeasurement.apartment || '',
@@ -8695,9 +8736,9 @@ END:VCARD`;
                                     String(m.w_value || '').trim() !== '' || String(m.b_value || '').trim() !== ''
                                 );
 
-                                // 1. Migrate old active measurementData to history if starting a new measurement visit
+                                // 1. Migrate old active measurementData to history if starting a new measurement visit or date changed
                                 let baseHistory = history;
-                                if (isNewMeasurement && activeRoomForMeasurement.measurementData && Array.isArray(activeRoomForMeasurement.measurementData.measurements) && activeRoomForMeasurement.measurementData.measurements.length > 0) {
+                                if (shouldArchive && activeRoomForMeasurement.measurementData && Array.isArray(activeRoomForMeasurement.measurementData.measurements) && activeRoomForMeasurement.measurementData.measurements.length > 0) {
                                     const mDataDate = activeRoomForMeasurement.measurementData.globalSettings?.date || activeRoomForMeasurement.measurementData.date || new Date().toISOString();
                                     const isDuplicate = baseHistory.some(h => (h.date || h.globalSettings?.date) === mDataDate);
                                     if (!isDuplicate) {
