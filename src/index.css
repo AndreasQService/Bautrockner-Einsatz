@@ -565,7 +565,7 @@ body {
 
 /* Container: kein unnötiger Padding, volle Breite */
 .container {
-  max-width: 1600px;
+  max-width: 100% !important;
   margin: 0 auto;
   padding: 12px 16px;
 }

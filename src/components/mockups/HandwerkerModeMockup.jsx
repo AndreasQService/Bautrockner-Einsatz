@@ -225,9 +225,38 @@ const getQueryRole = () => {
 
 const savedState = getInitialState();
 
+const getStatusBadgeStyle = (currentStatus) => {
+    switch (currentStatus) {
+        case 'Neu':
+            return {
+                backgroundColor: 'rgba(30, 109, 183, 0.15)',
+                color: '#1E6DB7',
+                border: '1.5px solid rgba(30, 109, 183, 0.3)'
+            };
+        case 'In Arbeit':
+            return {
+                backgroundColor: 'rgba(245, 158, 11, 0.15)',
+                color: '#D97706',
+                border: '1.5px solid rgba(245, 158, 11, 0.3)'
+            };
+        case 'Abgeschlossen':
+            return {
+                backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                color: '#059669',
+                border: '1.5px solid rgba(16, 185, 129, 0.3)'
+            };
+        default:
+            return {
+                backgroundColor: 'rgba(148, 163, 184, 0.15)',
+                color: '#94A3B8',
+                border: '1.5px solid rgba(148, 163, 184, 0.3)'
+            };
+    }
+};
+
 export default function HandwerkerModeMockup({ report, onBack } = {}) {
     // ── STATE ──
-    const [activeTab, setActiveTab] = useState(savedState?.activeTab || 'Arbeitsauftrag');
+    const [activeTab, setActiveTab] = useState(savedState?.activeTab || 'Auftrag und Schadenort');
     const [orderNumber, setOrderNumber] = useState(savedState?.orderNumber || report?.orderNumber || 'BA-2024-015');
     const [projectTitle, setProjectTitle] = useState(savedState?.projectTitle || report?.projectTitle || 'Badezimmer Sanierung');
 
@@ -265,7 +294,7 @@ export default function HandwerkerModeMockup({ report, onBack } = {}) {
         savedState?.description !== undefined ? savedState.description : 'Komplette Sanierung des Badezimmers inkl. Fliesenarbeiten, Sanitär, Elektro und Malerarbeiten. Neue Dusche, Waschtisch und WC.'
     );
     const [priority, setPriority] = useState(savedState?.priority || 'Hoch');
-    const [status, setStatus] = useState(savedState?.status || 'In Arbeit');
+    const [status, setStatus] = useState(savedState?.status || 'Neu');
     const [startDate, setStartDate] = useState(savedState?.startDate || '2024-05-27');
     const [endDate, setEndDate] = useState(savedState?.endDate || '2024-06-14');
     const [plannedDuration, setPlannedDuration] = useState(savedState?.plannedDuration || '40');
@@ -311,6 +340,9 @@ export default function HandwerkerModeMockup({ report, onBack } = {}) {
     // Outlook simulation Modal state
     const [showOutlookModal, setShowOutlookModal] = useState(false);
     const [location, setLocation] = useState(savedState?.location || 'Musterstrasse 12, 8000 Zürich');
+    const [exteriorPhoto, setExteriorPhoto] = useState(savedState?.exteriorPhoto || null);
+    const [handwerkerContact, setHandwerkerContact] = useState(savedState?.handwerkerContact || { name: 'Blerim Hasan (Sanitär)', phone: '079 444 55 66', company: 'Q-Service Sanitär AG', email: 'b.hasan@q-service.ch' });
+
 
     // Role state based on URL parameter (?role=handwerker) or localStorage
     const queryRole = getQueryRole()?.toLowerCase();
@@ -320,7 +352,7 @@ export default function HandwerkerModeMockup({ report, onBack } = {}) {
                         (savedRole === 'handwerker' ? 'Handwerker' : 'Disponent'));
     const [userRole, setUserRole] = useState(initialRole);
     const isUrlLocked = queryRole !== null;
-    const isHandwerkerMode = userRole?.toLowerCase() === 'handwerker';
+    const isHandwerkerMode = false; // Forced to false to only render QTool desktop form mockup
 
     // Dark / Light Mode state
     const [isDarkMode, setIsDarkMode] = useState(() => {
@@ -344,6 +376,53 @@ export default function HandwerkerModeMockup({ report, onBack } = {}) {
     const [newTimeEnd, setNewTimeEnd] = useState('16:30');
     const [newTimeBreak, setNewTimeBreak] = useState('1.0');
     const [newTimeTask, setNewTimeTask] = useState('');
+
+    // QTool Form states
+    const [verwaltungContact, setVerwaltungContact] = useState(savedState?.verwaltungContact || { name: 'Herr Keller', phone: '044 987 65 43', email: 'keller@wincasa.ch' });
+    const [eigentuemerContact, setEigentuemerContact] = useState(savedState?.eigentuemerContact || { name: 'Dr. R. Schmid', phone: '078 456 12 34', email: 'r.schmid@gmail.com' });
+    const [hauswartContact, setHauswartContact] = useState(savedState?.hauswartContact || { name: 'Peter Giger', phone: '076 111 22 33', email: 'giger-hauswart@bluewin.ch' });
+    const [clientName, setClientName] = useState(savedState?.clientName || 'Allianz Versicherungs AG');
+    const [verwaltungName, setVerwaltungName] = useState(savedState?.verwaltungName || 'Wincasa AG');
+    const [schadenursache, setSchadenursache] = useState(savedState?.schadenursache || 'Defektes Siphon-Rohr unter dem Waschtisch führt zu kontinuierlichem Wasseraustritt in die Wand.');
+    const [massnahmen, setMassnahmen] = useState(savedState?.massnahmen || '1. Siphon austauschen\n2. Bautrockner KT-20 im Badezimmer aufstellen\n3. Feuchtigkeitsmessung wöchentlich durchführen');
+    const [roomChecklist, setRoomChecklist] = useState(savedState?.roomChecklist || {
+        Badezimmer: { done: true, measures: ['Wandfliesen entfernen', 'Siphon demontieren', 'KT-20 aufstellen'] },
+        Küche: { done: false, measures: ['Sockelblenden entfernen', 'Kernbohrung Estrich', 'Lüfter aufstellen'] },
+        Keller: { done: false, measures: ['Boden absaugen', 'Desinfektion', 'KT-20 aufstellen'] }
+    });
+    const [moistureReadings, setMoistureReadings] = useState(savedState?.moistureReadings || [
+        { id: 1, room: 'Badezimmer', point: 'Wand Fliesenbereich unten', initial: 92, current: 42, limit: 40 },
+        { id: 2, room: 'Badezimmer', point: 'Boden Estrich Dusche', initial: 120, current: 85, limit: 50 },
+        { id: 3, room: 'Küche', point: 'Wand hinter Spülmaschine', initial: 95, current: 91, limit: 40 },
+        { id: 4, room: 'Keller', point: 'Estrich neben Boiler', initial: 140, current: 65, limit: 50 }
+    ]);
+    const [devices, setDevices] = useState(savedState?.devices || [
+        { id: 'dev1', name: 'Kondenstrockner AERIAL KT-20', room: 'Badezimmer', startDate: '2024-05-27', hours: 145, startKwh: 1245.5, endKwh: 1290.2, status: 'Aktiv' },
+        { id: 'dev2', name: 'Infrarot-Heizplatte IR-600', room: 'Badezimmer', startDate: '2024-05-27', hours: 120, startKwh: 345.1, endKwh: 381.6, status: 'Abgebaut' },
+        { id: 'dev3', name: 'Seitenkanalverdichter SV-2', room: 'Küche', startDate: '2024-06-01', hours: 96, startKwh: 890.0, endKwh: 928.4, status: 'Aktiv' }
+    ]);
+
+    const resetToNewOrder = () => {
+        setOrderNumber('BA-' + new Date().getFullYear() + '-' + Math.floor(1000 + Math.random() * 9000));
+        setProjectTitle('Neues Projekt');
+        setDescription('');
+        setPriority('Mittel');
+        setStatus('Neu');
+        setClientName('');
+        setVerwaltungName('');
+        setTenantName('');
+        setTenantPhone('');
+        setTenantApartment('');
+        setLocation('');
+        setSchadenursache('');
+        setMassnahmen('');
+        setExteriorPhoto(null);
+        setAssignedHandwerker([]);
+        setPhotos([]);
+        setCustomProjectPhotos([]);
+        setSelectedProjectPhotos([]);
+        setHandwerkerContact({ name: '', phone: '', company: '', email: '' });
+    };
 
     const calculateHours = (start, end, breakHrs) => {
         const [sh, sm] = start.split(':').map(Number);
@@ -453,7 +532,19 @@ export default function HandwerkerModeMockup({ report, onBack } = {}) {
                 customProjectPhotos,
                 tenantName,
                 tenantPhone,
-                tenantApartment
+                tenantApartment,
+                verwaltungContact,
+                eigentuemerContact,
+                hauswartContact,
+                clientName,
+                verwaltungName,
+                schadenursache,
+                massnahmen,
+                roomChecklist,
+                moistureReadings,
+                devices,
+                exteriorPhoto,
+                handwerkerContact
             };
             localStorage.setItem(STORAGE_KEY, JSON.stringify(stateToSave));
         } catch (e) {
@@ -480,7 +571,19 @@ export default function HandwerkerModeMockup({ report, onBack } = {}) {
         customProjectPhotos,
         tenantName,
         tenantPhone,
-        tenantApartment
+        tenantApartment,
+        verwaltungContact,
+        eigentuemerContact,
+        hauswartContact,
+        clientName,
+        verwaltungName,
+        schadenursache,
+        massnahmen,
+        roomChecklist,
+        moistureReadings,
+        devices,
+        exteriorPhoto,
+        handwerkerContact
     ]);
 
     // Live cross-tab sync via storage events
@@ -510,6 +613,18 @@ export default function HandwerkerModeMockup({ report, onBack } = {}) {
                     if (data.tenantName) setTenantName(data.tenantName);
                     if (data.tenantPhone) setTenantPhone(data.tenantPhone);
                     if (data.tenantApartment) setTenantApartment(data.tenantApartment);
+                    if (data.verwaltungContact) setVerwaltungContact(data.verwaltungContact);
+                    if (data.eigentuemerContact) setEigentuemerContact(data.eigentuemerContact);
+                    if (data.hauswartContact) setHauswartContact(data.hauswartContact);
+                    if (data.clientName) setClientName(data.clientName);
+                    if (data.verwaltungName) setVerwaltungName(data.verwaltungName);
+                    if (data.schadenursache) setSchadenursache(data.schadenursache);
+                    if (data.massnahmen) setMassnahmen(data.massnahmen);
+                    if (data.roomChecklist) setRoomChecklist(data.roomChecklist);
+                    if (data.moistureReadings) setMoistureReadings(data.moistureReadings);
+                    if (data.devices) setDevices(data.devices);
+                    if (data.exteriorPhoto !== undefined) setExteriorPhoto(data.exteriorPhoto);
+                    if (data.handwerkerContact !== undefined) setHandwerkerContact(data.handwerkerContact);
                 } catch (err) {
                     console.error("Error parsing storage sync data:", err);
                 }
@@ -740,13 +855,18 @@ https://qtool.q-service.ch/project/${orderNumber}`;
                                     </span>
                                     <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>•</span>
                                     <span 
-                                        className="status-badge bg-green-100"
+                                        className="status-badge"
                                         style={{ 
                                             fontSize: '0.75rem', 
                                             fontWeight: 700, 
                                             padding: '0.2rem 0.6rem', 
                                             borderRadius: '20px',
-                                            whiteSpace: 'nowrap'
+                                            whiteSpace: 'nowrap',
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            boxSizing: 'border-box',
+                                            ...getStatusBadgeStyle(status)
                                         }}
                                     >
                                         {status}
@@ -779,50 +899,6 @@ https://qtool.q-service.ch/project/${orderNumber}`;
                         </div>
                         
                         <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexShrink: 0 }}>
-                            {!isUrlLocked && (
-                                <button 
-                                    onClick={() => setUserRole('Handwerker')}
-                                    className="btn btn-outline"
-                                    style={{ 
-                                        display: 'inline-flex', 
-                                        alignItems: 'center', 
-                                        gap: '0.4rem', 
-                                        padding: '0.5rem 0.9rem', 
-                                        fontSize: '0.82rem', 
-                                        fontWeight: 700, 
-                                        cursor: 'pointer',
-                                        borderColor: 'var(--primary)',
-                                        color: 'var(--primary)',
-                                        whiteSpace: 'nowrap',
-                                        height: '38px',
-                                        boxSizing: 'border-box'
-                                    }}
-                                >
-                                    🛠️ Handwerker-Ansicht
-                                </button>
-                            )}
-                            {isUrlLocked && (
-                                <button 
-                                    onClick={() => window.open(window.location.pathname + '?role=handwerker', '_blank')}
-                                    className="btn btn-outline"
-                                    style={{ 
-                                        display: 'inline-flex', 
-                                        alignItems: 'center', 
-                                        gap: '0.4rem', 
-                                        padding: '0.5rem 0.9rem', 
-                                        fontSize: '0.82rem', 
-                                        fontWeight: 700, 
-                                        cursor: 'pointer',
-                                        borderColor: 'var(--primary)',
-                                        color: 'var(--primary)',
-                                        whiteSpace: 'nowrap',
-                                        height: '38px',
-                                        boxSizing: 'border-box'
-                                    }}
-                                >
-                                    <Info size={14} /> Link vorschauen
-                                </button>
-                            )}
                             <span style={{ 
                                 fontSize: '0.78rem', 
                                 color: 'var(--text-muted)', 
@@ -854,10 +930,10 @@ https://qtool.q-service.ch/project/${orderNumber}`;
                             >
                                 <Mail size={14} /> Outlook
                             </button>
-                            <button 
-                                onClick={handleNewOrderClick}
+                            <button
+                                onClick={resetToNewOrder}
                                 className="btn btn-outline"
-                                style={{ 
+                                style={{
                                     display: 'inline-flex', 
                                     alignItems: 'center', 
                                     justifyContent: 'center',
@@ -865,13 +941,12 @@ https://qtool.q-service.ch/project/${orderNumber}`;
                                     height: '38px',
                                     padding: 0,
                                     cursor: 'pointer',
-                                    opacity: 0.5,
                                     flexShrink: 0,
                                     borderColor: 'var(--border)',
-                                    color: 'var(--text-muted)',
+                                    color: 'var(--text-main)',
                                     boxSizing: 'border-box'
                                 }}
-                                title="Neuer Auftrag (inaktiv)"
+                                title="Neuen leeren Auftrag erfassen"
                             >
                                 <Plus size={18} />
                             </button>
@@ -881,39 +956,37 @@ https://qtool.q-service.ch/project/${orderNumber}`;
             </header>
 
             {/* ── 2. TABS (Styled matching standard tabs) ── */}
-            {!isHandwerkerMode && (
-                <nav style={{ 
-                    display: 'flex', 
-                    gap: '0.25rem', 
-                    borderBottom: '2px solid var(--border)', 
-                    marginBottom: '1.5rem',
-                    paddingBottom: '0.1rem'
-                }}>
-                    {['Übersicht', 'Arbeitsauftrag', 'Fotos', 'Skizzen', 'Handwerker', 'Fortschritt'].map(tab => {
-                        const isActive = activeTab === tab;
-                        return (
-                            <button
-                                key={tab}
-                                onClick={() => setActiveTab(tab)}
-                                style={{
-                                    background: 'none',
-                                    border: 'none',
-                                    borderBottom: isActive ? '3px solid var(--primary)' : '3px solid transparent',
-                                    color: isActive ? 'var(--primary)' : 'var(--text-muted)',
-                                    padding: '0.75rem 1.25rem',
-                                    fontSize: '0.95rem',
-                                    fontWeight: isActive ? 700 : 500,
-                                    cursor: 'pointer',
-                                    transition: 'all 0.12s',
-                                    marginBottom: '-3px'
-                                }}
-                            >
-                                {tab}
-                            </button>
-                        );
-                    })}
-                </nav>
-            )}
+            <nav style={{ 
+                display: 'flex', 
+                gap: '0.25rem', 
+                borderBottom: '2px solid var(--border)', 
+                marginBottom: '1.5rem',
+                paddingBottom: '0.1rem'
+            }}>
+                {['Auftrag und Schadenort', 'Kontakte', 'Räume und Schadensberichte', 'Messprotokolle', 'Geräte'].map(tab => {
+                    const isActive = activeTab === tab;
+                    return (
+                        <button
+                            key={tab}
+                            onClick={() => setActiveTab(tab)}
+                            style={{
+                                background: 'none',
+                                border: 'none',
+                                borderBottom: isActive ? '3px solid var(--primary)' : '3px solid transparent',
+                                color: isActive ? 'var(--primary)' : 'var(--text-muted)',
+                                padding: '0.75rem 1.25rem',
+                                fontSize: '0.95rem',
+                                fontWeight: isActive ? 700 : 500,
+                                cursor: 'pointer',
+                                transition: 'all 0.12s',
+                                marginBottom: '-3px'
+                            }}
+                        >
+                            {tab}
+                        </button>
+                    );
+                })}
+            </nav>
 
             {/* ── 3. MAIN WORKSPACE (TWO COLUMNS / ROLE SPECIFIC) ── */}
             {isHandwerkerMode ? (
@@ -1366,862 +1439,1739 @@ https://qtool.q-service.ch/project/${orderNumber}`;
                     </div>
                 </main>
             ) : (
-                /* ── DISPONENT / PLANNER VIEW ── */
-                <main style={{ 
-                    display: 'grid', 
-                    gridTemplateColumns: '1.1fr 0.9fr', 
-                    gap: '1.5rem',
-                    alignItems: 'start'
-                }}>
-                
-                {/* ── LEFT COLUMN ── */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                    
-                    {/* ARBEITSAUFTRAG-KARTE */}
-                    <section className="card" style={{ padding: '1.5rem', border: '1.5px solid var(--border)' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                            {/* Dummy input to absorb password manager / LastPass icon injection */}
-                            <input 
-                                type="text" 
-                                style={{ position: 'absolute', opacity: 0, width: 0, height: 0, pointerEvents: 'none', zIndex: -1 }} 
-                                tabIndex={-1} 
-                            />
+                /* ── 3. MAIN WORKSPACE (TABBED LAYOUT) ── */
+                <main style={{ width: '100%' }}>
+                    {/* ── TAB 1: AUFTRAG UND SCHADENORT ── */}
+                    <div style={{ display: activeTab === 'Auftrag und Schadenort' ? 'grid' : 'none', gridTemplateColumns: '1.1fr 0.9fr', gap: '1.5rem', alignItems: 'start' }}>
+                        {/* LEFT COLUMN: Order Card & Projektimport */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                            {/* Projektimport & KI-Analyse (visible only if status is "Neu") */}
+                            {status === 'Neu' && !clientName && !location && (
+                                <section className="card" style={{ padding: "1.5rem", border: "1.5px solid var(--border)", borderRadius: "8px", display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                                    <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", marginBottom: "0.5rem" }}>
+                                        <span style={{ fontSize: '1.1rem' }}>📁</span>
+                                        <strong style={{ fontSize: "0.85rem", color: "var(--text-main)", textTransform: 'uppercase', letterSpacing: '0.05em' }}>PROJEKTIMPORT & KI-ANALYSE</strong>
+                                    </div>
 
-                            {/* Row 1: Auftragsnummer & Standort / Einsatzadresse */}
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '1.5rem' }}>
-                                <div>
-                                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Auftragsnummer</label>
-                                    <input 
-                                        type="text" 
-                                        name="auftragsnummer"
-                                        id="auftragsnummer"
-                                        className="form-input"
-                                        value={orderNumber} 
-                                        onChange={(e) => setOrderNumber(e.target.value)}
-                                        style={{ width: '100%', boxSizing: 'border-box' }}
-                                        data-lpignore="true"
-                                        data-1p-ignore="true"
-                                        data-bwignore="true"
-                                        autocomplete="off"
-                                    />
-                                </div>
-                                <div>
-                                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Standort / Einsatzadresse</label>
-                                    <input 
-                                        type="text" 
-                                        className="form-input"
-                                        value={location} 
-                                        onChange={(e) => setLocation(e.target.value)}
-                                        placeholder="z. B. Hauptstrasse 45, 9000 St. Gallen"
-                                        style={{ width: '100%', boxSizing: 'border-box' }}
-                                        data-lpignore="true"
-                                        autocomplete="off"
-                                    />
-                                </div>
-                            </div>
-
-                            {/* Row: Mieter-Auswahl & Details */}
-                            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.5fr 1fr 1fr', gap: '1rem', alignItems: 'end' }}>
-                                <div>
-                                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Mieter wählen</label>
-                                    <select
-                                        className="form-input"
-                                        value={selectedTenantIndex}
-                                        onChange={(e) => {
-                                            const idx = e.target.value;
-                                            setSelectedTenantIndex(idx);
-                                            if (idx !== '') {
-                                                const tenant = tenantsList[idx];
-                                                setTenantName(tenant.name || '');
-                                                setTenantPhone(tenant.phone || '');
-                                                setTenantApartment(tenant.apartment || tenant.floor || '');
-                                            }
+                                    {/* PDF Drag Zone */}
+                                    <div
+                                        onClick={() => alert("Simulation: PDF-Datei ausgewählt. Text aus der PDF wird extrahiert.")}
+                                        style={{
+                                            border: '1.5px dashed var(--border)',
+                                            borderRadius: '6px',
+                                            padding: '1.25rem',
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem',
+                                            backgroundColor: 'var(--color-input-bg)',
+                                            cursor: 'pointer',
+                                            fontSize: '0.85rem', color: 'var(--text-muted)',
+                                            textAlign: 'center'
                                         }}
-                                        style={{ width: '100%', backgroundColor: 'var(--surface)', color: 'var(--text-main)', boxSizing: 'border-box' }}
                                     >
-                                        <option value="">Auswählen...</option>
-                                        {tenantsList.map((tenant, idx) => (
-                                            <option key={idx} value={idx}>
-                                                {tenant.name} {tenant.apartment || tenant.floor ? `(${tenant.apartment || tenant.floor})` : ''}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                                <div>
-                                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Name</label>
-                                    <input 
-                                        type="text" 
-                                        className="form-input"
-                                        value={tenantName} 
-                                        onChange={(e) => setTenantName(e.target.value)}
-                                        style={{ width: '100%', boxSizing: 'border-box' }}
-                                        placeholder="Name des Mieters"
-                                        autocomplete="off"
-                                    />
-                                </div>
-                                <div>
-                                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Telefon</label>
-                                    <input 
-                                        type="text" 
-                                        className="form-input"
-                                        value={tenantPhone} 
-                                        onChange={(e) => setTenantPhone(e.target.value)}
-                                        style={{ width: '100%', boxSizing: 'border-box' }}
-                                        placeholder="Telefonnummer"
-                                        autocomplete="off"
-                                    />
-                                </div>
-                                <div>
-                                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Wohnung</label>
-                                    <input 
-                                        type="text" 
-                                        className="form-input"
-                                        value={tenantApartment} 
-                                        onChange={(e) => setTenantApartment(e.target.value)}
-                                        style={{ width: '100%', boxSizing: 'border-box' }}
-                                        placeholder="z. B. 3. OG links"
-                                        autocomplete="off"
-                                    />
-                                </div>
-                            </div>
+                                        <span style={{ fontSize: '1.2rem' }}>⬆️</span>
+                                        <span style={{ fontWeight: 700 }}>PDF-Dokument hier ablegen oder anklicken</span>
+                                    </div>
 
-                            {/* Row 2: Beschreibung */}
-                            <div>
-                                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Beschreibung</label>
-                                <textarea 
-                                    className="form-input"
-                                    value={description} 
-                                    onChange={(e) => setDescription(e.target.value)}
-                                    rows={4}
-                                    style={{ width: '100%', fontFamily: 'var(--font-desktop)', lineHeight: 1.4, boxSizing: 'border-box', resize: 'vertical' }}
-                                />
-                            </div>
-
-                            {/* Row 3: Priorität & Status */}
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
-                                <div>
-                                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Priorität</label>
-                                    <select 
-                                        className="form-input"
-                                        value={priority} 
-                                        onChange={(e) => setPriority(e.target.value)}
-                                        style={{ width: '100%', backgroundColor: 'var(--surface)', color: 'var(--text-main)', boxSizing: 'border-box' }}
-                                    >
-                                        <option value="Niedrig">Niedrig</option>
-                                        <option value="Mittel">Mittel</option>
-                                        <option value="Hoch">Hoch</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Status</label>
-                                    <select 
-                                        className="form-input"
-                                        value={status} 
-                                        onChange={(e) => setStatus(e.target.value)}
-                                        style={{ width: '100%', backgroundColor: 'var(--surface)', color: 'var(--text-main)', boxSizing: 'border-box' }}
-                                    >
-                                        <option value="In Arbeit">In Arbeit</option>
-                                        <option value="Abgeschlossen">Abgeschlossen</option>
-                                    </select>
-                                </div>
-                            </div>
-
-                            {/* Row 4: Start & Fertigstellung */}
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
-                                <div>
-                                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Gewünschter Start</label>
-                                    <div style={{ position: 'relative' }}>
-                                        <input 
-                                            type="date" 
+                                    <div>
+                                        <label style={{ display: 'block', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 800, marginBottom: '0.4rem' }}>Notizen / E-Mail Text einfügen</label>
+                                        <textarea
+                                            placeholder="E-Mail Text, Notizen oder Schadensmeldung hier einfügen..."
                                             className="form-input"
-                                            value={startDate} 
-                                            onChange={(e) => setStartDate(e.target.value)}
-                                            style={{ width: '100%', paddingLeft: '2.2rem', boxSizing: 'border-box' }}
+                                            rows={4}
+                                            style={{
+                                                width: "100%",
+                                                padding: "0.5rem",
+                                                borderRadius: "4px",
+                                                border: "1.2px solid var(--border)",
+                                                backgroundColor: "var(--surface)",
+                                                color: "var(--text-main)",
+                                                resize: "vertical",
+                                                fontFamily: "var(--font-desktop)",
+                                                fontSize: "0.85rem",
+                                                boxSizing: 'border-box'
+                                            }}
                                         />
-                                        <Calendar size={15} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                                    </div>
+
+                                    <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "0.5rem" }}>
+                                        <button
+                                            onClick={() => {
+                                                alert("Simulation: KI analysiert den Text und befüllt die Schadensdetails sowie Kontakte.");
+                                                setClientName("Allianz Versicherungs AG");
+                                                setVerwaltungName("Wincasa AG");
+                                                setLocation("Musterstrasse 12, 8000 Zürich");
+                                                setDescription("Komplette Sanierung des Badezimmers inkl. Fliesenarbeiten, Sanitär, Elektro und Malerarbeiten. Neue Dusche, Waschtisch und WC.");
+                                                setTenantName("Hans Meier");
+                                                setTenantPhone("079 123 45 67");
+                                                setTenantApartment("3. OG Links");
+                                                setStatus("In Arbeit");
+                                            }}
+                                            className="btn btn-primary"
+                                            style={{
+                                                minWidth: "160px",
+                                                height: "36px",
+                                                fontWeight: 700,
+                                                fontSize: '0.8rem',
+                                                cursor: 'pointer'
+                                            }}
+                                        >
+                                            KI-Analyse starten
+                                        </button>
+                                    </div>
+                                </section>
+                            )}
+
+                            <section className="card" style={{ padding: '1.5rem', border: '1.5px solid var(--border)' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                                    {/* Dummy input to absorb password manager / LastPass icon injection */}
+                                    <input 
+                                        type="text" 
+                                        style={{ position: 'absolute', opacity: 0, width: 0, height: 0, pointerEvents: 'none', zIndex: -1 }} 
+                                        tabIndex={-1} 
+                                    />
+
+                                    {/* Row 1: Auftragsnummer & Standort / Einsatzadresse */}
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '1.5rem' }}>
+                                        <div>
+                                            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Auftragsnummer</label>
+                                            <input 
+                                                type="text" 
+                                                name="auftragsnummer"
+                                                id="auftragsnummer"
+                                                className="form-input"
+                                                value={orderNumber} 
+                                                onChange={(e) => setOrderNumber(e.target.value)}
+                                                style={{ width: '100%', boxSizing: 'border-box' }}
+                                                data-lpignore="true"
+                                                data-1p-ignore="true"
+                                                data-bwignore="true"
+                                                autocomplete="off"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Standort / Einsatzadresse</label>
+                                            <input 
+                                                type="text" 
+                                                className="form-input"
+                                                value={location} 
+                                                onChange={(e) => setLocation(e.target.value)}
+                                                placeholder="z. B. Hauptstrasse 45, 9000 St. Gallen"
+                                                style={{ width: '100%', boxSizing: 'border-box' }}
+                                                data-lpignore="true"
+                                                autocomplete="off"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Row: Auftraggeber & Verwaltung */}
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+                                        <div>
+                                            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Auftraggeber (Versicherung / Eigentümer)</label>
+                                            <input 
+                                                type="text" 
+                                                className="form-input"
+                                                value={clientName} 
+                                                onChange={(e) => setClientName(e.target.value)}
+                                                style={{ width: '100%', boxSizing: 'border-box' }}
+                                                placeholder="z. B. Allianz Versicherungen AG"
+                                                autocomplete="off"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Verwaltung</label>
+                                            <input 
+                                                type="text" 
+                                                className="form-input"
+                                                value={verwaltungName} 
+                                                onChange={(e) => setVerwaltungName(e.target.value)}
+                                                style={{ width: '100%', boxSizing: 'border-box' }}
+                                                placeholder="z. B. Wincasa AG"
+                                                autocomplete="off"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Row 2: Beschreibung */}
+                                    <div>
+                                        <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Beschreibung</label>
+                                        <textarea 
+                                            className="form-input"
+                                            value={description} 
+                                            onChange={(e) => setDescription(e.target.value)}
+                                            rows={4}
+                                            style={{ width: '100%', fontFamily: 'var(--font-desktop)', lineHeight: 1.4, boxSizing: 'border-box', resize: 'vertical' }}
+                                        />
+                                    </div>
+
+                                    {/* Row 3: Priorität & Status */}
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+                                        <div>
+                                            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Priorität</label>
+                                            <select 
+                                                className="form-input"
+                                                value={priority} 
+                                                onChange={(e) => setPriority(e.target.value)}
+                                                style={{ width: '100%', backgroundColor: 'var(--surface)', color: 'var(--text-main)', boxSizing: 'border-box' }}
+                                            >
+                                                <option value="Niedrig">Niedrig</option>
+                                                <option value="Mittel">Mittel</option>
+                                                <option value="Hoch">Hoch</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Status</label>
+                                            <select 
+                                                className="form-input"
+                                                value={status} 
+                                                onChange={(e) => setStatus(e.target.value)}
+                                                style={{ width: '100%', backgroundColor: 'var(--surface)', color: 'var(--text-main)', boxSizing: 'border-box' }}
+                                            >
+                                                <option value="Neu">Neu</option>
+                                                <option value="In Arbeit">In Arbeit</option>
+                                                <option value="Abgeschlossen">Abgeschlossen</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    {/* Row 4: Start & Fertigstellung */}
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+                                        <div>
+                                            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Gewünschter Start</label>
+                                            <div style={{ position: 'relative' }}>
+                                                <input 
+                                                    type="date" 
+                                                    className="form-input"
+                                                    value={startDate} 
+                                                    onChange={(e) => setStartDate(e.target.value)}
+                                                    style={{ width: '100%', paddingLeft: '2.2rem', boxSizing: 'border-box' }}
+                                                />
+                                                <Calendar size={15} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Fertigstellung bis</label>
+                                            <div style={{ position: 'relative' }}>
+                                                <input 
+                                                    type="date" 
+                                                    className="form-input"
+                                                    value={endDate} 
+                                                    onChange={(e) => setEndDate(e.target.value)}
+                                                    style={{ width: '100%', paddingLeft: '2.2rem', boxSizing: 'border-box' }}
+                                                />
+                                                <Calendar size={15} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Row 5: Geplanter Zeitaufwand */}
+                                    <div>
+                                        <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Geplanter Zeitaufwand</label>
+                                        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                                            <input 
+                                                type="number" 
+                                                className="form-input"
+                                                value={plannedDuration} 
+                                                onChange={(e) => setPlannedDuration(e.target.value)}
+                                                style={{ width: '100px' }}
+                                            />
+                                            <select 
+                                                className="form-input"
+                                                value={plannedDurationUnit} 
+                                                onChange={(e) => setPlannedDurationUnit(e.target.value)}
+                                                style={{ backgroundColor: 'var(--surface)', color: 'var(--text-main)' }}
+                                            >
+                                                <option value="Stunden">Stunden</option>
+                                                <option value="Arbeitstage">Arbeitstage</option>
+                                            </select>
+                                            <Info size={16} style={{ color: 'var(--primary)', cursor: 'help' }} title="Geschätzter Zeitaufwand für die Durchführung" />
+                                        </div>
                                     </div>
                                 </div>
-                                <div>
-                                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Fertigstellung bis</label>
-                                    <div style={{ position: 'relative' }}>
-                                        <input 
-                                            type="date" 
-                                            className="form-input"
-                                            value={endDate} 
-                                            onChange={(e) => setEndDate(e.target.value)}
-                                            style={{ width: '100%', paddingLeft: '2.2rem', boxSizing: 'border-box' }}
-                                        />
-                                        <Calendar size={15} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Row 5: Geplanter Zeitaufwand */}
-                            <div>
-                                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Geplanter Zeitaufwand</label>
-                                <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-                                    <input 
-                                        type="number" 
-                                        className="form-input"
-                                        value={plannedDuration} 
-                                        onChange={(e) => setPlannedDuration(e.target.value)}
-                                        style={{ width: '100px' }}
-                                    />
-                                    <select 
-                                        className="form-input"
-                                        value={plannedDurationUnit} 
-                                        onChange={(e) => setPlannedDurationUnit(e.target.value)}
-                                        style={{ backgroundColor: 'var(--surface)', color: 'var(--text-main)' }}
-                                    >
-                                        <option value="Stunden">Stunden</option>
-                                        <option value="Arbeitstage">Arbeitstage</option>
-                                    </select>
-                                    <Info size={16} style={{ color: 'var(--primary)', cursor: 'help' }} title="Geschätzter Zeitaufwand für die Durchführung" />
-                                </div>
-                            </div>
+                            </section>
                         </div>
-                    </section>
 
-                    {/* HANDWERKER-ZUWEISUNG */}
-                    <section className="card" style={{ padding: '1.5rem', border: '1.5px solid var(--border)' }}>
-                        <h2 className="section-header" style={{ margin: '0 0 1.25rem 0', fontSize: '1.05rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                            Handwerker Zuweisung
-                        </h2>
-
-                        <div ref={handwerkerDropdownRef} style={{ position: 'relative' }}>
-                            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Handwerker</label>
-                            
-                            {/* Customized Multi-Select Input Field matching standard input styling */}
-                            <div 
-                                onClick={() => setShowHandwerkerDropdown(!showHandwerkerDropdown)}
-                                className="form-input"
-                                style={{ 
-                                    display: 'flex', 
-                                    flexWrap: 'wrap', 
-                                    gap: '0.4rem', 
-                                    padding: '0.5rem 0.75rem', 
-                                    minHeight: '44px',
-                                    cursor: 'pointer',
-                                    alignItems: 'center',
-                                    boxSizing: 'border-box'
-                                }}
-                            >
-                                {assignedHandwerker.length === 0 && (
-                                    <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Keine Handwerker zugewiesen...</span>
-                                )}
-                                {assignedHandwerker.map(name => (
-                                    <span 
-                                        key={name}
-                                        onClick={(e) => {
-                                            e.stopPropagation(); // Avoid opening dropdown
-                                            setAssignedHandwerker(prev => prev.filter(h => h !== name));
-                                        }}
-                                        style={{ 
-                                            display: 'inline-flex', 
-                                            alignItems: 'center', 
-                                            gap: '0.25rem', 
-                                            backgroundColor: 'var(--color-primary-soft)', 
-                                            color: 'var(--primary)', 
-                                            padding: '0.25rem 0.6rem', 
-                                            borderRadius: '4px', 
-                                            fontSize: '0.85rem', 
-                                            fontWeight: 600,
-                                            border: '1px solid var(--color-border-strong)'
-                                        }}
-                                    >
-                                        {name}
-                                        <X size={12} style={{ opacity: 0.8, cursor: 'pointer' }} />
-                                    </span>
-                                ))}
-                                <ChevronDown size={18} style={{ marginLeft: 'auto', color: 'var(--text-muted)' }} />
-                            </div>
-
-                            {/* Dropdown Menu */}
-                            {showHandwerkerDropdown && (
+                        {/* RIGHT COLUMN: Map & Location Mockup */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                            {/* Map Mockup */}
+                            <section className="card" style={{ padding: '1.5rem', border: '1.5px solid var(--border)' }}>
+                                <h2 className="section-header" style={{ margin: '0 0 1rem 0', fontSize: '1.05rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                    🗺️ Schadenort-Karte
+                                </h2>
                                 <div style={{ 
-                                    position: 'absolute', 
-                                    top: '100%', 
-                                    left: 0, 
-                                    right: 0, 
-                                    backgroundColor: 'var(--surface)', 
-                                    border: '1.5px solid var(--border)', 
-                                    borderRadius: '4px', 
-                                    boxShadow: '0 8px 16px rgba(0,0,0,0.15)',
-                                    zIndex: 50,
-                                    marginTop: '0.25rem',
+                                    height: '240px', 
+                                    backgroundColor: 'var(--color-input-bg)', 
+                                    border: '1px solid var(--border)', 
+                                    borderRadius: '6px',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    position: 'relative',
                                     overflow: 'hidden'
                                 }}>
-                                    {availableHandwerker.map(name => {
-                                        const isChecked = assignedHandwerker.includes(name);
-                                        return (
+                                    <svg width="100%" height="100%" viewBox="0 0 400 240" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ opacity: 0.85 }}>
+                                        <rect width="400" height="240" fill="var(--color-input-bg)"/>
+                                        {/* Streets */}
+                                        <path d="M-10 80 H410 M-10 160 H410 M120 -10 V250 M280 -10 V250" stroke="var(--border)" strokeWidth="12" strokeLinecap="round"/>
+                                        <path d="M-10 80 H410 M-10 160 H410 M120 -10 V250 M280 -10 V250" stroke="var(--background)" strokeWidth="2" strokeDasharray="6 4"/>
+                                        {/* Buildings */}
+                                        <rect x="20" y="20" width="80" height="40" rx="3" fill="var(--color-primary-soft)" stroke="var(--border)" strokeWidth="1.5"/>
+                                        <rect x="150" y="20" width="100" height="40" rx="3" fill="var(--color-primary-soft)" stroke="var(--border)" strokeWidth="1.5"/>
+                                        <rect x="300" y="20" width="80" height="120" rx="3" fill="var(--color-primary-soft)" stroke="var(--border)" strokeWidth="1.5"/>
+                                        <rect x="20" y="110" width="80" height="30" rx="3" fill="var(--color-primary-soft)" stroke="var(--border)" strokeWidth="1.5"/>
+                                        <rect x="150" y="190" width="100" height="40" rx="3" fill="var(--color-primary-soft)" stroke="var(--border)" strokeWidth="1.5"/>
+                                        <rect x="20" y="190" width="80" height="40" rx="3" fill="var(--color-primary-soft)" stroke="var(--border)" strokeWidth="1.5"/>
+                                        {/* Target Pin */}
+                                        <g transform="translate(180, 80)">
+                                            <circle cx="20" cy="20" r="10" fill="var(--primary)" opacity="0.3"/>
+                                            <path d="M20 0C11.7 0 5 6.7 5 15C5 25 20 40 20 40C20 40 35 25 35 15C35 6.7 28.3 0 20 0ZM20 20C17.2 20 15 17.8 15 15C15 12.2 17.2 10 20 10C22.8 10 25 12.2 25 15C25 17.8 22.8 20 20 20Z" fill="var(--primary)"/>
+                                        </g>
+                                    </svg>
+                                    
+                                    <div style={{ 
+                                        position: 'absolute', 
+                                        bottom: '10px', 
+                                        left: '10px', 
+                                        right: '10px', 
+                                        backgroundColor: 'var(--surface)', 
+                                        border: '1px solid var(--border)',
+                                        borderRadius: '4px',
+                                        padding: '0.4rem 0.6rem',
+                                        fontSize: '0.8rem',
+                                        fontWeight: 700,
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'center',
+                                        boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+                                    }}>
+                                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>📍 {location}</span>
+                                        <button 
+                                            onClick={() => window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(location)}`, '_blank')}
+                                            className="btn btn-outline"
+                                            style={{ padding: '0.2rem 0.5rem', fontSize: '0.7rem', height: '24px', whiteSpace: 'nowrap' }}
+                                        >
+                                            Route planen
+                                        </button>
+                                    </div>
+                                </div>
+                            </section>
+
+                            {/* Außenaufnahme Mockup */}
+                            <section className="card" style={{ padding: '1.5rem', border: '1.5px solid var(--border)' }}>
+                                <h2 className="section-header" style={{ margin: '0 0 1rem 0', fontSize: '1.05rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                    🏢 Außenaufnahme Schadenobjekt
+                                </h2>
+                                <div style={{ 
+                                    height: '180px', 
+                                    backgroundColor: 'var(--color-input-bg)', 
+                                    border: '1px solid var(--border)', 
+                                    borderRadius: '6px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    overflow: 'hidden',
+                                    position: 'relative'
+                                }}>
+                                    {exteriorPhoto ? (
+                                        <img src={exteriorPhoto} alt="Außenaufnahme Schadenobjekt" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                    ) : (
+                                        <svg width="100%" height="100%" viewBox="0 0 400 180" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                            <rect width="400" height="180" fill="#E2E8F0"/>
+                                            {/* Building outline */}
+                                            <path d="M120 180 V40 H280 V180 Z" fill="#94A3B8" stroke="#475569" strokeWidth="2"/>
+                                            {/* Roof */}
+                                            <path d="M100 40 L200 10 L300 40 Z" fill="#475569" stroke="#334155" strokeWidth="2"/>
+                                            {/* Windows */}
+                                            <rect x="140" y="60" width="30" height="30" fill="#F8FAFC" stroke="#475569" strokeWidth="1.5"/>
+                                            <rect x="230" y="60" width="30" height="30" fill="#F8FAFC" stroke="#475569" strokeWidth="1.5"/>
+                                            <rect x="140" y="110" width="30" height="30" fill="#F8FAFC" stroke="#475569" strokeWidth="1.5"/>
+                                            <rect x="230" y="110" width="30" height="30" fill="#F8FAFC" stroke="#475569" strokeWidth="1.5"/>
+                                            {/* Door */}
+                                            <rect x="185" y="130" width="30" height="50" fill="#334155" stroke="#1E293B" strokeWidth="1.5"/>
+                                            {/* Water pool at base to suggest leakage */}
+                                            <ellipse cx="200" cy="180" rx="160" ry="12" fill="#3B82F6" opacity="0.45"/>
+                                            <text x="200" y="165" fill="#1E293B" font-family="sans-serif" font-size="10" font-weight="bold" text-anchor="middle">Mehrfamilienhaus - Schadenseite Ost</text>
+                                        </svg>
+                                    )}
+                                    <div style={{ 
+                                        position: 'absolute', 
+                                        top: '10px', 
+                                        right: '10px', 
+                                        backgroundColor: 'rgba(15,23,42,0.7)', 
+                                        color: '#FFFFFF', 
+                                        padding: '0.2rem 0.5rem', 
+                                        borderRadius: '4px', 
+                                        fontSize: '0.65rem', 
+                                        fontWeight: 700 
+                                    }}>
+                                        Foto vom 27.05.2024
+                                    </div>
+                                </div>
+                                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem' }}>
+                                    <input 
+                                        type="file" 
+                                        id="exterior-photo-upload"
+                                        accept="image/*"
+                                        style={{ display: 'none' }}
+                                        onChange={(e) => {
+                                            const file = e.target.files[0];
+                                            if (file) {
+                                                const reader = new FileReader();
+                                                reader.onloadend = () => {
+                                                    setExteriorPhoto(reader.result);
+                                                };
+                                                reader.readAsDataURL(file);
+                                            }
+                                        }}
+                                    />
+                                    <button 
+                                        onClick={() => document.getElementById('exterior-photo-upload').click()}
+                                        className="btn btn-outline"
+                                        style={{ flex: 1, height: '32px', fontSize: '0.8rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem', cursor: 'pointer' }}
+                                    >
+                                        <Camera size={14} /> Außenaufnahme hochladen
+                                    </button>
+                                    {exteriorPhoto && (
+                                        <button 
+                                            onClick={() => setExteriorPhoto(null)}
+                                            className="btn btn-outline"
+                                            style={{ height: '32px', width: '32px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderColor: 'var(--danger)', color: 'var(--danger)', cursor: 'pointer' }}
+                                            title="Foto zurücksetzen"
+                                        >
+                                            <Trash2 size={14} />
+                                        </button>
+                                    )}
+                                </div>
+                            </section>
+                        </div>
+                    </div>
+
+                    {/* ── TAB 2: KONTAKTE ── */}
+                    <div style={{ display: activeTab === 'Kontakte' ? 'grid' : 'none', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', alignItems: 'start' }}>
+                        {/* LEFT COLUMN: Mieter & Handwerker-Zuweisung */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                            {/* Mieter-Auswahl & Details */}
+                            <section className="card" style={{ padding: '1.5rem', border: '1.5px solid var(--border)' }}>
+                                <h2 className="section-header" style={{ margin: '0 0 1.25rem 0', fontSize: '1.05rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                    👤 Mieter-Kontakt
+                                </h2>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                                    <div>
+                                        <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Mieter wählen</label>
+                                        <select
+                                            className="form-input"
+                                            value={selectedTenantIndex}
+                                            onChange={(e) => {
+                                                const idx = e.target.value;
+                                                setSelectedTenantIndex(idx);
+                                                if (idx !== '') {
+                                                    const tenant = tenantsList[idx];
+                                                    setTenantName(tenant.name || '');
+                                                    setTenantPhone(tenant.phone || '');
+                                                    setTenantApartment(tenant.apartment || tenant.floor || '');
+                                                }
+                                            }}
+                                            style={{ width: '100%', backgroundColor: 'var(--surface)', color: 'var(--text-main)', boxSizing: 'border-box' }}
+                                        >
+                                            <option value="">Auswählen...</option>
+                                            {tenantsList.map((tenant, idx) => (
+                                                <option key={idx} value={idx}>
+                                                    {tenant.name} {tenant.apartment || tenant.floor ? `(${tenant.apartment || tenant.floor})` : ''}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Name</label>
+                                        <input 
+                                            type="text" 
+                                            className="form-input"
+                                            value={tenantName} 
+                                            onChange={(e) => setTenantName(e.target.value)}
+                                            style={{ width: '100%', boxSizing: 'border-box' }}
+                                            placeholder="Name des Mieters"
+                                            autocomplete="off"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Telefon</label>
+                                        <input 
+                                            type="text" 
+                                            className="form-input"
+                                            value={tenantPhone} 
+                                            onChange={(e) => setTenantPhone(e.target.value)}
+                                            style={{ width: '100%', boxSizing: 'border-box' }}
+                                            placeholder="Telefonnummer"
+                                            autocomplete="off"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Wohnung</label>
+                                        <input 
+                                            type="text" 
+                                            className="form-input"
+                                            value={tenantApartment} 
+                                            onChange={(e) => setTenantApartment(e.target.value)}
+                                            style={{ width: '100%', boxSizing: 'border-box' }}
+                                            placeholder="z. B. 3. OG links"
+                                            autocomplete="off"
+                                        />
+                                    </div>
+                                </div>
+                            </section>
+                            <section className="card" style={{ padding: '1.5rem', border: '1.5px solid var(--border)' }}>
+                                <h2 className="section-header" style={{ margin: '0 0 1.25rem 0', fontSize: '1.05rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                    👷 Handwerker / Sanitär-Kontakt
+                                </h2>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.8fr', gap: '1rem' }}>
+                                        <div>
+                                            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.3rem' }}>Firma</label>
+                                            <input 
+                                                type="text" 
+                                                className="form-input" 
+                                                value={handwerkerContact.company} 
+                                                onChange={(e) => setHandwerkerContact(prev => ({ ...prev, company: e.target.value }))}
+                                                style={{ width: '100%', boxSizing: 'border-box' }}
+                                                autocomplete="off"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.3rem' }}>Ansprechpartner</label>
+                                            <input 
+                                                type="text" 
+                                                className="form-input" 
+                                                value={handwerkerContact.name} 
+                                                onChange={(e) => setHandwerkerContact(prev => ({ ...prev, name: e.target.value }))}
+                                                style={{ width: '100%', boxSizing: 'border-box' }}
+                                                autocomplete="off"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.8fr', gap: '1rem' }}>
+                                        <div>
+                                            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.3rem' }}>Telefon</label>
+                                            <input 
+                                                type="text" 
+                                                className="form-input" 
+                                                value={handwerkerContact.phone} 
+                                                onChange={(e) => setHandwerkerContact(prev => ({ ...prev, phone: e.target.value }))}
+                                                style={{ width: '100%', boxSizing: 'border-box' }}
+                                                autocomplete="off"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.3rem' }}>E-Mail</label>
+                                            <input 
+                                                type="email" 
+                                                className="form-input" 
+                                                value={handwerkerContact.email} 
+                                                onChange={(e) => setHandwerkerContact(prev => ({ ...prev, email: e.target.value }))}
+                                                style={{ width: '100%', boxSizing: 'border-box' }}
+                                                autocomplete="off"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Technician assignment multi-select underneath */}
+                                    <div style={{ borderTop: '1.5px dashed var(--border)', paddingTop: '1rem', marginTop: '0.5rem' }}>
+                                        <div ref={handwerkerDropdownRef} style={{ position: 'relative' }}>
+                                            <label style={{ display: 'block', fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.4rem', fontWeight: 700 }}>Eingeteilte Techniker</label>
                                             <div 
-                                                key={name}
-                                                onClick={() => toggleHandwerker(name)}
+                                                onClick={() => setShowHandwerkerDropdown(!showHandwerkerDropdown)}
+                                                className="form-input"
                                                 style={{ 
                                                     display: 'flex', 
-                                                    alignItems: 'center', 
-                                                    justifyContent: 'space-between', 
-                                                    padding: '0.75rem 1rem', 
-                                                    fontSize: '0.9rem',
+                                                    flexWrap: 'wrap', 
+                                                    gap: '0.4rem', 
+                                                    padding: '0.5rem 0.75rem', 
+                                                    minHeight: '44px',
                                                     cursor: 'pointer',
-                                                    backgroundColor: isChecked ? 'var(--color-row-hover)' : 'transparent',
-                                                    color: 'var(--text-main)',
-                                                    fontWeight: isChecked ? 600 : 500,
-                                                    borderBottom: '1px solid var(--border)'
+                                                    alignItems: 'center',
+                                                    boxSizing: 'border-box'
                                                 }}
                                             >
-                                                <span>{name}</span>
-                                                {isChecked && <Check size={16} color="var(--primary)" />}
+                                                {assignedHandwerker.length === 0 && (
+                                                    <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Keine Techniker zugewiesen...</span>
+                                                )}
+                                                {assignedHandwerker.map(name => (
+                                                    <span 
+                                                        key={name}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation(); // Avoid opening dropdown
+                                                            setAssignedHandwerker(prev => prev.filter(h => h !== name));
+                                                        }}
+                                                        style={{ 
+                                                            display: 'inline-flex', 
+                                                            alignItems: 'center', 
+                                                            gap: '0.25rem', 
+                                                            backgroundColor: 'var(--color-primary-soft)', 
+                                                            color: 'var(--primary)', 
+                                                            padding: '0.25rem 0.6rem', 
+                                                            borderRadius: '4px', 
+                                                            fontSize: '0.85rem', 
+                                                            fontWeight: 600,
+                                                            border: '1px solid var(--color-border-strong)'
+                                                        }}
+                                                    >
+                                                        {name}
+                                                        <X size={12} style={{ opacity: 0.8, cursor: 'pointer' }} />
+                                                    </span>
+                                                ))}
+                                                <ChevronDown size={18} style={{ marginLeft: 'auto', color: 'var(--text-muted)' }} />
+                                            </div>
+
+                                            {showHandwerkerDropdown && (
+                                                <div style={{ 
+                                                    position: 'absolute', 
+                                                    top: '100%', 
+                                                    left: 0, 
+                                                    right: 0, 
+                                                    backgroundColor: 'var(--surface)', 
+                                                    border: '1.5px solid var(--border)', 
+                                                    borderRadius: '4px', 
+                                                    boxShadow: '0 8px 16px rgba(0,0,0,0.15)',
+                                                    zIndex: 50,
+                                                    marginTop: '0.25rem',
+                                                    overflow: 'hidden'
+                                                }}>
+                                                    {availableHandwerker.map(name => {
+                                                        const isChecked = assignedHandwerker.includes(name);
+                                                        return (
+                                                            <div 
+                                                                key={name}
+                                                                onClick={() => toggleHandwerker(name)}
+                                                                style={{ 
+                                                                    display: 'flex', 
+                                                                    alignItems: 'center', 
+                                                                    justifyContent: 'space-between', 
+                                                                    padding: '0.75rem 1rem', 
+                                                                    fontSize: '0.9rem',
+                                                                    cursor: 'pointer',
+                                                                    backgroundColor: isChecked ? 'var(--color-row-hover)' : 'transparent',
+                                                                    color: 'var(--text-main)',
+                                                                    fontWeight: isChecked ? 600 : 500,
+                                                                    borderBottom: '1px solid var(--border)'
+                                                                }}
+                                                            >
+                                                                <span>{name}</span>
+                                                                {isChecked && <Check size={16} color="var(--primary)" />}
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            </section>
+
+                        </div>
+
+                        {/* RIGHT COLUMN: Verwaltung, Eigentümer, Hauswart */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                            {/* Verwaltung Card */}
+                            <section className="card" style={{ padding: '1.5rem', border: '1.5px solid var(--border)' }}>
+                                <h2 className="section-header" style={{ margin: '0 0 1.25rem 0', fontSize: '1.05rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                    🏢 Liegenschaftsverwaltung
+                                </h2>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.8fr', gap: '1rem' }}>
+                                        <div>
+                                            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.3rem' }}>Ansprechpartner</label>
+                                            <input 
+                                                type="text" 
+                                                className="form-input" 
+                                                value={verwaltungContact.name} 
+                                                onChange={(e) => setVerwaltungContact(prev => ({ ...prev, name: e.target.value }))}
+                                                style={{ width: '100%', boxSizing: 'border-box' }}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.3rem' }}>E-Mail</label>
+                                            <input 
+                                                type="email" 
+                                                className="form-input" 
+                                                value={verwaltungContact.email} 
+                                                onChange={(e) => setVerwaltungContact(prev => ({ ...prev, email: e.target.value }))}
+                                                style={{ width: '100%', boxSizing: 'border-box' }}
+                                            />
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.3rem' }}>Telefon</label>
+                                        <input 
+                                            type="text" 
+                                            className="form-input" 
+                                            value={verwaltungContact.phone} 
+                                            onChange={(e) => setVerwaltungContact(prev => ({ ...prev, phone: e.target.value }))}
+                                            style={{ width: '100%', boxSizing: 'border-box' }}
+                                        />
+                                    </div>
+                                </div>
+                            </section>
+
+                            {/* Eigentümer Card */}
+                            <section className="card" style={{ padding: '1.5rem', border: '1.5px solid var(--border)' }}>
+                                <h2 className="section-header" style={{ margin: '0 0 1.25rem 0', fontSize: '1.05rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                    👑 Eigentümer
+                                </h2>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.8fr', gap: '1rem' }}>
+                                        <div>
+                                            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.3rem' }}>Name</label>
+                                            <input 
+                                                type="text" 
+                                                className="form-input" 
+                                                value={eigentuemerContact.name} 
+                                                onChange={(e) => setEigentuemerContact(prev => ({ ...prev, name: e.target.value }))}
+                                                style={{ width: '100%', boxSizing: 'border-box' }}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.3rem' }}>E-Mail</label>
+                                            <input 
+                                                type="email" 
+                                                className="form-input" 
+                                                value={eigentuemerContact.email} 
+                                                onChange={(e) => setEigentuemerContact(prev => ({ ...prev, email: e.target.value }))}
+                                                style={{ width: '100%', boxSizing: 'border-box' }}
+                                            />
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.3rem' }}>Telefon</label>
+                                        <input 
+                                            type="text" 
+                                            className="form-input" 
+                                            value={eigentuemerContact.phone} 
+                                            onChange={(e) => setEigentuemerContact(prev => ({ ...prev, phone: e.target.value }))}
+                                            style={{ width: '100%', boxSizing: 'border-box' }}
+                                        />
+                                    </div>
+                                </div>
+                            </section>
+
+                            {/* Hauswart Card */}
+                            <section className="card" style={{ padding: '1.5rem', border: '1.5px solid var(--border)' }}>
+                                <h2 className="section-header" style={{ margin: '0 0 1.25rem 0', fontSize: '1.05rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                    🔑 Hauswart / Kontakt vor Ort
+                                </h2>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.8fr', gap: '1rem' }}>
+                                        <div>
+                                            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.3rem' }}>Name</label>
+                                            <input 
+                                                type="text" 
+                                                className="form-input" 
+                                                value={hauswartContact.name} 
+                                                onChange={(e) => setHauswartContact(prev => ({ ...prev, name: e.target.value }))}
+                                                style={{ width: '100%', boxSizing: 'border-box' }}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.3rem' }}>E-Mail</label>
+                                            <input 
+                                                type="email" 
+                                                className="form-input" 
+                                                value={hauswartContact.email} 
+                                                onChange={(e) => setHauswartContact(prev => ({ ...prev, email: e.target.value }))}
+                                                style={{ width: '100%', boxSizing: 'border-box' }}
+                                            />
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.3rem' }}>Telefon</label>
+                                        <input 
+                                            type="text" 
+                                            className="form-input" 
+                                            value={hauswartContact.phone} 
+                                            onChange={(e) => setHauswartContact(prev => ({ ...prev, phone: e.target.value }))}
+                                            style={{ width: '100%', boxSizing: 'border-box' }}
+                                        />
+                                    </div>
+                                </div>
+                            </section>
+                        </div>
+                    </div>
+
+                    {/* ── TAB 3: RÄUME UND SCHADENSBERICHTE ── */}
+                    <div style={{ display: activeTab === 'Räume und Schadensberichte' ? 'grid' : 'none', gridTemplateColumns: '1.1fr 0.9fr', gap: '1.5rem', alignItems: 'start' }}>
+                        {/* LEFT COLUMN: Rooms & Photos/Sketches */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                            {/* Rooms & Measures Checklist */}
+                            <section className="card" style={{ padding: '1.5rem', border: '1.5px solid var(--border)' }}>
+                                <h2 className="section-header" style={{ margin: '0 0 1.25rem 0', fontSize: '1.05rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                    🚪 Räume & Instandstellungs-Status
+                                </h2>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                    {Object.keys(roomChecklist).map(roomName => {
+                                        const roomData = roomChecklist[roomName];
+                                        return (
+                                            <div key={roomName} style={{ 
+                                                padding: '0.75rem', 
+                                                backgroundColor: 'var(--color-input-bg)', 
+                                                border: '1px solid var(--border)', 
+                                                borderRadius: '6px',
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                gap: '0.5rem'
+                                            }}>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                    <span style={{ fontWeight: 800, fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                                                        <span>{roomName === 'Badezimmer' ? '🛁' : roomName === 'Küche' ? '🍳' : '📦'}</span>
+                                                        {roomName}
+                                                    </span>
+                                                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 700, color: roomData.done ? 'var(--primary)' : 'var(--text-muted)' }}>
+                                                        <input 
+                                                            type="checkbox" 
+                                                            checked={roomData.done} 
+                                                            onChange={() => setRoomChecklist(prev => ({
+                                                                ...prev,
+                                                                [roomName]: { ...roomData, done: !roomData.done }
+                                                            }))}
+                                                            style={{ accentColor: 'var(--primary)', cursor: 'pointer' }}
+                                                        />
+                                                        Erledigt
+                                                    </label>
+                                                </div>
+                                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginTop: '0.2rem' }}>
+                                                    {roomData.measures.map((m, idx) => (
+                                                        <span key={idx} style={{ 
+                                                            fontSize: '0.75rem', 
+                                                            backgroundColor: 'var(--surface)', 
+                                                            color: 'var(--text-main)', 
+                                                            padding: '0.2rem 0.5rem', 
+                                                            borderRadius: '4px',
+                                                            border: '1.2px solid var(--border)',
+                                                            fontWeight: 500
+                                                        }}>
+                                                            ✓ {m}
+                                                        </span>
+                                                    ))}
+                                                </div>
                                             </div>
                                         );
                                     })}
                                 </div>
-                            )}
-                        </div>
-                    </section>
-                </div>
+                            </section>
 
-                {/* ── RIGHT COLUMN ── */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                    
-                    {/* UNIFIED BILDER & SKIZZEN CARD */}
-                    <section className="card" style={{ padding: '1.5rem', border: '1.5px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                        {/* Main Card Header */}
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
-                            <h2 className="section-header" style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: 'none', paddingBottom: 0 }}>
-                                Bilder & Skizzen
-                            </h2>
-                            <div style={{ display: 'flex', gap: '0.6rem' }}>
+                            {/* Bilder & Skizzen Section */}
+                            <section className="card" style={{ padding: '1.5rem', border: '1.5px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                                {/* Main Card Header */}
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+                                    <h2 className="section-header" style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: 'none', paddingBottom: 0 }}>
+                                        Bilder & Skizzen
+                                    </h2>
+                                    <div style={{ display: 'flex', gap: '0.6rem' }}>
+                                        <button 
+                                            onClick={() => {
+                                                setEditingSketchId(null);
+                                                setCanvasTitle('');
+                                                setShowCanvasModal(true);
+                                            }}
+                                            className="btn btn-primary"
+                                            style={{ 
+                                                display: 'inline-flex', 
+                                                alignItems: 'center', 
+                                                gap: '0.4rem', 
+                                                padding: '0.4rem 0.8rem', 
+                                                fontSize: '0.8rem', 
+                                                fontWeight: 700, 
+                                                cursor: 'pointer',
+                                                height: '34px'
+                                            }}
+                                        >
+                                            <Plus size={14} /> Neue Skizze
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* PART 1: PROJECT PHOTO SELECTION DROPDOWNS (SCHADENAUFNAHME) */}
+                                <div style={{ 
+                                    backgroundColor: 'var(--background)', 
+                                    padding: '1rem', 
+                                    borderRadius: '6px', 
+                                    border: '1px solid var(--border)',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '0.75rem'
+                                }}>
+                                    <div style={{ fontSize: '0.78rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '0.03em' }}>
+                                        🔍 Vorhandene Projektbilder (Schadenaufnahme) auswählen
+                                    </div>
+
+                                    <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                                        {/* Room Dropdown (now Bild wählen) */}
+                                        <div style={{ flex: 1, minWidth: '130px', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                                            <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)' }}>Bild wählen:</span>
+                                            <select 
+                                                value={selectedRoomFilter} 
+                                                onChange={(e) => {
+                                                    if (e.target.value === 'import_from_library') {
+                                                        setImportRoom(selectedRoomFilter || 'Badezimmer');
+                                                        setImportFile(null);
+                                                        setImportFilePreview(null);
+                                                        setShowImportModal(true);
+                                                    } else {
+                                                        setSelectedRoomFilter(e.target.value);
+                                                        setSelectedPhotoId('');
+                                                    }
+                                                }}
+                                                className="select"
+                                                style={{ 
+                                                    padding: '0.25rem 0.5rem', 
+                                                    fontSize: '0.8rem', 
+                                                    borderRadius: '4px',
+                                                    border: '1.5px solid var(--border)',
+                                                    backgroundColor: 'var(--surface)',
+                                                    color: 'var(--text-main)',
+                                                    cursor: 'pointer',
+                                                    fontWeight: 600,
+                                                    outline: 'none',
+                                                    height: '32px'
+                                                }}
+                                            >
+                                                <option value="">-- Bild wählen --</option>
+                                                <option value="Badezimmer">
+                                                    Badezimmer ({projectPhotosPool.filter(p => p.room === 'Badezimmer').length} Bild{projectPhotosPool.filter(p => p.room === 'Badezimmer').length === 1 ? '' : 'er'})
+                                                </option>
+                                                <option value="Küche">
+                                                    Küche ({projectPhotosPool.filter(p => p.room === 'Küche').length} Bild{projectPhotosPool.filter(p => p.room === 'Küche').length === 1 ? '' : 'er'})
+                                                </option>
+                                                <option value="Keller">
+                                                    Keller ({projectPhotosPool.filter(p => p.room === 'Keller').length} Bild{projectPhotosPool.filter(p => p.room === 'Keller').length === 1 ? '' : 'er'})
+                                                </option>
+                                                <option value="import_from_library" style={{ fontWeight: 'bold', color: 'var(--primary)' }}>
+                                                    📁 + Aus Fotomediathek...
+                                                </option>
+                                            </select>
+                                        </div>
+
+                                        {/* Photo Dropdown (now Detailbild wählen) */}
+                                        <div style={{ flex: 1.2, minWidth: '170px', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                                            <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)' }}>Detailbild wählen:</span>
+                                            <select 
+                                                value={selectedPhotoId} 
+                                                onChange={(e) => {
+                                                    setSelectedPhotoId(e.target.value);
+                                                }}
+                                                disabled={!selectedRoomFilter}
+                                                className="select"
+                                                style={{ 
+                                                    padding: '0.25rem 0.5rem', 
+                                                    fontSize: '0.8rem', 
+                                                    borderRadius: '4px',
+                                                    border: '1.5px solid var(--border)',
+                                                    backgroundColor: !selectedRoomFilter ? 'rgba(0,0,0,0.03)' : 'var(--surface)',
+                                                    color: 'var(--text-main)',
+                                                    cursor: !selectedRoomFilter ? 'not-allowed' : 'pointer',
+                                                    fontWeight: 600,
+                                                    outline: 'none',
+                                                    height: '32px',
+                                                    opacity: !selectedRoomFilter ? 0.6 : 1
+                                                }}
+                                            >
+                                                <option value="">
+                                                    {!selectedRoomFilter ? '-- Zuerst Bild wählen --' : '-- Detailbild wählen --'}
+                                                </option>
+                                                {projectPhotosPool.filter(p => p.room === selectedRoomFilter).map(p => (
+                                                    <option key={p.id} value={p.id}>
+                                                        {p.title}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    {/* Preview Frame for selected project photo */}
+                                    {selectedPhotoId && selectedPhotoId !== 'import_from_library' ? (() => {
+                                        const selectedPhoto = projectPhotosPool.find(p => p.id === selectedPhotoId);
+                                        if (!selectedPhoto) return null;
+                                        const isSelected = selectedProjectPhotos.includes(selectedPhoto.id);
+                                        return (
+                                            <div 
+                                                style={{ 
+                                                    border: '1px solid var(--border)', 
+                                                    borderRadius: '4px', 
+                                                    padding: '0.5rem',
+                                                    backgroundColor: 'var(--surface)',
+                                                    display: 'flex',
+                                                    flexDirection: 'column',
+                                                    gap: '0.5rem',
+                                                    animation: 'fadeIn 0.2s ease'
+                                                }}
+                                            >
+                                                <div 
+                                                    onClick={() => {
+                                                        setZoomedSketch({ id: selectedPhoto.id, title: `${selectedPhoto.title} (Original)`, src: selectedPhoto.src });
+                                                        setShowZoomModal(true);
+                                                    }}
+                                                    style={{ 
+                                                        height: '140px', 
+                                                        backgroundColor: '#FFFFFF', 
+                                                        display: 'flex', 
+                                                        alignItems: 'center', 
+                                                        justifyContent: 'center',
+                                                        borderRadius: '4px',
+                                                        border: '1px solid var(--border)',
+                                                        overflow: 'hidden',
+                                                        cursor: 'pointer'
+                                                    }}
+                                                    title="Großansicht"
+                                                >
+                                                    <img 
+                                                        src={selectedPhoto.src} 
+                                                        alt={selectedPhoto.title} 
+                                                        style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                                                    />
+                                                </div>
+
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.4rem' }}>
+                                                    <div>
+                                                        <div style={{ fontWeight: 800, fontSize: '0.78rem', color: 'var(--text-main)' }}>{selectedPhoto.title}</div>
+                                                        <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Raum: 🚪 {selectedPhoto.room}</div>
+                                                    </div>
+
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                        {/* Checkbox "Senden" */}
+                                                        <label 
+                                                            style={{ 
+                                                                display: 'inline-flex', 
+                                                                alignItems: 'center', 
+                                                                gap: '0.25rem', 
+                                                                cursor: 'pointer', 
+                                                                fontSize: '0.72rem', 
+                                                                fontWeight: 700, 
+                                                                color: isSelected ? 'var(--primary)' : 'var(--text-muted)',
+                                                                backgroundColor: isSelected ? 'var(--color-primary-soft)' : 'transparent',
+                                                                padding: '0.25rem 0.5rem',
+                                                                borderRadius: '4px',
+                                                                border: isSelected ? '1px solid var(--color-border-strong)' : '1px solid var(--border)'
+                                                            }}
+                                                        >
+                                                            <input 
+                                                                type="checkbox"
+                                                                checked={isSelected}
+                                                                onChange={() => {
+                                                                    if (isSelected) {
+                                                                        setSelectedProjectPhotos(prev => prev.filter(id => id !== selectedPhoto.id));
+                                                                    } else {
+                                                                        setSelectedProjectPhotos(prev => [...prev, selectedPhoto.id]);
+                                                                    }
+                                                                }}
+                                                                style={{ cursor: 'pointer', accentColor: 'var(--primary)' }}
+                                                            />
+                                                            <span>Auf Bericht anzeigen</span>
+                                                        </label>
+
+                                                        {/* Sketch button */}
+                                                        <button
+                                                            onClick={() => {
+                                                                setEditingSketchId(null);
+                                                                setCanvasBackgroundPhoto(selectedPhoto.src);
+                                                                setCanvasTitle(`${selectedPhoto.title} - markiert`);
+                                                                setShowCanvasModal(true);
+                                                            }}
+                                                            className="btn btn-outline"
+                                                            style={{ 
+                                                                padding: '0.25rem 0.5rem', 
+                                                                fontSize: '0.72rem', 
+                                                                fontWeight: 700, 
+                                                                height: '26px', 
+                                                                display: 'inline-flex', 
+                                                                alignItems: 'center', 
+                                                                gap: '0.2rem' 
+                                                        }}
+                                                        >
+                                                            <Pen size={10} /> Für Bericht skizzieren
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })() : (
+                                        <div style={{ 
+                                            border: '1px dashed var(--border)', 
+                                            borderRadius: '4px', 
+                                            padding: '1rem', 
+                                            textAlign: 'center',
+                                            color: 'var(--text-muted)',
+                                            fontSize: '0.75rem',
+                                            fontStyle: 'italic'
+                                        }}>
+                                            Wähle oben einen Raum und ein Bild aus, um es anzusehen, für den Bericht zu bearbeiten (skizzieren) oder anzuheften.
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* DIVIDER */}
+                                <div style={{ borderTop: '1px dashed var(--border)' }}></div>
+
+                                {/* PART 2: SECTION A - BILDER INSTANDSTELLUNG */}
+                                <div>
+                                    <h3 style={{ fontSize: '0.8rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.75rem', letterSpacing: '0.03em', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                        <span>📷</span> Bilder Instandstellung ({photos.length})
+                                    </h3>
+                                    <div style={{ display: 'flex', gap: '1rem', overflowX: 'auto', paddingBottom: '0.5rem' }}>
+                                        {photos.length === 0 ? (
+                                            <p style={{ fontStyle: 'italic', fontSize: '0.8rem', color: 'var(--text-muted)', margin: '0.5rem 0' }}>Keine Bilder erfasst</p>
+                                        ) : (
+                                            photos.map(photo => (
+                                                <div 
+                                                    key={photo.id}
+                                                    style={{ 
+                                                        width: '120px', 
+                                                        height: '120px', 
+                                                        borderRadius: '6px', 
+                                                        overflow: 'hidden', 
+                                                        border: '1.5px solid var(--border)', 
+                                                        position: 'relative',
+                                                        flexShrink: 0
+                                                    }}
+                                                >
+                                                    <img 
+                                                        src={photo.src} 
+                                                        alt={photo.title}
+                                                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                                    />
+                                                    <div style={{ 
+                                                        position: 'absolute', 
+                                                        bottom: 0, 
+                                                        left: 0, 
+                                                        right: 0, 
+                                                        backgroundColor: 'rgba(15,23,42,0.75)', 
+                                                        color: '#FFFFFF', 
+                                                        fontSize: '0.65rem', 
+                                                        padding: '0.2rem 0.4rem', 
+                                                        textAlign: 'center',
+                                                        textOverflow: 'ellipsis',
+                                                        whiteSpace: 'nowrap',
+                                                        overflow: 'hidden'
+                                                    }}>
+                                                        {photo.title}
+                                                    </div>
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* DIVIDER */}
+                                <div style={{ borderTop: '1px dashed var(--border)' }}></div>
+
+                                {/* PART 3: SECTION B - SKIZZEN & PLÄNE */}
+                                <div>
+                                    <h3 style={{ fontSize: '0.8rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.75rem', letterSpacing: '0.03em', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                        <span>📐</span> Skizzen & Pläne ({sketches.length + selectedProjectPhotos.length})
+                                    </h3>
+                                    {sketches.length === 0 && selectedProjectPhotos.length === 0 ? (
+                                        <p style={{ fontStyle: 'italic', fontSize: '0.8rem', color: 'var(--text-muted)', margin: '0.5rem 0' }}>Keine Skizzen oder zugewiesenen Originalbilder vorhanden.</p>
+                                    ) : (
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
+                                            {/* 1. Render all assigned original project photos with green "Original" badge */}
+                                            {projectPhotosPool.filter(p => selectedProjectPhotos.includes(p.id)).map(photo => (
+                                                <div 
+                                                    key={photo.id}
+                                                    onClick={() => {
+                                                        setZoomedSketch({ id: photo.id, title: `${photo.title} (Original)`, src: photo.src });
+                                                        setShowZoomModal(true);
+                                                    }}
+                                                    className="card"
+                                                    style={{
+                                                        padding: 0,
+                                                        overflow: 'hidden',
+                                                        cursor: 'pointer',
+                                                        position: 'relative',
+                                                        border: '1.5px solid var(--border)'
+                                                    }}
+                                                >
+                                                    <div style={{ 
+                                                        height: '110px', 
+                                                        backgroundColor: '#FFFFFF', 
+                                                        display: 'flex', 
+                                                        alignItems: 'center', 
+                                                        justifyContent: 'center',
+                                                        borderBottom: '1px solid var(--border)',
+                                                        overflow: 'hidden'
+                                                    }}>
+                                                        <img 
+                                                            src={photo.src} 
+                                                            alt={photo.title} 
+                                                            style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                                                        />
+                                                    </div>
+                                                    <div style={{ 
+                                                        padding: '0.5rem', 
+                                                        fontSize: '0.75rem', 
+                                                        fontWeight: 700, 
+                                                        color: 'var(--text-main)',
+                                                        whiteSpace: 'nowrap',
+                                                        textOverflow: 'ellipsis',
+                                                        overflow: 'hidden',
+                                                        display: 'flex',
+                                                        justifyContent: 'space-between',
+                                                        alignItems: 'center'
+                                                    }}>
+                                                        <span>{photo.title}</span>
+                                                        <span style={{ 
+                                                            fontSize: '0.65rem', 
+                                                            color: '#065F46', 
+                                                            backgroundColor: '#ECFDF5', 
+                                                            padding: '0.1rem 0.4rem', 
+                                                            borderRadius: '4px',
+                                                            fontWeight: 800,
+                                                            border: '1.5px solid #A7F3D0'
+                                                        }}>Original</span>
+                                                    </div>
+
+                                                    {/* Disconnect/Deselect button for original image in Disponent View */}
+                                                    <button 
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setSelectedProjectPhotos(prev => prev.filter(id => id !== photo.id));
+                                                        }}
+                                                        style={{
+                                                            position: 'absolute',
+                                                            top: '6px',
+                                                            right: '6px',
+                                                            backgroundColor: '#EF4444',
+                                                            color: 'white',
+                                                            border: '2.5px solid var(--surface)',
+                                                            borderRadius: '50%',
+                                                            width: '20px',
+                                                            height: '20px',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
+                                                            cursor: 'pointer',
+                                                            padding: 0,
+                                                            boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                                                            zIndex: 10
+                                                        }}
+                                                        title="Zuweisung aufheben"
+                                                    >
+                                                        <X size={10} strokeWidth={3} />
+                                                    </button>
+                                                </div>
+                                            ))}
+
+                                            {/* 2. Render all sketches/edited photos */}
+                                            {sketches.map(sketch => {
+                                                const isMarked = sketch.title.toLowerCase().includes('markiert');
+                                                const badgeColor = isMarked ? '#1D4ED8' : '#4338CA';
+                                                const badgeText = isMarked ? 'Markiert' : 'Skizze';
+                                                const badgeBg = isMarked ? '#EFF6FF' : '#EEF2FF';
+                                                const badgeBorder = isMarked ? '1.5px solid #BFDBFE' : '1.5px solid #C7D2FE';
+
+                                                return (
+                                                    <div 
+                                                        key={sketch.id}
+                                                        onClick={() => {
+                                                            setZoomedSketch(sketch);
+                                                            setShowZoomModal(true);
+                                                        }}
+                                                        className="card"
+                                                        style={{
+                                                            padding: 0,
+                                                            overflow: 'hidden',
+                                                            cursor: 'pointer',
+                                                            position: 'relative',
+                                                            border: '1.5px solid var(--border)'
+                                                        }}
+                                                    >
+                                                        <div style={{ 
+                                                            height: '110px', 
+                                                            backgroundColor: '#FFFFFF', 
+                                                            display: 'flex', 
+                                                            alignItems: 'center', 
+                                                            justifyContent: 'center',
+                                                            borderBottom: '1px solid var(--border)',
+                                                            overflow: 'hidden'
+                                                        }}>
+                                                            <img 
+                                                                src={sketch.src} 
+                                                                alt={sketch.title} 
+                                                                style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                                                            />
+                                                        </div>
+                                                        <div style={{ 
+                                                            padding: '0.5rem', 
+                                                            fontSize: '0.75rem', 
+                                                            fontWeight: 700, 
+                                                            color: 'var(--text-main)',
+                                                            whiteSpace: 'nowrap',
+                                                            textOverflow: 'ellipsis',
+                                                            overflow: 'hidden',
+                                                            display: 'flex',
+                                                            justifyContent: 'space-between',
+                                                            alignItems: 'center'
+                                                        }}>
+                                                            <span>{sketch.title}</span>
+                                                            <span style={{ 
+                                                                fontSize: '0.65rem', 
+                                                                color: badgeColor, 
+                                                                backgroundColor: badgeBg, 
+                                                                padding: '0.1rem 0.4rem', 
+                                                                borderRadius: '4px',
+                                                                fontWeight: 800,
+                                                                border: badgeBorder
+                                                                }}>{badgeText}</span>
+                                                        </div>
+
+                                                        {/* Edit pen button */}
+                                                        <button 
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setEditingSketchId(sketch.id);
+                                                                setCanvasBackgroundPhoto(sketch.src.startsWith('data:image/svg') ? null : sketch.src);
+                                                                setCanvasTitle(sketch.title);
+                                                                setShowCanvasModal(true);
+                                                            }}
+                                                            style={{
+                                                                position: 'absolute',
+                                                                top: '6px',
+                                                                right: '30px',
+                                                                backgroundColor: 'var(--primary)',
+                                                                color: 'white',
+                                                                border: '2.5px solid var(--surface)',
+                                                                borderRadius: '50%',
+                                                                width: '20px',
+                                                                height: '20px',
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                justifyContent: 'center',
+                                                                cursor: 'pointer',
+                                                                padding: 0,
+                                                                boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                                                                zIndex: 10
+                                                            }}
+                                                            title="Skizze bearbeiten"
+                                                        >
+                                                            <Pen size={9} />
+                                                        </button>
+
+                                                        {/* Delete button */}
+                                                        <button 
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setSketches(prev => prev.filter(s => s.id !== sketch.id));
+                                                            }}
+                                                            style={{
+                                                                position: 'absolute',
+                                                                top: '6px',
+                                                                right: '6px',
+                                                                backgroundColor: '#EF4444',
+                                                                color: 'white',
+                                                                border: '2.5px solid var(--surface)',
+                                                                borderRadius: '50%',
+                                                                width: '20px',
+                                                                height: '20px',
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                justifyContent: 'center',
+                                                                cursor: 'pointer',
+                                                                padding: 0,
+                                                                boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                                                                zIndex: 10
+                                                            }}
+                                                            title="Skizze löschen"
+                                                        >
+                                                            <X size={10} strokeWidth={3} />
+                                                        </button>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.73rem', marginTop: '1.25rem', fontStyle: 'italic' }}>
+                                    Klicke auf eine Skizze, um sie zu bearbeiten oder im Detail zu betrachten.
+                                </div>
+                            </section>
+                        </div>
+
+                        {/* RIGHT COLUMN: Cause of damage, measures & PDF Export panel */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                            {/* Cause of Damage & Actions Card */}
+                            <section className="card" style={{ padding: '1.5rem', border: '1.5px solid var(--border)' }}>
+                                <h2 className="section-header" style={{ margin: '0 0 1.25rem 0', fontSize: '1.05rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                    🕵️ Schadensbericht Details
+                                </h2>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                                    <div>
+                                        <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Schadenursache</label>
+                                        <textarea 
+                                            className="form-input"
+                                            value={schadenursache} 
+                                            onChange={(e) => setSchadenursache(e.target.value)}
+                                            rows={4}
+                                            style={{ width: '100%', fontFamily: 'var(--font-desktop)', lineHeight: 1.4, boxSizing: 'border-box', resize: 'vertical' }}
+                                            placeholder="Schadensursache detailliert beschreiben..."
+                                        />
+                                    </div>
+                                    <div>
+                                        <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Sofortmassnahmen</label>
+                                        <textarea 
+                                            className="form-input"
+                                            value={massnahmen} 
+                                            onChange={(e) => setMassnahmen(e.target.value)}
+                                            rows={4}
+                                            style={{ width: '100%', fontFamily: 'var(--font-desktop)', lineHeight: 1.4, boxSizing: 'border-box', resize: 'vertical' }}
+                                            placeholder="Eingeleitete Sofortmassnahmen auflisten..."
+                                        />
+                                    </div>
+                                </div>
+                            </section>
+
+                            {/* PDF Export Panel */}
+                            <section className="card" style={{ padding: '1.5rem', border: '1.5px solid var(--border)' }}>
+                                <h2 className="section-header" style={{ margin: '0 0 1.25rem 0', fontSize: '1.05rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                    📄 Schadensbericht PDF-Export
+                                </h2>
+                                <div style={{ 
+                                    display: 'flex', 
+                                    flexDirection: 'column', 
+                                    gap: '1rem',
+                                    padding: '1rem',
+                                    backgroundColor: 'var(--color-input-bg)',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: '6px'
+                                }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                        {/* PDF Icon representation using SVG */}
+                                        <div style={{ 
+                                            width: '48px', 
+                                            height: '60px', 
+                                            backgroundColor: '#EF4444', 
+                                            borderRadius: '4px',
+                                            position: 'relative',
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            color: 'white',
+                                            fontWeight: 800,
+                                            fontSize: '0.75rem',
+                                            boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+                                        }}>
+                                            PDF
+                                            <div style={{ 
+                                                position: 'absolute', 
+                                                top: 0, 
+                                                right: 0, 
+                                                width: 0, 
+                                                height: 0, 
+                                                borderStyle: 'solid', 
+                                                borderWidth: '0 12px 12px 0', 
+                                                borderColor: 'transparent var(--surface) transparent transparent',
+                                                borderTopRightRadius: '4px'
+                                            }}></div>
+                                        </div>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                                            <strong style={{ fontSize: '0.9rem', color: 'var(--text-main)' }}>Schadensbericht_{orderNumber}.pdf</strong>
+                                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Größe: 1.4 MB • Letzter Export: gerade eben</span>
+                                        </div>
+                                    </div>
+                                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>
+                                        Enthält den vollständigen Arbeitsauftrag, alle Kontaktpersonen, Raumlisten mit Massnahmen, das Messprotokoll und die angehängten Skizzen.
+                                    </div>
+                                    <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
+                                        <button 
+                                            onClick={() => alert("Simulation: PDF wird generiert und im Browser-Tab geöffnet.")}
+                                            className="btn btn-outline" 
+                                            style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', height: '36px', fontSize: '0.8rem', fontWeight: 700 }}
+                                        >
+                                            Vorschau
+                                        </button>
+                                        <button 
+                                            onClick={() => alert("Simulation: Bericht erfolgreich als PDF heruntergeladen.")}
+                                            className="btn btn-primary" 
+                                            style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', height: '36px', fontSize: '0.8rem', fontWeight: 700 }}
+                                        >
+                                            Herunterladen
+                                        </button>
+                                    </div>
+                                </div>
+                            </section>
+                        </div>
+                    </div>
+
+                    {/* ── TAB 4: MESSPROTOKOLLE ── */}
+                    <div style={{ display: activeTab === 'Messprotokolle' ? 'grid' : 'none', gridTemplateColumns: '1.1fr 0.9fr', gap: '1.5rem', alignItems: 'start' }}>
+                        {/* LEFT COLUMN: Moisture measurement tables */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                            <section className="card" style={{ padding: '1.5rem', border: '1.5px solid var(--border)' }}>
+                                <h2 className="section-header" style={{ margin: '0 0 1.25rem 0', fontSize: '1.05rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                    📊 Feuchtigkeitsmessung (Darr- / Digits-Protokoll)
+                                </h2>
+                                <div style={{ overflowX: 'auto' }}>
+                                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem', textAlign: 'left' }}>
+                                        <thead>
+                                            <tr style={{ borderBottom: '1.5px solid var(--border)', color: 'var(--text-muted)', textTransform: 'uppercase', fontSize: '0.75rem', fontWeight: 700 }}>
+                                                <th style={{ padding: '0.5rem' }}>Raum</th>
+                                                <th style={{ padding: '0.5rem' }}>Messstelle</th>
+                                                <th style={{ padding: '0.5rem' }}>Anfang (Digits)</th>
+                                                <th style={{ padding: '0.5rem' }}>Grenzwert</th>
+                                                <th style={{ padding: '0.5rem', width: '120px' }}>Aktuell (Digits)</th>
+                                                <th style={{ padding: '0.5rem', textAlign: 'center' }}>Zustand</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {moistureReadings.map(reading => {
+                                                // Calculate state colors dynamically
+                                                const isDry = reading.current <= reading.limit;
+                                                const isWet = reading.current > 90;
+                                                const badgeColor = isDry ? '#065F46' : isWet ? '#991B1B' : '#92400E';
+                                                const badgeBg = isDry ? '#ECFDF5' : isWet ? '#FEF2F2' : '#FEF3C7';
+                                                const badgeBorder = isDry ? '1.2px solid #A7F3D0' : isWet ? '1.2px solid #FCA5A5' : '1.2px solid #FDE68A';
+                                                const badgeText = isDry ? 'Trocken' : isWet ? 'Nass' : 'Feucht';
+
+                                                return (
+                                                    <tr key={reading.id} style={{ borderBottom: '1px solid var(--border)', fontWeight: 500 }}>
+                                                        <td style={{ padding: '0.6rem 0.5rem' }}>
+                                                            {reading.room === 'Badezimmer' ? '🛁 Bad' : reading.room === 'Küche' ? '🍳 Küche' : '📦 Keller'}
+                                                        </td>
+                                                        <td style={{ padding: '0.6rem 0.5rem', color: 'var(--text-secondary)' }}>{reading.point}</td>
+                                                        <td style={{ padding: '0.6rem 0.5rem', fontWeight: 700 }}>{reading.initial}</td>
+                                                        <td style={{ padding: '0.6rem 0.5rem', color: 'var(--text-muted)' }}>&lt; {reading.limit}</td>
+                                                        <td style={{ padding: '0.6rem 0.5rem', fontWeight: 700, color: 'var(--text-main)' }}>
+                                                            {reading.current}
+                                                        </td>
+                                                        <td style={{ padding: '0.6rem 0.5rem', textAlign: 'center' }}>
+                                                            <span style={{ 
+                                                                fontSize: '0.72rem', 
+                                                                color: badgeColor, 
+                                                                backgroundColor: badgeBg, 
+                                                                padding: '0.15rem 0.5rem', 
+                                                                borderRadius: '4px',
+                                                                fontWeight: 800,
+                                                                border: badgeBorder
+                                                            }}>{badgeText}</span>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </section>
+                        </div>
+
+                        {/* RIGHT COLUMN: Arbeitszeit / Stundenerfassung */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                            {/* STUNDENERFASSUNG (DAILY TIME TRACKING SHEET) */}
+                            <section className="card" style={{ padding: '1.5rem', border: '1.5px solid var(--border)' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+                                    <h2 className="section-header" style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: 'none', paddingBottom: 0 }}>
+                                        Erfasste Arbeitsstunden
+                                    </h2>
+                                    <button 
+                                        onClick={() => setShowTimeModal(true)}
+                                        className="btn btn-primary"
+                                        style={{ 
+                                            display: 'inline-flex', 
+                                            alignItems: 'center', 
+                                            gap: '0.5rem', 
+                                            padding: '0.5rem 1rem', 
+                                            fontWeight: 700, 
+                                            height: '38px',
+                                            cursor: 'pointer',
+                                            fontSize: '0.8rem'
+                                        }}
+                                    >
+                                        <Plus size={14} /> Stunden buchen
+                                    </button>
+                                </div>
+
+                                {timeEntries.length === 0 ? (
+                                    <div style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--text-muted)', backgroundColor: 'var(--background)', borderRadius: '4px', border: '1px solid var(--border)' }}>
+                                        Keine Stunden erfasst. Klicken Sie auf „Stunden buchen“, um Ihren Aufwand zu dokumentieren.
+                                    </div>
+                                ) : (
+                                    <div style={{ overflowX: 'auto' }}>
+                                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem', textAlign: 'left' }}>
+                                            <thead>
+                                                <tr style={{ borderBottom: '1.5px solid var(--border)', color: 'var(--text-muted)', textTransform: 'uppercase', fontSize: '0.75rem', fontWeight: 700 }}>
+                                                    <th style={{ padding: '0.5rem' }}>Datum</th>
+                                                    <th style={{ padding: '0.5rem' }}>Arbeitszeit</th>
+                                                    <th style={{ padding: '0.5rem' }}>Pause</th>
+                                                    <th style={{ padding: '0.5rem' }}>Gesamt</th>
+                                                    <th style={{ padding: '0.5rem' }}>Tätigkeit</th>
+                                                    <th style={{ padding: '0.5rem', textAlign: 'center' }}></th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {timeEntries.map(entry => (
+                                                    <tr key={entry.id} style={{ borderBottom: '1px solid var(--border)', fontWeight: 500 }}>
+                                                        <td style={{ padding: '0.6rem 0.5rem' }}>{entry.date}</td>
+                                                        <td style={{ padding: '0.6rem 0.5rem' }}>{entry.start} - {entry.end}</td>
+                                                        <td style={{ padding: '0.6rem 0.5rem' }}>{entry.breakTime} Std.</td>
+                                                        <td style={{ padding: '0.6rem 0.5rem', fontWeight: 700, color: 'var(--primary)' }}>{entry.total.toFixed(2)} Std.</td>
+                                                        <td style={{ padding: '0.6rem 0.5rem', color: 'var(--text-secondary)', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={entry.task}>{entry.task}</td>
+                                                        <td style={{ padding: '0.6rem 0.5rem', textAlign: 'center' }}>
+                                                            <button 
+                                                                onClick={() => setTimeEntries(prev => prev.filter(t => t.id !== entry.id))}
+                                                                style={{ background: 'transparent', border: 'none', color: 'var(--danger)', cursor: 'pointer', padding: 0 }}
+                                                            >
+                                                                <Trash2 size={14} />
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                                <tr style={{ backgroundColor: 'var(--color-primary-soft)', fontWeight: 700 }}>
+                                                    <td colSpan="3" style={{ padding: '0.75rem 0.5rem', textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.05em' }}>Gesamtstunden erfasst</td>
+                                                    <td style={{ padding: '0.75rem 0.5rem', fontSize: '0.95rem', color: 'var(--primary)' }}>
+                                                        {timeEntries.reduce((sum, e) => sum + e.total, 0).toFixed(2)} Std.
+                                                    </td>
+                                                    <td colSpan="2" style={{ padding: '0.75rem 0.5rem' }}></td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+                            </section>
+                        </div>
+                    </div>
+
+                    {/* ── TAB 5: GERÄTE ── */}
+                    <div style={{ display: activeTab === 'Geräte' ? 'block' : 'none' }}>
+                        <section className="card" style={{ padding: '1.5rem', border: '1.5px solid var(--border)' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+                                <h2 className="section-header" style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: 'none', paddingBottom: 0 }}>
+                                    🔌 Installierte Trocknungsgeräte
+                                </h2>
                                 <button 
                                     onClick={() => {
-                                        setEditingSketchId(null);
-                                        setCanvasTitle('');
-                                        setShowCanvasModal(true);
+                                        const devName = prompt("Gerätenamen eingeben:", "Infrarot-Heizplatte IR-600");
+                                        const devRoom = prompt("Raum eingeben (Badezimmer / Küche / Keller):", "Badezimmer");
+                                        if (devName && devRoom) {
+                                            const newDevice = {
+                                                id: `dev_${Date.now()}`,
+                                                name: devName,
+                                                room: devRoom,
+                                                startDate: new Date().toISOString().split('T')[0],
+                                                hours: 0,
+                                                startKwh: 0.0,
+                                                endKwh: 0.0,
+                                                status: 'Aktiv'
+                                            };
+                                            setDevices(prev => [...prev, newDevice]);
+                                        }
                                     }}
                                     className="btn btn-primary"
                                     style={{ 
                                         display: 'inline-flex', 
                                         alignItems: 'center', 
                                         gap: '0.4rem', 
-                                        padding: '0.4rem 0.8rem', 
+                                        padding: '0.5rem 1rem', 
                                         fontSize: '0.8rem', 
                                         fontWeight: 700, 
-                                        cursor: 'pointer',
-                                        height: '34px'
+                                        height: '38px',
+                                        cursor: 'pointer' 
                                     }}
                                 >
-                                    <Plus size={14} /> Neue Skizze
+                                    <Plus size={14} /> Gerät hinzufügen
                                 </button>
                             </div>
-                        </div>
-
-                        {/* PART 1: PROJECT PHOTO SELECTION DROPDOWNS (SCHADENAUFNAHME) */}
-                        <div style={{ 
-                            backgroundColor: 'var(--background)', 
-                            padding: '1rem', 
-                            borderRadius: '6px', 
-                            border: '1px solid var(--border)',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '0.75rem'
-                        }}>
-                            <div style={{ fontSize: '0.78rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '0.03em' }}>
-                                🔍 Vorhandene Projektbilder (Schadenaufnahme) auswählen
+                            <div style={{ overflowX: 'auto' }}>
+                                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem', textAlign: 'left' }}>
+                                    <thead>
+                                        <tr style={{ borderBottom: '1.5px solid var(--border)', color: 'var(--text-muted)', textTransform: 'uppercase', fontSize: '0.75rem', fontWeight: 700 }}>
+                                            <th style={{ padding: '0.5rem' }}>Gerät</th>
+                                            <th style={{ padding: '0.5rem' }}>Aufstellort</th>
+                                            <th style={{ padding: '0.5rem' }}>Aufstelldatum</th>
+                                            <th style={{ padding: '0.5rem' }}>Laufzeit (h)</th>
+                                            <th style={{ padding: '0.5rem' }}>Zähler Anfang (kWh)</th>
+                                            <th style={{ padding: '0.5rem' }}>Zähler Ende (kWh)</th>
+                                            <th style={{ padding: '0.5rem', textAlign: 'center' }}>Status</th>
+                                            <th style={{ padding: '0.5rem' }}></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {devices.map(dev => {
+                                            const isActive = dev.status === 'Aktiv';
+                                            return (
+                                                <tr key={dev.id} style={{ borderBottom: '1px solid var(--border)', fontWeight: 500 }}>
+                                                    <td style={{ padding: '0.6rem 0.5rem', fontWeight: 700 }}>{dev.name}</td>
+                                                    <td style={{ padding: '0.6rem 0.5rem' }}>
+                                                        {dev.room === 'Badezimmer' ? '🛁 Bad' : dev.room === 'Küche' ? '🍳 Küche' : '📦 Keller'}
+                                                    </td>
+                                                    <td style={{ padding: '0.6rem 0.5rem', color: 'var(--text-muted)' }}>{dev.startDate}</td>
+                                                    <td style={{ padding: '0.6rem 0.5rem' }}>
+                                                        <input 
+                                                            type="number"
+                                                            value={dev.hours}
+                                                            onChange={(e) => {
+                                                                const newHrs = parseInt(e.target.value) || 0;
+                                                                setDevices(prev => prev.map(d => d.id === dev.id ? { ...d, hours: newHrs } : d));
+                                                            }}
+                                                            style={{ 
+                                                                width: '60px',
+                                                                padding: '0.2rem 0.4rem',
+                                                                borderRadius: '4px',
+                                                                border: '1.2px solid var(--border)',
+                                                                backgroundColor: 'var(--surface)',
+                                                                color: 'var(--text-main)',
+                                                                fontSize: '0.85rem'
+                                                            }}
+                                                        />
+                                                    </td>
+                                                    <td style={{ padding: '0.6rem 0.5rem' }}>{dev.startKwh.toFixed(1)} kWh</td>
+                                                    <td style={{ padding: '0.6rem 0.5rem' }}>
+                                                        <input 
+                                                            type="number"
+                                                            step="0.1"
+                                                            value={dev.endKwh}
+                                                            onChange={(e) => {
+                                                                const newKwh = parseFloat(e.target.value) || 0.0;
+                                                                setDevices(prev => prev.map(d => d.id === dev.id ? { ...d, endKwh: newKwh } : d));
+                                                            }}
+                                                            style={{ 
+                                                                width: '85px',
+                                                                padding: '0.2rem 0.4rem',
+                                                                borderRadius: '4px',
+                                                                border: '1.2px solid var(--border)',
+                                                                backgroundColor: 'var(--surface)',
+                                                                color: 'var(--text-main)',
+                                                                fontSize: '0.85rem'
+                                                            }}
+                                                        />
+                                                    </td>
+                                                    <td style={{ padding: '0.6rem 0.5rem', textAlign: 'center' }}>
+                                                        <button 
+                                                            onClick={() => setDevices(prev => prev.map(d => d.id === dev.id ? { ...d, status: isActive ? 'Abgebaut' : 'Aktiv' } : d))}
+                                                            style={{ 
+                                                                fontSize: '0.72rem', 
+                                                                color: isActive ? '#065F46' : '#4B5563', 
+                                                                backgroundColor: isActive ? '#ECFDF5' : '#F3F4F6', 
+                                                                padding: '0.2rem 0.6rem', 
+                                                                borderRadius: '4px',
+                                                                fontWeight: 800,
+                                                                border: isActive ? '1.2px solid #A7F3D0' : '1.2px solid #D1D5DB',
+                                                                cursor: 'pointer'
+                                                            }}
+                                                        >
+                                                            {dev.status}
+                                                        </button>
+                                                    </td>
+                                                    <td style={{ padding: '0.6rem 0.5rem', textAlign: 'center' }}>
+                                                        <button 
+                                                            onClick={() => setDevices(prev => prev.filter(d => d.id !== dev.id))}
+                                                            style={{ background: 'transparent', border: 'none', color: 'var(--danger)', cursor: 'pointer', padding: 0 }}
+                                                        >
+                                                            <Trash2 size={14} />
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
                             </div>
-
-                            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-                                {/* Room Dropdown (now Bild wählen) */}
-                                <div style={{ flex: 1, minWidth: '130px', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                                    <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)' }}>Bild wählen:</span>
-                                    <select 
-                                        value={selectedRoomFilter} 
-                                        onChange={(e) => {
-                                            if (e.target.value === 'import_from_library') {
-                                                setImportRoom(selectedRoomFilter || 'Badezimmer');
-                                                setImportFile(null);
-                                                setImportFilePreview(null);
-                                                setShowImportModal(true);
-                                            } else {
-                                                setSelectedRoomFilter(e.target.value);
-                                                setSelectedPhotoId('');
-                                            }
-                                        }}
-                                        className="select"
-                                        style={{ 
-                                            padding: '0.25rem 0.5rem', 
-                                            fontSize: '0.8rem', 
-                                            borderRadius: '4px',
-                                            border: '1.5px solid var(--border)',
-                                            backgroundColor: 'var(--surface)',
-                                            color: 'var(--text-main)',
-                                            cursor: 'pointer',
-                                            fontWeight: 600,
-                                            outline: 'none',
-                                            height: '32px'
-                                        }}
-                                    >
-                                        <option value="">-- Bild wählen --</option>
-                                        <option value="Badezimmer">
-                                            Badezimmer ({projectPhotosPool.filter(p => p.room === 'Badezimmer').length} Bild{projectPhotosPool.filter(p => p.room === 'Badezimmer').length === 1 ? '' : 'er'})
-                                        </option>
-                                        <option value="Küche">
-                                            Küche ({projectPhotosPool.filter(p => p.room === 'Küche').length} Bild{projectPhotosPool.filter(p => p.room === 'Küche').length === 1 ? '' : 'er'})
-                                        </option>
-                                        <option value="Keller">
-                                            Keller ({projectPhotosPool.filter(p => p.room === 'Keller').length} Bild{projectPhotosPool.filter(p => p.room === 'Keller').length === 1 ? '' : 'er'})
-                                        </option>
-                                        <option value="import_from_library" style={{ fontWeight: 'bold', color: 'var(--primary)' }}>
-                                            📁 + Aus Fotomediathek...
-                                        </option>
-                                    </select>
-                                </div>
-
-                                {/* Photo Dropdown (now Detailbild wählen) */}
-                                <div style={{ flex: 1.2, minWidth: '170px', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                                    <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)' }}>Detailbild wählen:</span>
-                                    <select 
-                                        value={selectedPhotoId} 
-                                        onChange={(e) => {
-                                            setSelectedPhotoId(e.target.value);
-                                        }}
-                                        disabled={!selectedRoomFilter}
-                                        className="select"
-                                        style={{ 
-                                            padding: '0.25rem 0.5rem', 
-                                            fontSize: '0.8rem', 
-                                            borderRadius: '4px',
-                                            border: '1.5px solid var(--border)',
-                                            backgroundColor: !selectedRoomFilter ? 'rgba(0,0,0,0.03)' : 'var(--surface)',
-                                            color: 'var(--text-main)',
-                                            cursor: !selectedRoomFilter ? 'not-allowed' : 'pointer',
-                                            fontWeight: 600,
-                                            outline: 'none',
-                                            height: '32px',
-                                            opacity: !selectedRoomFilter ? 0.6 : 1
-                                        }}
-                                    >
-                                        <option value="">
-                                            {!selectedRoomFilter ? '-- Zuerst Bild wählen --' : '-- Detailbild wählen --'}
-                                        </option>
-                                        {projectPhotosPool.filter(p => p.room === selectedRoomFilter).map(p => (
-                                            <option key={p.id} value={p.id}>
-                                                {p.title}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                            </div>
-
-                            {/* Preview Frame for selected project photo */}
-                            {selectedPhotoId && selectedPhotoId !== 'import_from_library' ? (() => {
-                                const selectedPhoto = projectPhotosPool.find(p => p.id === selectedPhotoId);
-                                if (!selectedPhoto) return null;
-                                const isSelected = selectedProjectPhotos.includes(selectedPhoto.id);
-                                return (
-                                    <div 
-                                        style={{ 
-                                            border: '1px solid var(--border)', 
-                                            borderRadius: '4px', 
-                                            padding: '0.5rem',
-                                            backgroundColor: 'var(--surface)',
-                                            display: 'flex',
-                                            flexDirection: 'column',
-                                            gap: '0.5rem',
-                                            animation: 'fadeIn 0.2s ease'
-                                        }}
-                                    >
-                                        <div 
-                                            onClick={() => {
-                                                setZoomedSketch({ id: selectedPhoto.id, title: `${selectedPhoto.title} (Original)`, src: selectedPhoto.src });
-                                                setShowZoomModal(true);
-                                            }}
-                                            style={{ 
-                                                height: '140px', 
-                                                backgroundColor: '#FFFFFF', 
-                                                display: 'flex', 
-                                                alignItems: 'center', 
-                                                justifyContent: 'center',
-                                                borderRadius: '4px',
-                                                border: '1px solid var(--border)',
-                                                overflow: 'hidden',
-                                                cursor: 'pointer'
-                                            }}
-                                            title="Großansicht"
-                                        >
-                                            <img 
-                                                src={selectedPhoto.src} 
-                                                alt={selectedPhoto.title} 
-                                                style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-                                            />
-                                        </div>
-
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.4rem' }}>
-                                            <div>
-                                                <div style={{ fontWeight: 800, fontSize: '0.78rem', color: 'var(--text-main)' }}>{selectedPhoto.title}</div>
-                                                <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Raum: 🚪 {selectedPhoto.room}</div>
-                                            </div>
-
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                                {/* Checkbox "Senden" */}
-                                                <label 
-                                                    style={{ 
-                                                        display: 'inline-flex', 
-                                                        alignItems: 'center', 
-                                                        gap: '0.25rem', 
-                                                        cursor: 'pointer', 
-                                                        fontSize: '0.72rem', 
-                                                        fontWeight: 700, 
-                                                        color: isSelected ? 'var(--primary)' : 'var(--text-muted)',
-                                                        backgroundColor: isSelected ? 'var(--color-primary-soft)' : 'transparent',
-                                                        padding: '0.25rem 0.5rem',
-                                                        borderRadius: '4px',
-                                                        border: isSelected ? '1px solid var(--color-border-strong)' : '1px solid var(--border)'
-                                                    }}
-                                                >
-                                                    <input 
-                                                        type="checkbox"
-                                                        checked={isSelected}
-                                                        onChange={() => {
-                                                            if (isSelected) {
-                                                                setSelectedProjectPhotos(prev => prev.filter(id => id !== selectedPhoto.id));
-                                                            } else {
-                                                                setSelectedProjectPhotos(prev => [...prev, selectedPhoto.id]);
-                                                            }
-                                                        }}
-                                                        style={{ cursor: 'pointer', accentColor: 'var(--primary)' }}
-                                                    />
-                                                    <span>An Handwerker senden</span>
-                                                </label>
-
-                                                {/* Sketch button */}
-                                                <button
-                                                    onClick={() => {
-                                                        setEditingSketchId(null);
-                                                        setCanvasBackgroundPhoto(selectedPhoto.src);
-                                                        setCanvasTitle(`${selectedPhoto.title} - markiert`);
-                                                        setShowCanvasModal(true);
-                                                    }}
-                                                    className="btn btn-outline"
-                                                    style={{ 
-                                                        padding: '0.25rem 0.5rem', 
-                                                        fontSize: '0.72rem', 
-                                                        fontWeight: 700, 
-                                                        height: '26px', 
-                                                        display: 'inline-flex', 
-                                                        alignItems: 'center', 
-                                                        gap: '0.2rem' 
-                                                }}
-                                                >
-                                                    <Pen size={10} /> Für Auftrag skizzieren
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                );
-                            })() : (
-                                <div style={{ 
-                                    border: '1px dashed var(--border)', 
-                                    borderRadius: '4px', 
-                                    padding: '1rem', 
-                                    textAlign: 'center',
-                                    color: 'var(--text-muted)',
-                                    fontSize: '0.75rem',
-                                    fontStyle: 'italic'
-                                }}>
-                                    Wähle oben einen Raum und ein Bild aus, um es anzusehen, für den Auftrag zu bearbeiten (skizzieren) oder freizugeben.
-                                </div>
-                            )}
-                        </div>
-
-                        {/* DIVIDER */}
-                        <div style={{ borderTop: '1px dashed var(--border)' }}></div>
-
-                        {/* PART 2: SECTION A - BILDER INSTANDSTELLUNG */}
-                        <div>
-                            <h3 style={{ fontSize: '0.8rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.75rem', letterSpacing: '0.03em', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                                <span>📷</span> Bilder Instandstellung ({photos.length})
-                            </h3>
-                            <div style={{ display: 'flex', gap: '1rem', overflowX: 'auto', paddingBottom: '0.5rem' }}>
-                                {photos.length === 0 ? (
-                                    <p style={{ fontStyle: 'italic', fontSize: '0.8rem', color: 'var(--text-muted)', margin: '0.5rem 0' }}>Keine Bilder erfasst</p>
-                                ) : (
-                                    photos.map(photo => (
-                                        <div 
-                                            key={photo.id}
-                                            style={{ 
-                                                width: '120px', 
-                                                height: '120px', 
-                                                borderRadius: '6px', 
-                                                overflow: 'hidden', 
-                                                border: '1.5px solid var(--border)', 
-                                                position: 'relative',
-                                                flexShrink: 0
-                                            }}
-                                        >
-                                            <img 
-                                                src={photo.src} 
-                                                alt={photo.title}
-                                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                                            />
-                                            <div style={{ 
-                                                position: 'absolute', 
-                                                bottom: 0, 
-                                                left: 0, 
-                                                right: 0, 
-                                                backgroundColor: 'rgba(15,23,42,0.75)', 
-                                                color: '#FFFFFF', 
-                                                fontSize: '0.65rem', 
-                                                padding: '0.2rem 0.4rem', 
-                                                textAlign: 'center',
-                                                textOverflow: 'ellipsis',
-                                                whiteSpace: 'nowrap',
-                                                overflow: 'hidden'
-                                            }}>
-                                                {photo.title}
-                                            </div>
-                                            
-                                            
-                                            </div>
-                                    ))
-                                )}
-                            </div>
-                        </div>
-
-                        {/* DIVIDER */}
-                        <div style={{ borderTop: '1px dashed var(--border)' }}></div>
-
-                        {/* PART 3: SECTION B - SKIZZEN & PLÄNE */}
-                        <div>
-                            <h3 style={{ fontSize: '0.8rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.75rem', letterSpacing: '0.03em', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                                <span>📐</span> Skizzen & Pläne ({sketches.length + selectedProjectPhotos.length})
-                            </h3>
-                            {sketches.length === 0 && selectedProjectPhotos.length === 0 ? (
-                                <p style={{ fontStyle: 'italic', fontSize: '0.8rem', color: 'var(--text-muted)', margin: '0.5rem 0' }}>Keine Skizzen oder zugewiesenen Originalbilder vorhanden.</p>
-                            ) : (
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
-                                    {/* 1. Render all assigned original project photos with green "Original" badge */}
-                                    {projectPhotosPool.filter(p => selectedProjectPhotos.includes(p.id)).map(photo => (
-                                        <div 
-                                            key={photo.id}
-                                            onClick={() => {
-                                                setZoomedSketch({ id: photo.id, title: `${photo.title} (Original)`, src: photo.src });
-                                                setShowZoomModal(true);
-                                            }}
-                                            className="card"
-                                            style={{
-                                                padding: 0,
-                                                overflow: 'hidden',
-                                                cursor: 'pointer',
-                                                position: 'relative',
-                                                border: '1.5px solid var(--border)'
-                                            }}
-                                        >
-                                            <div style={{ 
-                                                height: '110px', 
-                                                backgroundColor: '#FFFFFF', 
-                                                display: 'flex', 
-                                                alignItems: 'center', 
-                                                justifyContent: 'center',
-                                                borderBottom: '1px solid var(--border)',
-                                                overflow: 'hidden'
-                                            }}>
-                                                <img 
-                                                    src={photo.src} 
-                                                    alt={photo.title} 
-                                                    style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-                                                />
-                                            </div>
-                                            <div style={{ 
-                                                padding: '0.5rem', 
-                                                fontSize: '0.75rem', 
-                                                fontWeight: 700, 
-                                                color: 'var(--text-main)',
-                                                whiteSpace: 'nowrap',
-                                                textOverflow: 'ellipsis',
-                                                overflow: 'hidden',
-                                                display: 'flex',
-                                                justifyContent: 'space-between',
-                                                alignItems: 'center'
-                                            }}>
-                                                <span>{photo.title}</span>
-                                                <span style={{ 
-                                                    fontSize: '0.65rem', 
-                                                    color: '#065F46', 
-                                                    backgroundColor: '#ECFDF5', 
-                                                    padding: '0.1rem 0.4rem', 
-                                                    borderRadius: '4px',
-                                                    fontWeight: 800,
-                                                    border: '1.5px solid #A7F3D0'
-                                                }}>Original</span>
-                                            </div>
-
-                                            {/* Disconnect/Deselect button for original image in Disponent View */}
-                                            <button 
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setSelectedProjectPhotos(prev => prev.filter(id => id !== photo.id));
-                                                }}
-                                                style={{
-                                                    position: 'absolute',
-                                                    top: '6px',
-                                                    right: '6px',
-                                                    backgroundColor: '#EF4444',
-                                                    color: 'white',
-                                                    border: '2.5px solid var(--surface)',
-                                                    borderRadius: '50%',
-                                                    width: '20px',
-                                                    height: '20px',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'center',
-                                                    cursor: 'pointer',
-                                                    padding: 0,
-                                                    boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-                                                    zIndex: 10
-                                                }}
-                                                title="Zuweisung aufheben"
-                                            >
-                                                <X size={10} strokeWidth={3} />
-                                            </button>
-                                        </div>
-                                    ))}
-
-                                    {/* 2. Render all sketches/edited photos */}
-                                    {sketches.map(sketch => {
-                                        const isMarked = sketch.title.toLowerCase().includes('markiert');
-                                        const badgeColor = isMarked ? '#1D4ED8' : '#4338CA';
-                                        const badgeText = isMarked ? 'Markiert' : 'Skizze';
-                                        const badgeBg = isMarked ? '#EFF6FF' : '#EEF2FF';
-                                        const badgeBorder = isMarked ? '1.5px solid #BFDBFE' : '1.5px solid #C7D2FE';
-
-                                        return (
-                                            <div 
-                                                key={sketch.id}
-                                                onClick={() => {
-                                                    setZoomedSketch(sketch);
-                                                    setShowZoomModal(true);
-                                                }}
-                                                className="card"
-                                                style={{
-                                                    padding: 0,
-                                                    overflow: 'hidden',
-                                                    cursor: 'pointer',
-                                                    position: 'relative',
-                                                    border: '1.5px solid var(--border)'
-                                                }}
-                                            >
-                                                <div style={{ 
-                                                    height: '110px', 
-                                                    backgroundColor: '#FFFFFF', 
-                                                    display: 'flex', 
-                                                    alignItems: 'center', 
-                                                    justifyContent: 'center',
-                                                    borderBottom: '1px solid var(--border)',
-                                                    overflow: 'hidden'
-                                                }}>
-                                                    <img 
-                                                        src={sketch.src} 
-                                                        alt={sketch.title} 
-                                                        style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-                                                    />
-                                                </div>
-                                                <div style={{ 
-                                                    padding: '0.5rem', 
-                                                    fontSize: '0.75rem', 
-                                                    fontWeight: 700, 
-                                                    color: 'var(--text-main)',
-                                                    whiteSpace: 'nowrap',
-                                                    textOverflow: 'ellipsis',
-                                                    overflow: 'hidden',
-                                                    display: 'flex',
-                                                    justifyContent: 'space-between',
-                                                    alignItems: 'center'
-                                                }}>
-                                                    <span>{sketch.title}</span>
-                                                    <span style={{ 
-                                                        fontSize: '0.65rem', 
-                                                        color: badgeColor, 
-                                                        backgroundColor: badgeBg, 
-                                                        padding: '0.1rem 0.4rem', 
-                                                        borderRadius: '4px',
-                                                        fontWeight: 800,
-                                                        border: badgeBorder
-                                                        }}>{badgeText}</span>
-                                                </div>
-
-                                                {/* Edit pen button */}
-                                                <button 
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        setEditingSketchId(sketch.id);
-                                                        setCanvasBackgroundPhoto(sketch.src.startsWith('data:image/svg') ? null : sketch.src);
-                                                        setCanvasTitle(sketch.title);
-                                                        setShowCanvasModal(true);
-                                                    }}
-                                                    style={{
-                                                        position: 'absolute',
-                                                        top: '6px',
-                                                        right: '30px',
-                                                        backgroundColor: 'var(--primary)',
-                                                        color: 'white',
-                                                        border: '2.5px solid var(--surface)',
-                                                        borderRadius: '50%',
-                                                        width: '20px',
-                                                        height: '20px',
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        justifyContent: 'center',
-                                                        cursor: 'pointer',
-                                                        padding: 0,
-                                                        boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-                                                        zIndex: 10
-                                                    }}
-                                                    title="Skizze bearbeiten"
-                                                >
-                                                    <Pen size={9} />
-                                                </button>
-
-                                                {/* Delete button */}
-                                                <button 
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        setSketches(prev => prev.filter(s => s.id !== sketch.id));
-                                                    }}
-                                                    style={{
-                                                        position: 'absolute',
-                                                        top: '6px',
-                                                        right: '6px',
-                                                        backgroundColor: '#EF4444',
-                                                        color: 'white',
-                                                        border: '2.5px solid var(--surface)',
-                                                        borderRadius: '50%',
-                                                        width: '20px',
-                                                        height: '20px',
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        justifyContent: 'center',
-                                                        cursor: 'pointer',
-                                                        padding: 0,
-                                                        boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-                                                        zIndex: 10
-                                                    }}
-                                                    title="Skizze löschen"
-                                                >
-                                                    <X size={10} strokeWidth={3} />
-                                                </button>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            )}
-                        </div>
-
-                        <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.73rem', marginTop: '1.25rem', fontStyle: 'italic' }}>
-                            Klicke auf eine Skizze, um sie zu bearbeiten oder im Detail zu betrachten.
-                        </div>
-                    </section>
-                </div>
-            </main>
+                        </section>
+                    </div>
+                </main>
             )}
 
             {/* ── 4. REUSABLE 1:1 MEASUREMENT SKETCH CANVAS ── */}
