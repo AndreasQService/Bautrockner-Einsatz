@@ -79,3 +79,5 @@ temp_*.jsx
 *.js.bak
 trace_*.txt
 esbuild_error*.txt
+.vercel
+.env*
