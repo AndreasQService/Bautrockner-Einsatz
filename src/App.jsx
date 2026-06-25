@@ -168,7 +168,7 @@ function App() {
   const [mySessionToken] = useState(() => {
     let t = sessionStorage.getItem('qtool_session_token');
     if (!t) {
-      t = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      t = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
       sessionStorage.setItem('qtool_session_token', t);
     }
     sessionTokenRef.current = t;
@@ -503,6 +503,46 @@ function App() {
               localStorage.setItem('qservice_reports_prod', JSON.stringify(cachedReports));
             } catch (e) {
               console.warn('LocalStorage cache fehlgeschlagen:', e.message);
+            }
+
+            // Asynchrones Nachladen der detaillierten report_data für aktive Projekte im Hintergrund
+            const activeIds = loadedReports
+              .filter(r => r.status !== 'Abgeschlossen')
+              .map(r => r.id);
+
+            if (activeIds.length > 0) {
+              console.log('[Supabase] Starting background fetch for active projects:', activeIds.length);
+              (async () => {
+                try {
+                  const { data: detailData, error: detailError } = await supabase
+                    .from('damage_reports')
+                    .select('id, report_data, updated_at')
+                    .in('id', activeIds);
+
+                  if (detailError) {
+                    console.error('[Supabase] Detail background fetch error:', detailError);
+                  } else if (detailData) {
+                    console.log('[Supabase] Background fetch completed. Merged details for:', detailData.length);
+                    setReports(prev => prev.map(r => {
+                      const detail = detailData.find(d => d.id === r.id);
+                      if (detail && detail.report_data) {
+                        const parsedData = typeof detail.report_data === 'string'
+                          ? JSON.parse(detail.report_data)
+                          : detail.report_data;
+                        return {
+                          ...r,
+                          ...parsedData,
+                          isLightweight: false,
+                          _supabase_updated_at: detail.updated_at
+                        };
+                      }
+                      return r;
+                    }));
+                  }
+                } catch (err) {
+                  console.warn('[Supabase] Detail background fetch failed:', err);
+                }
+              })();
             }
           }
         }

@@ -40,11 +40,16 @@ const statusColors = {
 
 // Helper to find latest measurement date across all rooms (moved to global scope for reuse)
 const getLatestMeasurementDays = (report) => {
-    if (!report.rooms || report.rooms.length === 0) return null;
+    const allRooms = [
+        ...(report.measurementRooms || []),
+        ...(report.rooms || [])
+    ];
+    if (allRooms.length === 0) return null;
 
     let latestDate = null;
 
-    report.rooms.forEach(room => {
+    allRooms.forEach(room => {
+        if (!room) return;
         // 1. Check current data
         if (room.measurementData?.globalSettings?.date) {
             const d = new Date(room.measurementData.globalSettings.date);
@@ -55,8 +60,9 @@ const getLatestMeasurementDays = (report) => {
         // 2. Check history
         if (room.measurementHistory && Array.isArray(room.measurementHistory)) {
             room.measurementHistory.forEach(hist => {
-                if (hist.date) {
-                    const d = new Date(hist.date);
+                const hDate = hist.date || hist.datum || hist.timestamp || hist.createdAt || hist.globalSettings?.date;
+                if (hDate) {
+                    const d = new Date(hDate);
                     if (!isNaN(d.getTime())) {
                         if (!latestDate || d > latestDate) latestDate = d;
                     }
@@ -69,9 +75,42 @@ const getLatestMeasurementDays = (report) => {
     return getDaysDiff(latestDate);
 };
 
-const DryingMonitor = ({ reports, onSelectReport }) => {
+const getUrgencyStyle = (days, thresholds = [7, 10]) => {
+    const isLight = typeof document !== 'undefined' && document.documentElement.getAttribute('data-theme') === 'light';
+    const [t1, t2] = thresholds;
+    
+    if (days > t2) {
+        return {
+            bg: isLight ? '#FCE4E6' : 'rgba(239, 68, 68, 0.15)',
+            color: isLight ? '#991B1B' : '#EF4444',
+            border: isLight ? '1px solid #F87171' : '1px solid rgba(239, 68, 68, 0.25)'
+        };
+    } else if (days > t1) {
+        return {
+            bg: isLight ? '#FFF4C6' : 'rgba(245, 158, 11, 0.15)',
+            color: isLight ? '#92400E' : '#F59E0B',
+            border: isLight ? '1px solid #FBBF24' : '1px solid rgba(245, 158, 11, 0.25)'
+        };
+    } else {
+        return {
+            bg: isLight ? '#E8F4EA' : 'rgba(16, 185, 129, 0.15)',
+            color: isLight ? '#065F46' : '#10B981',
+            border: isLight ? '1px solid #34D399' : '1px solid rgba(16, 185, 129, 0.25)'
+        };
+    }
+};
+
+const DryingMonitor = ({ reports, onSelectReport, workflowStore = {} }) => {
     // Filter by status 'Trocknung' OR if there are active devices
-    const dryingReports = reports.filter(r => r.status === 'Trocknung' || (r.equipment && r.equipment.length > 0));
+    const dryingReports = reports.filter(r => {
+        const isStatusDrying = r.status === 'Trocknung' || (r.equipment && r.equipment.length > 0);
+        if (!isStatusDrying) return false;
+
+        // Filter out if the workflow milestone 'trocknung' is set to done or skip
+        const sd = workflowStore[`${r.id}__trocknung`] || {};
+        const isMilestoneDone = sd.status === 'done' || sd.status === 'skip';
+        return !isMilestoneDone;
+    });
 
     // Helper to get start date (from first device or report date)
     const getStartDate = (report) => {
@@ -98,12 +137,7 @@ const DryingMonitor = ({ reports, onSelectReport }) => {
                     dryingReports.map(report => {
                         const startDate = getStartDate(report);
                         const days = getDaysDiff(startDate);
-                        let urgencyBg = '#E8F4EA'; // grün
-                        if (days > 30) {
-                            urgencyBg = '#FCE8E8';
-                        } else if (days > 15) {
-                            urgencyBg = '#FFF4DD';
-                        }
+                        const uStyle = getUrgencyStyle(days, [15, 30]);
 
                         // Calculate equipment summary
                         const equipSummary = report.equipment && report.equipment.length > 0
@@ -129,8 +163,8 @@ const DryingMonitor = ({ reports, onSelectReport }) => {
                                         <span style={{ fontWeight: 600, fontSize: '0.8rem', color: 'var(--text-main)' }}>{report.locationDetails || report.client}</span>
                                         <span style={{
                                             fontSize: '0.72rem', fontWeight: 600,
-                                            padding: '0.1rem 0.5rem', borderRadius: '3px',
-                                            backgroundColor: urgencyBg, color: 'var(--color-text-primary, #2C3540)'
+                                            padding: '0.15rem 0.5rem', borderRadius: '6px',
+                                            backgroundColor: uStyle.bg, color: uStyle.color, border: uStyle.border
                                         }}>{days}d</span>
                                     </div>
                                 </div>
@@ -205,13 +239,9 @@ const DryingMonitor = ({ reports, onSelectReport }) => {
                                 </div>
 
                                 {/* Kontrolle Trocknung (Days since last measurement) */}
-                                {(() => {
-                                    const mDays = getLatestMeasurementDays(report);
+                                {(() => {                                    const mDays = getLatestMeasurementDays(report);
                                     if (mDays === null) return null;
-
-                                    let ctrlBg = '#E8F4EA';
-                                    if (mDays > 10) ctrlBg = '#FCE8E8';
-                                    else if (mDays > 7) ctrlBg = '#FFF4DD';
+                                    const cStyle = getUrgencyStyle(mDays, [7, 10]);
 
                                     return (
                                         <div style={{
@@ -228,10 +258,11 @@ const DryingMonitor = ({ reports, onSelectReport }) => {
                                             <span style={{ fontWeight: 500, color: 'var(--text-muted)' }}>Kontrolle Trocknung</span>
                                             <span style={{
                                                 fontWeight: 600,
-                                                padding: '0.1rem 0.4rem',
-                                                borderRadius: '3px',
-                                                backgroundColor: ctrlBg,
-                                                color: 'var(--color-text-primary, #2C3540)'
+                                                padding: '0.15rem 0.4rem',
+                                                borderRadius: '6px',
+                                                backgroundColor: cStyle.bg,
+                                                color: cStyle.color,
+                                                border: cStyle.border
                                             }}>vor {mDays} {mDays === 1 ? 'Tag' : 'Tagen'}</span>
                                         </div>
                                     );
@@ -252,86 +283,19 @@ const DryingMonitor = ({ reports, onSelectReport }) => {
     )
 }
 
-const MeasurementControlOverview = ({ reports, onSelectReport }) => {
-    // Only active or drying reports
-    const activeReports = reports.filter(r => r.status === 'Trocknung' || (r.equipment && r.equipment.length > 0));
 
-    const sortedReports = activeReports
-        .map(r => ({ ...r, mDays: getLatestMeasurementDays(r) }))
-        .filter(r => r.mDays !== null)
-        .sort((a, b) => b.mDays - a.mDays);
-
-    if (sortedReports.length === 0) return null;
-
-    return (
-        <div className="card" style={{ marginBottom: '2rem', borderTop: '4px solid #10B981' }}>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#10B981' }}></div>
-                Übersicht Kontrolle Trocknung
-            </h2>
-            <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
-                    <thead>
-                        <tr style={{ borderBottom: '1px solid var(--border)', color: 'var(--text-muted)', textAlign: 'left' }}>
-                            <th style={{ padding: '0.75rem', fontWeight: 600 }}>Adresse / Strasse</th>
-                            <th style={{ padding: '0.75rem', fontWeight: 600 }}>Schadenort</th>
-                            <th style={{ padding: '0.75rem', textAlign: 'right', fontWeight: 600 }}>Status</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {sortedReports.map(report => {
-                            let ctrlBg = '#E8F4EA';
-                            if (report.mDays > 10) ctrlBg = '#FCE8E8';
-                            else if (report.mDays > 7) ctrlBg = '#FFF4DD';
-
-                            return (
-                                <tr
-                                    key={report.id}
-                                    onClick={() => onSelectReport(report)}
-                                    style={{ borderBottom: '1px solid var(--border)', cursor: 'pointer', transition: 'background-color 0.2s' }}
-                                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.03)'}
-                                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                                >
-                                    <td style={{ padding: '0.75rem' }}>
-                                        <div style={{ fontWeight: 700, color: 'var(--text-main)' }}>
-                                            {report.street || (report.address ? report.address.split(',')[0] : 'Keine Strasse')}
-                                        </div>
-                                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                                            {report.zip} {report.city} {report.projectNumber ? `(${report.projectNumber})` : ''}
-                                        </div>
-                                    </td>
-                                    <td style={{ padding: '0.75rem', color: 'var(--text-main)' }}>
-                                        {report.locationDetails || report.client}
-                                    </td>
-                                    <td style={{ padding: '0.45rem 0.75rem', textAlign: 'right' }}>
-                                        <span style={{
-                                            fontWeight: 600,
-                                            padding: '0.15rem 0.5rem',
-                                            borderRadius: '3px',
-                                            backgroundColor: ctrlBg,
-                                            color: 'var(--color-text-primary, #2C3540)',
-                                            display: 'inline-block',
-                                            minWidth: '80px',
-                                            textAlign: 'center',
-                                            fontSize: '0.75rem'
-                                        }}>
-                                            vor {report.mDays} {report.mDays === 1 ? 'Tag' : 'Tagen'}
-                                        </span>
-                                    </td>
-                                </tr>
-                            );
-                        })}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    );
-};
 
 export default function Dashboard({ reports, onSelectReport, onDeleteReport, mode, supabase, currentUser, users, onReportsChanged, lockedProjectIds, onLogout }) {
     const [searchTerm, setSearchTerm] = useState('')
     const [currentPage, setCurrentPage] = useState(1);
     const [selectedSidebarReport, setSelectedSidebarReport] = useState(null);
+    const [workflowStore, setWorkflowStore] = useState(() => {
+        try {
+            return JSON.parse(localStorage.getItem('qtool_wf_v4') || '{}');
+        } catch {
+            return {};
+        }
+    });
     const itemsPerPage = 20;
     const [showArchive, setShowArchive] = useState(false);
     const lockedIds = lockedProjectIds instanceof Set ? lockedProjectIds : new Set();
@@ -466,9 +430,8 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
             {/* Pass Filtered Reports to Monitors (only when not in Archive OR Technician Mode) */}
             {!showArchive && mode !== 'technician' && (
                 <div>
-                    <WorkflowStatusOverview reports={reports} onSelectReport={onSelectReport} currentUser={currentUser} users={users || []} searchTerm={searchTerm} />
-                    <MeasurementControlOverview reports={filteredReports} onSelectReport={onSelectReport} />
-                    <DryingMonitor reports={filteredReports} onSelectReport={onSelectReport} />
+                    <WorkflowStatusOverview reports={reports} onSelectReport={onSelectReport} currentUser={currentUser} users={users || []} searchTerm={searchTerm} store={workflowStore} onStoreChange={setWorkflowStore} />
+                    <DryingMonitor reports={filteredReports} onSelectReport={onSelectReport} workflowStore={workflowStore} />
                 </div>
             )}
 

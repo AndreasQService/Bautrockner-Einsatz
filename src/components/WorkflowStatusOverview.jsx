@@ -48,15 +48,22 @@ const compDate = (store, rid, sid, rep) => {
 }
 const getDryingStart = (r) => r.dryingStarted || (r.equipment?.length > 0 ? r.equipment.map(e => e.startDate).filter(Boolean).sort()[0] : null) || r.date
 const getLastM = (r) => {
-  if (!r.rooms) return null; let lat = null;
-  r.rooms.forEach(rm => {
+  const allRooms = [
+    ...(r.measurementRooms || []),
+    ...(r.rooms || [])
+  ];
+  if (allRooms.length === 0) return null;
+  let lat = null;
+  allRooms.forEach(rm => {
+    if (!rm) return;
     if (rm.measurementData?.globalSettings?.date) {
       const d = new Date(rm.measurementData.globalSettings.date); d.setHours(0, 0, 0, 0);
       if (!lat || d > lat) lat = d;
     }
     (rm.measurementHistory || []).forEach(h => {
-      if (h.date) {
-        const d = new Date(h.date); d.setHours(0, 0, 0, 0);
+      const hDate = h.date || h.datum || h.timestamp || h.createdAt || h.globalSettings?.date;
+      if (hDate) {
+        const d = new Date(hDate); d.setHours(0, 0, 0, 0);
         if (!lat || d > lat) lat = d;
       }
     });
@@ -64,6 +71,62 @@ const getLastM = (r) => {
   return lat ? Math.floor((t0() - lat) / 86400000) : null;
 }
 const isDryDone = (r) => r.equipment?.length > 0 && r.equipment.every(e => e.endDate)
+
+const getOverdueRooms = (report) => {
+  const rooms = (report.measurementRooms && report.measurementRooms.length > 0)
+    ? report.measurementRooms
+    : (report.rooms || []);
+  if (!rooms || !Array.isArray(rooms)) return [];
+
+  const overdueRooms = [];
+
+  rooms.forEach(room => {
+    if (room.controlCompleted) return;
+
+    const dates = [];
+
+    if (room.measurementData) {
+      const mDate = room.measurementData.globalSettings?.date || room.measurementData.date || room.measurementData.timestamp;
+      if (mDate) {
+        const d = new Date(mDate);
+        if (!isNaN(d.getTime())) {
+          dates.push(d);
+        }
+      }
+    }
+
+    if (room.measurementHistory && Array.isArray(room.measurementHistory)) {
+      room.measurementHistory.forEach(hist => {
+        const histDate = hist.date || hist.datum || hist.timestamp || hist.createdAt || hist.globalSettings?.date;
+        if (histDate) {
+          const d = new Date(histDate);
+          if (!isNaN(d.getTime())) {
+            dates.push(d);
+          }
+        }
+      });
+    }
+
+    if (dates.length === 0) return;
+
+    const latestDate = new Date(Math.max(...dates.map(d => d.getTime())));
+    const latest = new Date(latestDate);
+    latest.setHours(0, 0, 0, 0);
+    const diffTime = t0() - latest;
+    const daysDiff = Math.max(0, Math.ceil(diffTime / 86400000));
+
+    if (daysDiff >= 7) {
+      overdueRooms.push({
+        roomId: room.id,
+        roomName: room.name || 'Unbenannter Raum',
+        daysOverdue: daysDiff,
+        latestDate: latestDate
+      });
+    }
+  });
+
+  return overdueRooms;
+};
 
 const getDeadline = (store, rid, step, rep) => {
   if (!step.slaDays || !step.from) return null
@@ -419,13 +482,137 @@ function ProjectRow({ rep, store, onSave, onSelect, openKey, onOpen }) {
   )
 }
 
+function DueMeasurementsDropdown({ dueReports, onSelectReport, onClose, rect }) {
+  const ref = useRef(null)
+  
+  useEffect(() => {
+    const hk = e => { if (e.key === "Escape") onClose() }
+    const hc = e => { if (ref.current && !ref.current.contains(e.target)) onClose() }
+    document.addEventListener("mousedown", hc); document.addEventListener("keydown", hk)
+    return () => { document.removeEventListener("mousedown", hc); document.removeEventListener("keydown", hk) }
+  }, [onClose])
+
+  const st = { 
+    position: "fixed", 
+    zIndex: 9999, 
+    background: "var(--color-surface-alt, #1E293B)", 
+    border: "1px solid var(--color-border, rgba(255, 255, 255, 0.08))", 
+    borderRadius: 10, 
+    padding: "0.85rem", 
+    width: "max-content",
+    minWidth: 640,
+    maxWidth: "calc(100vw - 32px)",
+    display: "flex",
+    flexDirection: "column",
+    boxShadow: "0 12px 32px rgba(0,0,0,0.3)", 
+    fontFamily: '"Segoe UI", "Roboto", Arial, sans-serif',
+    animation: "wfFade 0.12s ease"
+  }
+  
+  if (rect) { 
+    const ww = window.innerWidth;
+    st.top = rect.bottom + 6;
+    st.bottom = 16; // Nütze die ganze Höhe des Bildschirms bis zum unteren Rand (16px Abstand)
+    
+    const expectedWidth = 640;
+    if (rect.left + expectedWidth <= ww - 16) {
+      st.left = Math.max(16, rect.left);
+    } else {
+      const rightOffset = ww - rect.right;
+      if (ww - rightOffset - expectedWidth >= 16) {
+        st.right = Math.max(16, rightOffset);
+      } else {
+        st.left = 16;
+      }
+    }
+  }
+
+  return createPortal(
+    <div ref={ref} style={st} onClick={e => e.stopPropagation()}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem", flexShrink: 0 }}>
+        <h3 style={{ margin: 0, fontSize: "0.9rem", fontWeight: 700, color: "var(--text-main)", display: "flex", alignItems: "center", gap: "0.4rem" }}>
+          <AlertTriangle size={14} style={{ color: "#F97316" }} />
+          Fällige Messungen Details
+        </h3>
+        <button 
+          onClick={onClose}
+          style={{ background: "none", border: "none", color: "var(--text-muted, #64748B)", cursor: "pointer", display: "flex", alignItems: "center", padding: "2px" }}
+        >
+          <X size={16} />
+        </button>
+      </div>
+      <div style={{ overflowY: "auto", overflowX: "auto", flex: 1, minHeight: 0 }}>
+        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <thead>
+            <tr style={{ borderBottom: "1px solid var(--color-border,rgba(255,255,255,0.08))", color: "var(--text-muted, #64748B)", textAlign: "left", fontSize: "0.75rem" }}>
+              <th style={{ padding: "0.5rem", fontWeight: 600 }}>Projektnummer</th>
+              <th style={{ padding: "0.5rem", fontWeight: 600 }}>Schadenort</th>
+              <th style={{ padding: "0.5rem", fontWeight: 600 }}>Fällige Räume</th>
+            </tr>
+          </thead>
+          <tbody>
+            {dueReports.map(({ report, overdueRooms }) => (
+              <tr
+                key={report.id}
+                style={{ borderBottom: "1px solid var(--color-border,rgba(255,255,255,0.08))", cursor: "pointer", transition: "background-color 0.2s" }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.02)"}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
+                onClick={() => { onSelectReport(report); onClose(); }}
+              >
+                <td style={{ padding: "0.5rem", fontWeight: 700, color: "var(--text-main)" }}>
+                  {report.projectNumber || report.projectTitle || report.id}
+                </td>
+                <td style={{ padding: "0.5rem", color: "var(--text-main)" }}>
+                  <div style={{ fontWeight: 600 }}>
+                    {report.street || 'Keine Angabe'}
+                  </div>
+                  <div style={{ fontSize: "0.75rem", color: "var(--text-muted, #64748B)", marginTop: "2px" }}>
+                    {[report.zip, report.city].filter(Boolean).join(' ') || 'Keine Angabe'}
+                  </div>
+                </td>
+                <td style={{ padding: "0.5rem" }}>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem" }}>
+                    {overdueRooms.map((room, idx) => (
+                      <span 
+                        key={idx} 
+                        style={{ 
+                          fontSize: "0.7rem", 
+                          fontWeight: 600, 
+                          padding: "0.1rem 0.4rem", 
+                          borderRadius: "4px", 
+                          backgroundColor: "rgba(249, 115, 22, 0.1)", 
+                          color: "#F97316",
+                          border: "1px solid rgba(249, 115, 22, 0.2)",
+                          whiteSpace: "nowrap"
+                        }}
+                      >
+                        {room.roomName} (vor {room.daysOverdue} d)
+                      </span>
+                    ))}
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>,
+    document.body
+  )
+}
+
 // ─── Main Export ──────────────────────────────────────────────────────────────
-export default function WorkflowStatusOverview({ reports, onSelectReport, currentUser, users = [], searchTerm = "" }) {
-  const [store, setStore] = useState(load)
+export default function WorkflowStatusOverview({ reports, onSelectReport, currentUser, users = [], searchTerm = "", store: passedStore, onStoreChange }) {
+  const [localStore, setLocalStore] = useState(load)
+  const store = passedStore !== undefined ? passedStore : localStore
+  const setStore = onStoreChange !== undefined ? onStoreChange : setLocalStore
+
   const [tab, setTab] = useState("alle")
   const [collapsed, setCollapsed] = useState(false)
   const [popover, setPopover] = useState(null)
   const [userFilter, setUserFilter] = useState("alle")
+  const [isDueExpanded, setIsDueExpanded] = useState(false)
+  const [dueButtonRect, setDueButtonRect] = useState(null)
 
   const allUsers = useMemo(() => {
     const names = users.map(u => u.name).filter(Boolean)
@@ -434,11 +621,29 @@ export default function WorkflowStatusOverview({ reports, onSelectReport, curren
 
   const handleSave = useCallback((rid, sid, data) => {
     setStore(prev => { const n = setSd(prev, rid, sid, data); save(n); return n })
-  }, [])
+  }, [setStore])
   const handleOpen = useCallback((rid, sid, rect) => { setPopover(prev => prev?.rid === rid && prev?.sid === sid ? null : { rid, sid, rect }) }, [])
   const handleClose = useCallback(() => setPopover(null), [])
 
-  const allActive = useMemo(() => reports.filter(r => r.status !== "Abgeschlossen" && (!userFilter || userFilter === "alle" || r.assignedTo === userFilter)).sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0)), [reports, userFilter])
+  const allActive = useMemo(() => reports.filter(r => r.status !== "Abgeschlossen" && (!userFilter || userFilter === "alle" || r.assignedTo === userFilter)).sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0)), [reports, userFilter])
+  
+  // Calculate due reports (rooms overdue by 7 days or more), sorted by oldest measurement (highest daysOverdue first)
+  const dueReports = useMemo(() => {
+    return allActive.map(report => {
+      const overdueRooms = getOverdueRooms(report);
+      return {
+        report,
+        overdueRooms
+      };
+    })
+    .filter(item => item.overdueRooms.length > 0)
+    .sort((a, b) => {
+      const maxA = Math.max(...a.overdueRooms.map(r => r.daysOverdue));
+      const maxB = Math.max(...b.overdueRooms.map(r => r.daysOverdue));
+      return maxB - maxA;
+    });
+  }, [allActive]);
+
   const archived = useMemo(() => reports.filter(r => r.status === "Abgeschlossen" && (!userFilter || userFilter === "alle" || r.assignedTo === userFilter)), [reports, userFilter])
   const overdue = useMemo(() => allActive.filter(r => getPriority(r, store) === "red"), [allActive, store])
   const trocknungList = useMemo(() => allActive.filter(r => { const ai = getActiveIdx(r, store); return STEPS[ai]?.id === "trocknung" }), [allActive, store])
@@ -476,6 +681,35 @@ export default function WorkflowStatusOverview({ reports, onSelectReport, curren
             <h2 style={{ margin: 0, fontSize: "1.25rem", fontWeight: 700, color: "var(--text-main)" }}>Workflow-Übersicht</h2>
             <span style={{ fontSize: "0.72rem", color: "#475569", fontWeight: 400 }}>{allActive.length} aktive Projekte</span>
             {overdue.length > 0 && <span style={{ display: "inline-flex", alignItems: "center", gap: 3, padding: "1px 7px", borderRadius: 8, background: "rgba(239,68,68,0.12)", color: "#EF4444", fontSize: "0.68rem", fontWeight: 700, border: "1px solid rgba(239,68,68,0.2)" }}><AlertTriangle size={10} />{overdue.length} überfällig</span>}
+            {dueReports.length > 0 && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  setDueButtonRect(rect);
+                  setIsDueExpanded(!isDueExpanded);
+                }}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 5,
+                  padding: "3px 10px",
+                  borderRadius: 8,
+                  background: isDueExpanded ? "#EF4444" : "#D97706",
+                  color: "#FFFFFF",
+                  fontSize: "0.72rem",
+                  fontWeight: 700,
+                  border: "none",
+                  cursor: "pointer",
+                  transition: "all 0.15s",
+                  marginLeft: "0.5rem",
+                  boxShadow: "0 2px 5px rgba(217, 119, 6, 0.4), 0 1px 2px rgba(0,0,0,0.15)"
+                }}
+              >
+                <AlertTriangle size={11} style={{ color: "#FFFFFF" }} />
+                Kontrolle Trocknung {dueReports.length} fällig
+              </button>
+            )}
           </div>
           <div style={{ display: "flex", gap: "0.4rem", alignItems: "center" }}>
             {/* User Filter Dropdown */}
@@ -564,6 +798,15 @@ export default function WorkflowStatusOverview({ reports, onSelectReport, curren
       {popover && popStep && popSd && (
         <Popover key={openKey} rid={popover.rid} step={popStep} sd={popSd} rect={popover.rect}
           onSave={data => handleSave(popover.rid, popover.sid, data)} onClose={handleClose} />
+      )}
+
+      {isDueExpanded && dueReports.length > 0 && (
+        <DueMeasurementsDropdown 
+          dueReports={dueReports} 
+          onSelectReport={onSelectReport} 
+          rect={dueButtonRect} 
+          onClose={() => setIsDueExpanded(false)} 
+        />
       )}
 
       <style>{`

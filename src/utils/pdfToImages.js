@@ -24,7 +24,7 @@ export const convertPdfToImages = async (file) => {
             // Convert canvas to Data URL (PNG)
             const dataUrl = canvas.toDataURL('image/png');
             images.push({
-                id: crypto.randomUUID(),
+                id: (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`,
                 preview: dataUrl,
                 description: `Messprotokoll Seite ${i}`,
                 includeInReport: true
