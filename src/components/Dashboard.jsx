@@ -328,6 +328,155 @@ const MeasurementControlOverview = ({ reports, onSelectReport }) => {
     );
 };
 
+const DeviceInventoryList = ({ reports, onSelectReport }) => {
+    const devicesList = useMemo(() => {
+        const list = [];
+        reports.forEach(report => {
+            if (report.equipment && Array.isArray(report.equipment)) {
+                report.equipment.forEach(item => {
+                    list.push({ report, item });
+                });
+            }
+        });
+        
+        return list.sort((a, b) => {
+            const dateA = a.item.startDate ? new Date(a.item.startDate) : new Date(0);
+            const dateB = b.item.startDate ? new Date(b.item.startDate) : new Date(0);
+            return dateB - dateA;
+        });
+    }, [reports]);
+
+    const formatEquipmentDate = (dateString) => {
+        if (!dateString) return '-';
+        const date = new Date(dateString);
+        if (isNaN(date.getTime())) return dateString;
+        const day = String(date.getDate()).padStart(2, '0');
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const year = String(date.getFullYear()).slice(-2);
+        return `${day}.${month}.${year}`;
+    };
+
+    const getDaysRunning = (startDateStr, endDateStr) => {
+        if (!startDateStr) return '-';
+        const start = new Date(startDateStr);
+        if (isNaN(start.getTime())) return '-';
+        const end = endDateStr ? new Date(endDateStr) : new Date();
+        if (isNaN(end.getTime())) return '-';
+        start.setHours(0,0,0,0);
+        end.setHours(0,0,0,0);
+        const diffTime = end - start;
+        return `${Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)))} d`;
+    };
+
+    return (
+        <div className="card" style={{ marginBottom: '2rem', borderTop: '4px solid #3B82F6' }}>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#3B82F6' }}></div>
+                Geräte / Inventarliste
+            </h2>
+            <div style={{ overflowX: 'auto' }}>
+                {devicesList.length > 0 ? (
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+                        <thead>
+                            <tr style={{ borderBottom: '1px solid var(--border)', color: 'var(--text-muted)', textAlign: 'left' }}>
+                                <th style={{ padding: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>Typ / Modell</th>
+                                <th style={{ padding: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>Inventar-Nr.</th>
+                                <th style={{ padding: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>Projekt / Adresse</th>
+                                <th style={{ padding: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>Raum</th>
+                                <th style={{ padding: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>Installiert am</th>
+                                <th style={{ padding: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>Deinstalliert am</th>
+                                <th style={{ padding: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>Status</th>
+                                <th style={{ padding: '0.75rem', textAlign: 'right', fontWeight: 600, color: 'var(--text-muted)' }}>Tage</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {devicesList.map(({ report, item }, idx) => {
+                                const typeModel = [item.type, item.model].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i).join(' - ');
+                                const isAktiv = !item.endDate;
+                                
+                                const statusStyle = isAktiv ? {
+                                    bg: 'rgba(16, 185, 129, 0.15)',
+                                    color: '#10B981',
+                                    border: '1px solid rgba(16, 185, 129, 0.25)'
+                                } : {
+                                    bg: 'rgba(59, 130, 246, 0.15)',
+                                    color: '#3B82F6',
+                                    border: '1px solid rgba(59, 130, 246, 0.25)'
+                                };
+
+                                return (
+                                    <tr
+                                        key={`${report.id}-${idx}`}
+                                        onClick={() => onSelectReport(report)}
+                                        style={{ borderBottom: '1px solid var(--border)', cursor: 'pointer', transition: 'background-color 0.2s' }}
+                                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.03)'}
+                                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                                    >
+                                        <td style={{ padding: '0.75rem' }}>
+                                            <div style={{ fontWeight: 700, color: 'var(--text-main)' }}>{typeModel || 'Unbekanntes Gerät'}</div>
+                                        </td>
+                                        <td style={{ padding: '0.75rem' }}>
+                                            {item.deviceNumber ? (
+                                                <span style={{ fontFamily: 'monospace', fontWeight: 600, color: 'var(--text-main)' }}>
+                                                    {item.deviceNumber}
+                                                </span>
+                                            ) : (
+                                                <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>ohne Inventar-Nr.</span>
+                                            )}
+                                        </td>
+                                        <td style={{ padding: '0.75rem' }}>
+                                            <div style={{ fontWeight: 600, color: 'var(--text-main)' }}>
+                                                {report.street || 'Keine Strasse'}
+                                            </div>
+                                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                                {[report.zip, report.city].filter(Boolean).join(' ')} {report.projectNumber ? `(${report.projectNumber})` : ''}
+                                            </div>
+                                        </td>
+                                        <td style={{ padding: '0.75rem', color: 'var(--text-main)' }}>
+                                            {item.room ? (
+                                                <span>{item.apartment ? `${item.apartment} - ` : ''}{item.room}</span>
+                                            ) : (
+                                                <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>kein Raum zugeordnet</span>
+                                            )}
+                                        </td>
+                                        <td style={{ padding: '0.75rem', color: 'var(--text-main)' }}>
+                                            {formatEquipmentDate(item.startDate)}
+                                        </td>
+                                        <td style={{ padding: '0.75rem', color: 'var(--text-main)' }}>
+                                            {formatEquipmentDate(item.endDate)}
+                                        </td>
+                                        <td style={{ padding: '0.75rem' }}>
+                                            <span style={{
+                                                fontSize: '0.72rem',
+                                                fontWeight: 600,
+                                                padding: '0.15rem 0.5rem',
+                                                borderRadius: '6px',
+                                                backgroundColor: statusStyle.bg,
+                                                color: statusStyle.color,
+                                                border: statusStyle.border,
+                                                display: 'inline-block'
+                                            }}>
+                                                {isAktiv ? 'Aktiv' : 'Deinstalliert'}
+                                            </span>
+                                        </td>
+                                        <td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: 700, color: 'var(--text-main)' }}>
+                                            {getDaysRunning(item.startDate, item.endDate)}
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                ) : (
+                    <div style={{ padding: '1rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                        Keine Geräte erfasst.
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
 export default function Dashboard({ reports, onSelectReport, onDeleteReport, mode, supabase, currentUser, users, onReportsChanged, lockedProjectIds, onLogout }) {
     const [searchTerm, setSearchTerm] = useState('')
     const [currentPage, setCurrentPage] = useState(1);
@@ -469,6 +618,7 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
                     <WorkflowStatusOverview reports={reports} onSelectReport={onSelectReport} currentUser={currentUser} users={users || []} searchTerm={searchTerm} />
                     <MeasurementControlOverview reports={filteredReports} onSelectReport={onSelectReport} />
                     <DryingMonitor reports={filteredReports} onSelectReport={onSelectReport} />
+                    <DeviceInventoryList reports={filteredReports} onSelectReport={onSelectReport} />
                 </div>
             )}
 
