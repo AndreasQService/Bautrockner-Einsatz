@@ -624,6 +624,10 @@ function App() {
   }
 
   const handleSaveReport = useCallback(async (updatedReport, silent = false) => {
+    if (updatedReport && updatedReport.isLightweight === true) {
+      console.warn('[handleSaveReport] Aborted save of lightweight report to prevent data loss:', updatedReport.id);
+      return;
+    }
     let finalReport = sanitizeMeasurementStorage({ ...updatedReport });
 
     const incomingExteriorPhoto = finalReport.exteriorPhoto;
@@ -785,6 +789,7 @@ function App() {
               .then(({ data: updateResult, error }) => {
                 if (!error && updateResult && updateResult.length > 0) {
                   setReports(prev => prev.map(r => r.id === finalReport.id ? { ...r, _supabase_updated_at: now } : r));
+                  setSelectedReport(prev => prev && prev.id === finalReport.id ? { ...prev, _supabase_updated_at: now } : prev);
                   oneDriveBackup();
                 }
               }).catch(err => console.warn('[Supabase] Silent update failed:', err.message));
@@ -804,6 +809,7 @@ function App() {
               showToast('⚠️ Neuere Version auf anderem Gerät! Seite neu laden.', 'warning');
             } else {
               setReports(prev => prev.map(r => r.id === finalReport.id ? { ...r, _supabase_updated_at: now } : r));
+              setSelectedReport(prev => prev && prev.id === finalReport.id ? { ...prev, _supabase_updated_at: now } : prev);
               oneDriveBackup();
             }
           }
@@ -816,6 +822,7 @@ function App() {
               .then(({ error }) => {
                 if (!error) {
                   setReports(prev => prev.map(r => r.id === finalReport.id ? { ...r, _supabase_updated_at: now } : r));
+                  setSelectedReport(prev => prev && prev.id === finalReport.id ? { ...prev, _supabase_updated_at: now } : prev);
                   oneDriveBackup();
                 }
               }).catch(err => console.warn('[Supabase] Silent upsert failed:', err.message));
@@ -826,21 +833,31 @@ function App() {
               showToast(`⚠️ Speicherfehler: ${error.message || error.code || 'Supabase-Fehler'}. Daten nur lokal gesichert!`, 'error');
             } else {
               setReports(prev => prev.map(r => r.id === finalReport.id ? { ...r, _supabase_updated_at: now } : r));
+              setSelectedReport(prev => prev && prev.id === finalReport.id ? { ...prev, _supabase_updated_at: now } : prev);
               oneDriveBackup();
             }
           }
         }
       };
 
-      if (silent) {
+      // Bypass 20s debounce for image upload completions or deletions (critical data)
+      const hasImageChanges = JSON.stringify(finalReport.images?.map(img => ({ id: img.id, uploading: img.uploading, preview: img.preview }))) !==
+                              JSON.stringify((existingRecord?.images || existingRecord?.report_data?.images || []).map(img => ({ id: img.id, uploading: img.uploading, preview: img.preview })));
+      
+      const shouldSaveInstantly = !silent || hasImageChanges;
+
+      if (shouldSaveInstantly) {
+        if (silentSaveDebounceTimers.current[finalReport.id]) {
+          clearTimeout(silentSaveDebounceTimers.current[finalReport.id]);
+          delete silentSaveDebounceTimers.current[finalReport.id];
+        }
+        await performCloudSave();
+      } else if (silent) {
         // Debounce cloud autosave by 20 seconds to dramatically reduce Supabase Disk IO and OneDrive bandwidth consumption
         silentSaveDebounceTimers.current[finalReport.id] = setTimeout(() => {
           performCloudSave();
           delete silentSaveDebounceTimers.current[finalReport.id];
         }, 20000);
-      } else {
-        // Explicit manual save is executed instantly
-        await performCloudSave();
       }
     }
 
@@ -1169,7 +1186,7 @@ function App() {
 
                 {!isTechnicianMode && (
                   <>
-                    <button className="btn btn-primary" onClick={() => { setSelectedReport(null); setView('new-report'); }}>
+                    <button className="btn btn-primary" onClick={() => { setSelectedReport(null); setProjectMode('desktop'); setView('new-report'); }}>
                       <Plus size={18} />
                       {i18n.t('newOrder')}
                     </button>

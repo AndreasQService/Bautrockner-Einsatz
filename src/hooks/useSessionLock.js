@@ -120,7 +120,8 @@ export function useSessionLock(supabase, sessionToken, selectedReportId, view, r
     const mySessionStart = mySessionData?.last_seen ?? new Date().toISOString();
     // Wir verwenden sessionStartedAt (ms seit Epoch) das wir mitgespeichert haben
     // Da wir es noch nicht speichern, nutzen wir Token-Vergleich als deterministischen Tiebreaker
-    const amIOwner = myToken < earliest.session_token; // lexikografisch deterministisch
+    const isNewSession = Date.now() - sessionStartedAt < 15000;
+    const amIOwner = isNewSession || (myToken < earliest.session_token); // lexikografisch deterministisch
 
     if (amIOwner) {
       console.log('[SessionLock] ✅ Owner (kein Konflikt)');

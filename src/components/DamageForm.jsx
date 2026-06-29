@@ -1867,8 +1867,8 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         let deviceToAdd = {
             id: Date.now(),
             deviceNumber: newDevice.deviceNumber,
-            type: selectedDevice ? selectedDevice.type : 'Unbekannt', // Fallback
-            model: selectedDevice ? selectedDevice.model : '',
+            type: selectedDevice ? selectedDevice.type : (selectedCatalogItem ? selectedCatalogItem.geraetetyp : (newDevice.type || 'Unbekannt')),
+            model: selectedDevice ? selectedDevice.model : (selectedCatalogItem ? `${selectedCatalogItem.hersteller} ${selectedCatalogItem.modell}`.trim() : ''),
             apartment: newDevice.apartment,
             room: newDevice.room,
             startDate: newDevice.startDate || new Date().toISOString().split('T')[0],
