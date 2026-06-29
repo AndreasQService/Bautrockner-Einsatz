@@ -625,7 +625,19 @@ export default function WorkflowStatusOverview({ reports, onSelectReport, curren
   const handleOpen = useCallback((rid, sid, rect) => { setPopover(prev => prev?.rid === rid && prev?.sid === sid ? null : { rid, sid, rect }) }, [])
   const handleClose = useCallback(() => setPopover(null), [])
 
-  const allActive = useMemo(() => reports.filter(r => r.status !== "Abgeschlossen" && (!userFilter || userFilter === "alle" || r.assignedTo === userFilter)).sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0)), [reports, userFilter])
+  const allActive = useMemo(() => {
+    const list = reports.filter(r => r.status !== "Abgeschlossen" && (!userFilter || userFilter === "alle" || r.assignedTo === userFilter));
+    return [...list].sort((a, b) => {
+      const counterA = a.version !== undefined ? a.version : (a.editCount !== undefined ? a.editCount : null);
+      const counterB = b.version !== undefined ? b.version : (b.editCount !== undefined ? b.editCount : null);
+      if (counterA !== null && counterB !== null && counterA !== counterB) {
+        return counterB - counterA;
+      }
+      const timeA = new Date(a._supabase_updated_at || a.updatedAt || a.updated_at || a.modifiedAt || a.lastModified || a.savedAt || a.date || 0).getTime();
+      const timeB = new Date(b._supabase_updated_at || b.updatedAt || b.updated_at || b.modifiedAt || b.lastModified || b.savedAt || b.date || 0).getTime();
+      return timeB - timeA;
+    });
+  }, [reports, userFilter])
   
   // Calculate due reports (rooms overdue by 7 days or more), sorted by oldest measurement (highest daysOverdue first)
   const dueReports = useMemo(() => {
@@ -644,7 +656,19 @@ export default function WorkflowStatusOverview({ reports, onSelectReport, curren
     });
   }, [allActive]);
 
-  const archived = useMemo(() => reports.filter(r => r.status === "Abgeschlossen" && (!userFilter || userFilter === "alle" || r.assignedTo === userFilter)), [reports, userFilter])
+  const archived = useMemo(() => {
+    const list = reports.filter(r => r.status === "Abgeschlossen" && (!userFilter || userFilter === "alle" || r.assignedTo === userFilter));
+    return [...list].sort((a, b) => {
+      const counterA = a.version !== undefined ? a.version : (a.editCount !== undefined ? a.editCount : null);
+      const counterB = b.version !== undefined ? b.version : (b.editCount !== undefined ? b.editCount : null);
+      if (counterA !== null && counterB !== null && counterA !== counterB) {
+        return counterB - counterA;
+      }
+      const timeA = new Date(a._supabase_updated_at || a.updatedAt || a.updated_at || a.modifiedAt || a.lastModified || a.savedAt || a.date || 0).getTime();
+      const timeB = new Date(b._supabase_updated_at || b.updatedAt || b.updated_at || b.modifiedAt || b.lastModified || b.savedAt || b.date || 0).getTime();
+      return timeB - timeA;
+    });
+  }, [reports, userFilter])
   const overdue = useMemo(() => allActive.filter(r => getPriority(r, store) === "red"), [allActive, store])
   const trocknungList = useMemo(() => allActive.filter(r => { const ai = getActiveIdx(r, store); return STEPS[ai]?.id === "trocknung" }), [allActive, store])
   const aktiv = useMemo(() => allActive.filter(r => getPriority(r, store) !== "red"), [allActive, store])
