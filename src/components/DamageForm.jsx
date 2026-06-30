@@ -1153,60 +1153,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
     };
     // const dialogRef = useRef(null); // Unused
 
-    useEffect(() => {
-        // Vanilla JS implementation to guarantee overlay visibility
-        const currentOverlay = document.getElementById('manual-lightbox');
-        if (currentOverlay) currentOverlay.remove();
-
-        if (globalPreviewImage) {
-            const div = document.createElement('div');
-            div.id = 'manual-lightbox';
-            Object.assign(div.style, {
-                position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-                zIndex: '2147483647',
-                backgroundColor: 'rgba(0,0,0,0.95)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                cursor: 'pointer'
-            });
-
-            const img = document.createElement('img');
-            img.src = globalPreviewImage;
-            img.alt = "Große Ansicht";
-            Object.assign(img.style, {
-                maxWidth: '98vw', maxHeight: '98vh',
-                objectFit: 'contain',
-                boxShadow: '0 0 50px rgba(0,0,0,0.8)',
-                cursor: 'default',
-                borderRadius: '4px'
-            });
-            img.onclick = (e) => e.stopPropagation();
-
-            const closeBtn = document.createElement('div');
-            closeBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>';
-            Object.assign(closeBtn.style, {
-                position: 'absolute', top: '20px', right: '20px',
-                background: 'rgba(255,255,255,0.2)',
-                borderRadius: '50%', width: '50px', height: '50px',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                cursor: 'pointer', zIndex: '2147483648'
-            });
-            closeBtn.onclick = (e) => {
-                e.stopPropagation();
-                setGlobalPreviewImage(null);
-            };
-
-            div.onclick = () => setGlobalPreviewImage(null);
-
-            div.appendChild(img);
-            div.appendChild(closeBtn);
-            document.body.appendChild(div);
-        }
-
-        return () => {
-            const existing = document.getElementById('manual-lightbox');
-            if (existing) existing.remove();
-        };
-    }, [globalPreviewImage]);
+        // globalPreviewImage manual effect removed
 
     const [editingImage, setEditingImage] = useState(null);
     const [activeImageMeta, setActiveImageMeta] = useState(null); // For the new Metadata Modal
@@ -4720,7 +4667,7 @@ END:VCARD`;
                                     <img
                                         src={img.preview}
                                         alt="Schadensbild"
-                                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                        style={{ width: '100%', height: '100%', objectFit: 'contain' }}
                                         onClick={() => setGlobalPreviewImage(img.preview)}
                                     />
                                     <div
@@ -4926,7 +4873,7 @@ END:VCARD`;
                                         {/* Thumbnail + Controls */}
                                         <div style={{ flex: '0 0 140px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
                                             <div style={{ width: '140px', height: '140px', borderRadius: '6px', overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-                                                <img src={img.preview} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: 'pointer' }} onClick={() => setGlobalPreviewImage(img.preview)} />
+                                                <img src={img.preview} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain', cursor: 'pointer' }} onClick={() => setGlobalPreviewImage(img.preview)} />
                                             </div>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', padding: '0 2px', alignItems: 'center' }}>
                                                 <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', fontSize: '0.75rem', cursor: 'pointer', color: 'var(--text-main)' }}>
@@ -5742,7 +5689,7 @@ END:VCARD`;
                                                         flexShrink: 0,
                                                         border: img.includeInReport !== false ? '2px solid #0F6EA3' : '1px solid var(--border)'
                                                     }}>
-                                                        <img src={img.preview} style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: 'pointer' }} onClick={() => setEditingImage(img)} />
+                                                        <img src={img.preview} style={{ width: '100%', height: '100%', objectFit: 'contain', cursor: 'pointer' }} onClick={() => setEditingImage(img)} />
 
                                                         {/* Include in Report Toggle (Centered/Unified) */}
                                                         <div
@@ -6194,7 +6141,7 @@ END:VCARD`;
                                                                                 }
                                                                             }}
                                                                         >
-                                                                            <img src={img.preview} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onClick={async (e) => {
+                                                                            <img src={img.preview} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} onClick={async (e) => {
                                                                                 e.stopPropagation();
                                                                                 if (!linkingImageId) {
                                                                                     // OneDrive-Bild: frische URL holen
@@ -6310,7 +6257,7 @@ END:VCARD`;
                                                                     {thermalImg && (
                                                                         <div style={{ flex: '0 0 160px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', opacity: linkingImageId ? 0.5 : 1 }}>
                                                                             <div style={{ width: '160px', height: '160px', borderRadius: '6px', overflow: 'hidden', backgroundColor: '#E5E7EB', border: '2px solid #1E6DB7', position: 'relative' }}>
-                                                                                <img src={thermalImg.preview} alt="Thermobild" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onClick={() => window.open(thermalImg.preview, '_blank')} />
+                                                                                <img src={thermalImg.preview} alt="Thermobild" style={{ width: '100%', height: '100%', objectFit: 'contain' }} onClick={() => window.open(thermalImg.preview, '_blank')} />
                                                                                 <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(30, 109, 183, 0.9)', color: 'white', fontSize: '0.65rem', textAlign: 'center', padding: '3px 0', fontWeight: 'bold', textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>THERMO</div>
                                                                             </div>
                                                                         </div>
@@ -6680,7 +6627,7 @@ END:VCARD`;
                                             {/* Thumbnail + Controls */}
                                             <div style={{ flex: '0 0 160px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
                                                 <div style={{ width: '160px', height: '160px', borderRadius: '6px', overflow: 'hidden', backgroundColor: '#E5E7EB', border: '1px solid var(--border)', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-                                                    <img src={item.preview} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: 'pointer' }} onClick={() => setEditingImage(item)} />
+                                                    <img src={item.preview} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain', cursor: 'pointer' }} onClick={() => setEditingImage(item)} />
                                                 </div>
                                                 <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', padding: '0 2px', alignItems: 'center' }}>
                                                     <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', fontSize: '0.75rem', cursor: 'pointer', color: 'var(--text-main)' }}>
@@ -9842,6 +9789,50 @@ END:VCARD`;
                         >
                             Schliessen
                         </button>
+                    </div>
+                </div>
+            )}
+            {globalPreviewImage && (
+                <div
+                    id="manual-lightbox"
+                    onClick={() => setGlobalPreviewImage(null)}
+                    style={{
+                        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                        zIndex: 2147483647,
+                        backgroundColor: 'rgba(0,0,0,0.95)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        cursor: 'pointer'
+                    }}
+                >
+                    <img
+                        src={globalPreviewImage}
+                        alt="Große Ansicht"
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                            maxWidth: '98vw', maxHeight: '98vh',
+                            objectFit: 'contain',
+                            boxShadow: '0 0 50px rgba(0,0,0,0.8)',
+                            cursor: 'default',
+                            borderRadius: '4px'
+                        }}
+                    />
+                    <div
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            setGlobalPreviewImage(null);
+                        }}
+                        style={{
+                            position: 'absolute', top: '20px', right: '20px',
+                            background: 'rgba(255,255,255,0.2)',
+                            borderRadius: '50%', width: '50px', height: '50px',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            cursor: 'pointer', zIndex: 2147483648
+                        }}
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M18 6 6 18"/>
+                            <path d="m6 6 12 12"/>
+                        </svg>
                     </div>
                 </div>
             )}
