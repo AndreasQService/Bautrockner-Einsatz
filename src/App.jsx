@@ -351,7 +351,8 @@ function App() {
     const saved = localStorage.getItem('qtool_users_v2');
     return saved ? JSON.parse(saved) : [
       { id: 1, name: 'Admin User', role: 'admin', password: 'admin' },
-      { id: 2, name: 'Techniker 1', role: 'technician', password: '123' }
+      { id: 2, name: 'Techniker 1', role: 'technician', password: '123' },
+      { id: 3, name: 'Mensur Sherifi', role: 'technician', password: '123' }
     ];
   });
 
