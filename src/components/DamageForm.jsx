@@ -331,6 +331,8 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         ownerCity: initialData.ownerCity || '',
         invoiceReference: initialData.invoiceReference || '',
         ownerEmail: initialData.ownerEmail || '',
+        ownerIsResident: initialData.ownerIsResident || false,
+        clientIsResident: initialData.clientIsResident || false,
 
         contacts: (initialData?.contacts && initialData.contacts.filter(c => c.name || c.phone).length > 0)
             ? initialData.contacts.filter(c => c.name || c.phone)
@@ -452,6 +454,8 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         ownerCity: '',
         invoiceReference: '',
         ownerEmail: '',
+        ownerIsResident: false,
+        clientIsResident: false,
         // address: '',
         contacts: [
             { apartment: '', name: '', phone: '', role: 'Mieter' },
@@ -4177,9 +4181,17 @@ END:VCARD`;
                                             const newData = { ...prev, clientIsResident: isChecked };
                                             if (isChecked) {
                                                 const hasClient = (newData.contacts || []).some(c => c.role === 'Auftraggeber');
-                                                if (!hasClient) {
-                                                    newData.contacts = [...(newData.contacts || []), { id: Date.now(), role: 'Auftraggeber', name: newData.clientContactPerson || newData.client || '', phone: newData.clientPhone || '', email: newData.clientEmail || '' }];
-                                                }
+                                                 if (!hasClient) {
+                                                     const emptyIndex = (newData.contacts || []).findIndex(c => c.role === 'Mieter' && !c.name && !c.phone && !c.email);
+                                                     if (emptyIndex !== -1) {
+                                                         newData.contacts = [...newData.contacts];
+                                                         newData.contacts[emptyIndex] = { id: Date.now(), role: 'Auftraggeber', name: newData.clientContactPerson || newData.client || '', phone: newData.clientPhone || '', email: newData.clientEmail || '' };
+                                                     } else {
+                                                         newData.contacts = [...(newData.contacts || []), { id: Date.now(), role: 'Auftraggeber', name: newData.clientContactPerson || newData.client || '', phone: newData.clientPhone || '', email: newData.clientEmail || '' }];
+                                                     }
+                                                 } else {
+                                                     newData.contacts = (newData.contacts || []).map(c => c.role === 'Auftraggeber' ? { ...c, name: newData.clientContactPerson || newData.client || '', phone: newData.clientPhone || '', email: newData.clientEmail || '' } : c);
+                                                 }
                                             } else {
                                                 newData.contacts = (newData.contacts || []).filter(c => c.role !== 'Auftraggeber');
                                             }
@@ -4319,6 +4331,27 @@ END:VCARD`;
                                             return newData;
                                         });
                                     }}
+                                    onBlur={(e) => {
+                                        let val = e.target.value.replace(/\s+/g, '');
+                                        if (val.match(/^0\d{9}$/)) {
+                                            val = '+41' + val.substring(1);
+                                        }
+                                        if (val.match(/^\+41\d{9}$/)) {
+                                            val = val.replace(/(\+41)(\d{2})(\d{3})(\d{2})(\d{2})/, '$1 $2 $3 $4 $5');
+                                        }
+                                        else if (val.match(/^\+41\d{8}$/)) {
+                                            val = val.replace(/(\+41)(\d{2})(\d{2})(\d{2})(\d{2})/, '$1 $2 $3 $4 $5');
+                                        }
+                                        if (val !== e.target.value) {
+                                            setFormData(prev => {
+                                                const newData = { ...prev, clientPhone: val };
+                                                if (newData.clientIsResident) {
+                                                    newData.contacts = (newData.contacts || []).map(c => c.role === 'Auftraggeber' ? { ...c, phone: val } : c);
+                                                }
+                                                return newData;
+                                            });
+                                        }
+                                    }}
                                     style={{ width: '100%' }}
                                 />
                             </div>
@@ -4360,9 +4393,17 @@ END:VCARD`;
                                                 const newData = { ...prev, ownerIsResident: isChecked };
                                                 if (isChecked) {
                                                     const hasOwner = (newData.contacts || []).some(c => c.role === 'Eigentümer');
-                                                    if (!hasOwner) {
-                                                        newData.contacts = [...(newData.contacts || []), { id: Date.now(), role: 'Eigentümer', name: newData.ownerName || '', phone: '', email: newData.ownerEmail || '' }];
-                                                    }
+                                                     if (!hasOwner) {
+                                                         const emptyIndex = (newData.contacts || []).findIndex(c => c.role === 'Mieter' && !c.name && !c.phone && !c.email);
+                                                         if (emptyIndex !== -1) {
+                                                             newData.contacts = [...newData.contacts];
+                                                             newData.contacts[emptyIndex] = { id: Date.now(), role: 'Eigentümer', name: newData.ownerName || '', phone: '', email: newData.ownerEmail || '' };
+                                                         } else {
+                                                             newData.contacts = [...(newData.contacts || []), { id: Date.now(), role: 'Eigentümer', name: newData.ownerName || '', phone: '', email: newData.ownerEmail || '' }];
+                                                         }
+                                                     } else {
+                                                         newData.contacts = (newData.contacts || []).map(c => c.role === 'Eigentümer' ? { ...c, name: newData.ownerName || '', email: newData.ownerEmail || '' } : c);
+                                                     }
                                                 } else {
                                                     newData.contacts = (newData.contacts || []).filter(c => c.role !== 'Eigentümer');
                                                 }

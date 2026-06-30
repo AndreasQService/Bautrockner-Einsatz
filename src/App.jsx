@@ -198,6 +198,7 @@ function App() {
   // Projektspezifischer Modus: 'desktop' | 'technician' (Mutex – nie beides gleichzeitig)
   const [projectMode, setProjectMode] = useState('desktop');
   const setProjectModeExclusive = (mode) => {
+    if (userRole === 'technician') return;
     if (mode !== 'desktop' && mode !== 'technician') return;
     setProjectMode(mode);
   };
@@ -358,6 +359,13 @@ function App() {
   useEffect(() => {
     localStorage.setItem('qtool_users_v2', JSON.stringify(users));
   }, [users]);
+
+  useEffect(() => {
+    if (userRole === 'technician') {
+      setIsTechnicianMode(true);
+      setProjectMode('technician');
+    }
+  }, [userRole]);
 
   const handleLogin = (user) => {
     setCurrentUser(user);
@@ -583,9 +591,9 @@ function App() {
     setIsSessionActive(true);
     // Projektspezifischen Modus laden
     const savedMode = activeReport?._projectMode;
-    const initialMode = (savedMode === 'technician' || savedMode === 'desktop')
-      ? savedMode
-      : (isTechnicianMode ? 'technician' : 'desktop');
+    const initialMode = (userRole === 'technician' || isTechnicianMode)
+      ? 'technician'
+      : ((savedMode === 'technician' || savedMode === 'desktop') ? savedMode : 'desktop');
     setProjectMode(initialMode);
   }
 
