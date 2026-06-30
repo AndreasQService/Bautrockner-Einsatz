@@ -4007,8 +4007,8 @@ END:VCARD`;
                                 }}
                             />
                         </div>
-                        {/* Schritt-Abschluss Checkbox — nur Techniker, nicht Übersicht, nicht Trocknung, nicht Pläne */}
-                        {mode === 'technician' && techTab && techTab !== 'uebersicht' && techTab !== 'trocknung' && techTab !== 'plaene' && (() => {
+                        {/* Schritt-Abschluss Checkbox — nur Techniker, nicht Übersicht, nicht Pläne */}
+                        {mode === 'technician' && techTab && techTab !== 'uebersicht' && techTab !== 'plaene' && (() => {
                             const tabStatusMap = {
                                 aufnahme: 'Leckortung',
                                 leck: 'Trocknung',
@@ -4026,12 +4026,17 @@ END:VCARD`;
                             const nextStatus = tabStatusMap[techTab];
                             const label = tabLabelMap[techTab] || 'Schritt abgeschlossen';
                             const isChecked = nextStatus && formData.status === nextStatus;
+                            
+                            const isTrocknung = techTab === 'trocknung';
+                            const primaryColor = isTrocknung ? '#D97706' : '#1E6DB7';
+                            const primaryBg = isTrocknung ? 'rgba(217, 119, 6, 0.12)' : 'rgba(30, 109, 183, 0.12)';
+                            
                             return (
                                 <label style={{
                                     display: 'flex', alignItems: 'center', gap: '0.5rem',
                                     cursor: 'pointer', userSelect: 'none',
-                                    background: isChecked ? 'rgba(30, 109, 183,0.12)' : 'rgba(255,255,255,0.04)',
-                                    border: `1.5px solid ${isChecked ? '#1E6DB7' : 'rgba(255,255,255,0.1)'}`,
+                                    background: isChecked ? primaryBg : 'rgba(255,255,255,0.04)',
+                                    border: `1.5px solid ${isChecked ? primaryColor : 'rgba(255,255,255,0.1)'}`,
                                     borderRadius: 12, padding: '0.5rem 1rem',
                                     transition: 'all 0.15s', whiteSpace: 'nowrap'
                                 }}>
@@ -4046,9 +4051,9 @@ END:VCARD`;
                                                 if (onSave) setTimeout(() => onSave(updated, true), 200);
                                             }
                                         }}
-                                        style={{ width: 18, height: 18, accentColor: '#1E6DB7', cursor: 'pointer' }}
+                                        style={{ width: 18, height: 18, accentColor: primaryColor, cursor: 'pointer' }}
                                     />
-                                    <span style={{ fontSize: '0.85rem', fontWeight: 700, color: isChecked ? '#1E6DB7' : '#94A3B8' }}>
+                                    <span style={{ fontSize: '0.85rem', fontWeight: 700, color: isChecked ? primaryColor : '#94A3B8' }}>
                                         {isChecked ? '✓ ' : ''}{label}
                                     </span>
                                 </label>
