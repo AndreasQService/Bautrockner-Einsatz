@@ -5151,7 +5151,7 @@ END:VCARD`;
                                             <img
                                                 src={formData.customMapImage}
                                                 alt="Eigene Karte"
-                                                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                                                style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
                                             />
                                             <button
                                                 type="button"
@@ -5202,7 +5202,7 @@ END:VCARD`;
                                 <img
                                     src={formData.exteriorPhoto}
                                     alt="Aussenaufnahme"
-                                    style={{ width: '100%', height: '300px', objectFit: 'cover', display: 'block', transition: 'transform 0.5s ease' }}
+                                    style={{ width: '100%', height: '300px', objectFit: 'contain', display: 'block', transition: 'transform 0.5s ease' }}
                                     className="hover-zoom"
                                 />
                                 <button
@@ -7161,7 +7161,7 @@ END:VCARD`;
                                                 <img
                                                     src={item.preview}
                                                     alt="Vorschau"
-                                                    style={{ width: '40px', height: '40px', objectFit: 'cover', borderRadius: '4px' }}
+                                                    style={{ width: '40px', height: '40px', objectFit: 'contain', borderRadius: '4px' }}
                                                     onError={(e) => { e.target.style.display = 'none'; }}
                                                 />
                                                 <div style={{ flex: 1, overflow: 'hidden' }}>
@@ -7445,7 +7445,7 @@ END:VCARD`;
                                             </div>
                                         ) : (
                                             <div style={{ width: '80px', height: '80px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: '4px' }}>
-                                                <img src={item.preview} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '4px' }} />
+                                                <img src={item.preview} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '4px' }} />
                                             </div>
                                         )}
                                         {!((item.file && item.file.type === 'application/pdf') || (item.name && item.name.toLowerCase().endsWith('.pdf'))) && <div style={{ flex: 1, fontWeight: 500, color: 'white' }}>{item.name}</div>}
@@ -8155,7 +8155,7 @@ END:VCARD`;
                                         </div>
                                     ) : (
                                         <>
-                                            <img src={item.preview} alt="Vorschau" className="hover-zoom" style={{ width: '44px', height: '44px', objectFit: 'cover', borderRadius: '8px' }} />
+                                            <img src={item.preview} alt="Vorschau" className="hover-zoom" style={{ width: '44px', height: '44px', objectFit: 'contain', borderRadius: '8px' }} />
                                             <div style={{ flex: 1, overflow: 'hidden' }}>
                                                 <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'white' }}>{item.name || item.assignedTo}</div>
                                                 {item.description && (
@@ -9701,7 +9701,7 @@ END:VCARD`;
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                                     {formData.images.filter(img => img.includeInReport !== false && img.assignedTo !== 'Emails' && img.assignedTo !== 'Pläne').map((img, idx) => (
                                         <div key={idx} style={{ breakInside: 'avoid', border: '1px solid var(--border)', borderRadius: '8px', overflow: 'hidden' }}>
-                                            <img src={img.preview} alt="" style={{ width: '100%', height: '200px', objectFit: 'cover' }} />
+                                            <img src={img.preview} alt="" style={{ width: '100%', height: '200px', objectFit: 'contain' }} />
                                             {img.description && <div style={{ padding: '0.5rem', fontSize: '9pt', fontStyle: 'italic' }}>{img.description}</div>}
                                         </div>
                                     ))}
