@@ -156,7 +156,10 @@ function App() {
   // Authentication / User Management State
   const [showUserModal, setShowUserModal] = useState(false);
   const [showMeasurementManager, setShowMeasurementManager] = useState(false);
-  const [currentUser, setCurrentUser] = useState({ id: 1, name: 'Admin User', role: 'admin' }); // Auto-login as admin
+  const [currentUser, setCurrentUser] = useState(() => {
+    const saved = localStorage.getItem('qtool_current_user');
+    return saved ? JSON.parse(saved) : null;
+  });
   const sessionTokenRef = useRef(null);
   const isSessionActiveRef = useRef(true);
   const selectedReportRef = useRef(null);
@@ -180,8 +183,20 @@ function App() {
   useEffect(() => { selectedReportRef.current = selectedReport; }, [selectedReport]);
 
   // ── State-Deklarationen ───────────────────────────────────────────────────
-  const [userRole, setUserRole] = useState('admin'); // 'admin' | 'technician' | 'user'
-  const [isTechnicianMode, setIsTechnicianMode] = useState(false); // Globaler Fallback-Modus (Dashboard)
+  const [userRole, setUserRole] = useState(() => {
+    const saved = localStorage.getItem('qtool_current_user');
+    if (saved) {
+      try { return JSON.parse(saved).role; } catch (e) {}
+    }
+    return 'admin';
+  });
+  const [isTechnicianMode, setIsTechnicianMode] = useState(() => {
+    const saved = localStorage.getItem('qtool_current_user');
+    if (saved) {
+      try { return JSON.parse(saved).role === 'technician'; } catch (e) {}
+    }
+    return false;
+  });
   const [supabaseStatus, setSupabaseStatus] = useState(null); // null | { ok: bool, count: number, error: string }
 
   // ── Dark / Light Mode ────────────────────────────────────────────────────
@@ -361,6 +376,46 @@ function App() {
     localStorage.setItem('qtool_users_v2', JSON.stringify(users));
   }, [users]);
 
+  // Load users from Supabase on mount
+  useEffect(() => {
+    if (!supabase) return;
+    const loadUsersFromSupabase = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('damage_reports')
+          .select('report_data')
+          .eq('id', 'SYSTEM_SETTINGS')
+          .single();
+        if (data && data.report_data && data.report_data.users) {
+          setUsers(data.report_data.users);
+        }
+      } catch (err) {
+        console.error("Failed to load users from Supabase:", err);
+      }
+    };
+    loadUsersFromSupabase();
+  }, [supabase]);
+
+  // Save users to Supabase
+  const saveUsersToSupabase = async (newUsers) => {
+    if (!supabase) return;
+    try {
+      await supabase.from('damage_reports').upsert({
+        id: 'SYSTEM_SETTINGS',
+        project_title: 'System Settings',
+        report_data: { users: newUsers },
+        updated_at: new Date().toISOString()
+      });
+    } catch (err) {
+      console.error("Failed to save users to Supabase:", err);
+    }
+  };
+
+  const handleSetUsers = (newUsers) => {
+    setUsers(newUsers);
+    saveUsersToSupabase(newUsers);
+  };
+
   useEffect(() => {
     if (userRole === 'technician') {
       setIsTechnicianMode(true);
@@ -371,10 +426,9 @@ function App() {
   const handleLogin = (user) => {
     setCurrentUser(user);
     setUserRole(user.role);
-    // Automatically set mode based on role
     setIsTechnicianMode(user.role === 'technician');
-    // Projektmodus beim Login zurücksetzen
     setProjectMode(user.role === 'technician' ? 'technician' : 'desktop');
+    localStorage.setItem('qtool_current_user', JSON.stringify(user));
     showToast(`Angemeldet als ${user.name}`, 'success');
   };
 
@@ -385,6 +439,7 @@ function App() {
     setProjectMode('desktop');
     setView('dashboard');
     setSelectedReport(null);
+    localStorage.removeItem('qtool_current_user');
   };
 
   // Initialize reports from LocalStorage
@@ -1566,7 +1621,7 @@ function App() {
       </main>
 
       {/* Render User Management Modal */}
-      {showUserModal && <UserManagementModal onClose={() => setShowUserModal(false)} users={users} setUsers={setUsers} />}
+      {showUserModal && <UserManagementModal onClose={() => setShowUserModal(false)} users={users} setUsers={handleSetUsers} />}
       {showMeasurementManager && <MeasurementDeviceManager onClose={() => setShowMeasurementManager(false)} />}
       {showEmailImport && (
         <EmailImportModalV2
