@@ -139,7 +139,7 @@ export const styles = StyleSheet.create({
     image: {
         width: '100%',
         height: 185, // Slightly reduced for footer clearance
-        objectFit: 'cover',
+        objectFit: 'contain',
         objectPosition: 'center',
         borderRadius: 2,
     },
