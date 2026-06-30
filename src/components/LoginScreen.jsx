@@ -66,15 +66,40 @@ const LoginScreen = ({ users, onLogin }) => {
                         </label>
                         <div style={{ position: 'relative' }}>
                             <User size={20} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-                            <input
-                                type="text"
+                            <select
                                 value={name}
                                 onChange={(e) => { setName(e.target.value); setError(''); }}
-                                placeholder="Name eingeben..."
                                 className="form-input"
-                                style={{ width: '100%', paddingLeft: '40px', height: '48px' }}
+                                style={{
+                                    width: '100%',
+                                    paddingLeft: '40px',
+                                    height: '48px',
+                                    appearance: 'none',
+                                    WebkitAppearance: 'none',
+                                    background: 'var(--surface)',
+                                    color: 'var(--text-main)',
+                                    cursor: 'pointer'
+                                }}
                                 autoFocus
-                            />
+                            >
+                                <option value="">Benutzer auswählen...</option>
+                                {users.map(u => (
+                                    <option key={u.id} value={u.name}>{u.name}</option>
+                                ))}
+                            </select>
+                            <div style={{
+                                position: 'absolute',
+                                right: '15px',
+                                top: '50%',
+                                pointerEvents: 'none',
+                                border: 'solid var(--text-muted)',
+                                borderWidth: '0 2px 2px 0',
+                                display: 'inline-block',
+                                padding: '3px',
+                                transform: 'translateY(-70%) rotate(45deg)',
+                                WebkitTransform: 'translateY(-70%) rotate(45deg)',
+                                opacity: 0.5
+                            }} />
                         </div>
                     </div>
 
