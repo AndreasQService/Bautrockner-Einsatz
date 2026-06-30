@@ -329,8 +329,8 @@ ${text}`;
                 }
             } catch (e) { }
 
-            // Preferred models: 2.5-flash first, 2.0-flash as fallback, then legacy
-            const PREFERRED = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash-latest"];
+            // Preferred models: 1.5-flash first (most stable/widely supported), then newer/legacy models
+            const PREFERRED = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-flash-latest"];
             const legacyModels = discoveryModels.length > 0
                 ? discoveryModels.filter(m => !PREFERRED.includes(m))
                 : ["gemini-1.5-flash", "gemini-1.5-pro"];
@@ -363,7 +363,7 @@ ${text}`;
                     console.warn(`Fehlgeschlagen: ${attempt.model} (${attempt.version})`, msg);
                     if (msg.includes('429') || msg.includes('Quota') || msg.includes('limit')) {
                         hasQuotaError = true;
-                        continue;
+                        throw err; // Stop immediately to avoid hitting rate limit with consecutive calls!
                     } else if (msg.includes('503') || msg.includes('high demand') || msg.includes('overloaded')) {
                         console.warn(`${attempt.model} dauerhaft überlastet — nächstes Modell...`);
                         continue;
