@@ -112,10 +112,7 @@ const LoginScreen = ({ users, onLogin }) => {
                     </button>
                 </form>
 
-                <div style={{ marginTop: '2rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                    Admin: "Admin User" / "admin"<br />
-                    Tech: "Techniker 1" / "123"
-                </div>
+                
             </div>
 
             <div style={{ marginTop: '2rem', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
