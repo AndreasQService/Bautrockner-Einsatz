@@ -681,6 +681,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
     const [isRoomsExpanded, setIsRoomsExpanded] = useState(true);
     const [isDevicesExpanded, setIsDevicesExpanded] = useState(true);
     const [isMeasurementsExpanded, setIsMeasurementsExpanded] = useState(true);
+    const [saveAsNewVersion, setSaveAsNewVersion] = useState(false);
     const [selectedRoomIdForDetails, setSelectedRoomIdForDetails] = useState(null);
     const [deviceCatalog, setDeviceCatalog] = useState([]);
     const [showCreateInventoryModal, setShowCreateInventoryModal] = useState(false);
@@ -2363,6 +2364,13 @@ END:VCARD`;
 
         // Add the new file
         const file = new File([blob], fileName, { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const isNewVersionRequested = saveAsNewVersion || formData.status === 'Abgeschlossen';
+        if (!isNewVersionRequested) {
+            setFormData(prev => {
+                const otherImages = prev.images.filter(img => img.assignedTo !== 'Messprotokolle');
+                return { ...prev, images: otherImages };
+            });
+        }
         handleImageUpload([file], { assignedTo: 'Messprotokolle' });
     };
 
@@ -2447,7 +2455,16 @@ END:VCARD`;
                 uploadToApp: true,
                 getPhotoDownloadUrl,
                 uploadReport,
-                handleImageUpload,
+                handleImageUpload: (files, context) => {
+                    const isNewVersionRequested = saveAsNewVersion || formData.status === 'Abgeschlossen';
+                    if (!isNewVersionRequested) {
+                        setFormData(prev => {
+                            const otherImages = prev.images.filter(img => img.assignedTo !== context.assignedTo);
+                            return { ...prev, images: otherImages };
+                        });
+                    }
+                    return handleImageUpload(files, context);
+                },
                 buildProjectFolderName,
                 onProgress: (msg) => console.log(`[PDF Progress] ${msg}`)
             });
@@ -7039,6 +7056,18 @@ END:VCARD`;
                             </span>
                         </label>
 
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem', marginBottom: '0.25rem' }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', color: 'var(--text-main)', fontSize: '0.85rem' }}>
+                                <input
+                                    type="checkbox"
+                                    checked={saveAsNewVersion}
+                                    onChange={(e) => setSaveAsNewVersion(e.target.checked)}
+                                    style={{ width: '16px', height: '16px', accentColor: 'var(--primary)' }}
+                                />
+                                <span>Als neue Version sichern (nicht überschreiben)</span>
+                            </label>
+                        </div>
+
                         <button
                             type="button"
                             onClick={handleGeneratePDF}
@@ -7359,7 +7388,16 @@ END:VCARD`;
 
                 {/* PDF Button - Techniker Mode (immer sichtbar) */}
                 {mode === 'technician' && techTab !== 'plaene' && (
-                    <div style={{ display: 'flex', justifyContent: 'center', marginTop: '0.5rem', marginBottom: '1.5rem' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem', marginTop: '0.5rem', marginBottom: '1.5rem' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', color: 'var(--text-main)', fontSize: '0.85rem' }}>
+                            <input
+                                type="checkbox"
+                                checked={saveAsNewVersion}
+                                onChange={(e) => setSaveAsNewVersion(e.target.checked)}
+                                style={{ width: '16px', height: '16px', accentColor: 'var(--primary)' }}
+                            />
+                            <span>Als neue Version sichern</span>
+                        </label>
                         <button
                             type="button"
                             onClick={handleGeneratePDF}
