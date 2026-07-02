@@ -1173,6 +1173,27 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
     const [editRoomName, setEditRoomName] = useState('');
     const [editRoomStockwerk, setEditRoomStockwerk] = useState('');
     const [editRoomApartment, setEditRoomApartment] = useState('');
+
+    const [collapsedRooms, setCollapsedRooms] = useState({});
+
+    const handleMoveRoom = (index, direction) => {
+        const targetIndex = direction === 'up' ? index - 1 : index + 1;
+        if (targetIndex < 0 || targetIndex >= (formData.rooms || []).length) return;
+        
+        setFormData(prev => {
+            const rooms = [...prev.rooms];
+            const [moved] = rooms.splice(index, 1);
+            rooms.splice(targetIndex, 0, moved);
+            return { ...prev, rooms };
+        });
+    };
+
+    const toggleRoomCollapse = (roomId) => {
+        setCollapsedRooms(prev => ({
+            ...prev,
+            [roomId]: !prev[roomId]
+        }));
+    };
     const [showTechRoomSelector, setShowTechRoomSelector] = useState(false);
     const [techRoomSelectorMode, setTechRoomSelectorMode] = useState('messung');
     const [techSelectedEquipmentRoom, setTechSelectedEquipmentRoom] = useState(null);
@@ -5895,7 +5916,7 @@ END:VCARD`;
 
 
                 <div style={{ display: (mode !== 'technician' && !isRoomsExpanded) ? 'none' : 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                    {formData.rooms.map(room => (
+                    {formData.rooms.map((room, roomIndex) => (
                         <div key={room.id} className="card" style={{ 
                             padding: 0, 
                             overflow: 'hidden', 
@@ -5914,6 +5935,40 @@ END:VCARD`;
                                 margin: mode === 'technician' ? '0.75rem 0.75rem 0 0.75rem' : '0'
                             }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, minWidth: 0, paddingRight: '1rem', flexWrap: 'wrap' }}>
+                                    {/* Up & Down arrows */}
+                                    {mode !== 'technician' && (
+                                        <div style={{ display: 'flex', gap: '2px', marginRight: '4px', alignItems: 'center' }}>
+                                            <button
+                                                type="button"
+                                                disabled={roomIndex === 0}
+                                                onClick={(e) => { e.stopPropagation(); handleMoveRoom(roomIndex, 'up'); }}
+                                                style={{
+                                                    background: 'transparent', border: 'none', padding: 0,
+                                                    cursor: roomIndex === 0 ? 'default' : 'pointer',
+                                                    color: roomIndex === 0 ? 'rgba(255,255,255,0.1)' : 'var(--text-muted)',
+                                                    display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                                }}
+                                                title="Nach oben verschieben"
+                                            >
+                                                <ChevronUp size={16} />
+                                            </button>
+                                            <button
+                                                type="button"
+                                                disabled={roomIndex === formData.rooms.length - 1}
+                                                onClick={(e) => { e.stopPropagation(); handleMoveRoom(roomIndex, 'down'); }}
+                                                style={{
+                                                    background: 'transparent', border: 'none', padding: 0,
+                                                    cursor: roomIndex === formData.rooms.length - 1 ? 'default' : 'pointer',
+                                                    color: roomIndex === formData.rooms.length - 1 ? 'rgba(255,255,255,0.1)' : 'var(--text-muted)',
+                                                    display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                                }}
+                                                title="Nach unten verschieben"
+                                            >
+                                                <ChevronDown size={16} />
+                                            </button>
+                                        </div>
+                                    )}
+
                                     {editingRoomId === room.id ? (
                                         <>
                                             <input
@@ -6020,6 +6075,20 @@ END:VCARD`;
                                             >
                                                 <Edit3 size={14} />
                                             </button>
+
+                                            {/* Collapse/Expand Toggle Button */}
+                                            <button
+                                                type="button"
+                                                onClick={(e) => { e.stopPropagation(); toggleRoomCollapse(room.id); }}
+                                                style={{
+                                                    background: 'transparent', border: 'none', color: 'var(--primary)',
+                                                    cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '4px',
+                                                    marginLeft: '4px', opacity: 0.8
+                                                 }}
+                                                title={collapsedRooms[room.id] ? "Raum ausklappen" : "Raum einklappen"}
+                                            >
+                                                {collapsedRooms[room.id] ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
+                                            </button>
                                         </>
                                     )}
                                 </div>
@@ -6063,7 +6132,8 @@ END:VCARD`;
 
                                 </div>
                             </div>
-                            <div style={{ padding: '0.75rem' }}>
+                            {!collapsedRooms[room.id] && (
+                                <div style={{ padding: '0.75rem' }}>
                                 <>
                                     {(() => {
                                         const roomImages = formData.images.filter(img => img.roomId === room.id);
@@ -6442,6 +6512,7 @@ END:VCARD`;
                                     </div>
                                 </>
                             </div>
+                            )}
                         </div>
                     ))}
                     {formData.rooms.length === 0 && (
