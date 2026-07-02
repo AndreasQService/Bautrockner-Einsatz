@@ -34,6 +34,27 @@ export default function RoomManager({
 }) {
     // Local state for toggling room image visibility (if needed, or pass from parent)
     const [visibleRoomImages, setVisibleRoomImages] = useState({});
+    const [collapsedRooms, setCollapsedRooms] = useState({});
+
+    const handleMoveRoom = (index, direction) => {
+        const targetIndex = direction === 'up' ? index - 1 : index + 1;
+        if (targetIndex < 0 || targetIndex >= (formData.rooms || []).length) return;
+        
+        setFormData(prev => {
+            const rooms = [...prev.rooms];
+            const [moved] = rooms.splice(index, 1);
+            rooms.splice(targetIndex, 0, moved);
+            return { ...prev, rooms };
+        });
+    };
+
+    const toggleRoomCollapse = (roomId) => {
+        setCollapsedRooms(prev => ({
+            ...prev,
+            [roomId]: !prev[roomId]
+        }));
+    };
+
     const [dragImageIndex, setDragImageIndex] = useState(null);
     const [dragOverIndex, setDragOverIndex] = useState(null);
     const [dragRoomId, setDragRoomId] = useState(null);
@@ -682,6 +703,39 @@ export default function RoomManager({
                                         >
                                             <GripVertical size={18} />
                                         </div>
+
+                                        {/* Up & Down arrows */}
+                                        <div style={{ display: 'flex', gap: '2px', marginRight: '4px' }}>
+                                            <button
+                                                type="button"
+                                                disabled={roomIndex === 0}
+                                                onClick={(e) => { e.stopPropagation(); handleMoveRoom(roomIndex, 'up'); }}
+                                                style={{
+                                                    background: 'transparent', border: 'none', padding: 0,
+                                                    cursor: roomIndex === 0 ? 'default' : 'pointer',
+                                                    color: roomIndex === 0 ? 'rgba(255,255,255,0.1)' : 'var(--text-muted)',
+                                                    display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                                }}
+                                                title="Nach oben verschieben"
+                                            >
+                                                <ChevronUp size={16} />
+                                            </button>
+                                            <button
+                                                type="button"
+                                                disabled={roomIndex === formData.rooms.length - 1}
+                                                onClick={(e) => { e.stopPropagation(); handleMoveRoom(roomIndex, 'down'); }}
+                                                style={{
+                                                    background: 'transparent', border: 'none', padding: 0,
+                                                    cursor: roomIndex === formData.rooms.length - 1 ? 'default' : 'pointer',
+                                                    color: roomIndex === formData.rooms.length - 1 ? 'rgba(255,255,255,0.1)' : 'var(--text-muted)',
+                                                    display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                                }}
+                                                title="Nach unten verschieben"
+                                            >
+                                                <ChevronDown size={16} />
+                                            </button>
+                                        </div>
+
                                         <span style={{ fontWeight: 800, fontSize: '1.25rem', color: 'var(--primary)', whiteSpace: 'nowrap' }}>{room.name}</span>
                                         {room.stockwerk && (
                                             <span style={{ fontWeight: 800, fontSize: '1.25rem', color: 'var(--primary)', opacity: 0.75, whiteSpace: 'nowrap' }}>• {room.stockwerk}</span>
@@ -689,6 +743,20 @@ export default function RoomManager({
                                         {room.apartment && (
                                             <span style={{ fontWeight: 800, fontSize: '1.25rem', color: 'var(--primary)', opacity: 0.75, whiteSpace: 'nowrap' }}>• {room.apartment}</span>
                                         )}
+
+                                        {/* Collapse/Expand Toggle Button */}
+                                        <button
+                                            type="button"
+                                            onClick={(e) => { e.stopPropagation(); toggleRoomCollapse(room.id); }}
+                                            style={{
+                                                background: 'transparent', border: 'none', color: 'var(--primary)',
+                                                cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '4px',
+                                                marginLeft: '4px', opacity: 0.8
+                                            }}
+                                            title={collapsedRooms[room.id] ? "Raum ausklappen" : "Raum einklappen"}
+                                        >
+                                            {collapsedRooms[room.id] ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
+                                        </button>
                                     </div>
                                     <div style={{
                                         display: 'grid',
@@ -821,6 +889,7 @@ export default function RoomManager({
                                 </div>
 
                                 {/* Room Images & Details Section */}
+                                {!collapsedRooms[room.id] && (
                                 <div style={{ padding: '1rem 1.25rem' }}>
                                     {/* Room Header Info (Mobile View) */}
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
@@ -1037,6 +1106,7 @@ export default function RoomManager({
                                         />
                                     </div>
                                 </div>
+                                )}
                             </div>
                         ))}
 
