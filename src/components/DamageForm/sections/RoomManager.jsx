@@ -687,7 +687,7 @@ export default function RoomManager({
                                             <span style={{ fontWeight: 800, fontSize: '1.25rem', color: 'var(--primary)', opacity: 0.75, whiteSpace: 'nowrap' }}>• {room.stockwerk}</span>
                                         )}
                                         {room.apartment && (
-                                            <span style={{ fontWeight: 800, fontSize: '1.25rem', color: 'var(--primary)', opacity: 0.75, whiteSpace: 'nowrap' }}>• Whg {room.apartment}</span>
+                                            <span style={{ fontWeight: 800, fontSize: '1.25rem', color: 'var(--primary)', opacity: 0.75, whiteSpace: 'nowrap' }}>• {room.apartment}</span>
                                         )}
                                     </div>
                                     <div style={{

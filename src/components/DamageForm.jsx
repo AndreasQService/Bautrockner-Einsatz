@@ -5994,7 +5994,7 @@ END:VCARD`;
                                                 <span style={{ fontWeight: 700, fontSize: '1rem', color: mode === 'technician' ? 'var(--text-muted)' : 'var(--primary)', opacity: 0.75, whiteSpace: 'nowrap' }}>• {room.stockwerk}</span>
                                             )}
                                             {room.apartment && (
-                                                <span style={{ fontWeight: 700, fontSize: '1rem', color: mode === 'technician' ? 'var(--text-muted)' : 'var(--primary)', opacity: 0.75, whiteSpace: 'nowrap' }}>• Whg {room.apartment}</span>
+                                                <span style={{ fontWeight: 700, fontSize: '1rem', color: mode === 'technician' ? 'var(--text-muted)' : 'var(--primary)', opacity: 0.75, whiteSpace: 'nowrap' }}>• {room.apartment}</span>
                                             )}
                                             <button
                                                 type="button"
@@ -7560,8 +7560,7 @@ END:VCARD`;
                                         const rName = room.name || 'Unbenannter Raum';
                                         const floor = room.stockwerk ? `${room.stockwerk} ` : '';
                                         const apt = room.apartment || '';
-                                        const hasKeyword = apt && (apt.toLowerCase().includes('wohnung') || apt.toLowerCase().includes('whg'));
-                                        const displayApt = apt ? (hasKeyword ? apt : `Whg ${apt}`) : '';
+                                        const displayApt = apt;
                                         const roomTitle = `${rName} ${floor}${displayApt}`.trim();
 
                                         return (
@@ -7907,8 +7906,7 @@ END:VCARD`;
                                                                 const rName = room.name || 'Unbenannter Raum';
                                                                 const floor = room.stockwerk ? `${room.stockwerk} ` : '';
                                                                 const apt = room.apartment || '';
-                                                                const hasKeyword = apt.toLowerCase().includes('wohnung') || apt.toLowerCase().includes('whg');
-                                                                const displayApt = apt ? (hasKeyword ? apt : `Whg ${apt}`) : '';
+                                                                const displayApt = apt;
                                                                 return `${rName} ${floor}${displayApt}`.trim();
                                                             })()}
                                                         </div>

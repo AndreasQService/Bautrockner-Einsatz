@@ -62,10 +62,7 @@ const RoomDocumentation = ({ rooms, images, contacts = [] }) => {
                                                 c.name && apt && c.name.toLowerCase().includes(apt.toLowerCase())
                                             );
                                             const floor = matchingContact?.floor || matchingContact?.apartment || room.stockwerk || '';
-                                            const hasKeyword = apt.toLowerCase().includes('wohnung') || apt.toLowerCase().includes('whg');
-                                            // Nur Nachname (letztes Wort) für die Anzeige
-                                            const lastName = apt.trim().split(/\s+/).pop() || apt;
-                                            const displayApt = (apt && !hasKeyword) ? `Whg. ${lastName}` : apt;
+                                            const displayApt = apt;
                                             if (room.stockwerk && displayApt && displayApt.toLowerCase().includes(room.stockwerk.toLowerCase())) {
                                                 return displayApt;
                                             }
