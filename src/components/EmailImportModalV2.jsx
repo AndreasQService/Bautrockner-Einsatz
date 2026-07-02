@@ -433,15 +433,15 @@ ${text}`;
                 backdropFilter: 'blur(4px)'
             }}>
                 <div style={{
-                    backgroundColor: '#FFFFFF', padding: '2rem', borderRadius: '16px',
+                    backgroundColor: 'var(--surface)', padding: '2rem', borderRadius: '16px',
                     width: '900px', maxWidth: '95%', maxHeight: '90vh', overflowY: 'auto',
-                    border: '1px solid #E2E8F0', boxShadow: '0 10px 30px rgba(0,0,0,0.1)',
-                    color: '#1E293B'
+                    border: '1px solid var(--border)', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.5)',
+                    color: 'var(--text-main)'
                 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '1px solid #E2E8F0', paddingBottom: '1rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '1px solid var(--border)', paddingBottom: '1rem' }}>
                         <div>
-                            <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 800, color: '#10b981' }}>Vorschau & Korrektur (Gemini V4)</h2>
-                            {previewData.projektTitel && <p style={{ margin: '0.25rem 0 0', fontSize: '0.9rem', color: '#94a3b8' }}>{previewData.projektTitel}</p>}
+                            <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 800, color: 'var(--primary)' }}>Vorschau & Korrektur (Gemini V4)</h2>
+                            {previewData.projektTitel && <p style={{ margin: '0.25rem 0 0', fontSize: '0.9rem', color: 'var(--text-muted)' }}>{previewData.projektTitel}</p>}
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                             {previewData.priority === 'hoch' && (
@@ -453,8 +453,8 @@ ${text}`;
 
                     {/* Beschreibung */}
                     {(previewData.beschreibung || previewData.projekt_daten?.beschreibung) && (
-                        <div style={{ backgroundColor: 'rgba(59,130,246,0.08)', padding: '0.75rem 1rem', borderRadius: '10px', borderLeft: '3px solid #3b82f6', marginBottom: '1.25rem', fontSize: '0.85rem', color: '#93c5fd' }}>
-                            <strong style={{ color: '#3b82f6', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Beschreibung: </strong>
+                        <div style={{ backgroundColor: 'var(--background)', padding: '0.75rem 1rem', borderRadius: '10px', borderLeft: '3px solid var(--primary)', marginBottom: '1.25rem', fontSize: '0.85rem', color: 'var(--text-main)', border: '1px solid var(--border)', borderLeftWidth: '3px' }}>
+                            <strong style={{ color: 'var(--primary)', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Beschreibung: </strong>
                             {previewData.beschreibung || previewData.projekt_daten?.beschreibung}
                         </div>
                     )}
@@ -462,8 +462,8 @@ ${text}`;
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1.5rem', marginBottom: '2rem' }}>
 
                         {/* Auftraggeber */}
-                        <div style={{ backgroundColor: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: '12px' }}>
-                            <h4 style={{ marginTop: 0, color: '#3b82f6', fontSize: '0.9rem', textTransform: 'uppercase' }}>Auftraggeber / Verwaltung</h4>
+                        <div style={{ backgroundColor: 'var(--background)', padding: '1rem', borderRadius: '12px', border: '1px solid var(--border)' }}>
+                            <h4 style={{ marginTop: 0, color: '#60A5FA', fontSize: '0.9rem', textTransform: 'uppercase' }}>Auftraggeber / Verwaltung</h4>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                                 <div>
                                     <label style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8' }}>Firma</label>
@@ -495,8 +495,8 @@ ${text}`;
                         </div>
 
                         {/* Rechnungsdetails */}
-                        <div style={{ backgroundColor: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: '12px' }}>
-                            <h4 style={{ marginTop: 0, color: '#f59e0b', fontSize: '0.9rem', textTransform: 'uppercase' }}>Rechnungsdetails</h4>
+                        <div style={{ backgroundColor: 'var(--background)', padding: '1rem', borderRadius: '12px', border: '1px solid var(--border)' }}>
+                            <h4 style={{ marginTop: 0, color: '#F59E0B', fontSize: '0.9rem', textTransform: 'uppercase' }}>Rechnungsdetails</h4>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                                 <div>
                                     <label style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8' }}>Eigentümer / Rechnungsempfänger</label>
@@ -536,8 +536,8 @@ ${text}`;
                         </div>
 
                         {/* Schadenort */}
-                        <div style={{ gridColumn: 'span 2', backgroundColor: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: '12px' }}>
-                            <h4 style={{ marginTop: 0, color: '#ef4444', fontSize: '0.9rem', textTransform: 'uppercase' }}>Schadenort</h4>
+                        <div style={{ gridColumn: 'span 2', backgroundColor: 'var(--background)', padding: '1rem', borderRadius: '12px', border: '1px solid var(--border)' }}>
+                            <h4 style={{ marginTop: 0, color: '#F87171', fontSize: '0.9rem', textTransform: 'uppercase' }}>Schadenort</h4>
                             <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: '1rem' }}>
                                 <div>
                                     <label style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8' }}>Strasse</label>
@@ -578,10 +578,10 @@ ${text}`;
                         </div>
                     </div>
 
-                    <h4 style={{ color: '#10b981', fontSize: '0.9rem', textTransform: 'uppercase', marginBottom: '1rem' }}>Identifizierte Kontakte</h4>
+                    <h4 style={{ color: 'var(--primary)', fontSize: '0.9rem', textTransform: 'uppercase', marginBottom: '1rem' }}>Identifizierte Kontakte</h4>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '2rem' }}>
                         {previewData.kontakte && previewData.kontakte.map((c, idx) => (
-                            <div key={idx} style={{ display: 'grid', gridTemplateColumns: '120px 1fr 1fr 140px 140px 40px', gap: '0.5rem', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.2)', padding: '0.75rem', borderRadius: '8px' }}>
+                            <div key={idx} style={{ display: 'grid', gridTemplateColumns: '120px 1fr 1fr 140px 140px 40px', gap: '0.5rem', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.3)', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border)' }}>
                                 <input className="form-input" placeholder="Rolle" value={c.rolle || ''} onChange={e => {
                                     const newC = [...previewData.kontakte]; newC[idx] = { ...newC[idx], rolle: e.target.value }; setPreviewData({ ...previewData, kontakte: newC });
                                 }} />
@@ -606,12 +606,12 @@ ${text}`;
                         <button onClick={() => setPreviewData({ ...previewData, kontakte: [...(previewData.kontakte || []), { rolle: '', name: '', firma: '', telefon: '', zweck: '' }] })} className="btn btn-ghost" style={{ alignSelf: 'start', fontSize: '0.8rem' }}>+ Weiteren Kontakt hinzufügen</button>
                     </div>
 
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', borderTop: '1px solid #E2E8F0', paddingTop: '1.5rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', borderTop: '1px solid var(--border)', paddingTop: '1.5rem' }}>
                         <button onClick={() => setPreviewData(null)} className="btn btn-outline" style={{ minWidth: '120px' }}>Zurück</button>
                         <button onClick={() => {
                             onImport(previewData);
                             setPreviewData(null);
-                        }} className="btn btn-primary" style={{ minWidth: '180px', backgroundColor: '#10b981', border: 'none' }}>Daten übernehmen</button>
+                        }} className="btn btn-primary" style={{ minWidth: '180px' }}>Daten übernehmen</button>
                     </div>
                 </div>
             </div>,
