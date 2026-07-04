@@ -100,6 +100,25 @@ Set-ItemProperty -Path $hidPath -Name "BreakOnEntry" -Value 0 -Type DWord -EA Si
 
 Write-Host "      OK - LPM und HID-Timeouts angepasst" -ForegroundColor Green
 
+# --- 5. Netzwerkadapter Energiesparen deaktivieren ---
+Write-Host ""
+Write-Host "[5/5] Deaktiviere Energieverwaltung fuer alle Netzwerkadapter..." -ForegroundColor Yellow
+try {
+    $adapters = Get-NetAdapter -Physical -ErrorAction SilentlyContinue
+    if ($adapters) {
+        foreach ($adapter in $adapters) {
+            $pm = $adapter | Get-NetAdapterPowerManagement -ErrorAction SilentlyContinue
+            if ($pm -and $pm.AllowComputerToTurnOffDevice -ne 'Disabled') {
+                $pm.AllowComputerToTurnOffDevice = 'Disabled'
+                $pm | Set-NetAdapterPowerManagement -ErrorAction SilentlyContinue
+                Write-Host "      OK - Energieverwaltung fuer $($adapter.Name) deaktiviert" -ForegroundColor Green
+            }
+        }
+    }
+} catch {
+    Write-Host "      Fehler beim Anpassen der Netzwerkadapter-Energieverwaltung" -ForegroundColor Red
+}
+
 # --- Zusammenfassung ---
 Write-Host ""
 Write-Host "======================================================" -ForegroundColor Cyan
@@ -111,6 +130,7 @@ Write-Host "  - USB Selective Suspend deaktiviert (Netzbetrieb + Akku)" -Foregro
 Write-Host "  - USB Root Hub Energieverwaltung deaktiviert" -ForegroundColor Gray
 Write-Host "  - HID/Tastatur-Geraete: 'Ausschalten zum Sparen' OFF" -ForegroundColor Gray
 Write-Host "  - USB Link Power Management (LPM) deaktiviert" -ForegroundColor Gray
+Write-Host "  - Netzwerkadapter (inkl. Realtek USB GbE) Energieverwaltung deaktiviert" -ForegroundColor Gray
 Write-Host ""
 Write-Host "Wenn das Lag danach noch besteht: Dock-Firmware pruefen!" -ForegroundColor Yellow
 Write-Host ""
