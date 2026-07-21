@@ -3022,7 +3022,7 @@ END:VCARD`;
             { id: 'leck', label: 'Leckortung', icon: '💧', color: '#06B6D4', status: 'Leckortung' },
             { id: 'trocknung', label: 'Trocknung', icon: '🌬', color: '#A855F7', status: 'Trocknung' },
             { id: 'messung', label: 'Messung', icon: '📏', color: '#1E6DB7', status: null }, // corrected from Mäns
-            { id: 'plaene', label: 'Pläne', icon: '🗺️', color: '#10B981', status: null },
+            { id: 'plaene', label: 'Pläne / Bilder', icon: '🗺️', color: '#10B981', status: null },
         ];
         const adresse = [formData.street, [formData.zip, formData.city].filter(Boolean).join(' ')].filter(Boolean).join(', ');
         const sub = [formData.projectNumber, formData.damageCategory].filter(Boolean).join(' · ');
@@ -8259,7 +8259,8 @@ END:VCARD`;
 
                 {/* Pläne & Grundrisse Section */}
                 {mode === 'technician' && techTab === 'plaene' && (
-                    <div className="card" style={{ marginBottom: '1.5rem', padding: '1.5rem' }}>
+                    <>
+                        <div className="card" style={{ marginBottom: '1.5rem', padding: '1.5rem' }}>
                         <h3 className="section-header">
                             <FileText size={18} /> Pläne & Grundrisse
                         </h3>
@@ -8362,7 +8363,192 @@ END:VCARD`;
                             )}
                         </div>
                     </div>
-                )}
+
+                    {/* Bilder & Fotodokumentation Section */}
+                    <div className="card" style={{ marginBottom: '1.5rem', padding: '1.5rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+                            <h3 className="section-header" style={{ margin: 0, border: 'none', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <Camera size={18} /> Fotos & Bilder ({((formData.images || []).filter(img => !(img.type === 'document' || img.name?.toLowerCase().endsWith('.msg') || img.name?.toLowerCase().endsWith('.pdf')))).length + (formData.photos || []).length})
+                            </h3>
+                            
+                            <label 
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.4rem',
+                                    backgroundColor: '#1E6DB7',
+                                    color: '#FFFFFF',
+                                    borderRadius: '8px',
+                                    padding: '0.5rem 0.9rem',
+                                    fontSize: '0.85rem',
+                                    fontWeight: 700,
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                <Camera size={16} />
+                                <span>Foto aufnehmen</span>
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    multiple
+                                    capture="environment"
+                                    style={{ display: 'none' }}
+                                    onChange={(e) => {
+                                        const files = Array.from(e.target.files || []);
+                                        if (files.length > 0) {
+                                            for (const file of files) {
+                                                const reader = new FileReader();
+                                                reader.onload = (event) => {
+                                                    const newImg = {
+                                                        id: Date.now() + Math.random(),
+                                                        preview: event.target.result,
+                                                        url: event.target.result,
+                                                        date: new Date().toISOString(),
+                                                        name: file.name || 'Foto',
+                                                        assignedTo: 'Fotodokumentation',
+                                                        category: 'Fotos',
+                                                        room: 'Allgemein'
+                                                    };
+                                                    setFormData(prev => ({
+                                                        ...prev,
+                                                        images: [...(prev.images || []), newImg]
+                                                    }));
+                                                };
+                                                reader.readAsDataURL(file);
+                                            }
+                                        }
+                                        e.target.value = '';
+                                    }}
+                                />
+                            </label>
+                        </div>
+
+                        {/* Photo Grid */}
+                        {(() => {
+                            const allPhotos = [
+                                ...(formData.images || []).filter(img => !(img.type === 'document' || img.name?.toLowerCase().endsWith('.msg') || img.name?.toLowerCase().endsWith('.pdf'))),
+                                ...(formData.photos || []).map(p => ({ ...p, preview: p.url || p.preview }))
+                            ];
+
+                            const allRoomsList = [
+                                'Allgemein',
+                                ...(formData.measurementRooms || []).map(r => r.name),
+                                ...(formData.rooms || []).map(r => r.name)
+                            ].filter((v, i, a) => a.indexOf(v) === i);
+
+                            if (allPhotos.length === 0) {
+                                return (
+                                    <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem', fontStyle: 'italic', padding: '1.5rem' }}>
+                                        Noch keine Fotos vorhanden. Tippen Sie oben auf "Foto aufnehmen", um Bilder hinzuzufügen.
+                                    </div>
+                                );
+                            }
+
+                            return (
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '0.75rem' }}>
+                                    {allPhotos.map((img, i) => (
+                                        <div 
+                                            key={img.id || i} 
+                                            style={{ 
+                                                backgroundColor: 'var(--surface)', 
+                                                border: '1px solid var(--border)', 
+                                                borderRadius: '10px', 
+                                                overflow: 'hidden',
+                                                display: 'flex',
+                                                flexDirection: 'column'
+                                            }}
+                                        >
+                                            <div style={{ position: 'relative', width: '100%', height: '120px', backgroundColor: '#000' }}>
+                                                <img 
+                                                    src={img.preview || img.url} 
+                                                    alt={img.name || 'Foto'} 
+                                                    style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: 'pointer' }}
+                                                    onClick={() => {
+                                                        setEditingImage(img.preview || img.url);
+                                                        setEditingImageIndex(i);
+                                                    }}
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setEditingImage(img.preview || img.url);
+                                                        setEditingImageIndex(i);
+                                                    }}
+                                                    style={{
+                                                        position: 'absolute',
+                                                        bottom: '4px',
+                                                        right: '4px',
+                                                        backgroundColor: 'rgba(0,0,0,0.7)',
+                                                        color: '#FFF',
+                                                        border: 'none',
+                                                        borderRadius: '4px',
+                                                        padding: '2px 6px',
+                                                        fontSize: '0.7rem',
+                                                        cursor: 'pointer'
+                                                    }}
+                                                >
+                                                    ✏️ Bearbeiten
+                                                </button>
+                                            </div>
+                                            <div style={{ padding: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.4rem', flex: 1 }}>
+                                                <select
+                                                    className="form-input"
+                                                    style={{ fontSize: '0.75rem', padding: '0.25rem', width: '100%' }}
+                                                    value={img.room || img.roomName || 'Allgemein'}
+                                                    onChange={(e) => {
+                                                        const newRoom = e.target.value;
+                                                        setFormData(prev => ({
+                                                            ...prev,
+                                                            images: (prev.images || []).map(item => item.id === img.id ? { ...item, room: newRoom, roomName: newRoom } : item),
+                                                            photos: (prev.photos || []).map(item => item.id === img.id ? { ...item, room: newRoom } : item)
+                                                        }));
+                                                    }}
+                                                >
+                                                    {allRoomsList.map(r => (
+                                                        <option key={r} value={r}>{r}</option>
+                                                    ))}
+                                                </select>
+                                                <input
+                                                    type="text"
+                                                    className="form-input"
+                                                    placeholder="Notiz..."
+                                                    style={{ fontSize: '0.75rem', padding: '0.25rem', width: '100%' }}
+                                                    value={img.description || img.notes || ''}
+                                                    onChange={(e) => {
+                                                        const newDesc = e.target.value;
+                                                        setFormData(prev => ({
+                                                            ...prev,
+                                                            images: (prev.images || []).map(item => item.id === img.id ? { ...item, description: newDesc, notes: newDesc } : item),
+                                                            photos: (prev.photos || []).map(item => item.id === img.id ? { ...item, notes: newDesc } : item)
+                                                        }));
+                                                    }}
+                                                />
+                                                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 'auto' }}>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            if (window.confirm('Foto löschen?')) {
+                                                                setFormData(prev => ({
+                                                                    ...prev,
+                                                                    images: (prev.images || []).filter(item => item.id !== img.id),
+                                                                    photos: (prev.photos || []).filter(item => item.id !== img.id)
+                                                                }));
+                                                            }
+                                                        }}
+                                                        style={{ background: 'transparent', border: 'none', color: '#EF4444', cursor: 'pointer', padding: '2px' }}
+                                                    >
+                                                        <Trash size={14} />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            );
+                        })()}
+                    </div>
+                </>
+            )}
 
                 {/* 4. Drying Equipment - Visible in all relevant modes */}
                 {(mode === 'technician' ? techTab === 'trocknung' : false) && (
