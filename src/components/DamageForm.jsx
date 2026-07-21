@@ -8480,14 +8480,14 @@ END:VCARD`;
                                                     alt={img.name || 'Foto'} 
                                                     style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: 'pointer' }}
                                                     onClick={() => {
-                                                        setEditingImage(img.preview || img.url);
+                                                        setEditingImage(img);
                                                         setEditingImageIndex(i);
                                                     }}
                                                 />
                                                 <button
                                                     type="button"
                                                     onClick={() => {
-                                                        setEditingImage(img.preview || img.url);
+                                                        setEditingImage(img);
                                                         setEditingImageIndex(i);
                                                     }}
                                                     style={{
@@ -9648,14 +9648,14 @@ END:VCARD`;
                                                     alt={img.name || 'Foto'} 
                                                     style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: 'pointer' }}
                                                     onClick={() => {
-                                                        setEditingImage(img.preview || img.url);
+                                                        setEditingImage(img);
                                                         setEditingImageIndex(i);
                                                     }}
                                                 />
                                                 <button
                                                     type="button"
                                                     onClick={() => {
-                                                        setEditingImage(img.preview || img.url);
+                                                        setEditingImage(img);
                                                         setEditingImageIndex(i);
                                                     }}
                                                     style={{
@@ -9831,19 +9831,25 @@ END:VCARD`;
                                         return { ...prev, customMapImage: newPreview };
                                     }
 
-                                    // 2. Standard Case: List of Images
+                                    // 2. Standard Case: List of Images (Keep original AND add edited image side-by-side)
                                     const nextImages = [];
-                                    prev.images.forEach(img => {
-                                        if (img === editingImage) {
-                                            // Keep the original but hide it from the report
-                                            nextImages.push({ ...img, includeInReport: false });
-                                            // Add the NEW edited version as a separate entry
+                                    (prev.images || []).forEach(img => {
+                                        const isMatch = img === editingImage || 
+                                                        (img.id && editingImage.id && img.id === editingImage.id) ||
+                                                        (img.preview && editingImage.preview && img.preview === editingImage.preview) ||
+                                                        (img.url && editingImage.url && img.url === editingImage.url);
+
+                                        if (isMatch) {
+                                            // 1. Keep the ORIGINAL photo active & included
+                                            nextImages.push({ ...img, includeInReport: true });
+                                            // 2. Add the EDITED photo with drawings right next to it
                                             nextImages.push({
                                                 ...img,
-                                                id: `copy_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
-                                                name: img.name ? `Kopie von ${img.name}` : 'Bearbeitetes Bild',
+                                                id: `edited_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+                                                name: img.name ? `${img.name} (Bearbeitet)` : 'Bearbeitetes Bild',
                                                 preview: newPreview,
-                                                description: newDescription,
+                                                url: newPreview,
+                                                description: newDescription || img.description || '',
                                                 includeInReport: true
                                             });
                                         } else {
