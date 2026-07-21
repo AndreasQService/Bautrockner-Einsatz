@@ -45,7 +45,8 @@ const ImageEditor = ({ image, caseId, onSave, onCancel }) => {
     }, [image]);
 
     useEffect(() => {
-        if (!image || !image.preview) {
+        const imageUrl = typeof image === 'string' ? image : (image?.preview || image?.url || image?.src);
+        if (!image || !imageUrl) {
             console.error("Editor opened without valid image preview.");
             setIsInitializing(false);
             return;
@@ -53,7 +54,7 @@ const ImageEditor = ({ image, caseId, onSave, onCancel }) => {
 
         const img = new window.Image();
         // Skip crossOrigin for data URLs and blob URLs to avoid potential CORS issues
-        if (image.preview.startsWith('data:') || image.preview.startsWith('blob:')) {
+        if (imageUrl.startsWith('data:') || imageUrl.startsWith('blob:')) {
             // Already a local URL, no CORS needed
         } else {
             img.crossOrigin = 'Anonymous';
@@ -108,12 +109,12 @@ const ImageEditor = ({ image, caseId, onSave, onCancel }) => {
         };
 
         img.onerror = () => {
-            console.error("Failed to load image for editor", image.preview);
+            console.error("Failed to load image for editor", imageUrl);
             setIsInitializing(false); // Fail gracefully so user isn't stuck
             alert("Fehler beim Laden des Bildes.");
         };
 
-        img.src = image.preview;
+        img.src = imageUrl;
     }, [image]);
 
     const getCoordinates = (e) => {
