@@ -1950,11 +1950,23 @@ END:VCARD`;
     const handleImageUpload = async (files, contextData = {}) => {
         if (!files || files.length === 0) return;
 
-        for (const file of files) {
-            const previewUrl = URL.createObjectURL(file);
-            const tempId = Math.random().toString(36).substring(7);
+        for (let file of files) {
             const fileExt = file.name.split('.').pop().toLowerCase();
             const isDoc = ['pdf', 'msg', 'txt'].includes(fileExt);
+
+            if (!isDoc && file.type && file.type.startsWith('image/')) {
+                try {
+                    const compressedDataUrl = await compressAndResizeImage(file, 1600, 0.75);
+                    const res = await fetch(compressedDataUrl);
+                    const blob = await res.blob();
+                    file = new File([blob], file.name || 'photo.jpg', { type: 'image/jpeg' });
+                } catch (e) {
+                    console.warn("Universal image compression fallback:", e);
+                }
+            }
+
+            const previewUrl = URL.createObjectURL(file);
+            const tempId = Math.random().toString(36).substring(7);
 
             const imageEntry = {
                 id: tempId,
