@@ -3065,25 +3065,28 @@ END:VCARD`;
                                     accept="image/*"
                                     capture="environment"
                                     style={{ display: 'none' }}
-                                    onChange={(e) => {
+                                    onChange={async (e) => {
                                         const files = Array.from(e.target.files || []);
                                         if (files.length > 0) {
                                             for (const file of files) {
-                                                const reader = new FileReader();
-                                                reader.onload = (event) => {
+                                                try {
+                                                    const compressedUrl = await compressAndResizeImage(file, 1600, 0.7);
                                                     const newPhoto = {
                                                         id: Date.now() + Math.random(),
-                                                        url: event.target.result,
+                                                        preview: compressedUrl,
+                                                        url: compressedUrl,
                                                         date: new Date().toISOString(),
+                                                        name: file.name || 'Foto',
                                                         category: 'Schnellaufnahme',
                                                         room: 'Allgemein'
                                                     };
                                                     setFormData(prev => ({
                                                         ...prev,
-                                                        photos: [...(prev.photos || []), newPhoto]
+                                                        images: [...(prev.images || []), newPhoto]
                                                     }));
-                                                };
-                                                reader.readAsDataURL(file);
+                                                } catch (err) {
+                                                    console.error("Error compressing image:", err);
+                                                }
                                             }
                                         }
                                         e.target.value = '';
@@ -8393,16 +8396,16 @@ END:VCARD`;
                                     multiple
                                     capture="environment"
                                     style={{ display: 'none' }}
-                                    onChange={(e) => {
+                                    onChange={async (e) => {
                                         const files = Array.from(e.target.files || []);
                                         if (files.length > 0) {
                                             for (const file of files) {
-                                                const reader = new FileReader();
-                                                reader.onload = (event) => {
+                                                try {
+                                                    const compressedUrl = await compressAndResizeImage(file, 1600, 0.7);
                                                     const newImg = {
                                                         id: Date.now() + Math.random(),
-                                                        preview: event.target.result,
-                                                        url: event.target.result,
+                                                        preview: compressedUrl,
+                                                        url: compressedUrl,
                                                         date: new Date().toISOString(),
                                                         name: file.name || 'Foto',
                                                         assignedTo: 'Fotodokumentation',
@@ -8413,8 +8416,9 @@ END:VCARD`;
                                                         ...prev,
                                                         images: [...(prev.images || []), newImg]
                                                     }));
-                                                };
-                                                reader.readAsDataURL(file);
+                                                } catch (err) {
+                                                    console.error("Error compressing image:", err);
+                                                }
                                             }
                                         }
                                         e.target.value = '';
@@ -9557,16 +9561,16 @@ END:VCARD`;
                                     multiple
                                     capture="environment"
                                     style={{ display: 'none' }}
-                                    onChange={(e) => {
+                                    onChange={async (e) => {
                                         const files = Array.from(e.target.files || []);
                                         if (files.length > 0) {
                                             for (const file of files) {
-                                                const reader = new FileReader();
-                                                reader.onload = (event) => {
+                                                try {
+                                                    const compressedUrl = await compressAndResizeImage(file, 1600, 0.7);
                                                     const newImg = {
                                                         id: Date.now() + Math.random(),
-                                                        preview: event.target.result,
-                                                        url: event.target.result,
+                                                        preview: compressedUrl,
+                                                        url: compressedUrl,
                                                         date: new Date().toISOString(),
                                                         name: file.name || 'Foto',
                                                         assignedTo: 'Fotodokumentation',
@@ -9577,8 +9581,9 @@ END:VCARD`;
                                                         ...prev,
                                                         images: [...(prev.images || []), newImg]
                                                     }));
-                                                };
-                                                reader.readAsDataURL(file);
+                                                } catch (err) {
+                                                    console.error("Error compressing image:", err);
+                                                }
                                             }
                                         }
                                         e.target.value = '';
