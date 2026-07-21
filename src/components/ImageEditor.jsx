@@ -5,8 +5,9 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Save, X, PenTool, Circle as CircleIcon, Undo, Eraser, Loader2, Mic } from 'lucide-react';
+import { supabase } from '../supabaseClient';
 
-const ImageEditor = ({ image, onSave, onCancel }) => {
+const ImageEditor = ({ image, caseId, onSave, onCancel }) => {
     const canvasRef = useRef(null);            // Stable Drawing Layer
     const previewCanvasRef = useRef(null);     // Active Drawing Layer (Realtime)
     const bgCanvasRef = useRef(null);
@@ -28,6 +29,7 @@ const ImageEditor = ({ image, onSave, onCancel }) => {
     const [isInitializing, setIsInitializing] = useState(true);
     const [localDescription, setLocalDescription] = useState(image?.description || '');
     const [isRecording, setIsRecording] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
 
     const startPos = useRef({ x: 0, y: 0 });
 
@@ -229,21 +231,50 @@ const ImageEditor = ({ image, onSave, onCancel }) => {
         setHistory(newHistory);
     };
 
-    const handleSave = () => {
+    const handleSave = async () => {
         if (!canvasRef.current || !bgCanvasRef.current) return;
+        setIsSaving(true);
 
-        const mergeCanvas = document.createElement('canvas');
-        const width = bgCanvasRef.current.width;
-        const height = bgCanvasRef.current.height;
-        mergeCanvas.width = width;
-        mergeCanvas.height = height;
-        const mergeCtx = mergeCanvas.getContext('2d', { alpha: false });
+        try {
+            const mergeCanvas = document.createElement('canvas');
+            const width = bgCanvasRef.current.width;
+            const height = bgCanvasRef.current.height;
+            mergeCanvas.width = width;
+            mergeCanvas.height = height;
+            const mergeCtx = mergeCanvas.getContext('2d', { alpha: false });
 
-        mergeCtx.drawImage(bgCanvasRef.current, 0, 0);
-        mergeCtx.drawImage(canvasRef.current, 0, 0);
+            mergeCtx.drawImage(bgCanvasRef.current, 0, 0);
+            mergeCtx.drawImage(canvasRef.current, 0, 0);
 
-        const dataUrl = mergeCanvas.toDataURL('image/jpeg', 0.82);
-        onSave(dataUrl, localDescription);
+            const dataUrl = mergeCanvas.toDataURL('image/jpeg', 0.82);
+
+            if (supabase) {
+                try {
+                    // Convert base64 to Blob
+                    const res = await fetch(dataUrl);
+                    const blob = await res.blob();
+                    const ext = 'jpg';
+                    const fileName = `cases/${caseId || 'temp'}/images/edited_${Date.now()}.${ext}`;
+                    
+                    const { error } = await supabase.storage.from('case-files').upload(fileName, blob);
+                    if (error) throw error;
+                    
+                    const { data: { publicUrl } } = supabase.storage.from('case-files').getPublicUrl(fileName);
+                    onSave(publicUrl, localDescription);
+                    return;
+                } catch (uploadErr) {
+                    console.warn('Failed to upload edited image to Supabase Storage, falling back to base64:', uploadErr);
+                }
+            }
+            
+            // Fallback if supabase is not available or upload fails
+            onSave(dataUrl, localDescription);
+        } catch (err) {
+            console.error('Error saving/uploading edited image:', err);
+            alert('Fehler beim Speichern des Bildes.');
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     const startVoice = () => {
@@ -447,11 +478,27 @@ const ImageEditor = ({ image, onSave, onCancel }) => {
                 borderTop: '1px solid #E2E8F0',
                 display: 'flex', justifyContent: 'space-between', alignItems: 'center'
             }}>
-                <button onClick={onCancel} style={{ padding: '0.75rem 2rem', borderRadius: '12px', border: '2px solid rgba(255,255,255,0.15)', backgroundColor: 'transparent', color: '#94A3B8', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <button 
+                    onClick={onCancel} 
+                    disabled={isSaving}
+                    style={{ padding: '0.75rem 2rem', borderRadius: '12px', border: '2px solid rgba(255,255,255,0.15)', backgroundColor: 'transparent', color: '#94A3B8', fontWeight: 700, cursor: isSaving ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', opacity: isSaving ? 0.5 : 1 }}
+                >
                     <X size={22} /> Abbrechen
                 </button>
-                <button onClick={handleSave} style={{ padding: '0.75rem 2.5rem', borderRadius: '12px', border: 'none', backgroundColor: '#10B981', color: '#1E293B', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)' }}>
-                    <Save size={24} /> Speichern
+                <button 
+                    onClick={handleSave} 
+                    disabled={isSaving}
+                    style={{ padding: '0.75rem 2.5rem', borderRadius: '12px', border: 'none', backgroundColor: '#10B981', color: '#1E293B', fontWeight: 800, cursor: isSaving ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)', opacity: isSaving ? 0.8 : 1 }}
+                >
+                    {isSaving ? (
+                        <>
+                            <Loader2 className="animate-spin" size={24} /> Speichert...
+                        </>
+                    ) : (
+                        <>
+                            <Save size={24} /> Speichern
+                        </>
+                    )}
                 </button>
             </div>
         </div>

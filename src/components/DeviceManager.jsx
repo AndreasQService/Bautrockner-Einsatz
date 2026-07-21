@@ -144,6 +144,12 @@ export default function DeviceManager({ onBack, onNavigateToReport, reports = []
             return;
         }
 
+        // Mietgeräte-Nummern müssen mit 'M' beginnen
+        if (currentDevice.is_rental && !trimmedNumber.toUpperCase().startsWith('M')) {
+            setError("Mietgeräte-Inventarnummern müssen mit 'M' beginnen.");
+            return;
+        }
+
         const selectedCatalog = catalog.find(c => c.id === currentDevice.catalog_id);
         if (!selectedCatalog) {
             setError("Bitte wählen Sie ein Gerätemodell aus.");
@@ -175,7 +181,12 @@ export default function DeviceManager({ onBack, onNavigateToReport, reports = []
                 // Copy fields for backward compatibility
                 type: selectedCatalog.geraetetyp || 'Unbekannt',
                 model: `${selectedCatalog.hersteller || ''} ${selectedCatalog.modell || ''}`.trim(),
-                energy_consumption: selectedCatalog.anschlusswert || null
+                energy_consumption: selectedCatalog.anschlusswert || null,
+                is_rental: currentDevice.is_rental || false,
+                rental_provider: currentDevice.is_rental ? (currentDevice.rental_provider || '') : null,
+                rental_cost_daily: currentDevice.is_rental ? (parseFloat(currentDevice.rental_cost_daily) || 0) : 0,
+                rental_start: currentDevice.is_rental ? (currentDevice.rental_start || null) : null,
+                rental_end_planned: currentDevice.is_rental ? (currentDevice.rental_end_planned || null) : null
             };
 
             if (currentDevice.id) {
@@ -252,7 +263,15 @@ export default function DeviceManager({ onBack, onNavigateToReport, reports = []
     };
 
     const handleDeleteDevice = async (id) => {
-        if (window.confirm('Gerät wirklich löschen?')) {
+        const dev = devices.find(d => d.id === id);
+        if (dev && dev.current_report_id) {
+            alert(`Das Gerät ${dev.number} ist noch im Projekt "${dev.current_project}" im Einsatz und kann nicht gelöscht/ausgebucht werden!`);
+            return;
+        }
+        const confirmMsg = dev && dev.is_rental 
+            ? `Mietgerät ${dev.number} wirklich ausbuchen (löschen)? Die historischen Projektdaten bleiben erhalten.`
+            : 'Gerät wirklich löschen?';
+        if (window.confirm(confirmMsg)) {
             setIsLoading(true);
             try {
                 const { error } = await supabase
@@ -409,11 +428,17 @@ export default function DeviceManager({ onBack, onNavigateToReport, reports = []
     // Filter lists based on tab and search term
     const filteredDevices = devices.filter(d => {
         if (!d) return false;
+
+        // Separat filtern nach Mietgerät / Eigenes Inventar
+        if (activeTab === 'inventar' && d.is_rental) return false;
+        if (activeTab === 'mietgeraete' && !d.is_rental) return false;
+
         const num = d.number ? String(d.number).toLowerCase() : '';
         const mod = d.model ? String(d.model).toLowerCase() : '';
         const typ = d.type ? String(d.type).toLowerCase() : '';
+        const provider = d.rental_provider ? String(d.rental_provider).toLowerCase() : '';
         const search = searchTerm.toLowerCase();
-        return num.includes(search) || mod.includes(search) || typ.includes(search);
+        return num.includes(search) || mod.includes(search) || typ.includes(search) || provider.includes(search);
     });
 
     const filteredCatalog = catalog.filter(c => {
@@ -475,6 +500,26 @@ export default function DeviceManager({ onBack, onNavigateToReport, reports = []
                     Inventarliste
                 </button>
                 <button
+                    onClick={() => { setActiveTab('mietgeraete'); setSearchTerm(''); setError(null); }}
+                    style={{
+                        padding: '0.6rem 1.5rem',
+                        borderRadius: '9999px',
+                        fontWeight: 700,
+                        fontSize: '0.95rem',
+                        cursor: 'pointer',
+                        border: '1.5px solid var(--primary)',
+                        backgroundColor: activeTab === 'mietgeraete' ? 'var(--primary)' : 'transparent',
+                        color: activeTab === 'mietgeraete' ? '#fff' : 'var(--primary)',
+                        transition: 'all 0.15s ease',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem'
+                    }}
+                >
+                    <Wrench size={16} />
+                    Mietgeräte
+                </button>
+                <button
                     onClick={() => { setActiveTab('typen'); setSearchTerm(''); setError(null); }}
                     style={{
                         padding: '0.6rem 1.5rem',
@@ -517,7 +562,7 @@ export default function DeviceManager({ onBack, onNavigateToReport, reports = []
                                 background: 'rgba(15, 23, 42, 0.5)',
                                 border: '1px solid var(--border)'
                             }}
-                            placeholder={activeTab === 'inventar' ? "Inventar-Nr., Modell oder Typ durchsuchen..." : "Gerätetyp, Hersteller oder Modell durchsuchen..."}
+                            placeholder={activeTab === 'typen' ? "Gerätetyp, Hersteller oder Modell durchsuchen..." : "Inventar-Nr., Modell oder Typ durchsuchen..."}
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
@@ -525,9 +570,9 @@ export default function DeviceManager({ onBack, onNavigateToReport, reports = []
                     <div style={{ display: 'flex', gap: '0.75rem' }}>
                         <button
                             className="btn btn-outline"
-                            onClick={activeTab === 'inventar' ? handleImportStandardDevices : handleImportStandardModels}
+                            onClick={activeTab === 'typen' ? handleImportStandardModels : handleImportStandardDevices}
                             style={{ borderRadius: '9999px', fontSize: '0.9rem' }}
-                            disabled={isLoading}
+                            disabled={isLoading || activeTab === 'mietgeraete'}
                         >
                             <Download size={18} />
                             Import
@@ -537,7 +582,27 @@ export default function DeviceManager({ onBack, onNavigateToReport, reports = []
                             onClick={() => {
                                 setError(null);
                                 if (activeTab === 'inventar') {
-                                    setCurrentDevice({ number: '', catalog_id: catalog[0]?.id || '', status: 'Aktiv' });
+                                    setCurrentDevice({ 
+                                        number: '', 
+                                        catalog_id: catalog[0]?.id || '', 
+                                        status: 'Aktiv',
+                                        is_rental: false,
+                                        rental_provider: '',
+                                        rental_cost_daily: 0,
+                                        rental_start: new Date().toISOString().split('T')[0],
+                                        rental_end_planned: ''
+                                    });
+                                } else if (activeTab === 'mietgeraete') {
+                                    setCurrentDevice({ 
+                                        number: 'M-', 
+                                        catalog_id: catalog[0]?.id || '', 
+                                        status: 'Aktiv',
+                                        is_rental: true,
+                                        rental_provider: '',
+                                        rental_cost_daily: 0,
+                                        rental_start: new Date().toISOString().split('T')[0],
+                                        rental_end_planned: ''
+                                    });
                                 } else {
                                     setCurrentModel({ geraetetyp: 'Kondenstrockner', customGeraetetyp: '', hersteller: '', modell: '', anschlusswert: '' });
                                 }
@@ -547,7 +612,7 @@ export default function DeviceManager({ onBack, onNavigateToReport, reports = []
                             disabled={isLoading}
                         >
                             <Plus size={18} />
-                            {activeTab === 'inventar' ? 'Gerät hinzufügen' : 'Gerätetyp hinzufügen'}
+                            {activeTab === 'typen' ? 'Gerätetyp hinzufügen' : 'Gerät hinzufügen'}
                         </button>
                     </div>
                 </div>
@@ -574,6 +639,252 @@ export default function DeviceManager({ onBack, onNavigateToReport, reports = []
                         <div style={{ padding: '5rem', textAlign: 'center', color: 'var(--text-muted)' }}>
                             <Loader2 className="animate-spin" size={40} style={{ margin: '0 auto 1rem', color: 'var(--primary)' }} />
                             <p style={{ fontWeight: 500 }}>Aktualisiere Daten...</p>
+                        </div>
+                    ) : activeTab === 'mietgeraete' ? (
+                        /* MIETGERÄTE DASHBOARD UND TABELLE */
+                        <div>
+                            {/* Dashboard Cards */}
+                            <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', flexWrap: 'wrap' }}>
+                                <div className="card" style={{ flex: 1, minWidth: '220px', padding: '1.25rem', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                    <div style={{ width: '40px', height: '40px', borderRadius: '8px', background: 'rgba(96, 165, 250, 0.1)', color: '#60A5FA', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                        <Wrench size={22} />
+                                    </div>
+                                    <div>
+                                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>Aktive Mietgeräte</div>
+                                        <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-main)' }}>
+                                            {devices.filter(d => d.is_rental && d.current_project).length} / {devices.filter(d => d.is_rental).length}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="card" style={{ flex: 1, minWidth: '220px', padding: '1.25rem', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                    <div style={{ width: '40px', height: '40px', borderRadius: '8px', background: 'rgba(16, 185, 129, 0.1)', color: '#10B981', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                        <Zap size={22} />
+                                    </div>
+                                    <div>
+                                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>Tägliche Kosten (aktiv)</div>
+                                        <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#10B981' }}>
+                                            {devices.filter(d => d.is_rental && d.current_project).reduce((sum, d) => sum + (parseFloat(d.rental_cost_daily) || 0), 0).toFixed(2)} €
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="card" style={{ flex: 1, minWidth: '220px', padding: '1.25rem', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                    <div style={{ width: '40px', height: '40px', borderRadius: '8px', background: 'rgba(239, 68, 68, 0.1)', color: '#EF4444', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                        <Activity size={22} />
+                                    </div>
+                                    <div>
+                                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>Fristüberschreitungen</div>
+                                        <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#EF4444' }}>
+                                            {devices.filter(d => d.is_rental && d.current_project && d.rental_end_planned && new Date(d.rental_end_planned) < new Date()).length}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <table className="data-table">
+                                <thead>
+                                    <tr>
+                                        <th style={{ background: 'transparent', color: 'var(--text-muted)', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Nr.</th>
+                                        <th style={{ background: 'transparent', color: 'var(--text-muted)', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Typ / Modell</th>
+                                        <th style={{ background: 'transparent', color: 'var(--text-muted)', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Vermieter / Preis</th>
+                                        <th style={{ background: 'transparent', color: 'var(--text-muted)', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Laufzeit / Kosten</th>
+                                        <th style={{ background: 'transparent', color: 'var(--text-muted)', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.1em', textAlign: 'center' }}>Frist / Status</th>
+                                        <th style={{ background: 'transparent', color: 'var(--text-muted)', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Projekt</th>
+                                        <th style={{ background: 'transparent', textAlign: 'right' }}></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {filteredDevices.map(device => {
+                                        const report = device.current_project ? reports.find(r => r.id === device.current_project || r.projectTitle === device.current_project) : null;
+                                        
+                                        // Calculate rental duration and costs
+                                        const rentalStart = device.rental_start ? new Date(device.rental_start) : null;
+                                        const rentalEndPlanned = device.rental_end_planned ? new Date(device.rental_end_planned) : null;
+                                        const today = new Date();
+                                        
+                                        let daysActive = 0;
+                                        let accruedCost = 0;
+                                        let isOverdue = false;
+                                        
+                                        if (rentalStart) {
+                                            const diffTime = today - rentalStart;
+                                            daysActive = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24))) || 1;
+                                            accruedCost = daysActive * (parseFloat(device.rental_cost_daily) || 0);
+                                        }
+                                        
+                                        if (rentalEndPlanned && today > rentalEndPlanned && device.current_project) {
+                                            isOverdue = true;
+                                        }
+
+                                        return (
+                                            <tr key={device.id} style={{ transition: 'background 0.2s' }} className="report-row">
+                                                <td style={{ fontWeight: 700, color: 'var(--primary)', fontSize: '1rem' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                        <Hash size={14} style={{ opacity: 0.5 }} />
+                                                        {device.number}
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                                        <div style={{
+                                                            width: '32px',
+                                                            height: '32px',
+                                                            borderRadius: '8px',
+                                                            background: 'rgba(255,255,255,0.05)',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
+                                                            color: 'var(--primary)'
+                                                        }}>
+                                                            {DEVICE_ICONS[device.type] || <Package size={18} />}
+                                                        </div>
+                                                        <div>
+                                                            <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{device.type}</div>
+                                                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{device.model || '-'}</div>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{device.rental_provider || 'Unbekannt'}</div>
+                                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                                        <Zap size={12} /> {parseFloat(device.rental_cost_daily || 0).toFixed(2)} € / Tag
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{daysActive} Tage</div>
+                                                    <div style={{ fontSize: '0.75rem', color: '#10B981', fontWeight: 600 }}>
+                                                        {accruedCost.toFixed(2)} € gesamt
+                                                    </div>
+                                                </td>
+                                                <td style={{ textAlign: 'center' }}>
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', alignItems: 'center' }}>
+                                                        {isOverdue ? (
+                                                            <span style={{
+                                                                padding: '0.25rem 0.75rem',
+                                                                borderRadius: '9999px',
+                                                                background: 'rgba(239, 68, 68, 0.2)',
+                                                                color: '#EF4444',
+                                                                fontSize: '0.7rem',
+                                                                fontWeight: 700,
+                                                                border: '1px solid rgba(239, 68, 68, 0.3)'
+                                                            }}>
+                                                                ÜBERFÄLLIG
+                                                            </span>
+                                                        ) : (
+                                                            <span style={{
+                                                                padding: '0.25rem 0.75rem',
+                                                                borderRadius: '9999px',
+                                                                background: device.current_project ? 'rgba(245, 158, 11, 0.1)' : 'rgba(16, 185, 129, 0.1)',
+                                                                color: device.current_project ? '#F59E0B' : '#10B981',
+                                                                fontSize: '0.7rem',
+                                                                fontWeight: 700,
+                                                                border: `1px solid ${device.current_project ? 'rgba(245, 158, 11, 0.2)' : 'rgba(16, 185, 129, 0.2)'}`
+                                                            }}>
+                                                                {device.current_project ? 'IM EINSATZ' : 'FREI'}
+                                                            </span>
+                                                        )}
+                                                        {device.rental_end_planned && (
+                                                            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                                                                bis {new Date(device.rental_end_planned).toLocaleDateString('de-DE')}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    {device.current_project ? (
+                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                                                            {report ? (
+                                                                <button
+                                                                    onClick={() => onNavigateToReport && onNavigateToReport(device.current_project)}
+                                                                    style={{
+                                                                        color: 'var(--text-main)',
+                                                                        fontWeight: 700,
+                                                                        fontSize: '0.85rem',
+                                                                        display: 'flex',
+                                                                        alignItems: 'center',
+                                                                        gap: '0.5rem',
+                                                                        padding: 0,
+                                                                        background: 'transparent',
+                                                                        border: 'none',
+                                                                        cursor: 'pointer',
+                                                                        textAlign: 'left'
+                                                                    }}
+                                                                    title="Zum Projekt springen"
+                                                                >
+                                                                    {report.projectTitle || device.current_project}
+                                                                    <ExternalLink size={12} style={{ opacity: 0.6 }} />
+                                                                </button>
+                                                            ) : (
+                                                                <div style={{ color: '#FCA5A5', fontWeight: 700, fontSize: '0.85rem' }}>
+                                                                    {device.current_project}
+                                                                </div>
+                                                            )}
+                                                            <div style={{ fontSize: '0.75rem', color: 'var(--primary)', fontWeight: 600 }}>
+                                                                {report?.locationDetails || 'Ort nicht definiert'}
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem', opacity: 0.6 }}>Lager (Rückgabe-bereit)</span>
+                                                    )}
+                                                </td>
+                                                <td style={{ textAlign: 'right' }}>
+                                                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+                                                        {device.current_project && (
+                                                            <button
+                                                                className="btn btn-ghost"
+                                                                style={{ color: '#F59E0B', padding: '0.5rem', borderRadius: '8px' }}
+                                                                onClick={(e) => { e.stopPropagation(); handleReleaseDevice(device.id, device.current_project); }}
+                                                                title="Freigeben"
+                                                            >
+                                                                <LogOut size={18} />
+                                                            </button>
+                                                        )}
+                                                        <button
+                                                            className="btn btn-ghost"
+                                                            style={{ color: 'var(--primary)', padding: '0.5rem', borderRadius: '8px' }}
+                                                            onClick={(e) => { 
+                                                                e.stopPropagation(); 
+                                                                setCurrentDevice({
+                                                                    ...device,
+                                                                    is_rental: true,
+                                                                    rental_provider: device.rental_provider || '',
+                                                                    rental_cost_daily: device.rental_cost_daily || 0,
+                                                                    rental_start: device.rental_start || new Date().toISOString().split('T')[0],
+                                                                    rental_end_planned: device.rental_end_planned || ''
+                                                                }); 
+                                                                setIsEditing(true); 
+                                                            }}
+                                                            title="Bearbeiten"
+                                                        >
+                                                            <Edit size={18} />
+                                                        </button>
+                                                        <button
+                                                            className="btn btn-ghost"
+                                                            style={{ color: 'rgba(239, 68, 68, 0.7)', padding: '0.5rem', borderRadius: '8px' }}
+                                                            onClick={(e) => { e.stopPropagation(); handleDeleteDevice(device.id); }}
+                                                            title="Ausbuchen (Zurückgeben)"
+                                                            disabled={!!device.current_project}
+                                                        >
+                                                            <Trash size={18} />
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                    {filteredDevices.length === 0 && !isLoading && (
+                                        <tr>
+                                            <td colSpan={7} style={{ textAlign: 'center', padding: '5rem' }}>
+                                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.25rem' }}>
+                                                    <Wrench size={48} style={{ color: 'var(--text-muted)', opacity: 0.3 }} />
+                                                    <div style={{ color: 'var(--text-muted)', fontSize: '1rem', fontWeight: 500 }}>
+                                                        Keine aktiven Mietgeräte registriert.
+                                                    </div>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
                         </div>
                     ) : activeTab === 'inventar' ? (
                         /* INVENTAR TABELLE */
@@ -719,7 +1030,18 @@ export default function DeviceManager({ onBack, onNavigateToReport, reports = []
                                                     <button
                                                         className="btn btn-ghost"
                                                         style={{ color: 'var(--primary)', padding: '0.5rem', borderRadius: '8px' }}
-                                                        onClick={(e) => { e.stopPropagation(); setCurrentDevice(device); setIsEditing(true); }}
+                                                        onClick={(e) => { 
+                                                            e.stopPropagation(); 
+                                                            setCurrentDevice({
+                                                                ...device,
+                                                                is_rental: device.is_rental || false,
+                                                                rental_provider: device.rental_provider || '',
+                                                                rental_cost_daily: device.rental_cost_daily || 0,
+                                                                rental_start: device.rental_start || new Date().toISOString().split('T')[0],
+                                                                rental_end_planned: device.rental_end_planned || ''
+                                                            }); 
+                                                            setIsEditing(true); 
+                                                        }}
                                                         title="Bearbeiten"
                                                     >
                                                         <Edit size={18} />
@@ -910,7 +1232,7 @@ export default function DeviceManager({ onBack, onNavigateToReport, reports = []
                                     className="form-input"
                                     value={currentDevice.number}
                                     onChange={(e) => setCurrentDevice(prev => ({ ...prev, number: e.target.value }))}
-                                    placeholder="z.B. QS-101"
+                                    placeholder={currentDevice.is_rental ? "z.B. M-101 (Mietgeräte müssen mit M beginnen)" : "z.B. QS-101"}
                                     style={{ background: 'rgba(15, 23, 42, 0.3)' }}
                                 />
                             </div>
@@ -928,6 +1250,84 @@ export default function DeviceManager({ onBack, onNavigateToReport, reports = []
                                     <option value="Defekt" style={{ backgroundColor: 'var(--surface)' }}>Defekt</option>
                                 </select>
                             </div>
+
+                            {/* Mietgeräte Checkbox */}
+                            {(!currentDevice.id || currentDevice.is_rental) && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: '0.25rem 0' }}>
+                                    <input
+                                        type="checkbox"
+                                        id="is_rental_checkbox"
+                                        checked={currentDevice.is_rental || false}
+                                        onChange={(e) => {
+                                            const isChecked = e.target.checked;
+                                            setCurrentDevice(prev => {
+                                                let num = prev.number;
+                                                if (isChecked && !num.toUpperCase().startsWith('M')) {
+                                                    num = 'M-' + num;
+                                                }
+                                                return {
+                                                    ...prev,
+                                                    is_rental: isChecked,
+                                                    number: num
+                                                };
+                                            });
+                                        }}
+                                        style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                                    />
+                                    <label htmlFor="is_rental_checkbox" style={{ fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer' }}>
+                                        Dieses Gerät ist ein Mietgerät
+                                    </label>
+                                </div>
+                            )}
+
+                            {/* Mietgeräte Zusatzfelder */}
+                            {currentDevice.is_rental && (
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', border: '1px solid var(--border)', padding: '1rem', borderRadius: 'var(--radius)', background: 'rgba(255,255,255,0.02)' }}>
+                                    <div className="form-group" style={{ marginBottom: 0, gridColumn: 'span 2' }}>
+                                        <label className="form-label" style={{ opacity: 0.8, fontSize: '0.8rem' }}>Vermieter / Partner *</label>
+                                        <input
+                                            type="text"
+                                            className="form-input"
+                                            value={currentDevice.rental_provider || ''}
+                                            onChange={(e) => setCurrentDevice(prev => ({ ...prev, rental_provider: e.target.value }))}
+                                            placeholder="z.B. Boels, Zeppelin"
+                                            style={{ background: 'rgba(15, 23, 42, 0.3)' }}
+                                        />
+                                    </div>
+                                    <div className="form-group" style={{ marginBottom: 0 }}>
+                                        <label className="form-label" style={{ opacity: 0.8, fontSize: '0.8rem' }}>Mietgebühr pro Tag (€) *</label>
+                                        <input
+                                            type="number"
+                                            step="0.01"
+                                            className="form-input"
+                                            value={currentDevice.rental_cost_daily || 0}
+                                            onChange={(e) => setCurrentDevice(prev => ({ ...prev, rental_cost_daily: parseFloat(e.target.value) || 0 }))}
+                                            placeholder="z.B. 12.50"
+                                            style={{ background: 'rgba(15, 23, 42, 0.3)' }}
+                                        />
+                                    </div>
+                                    <div className="form-group" style={{ marginBottom: 0 }}>
+                                        <label className="form-label" style={{ opacity: 0.8, fontSize: '0.8rem' }}>Mietbeginn *</label>
+                                        <input
+                                            type="date"
+                                            className="form-input"
+                                            value={currentDevice.rental_start || ''}
+                                            onChange={(e) => setCurrentDevice(prev => ({ ...prev, rental_start: e.target.value }))}
+                                            style={{ background: 'rgba(15, 23, 42, 0.3)', color: 'white' }}
+                                        />
+                                    </div>
+                                    <div className="form-group" style={{ marginBottom: 0, gridColumn: 'span 2' }}>
+                                        <label className="form-label" style={{ opacity: 0.8, fontSize: '0.8rem' }}>Geplantes Mietende</label>
+                                        <input
+                                            type="date"
+                                            className="form-input"
+                                            value={currentDevice.rental_end_planned || ''}
+                                            onChange={(e) => setCurrentDevice(prev => ({ ...prev, rental_end_planned: e.target.value }))}
+                                            style={{ background: 'rgba(15, 23, 42, 0.3)', color: 'white' }}
+                                        />
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         <div style={{ display: 'flex', gap: '1rem', marginTop: '3rem' }}>

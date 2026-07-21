@@ -1795,6 +1795,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         // If manual entry (no selected device) and we have a device number, add to global inventory
         if (!selectedDevice && newDevice.deviceNumber && supabase) {
             console.log("Inserting new device into global inventory...");
+            const isRental = newDevice.deviceNumber.trim().toUpperCase().startsWith('M');
             const { data, error } = await supabase
                 .from('devices')
                 .insert([{
@@ -1803,7 +1804,9 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                     model: '',
                     status: 'Aktiv',
                     current_project: formData.projectTitle || formData.client || 'Unbekannt',
-                    current_report_id: formData.id
+                    current_report_id: formData.id,
+                    is_rental: isRental,
+                    rental_start: isRental ? new Date().toISOString().split('T')[0] : null
                 }])
                 .select();
                 
@@ -3028,9 +3031,66 @@ END:VCARD`;
                 {techTab === null ? (
                     <>
                         <div style={{ marginBottom: '2.5rem' }}>
-                    <div style={{ fontSize: '1.5rem', fontWeight: 800, lineHeight: 1.2 }}>{adresse || 'Schadenort'}</div>
-                    {sub && <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.4rem', fontWeight: 500 }}>{sub}</div>}
-                </div>
+                            <div style={{ fontSize: '1.5rem', fontWeight: 800, lineHeight: 1.2 }}>{adresse || 'Schadenort'}</div>
+                            {sub && <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.4rem', fontWeight: 500 }}>{sub}</div>}
+                        </div>
+
+                        {/* Schneller Foto-Aufnahme Button */}
+                        <div style={{ marginBottom: '1.5rem' }}>
+                            <label 
+                                htmlFor="quick-photo-capture-input"
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '0.75rem',
+                                    backgroundColor: '#1E6DB7',
+                                    color: '#FFFFFF',
+                                    borderRadius: '16px',
+                                    padding: '1.1rem 1.5rem',
+                                    fontSize: '1.15rem',
+                                    fontWeight: 800,
+                                    cursor: 'pointer',
+                                    boxShadow: '0 6px 20px rgba(30, 109, 183, 0.35)',
+                                    textAlign: 'center',
+                                    width: '100%',
+                                    userSelect: 'none'
+                                }}
+                            >
+                                <Camera size={26} />
+                                <span>Foto aufnehmen</span>
+                                <input
+                                    id="quick-photo-capture-input"
+                                    type="file"
+                                    accept="image/*"
+                                    capture="environment"
+                                    style={{ display: 'none' }}
+                                    onChange={(e) => {
+                                        const files = Array.from(e.target.files || []);
+                                        if (files.length > 0) {
+                                            for (const file of files) {
+                                                const reader = new FileReader();
+                                                reader.onload = (event) => {
+                                                    const newPhoto = {
+                                                        id: Date.now() + Math.random(),
+                                                        url: event.target.result,
+                                                        date: new Date().toISOString(),
+                                                        category: 'Schnellaufnahme',
+                                                        room: 'Allgemein'
+                                                    };
+                                                    setFormData(prev => ({
+                                                        ...prev,
+                                                        photos: [...(prev.photos || []), newPhoto]
+                                                    }));
+                                                };
+                                                reader.readAsDataURL(file);
+                                            }
+                                        }
+                                        e.target.value = '';
+                                    }}
+                                />
+                            </label>
+                        </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                     {TECH_TILES.map(tile => (
                         <button key={tile.id} onClick={() => { 
@@ -8822,13 +8882,16 @@ END:VCARD`;
                                                                     return;
                                                                 }
 
+                                                                const isRental = trimmedNumber.toUpperCase().startsWith('M');
                                                                 const row = {
                                                                     number: trimmedNumber,
                                                                     catalog_id: newInventory.catalog_id,
                                                                     status: newInventory.status || 'Aktiv',
                                                                     type: selectedCatalog.geraetetyp || 'Unbekannt',
                                                                     model: `${selectedCatalog.hersteller || ''} ${selectedCatalog.modell || ''}`.trim(),
-                                                                    energy_consumption: selectedCatalog.anschlusswert || null
+                                                                    energy_consumption: selectedCatalog.anschlusswert || null,
+                                                                    is_rental: isRental,
+                                                                    rental_start: isRental ? new Date().toISOString().split('T')[0] : null
                                                                 };
 
                                                                 const { data: inserted, error: insertError } = await supabase
@@ -8923,7 +8986,7 @@ END:VCARD`;
                                 </div>
                             )}
 
-                            {Object.keys(unsubscribeStates).length > 0 && mode === 'technician' && (() => {
+                            {Object.keys(unsubscribeStates).length > 0 && (() => {
                                 const idxStr = Object.keys(unsubscribeStates)[0];
                                 const idx = parseInt(idxStr, 10);
                                 const draft = unsubscribeStates[idxStr];
@@ -8996,7 +9059,7 @@ END:VCARD`;
                                                         style={{ flex: 1, padding: '0.75rem', fontWeight: 600 }}
                                                         onClick={() => {
                                                             const newEquipment = [...formData.equipment];
-                                                            newEquipment[idx].endDate = draft.endDate;
+                                                            newEquipment[idx].endDate = draft.endDate || new Date().toISOString().split('T')[0];
                                                             newEquipment[idx].counterEnd = draft.counterEnd;
                                                             newEquipment[idx].hours = draft.hours;
                                                             setFormData(prev => ({ ...prev, equipment: newEquipment }));
@@ -9068,10 +9131,9 @@ END:VCARD`;
                         {isDevicesExpanded && (
                         <div style={{ overflowX: 'auto' }}>
                             {mode === 'technician' ? (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                                     {(formData.equipment || [])
                                         .map((d, i) => ({ ...d, _originalIndex: i }))
-                                        .filter(device => !techSelectedEquipmentRoom?.apartment || (device.apartment || 'Allgemeiner Bereich').trim() === techSelectedEquipmentRoom.apartment)
                                         .map((device) => {
                                             const idx = device._originalIndex;
                                             const isFinished = !!device.endDate;
@@ -9089,43 +9151,78 @@ END:VCARD`;
                                                     key={idx}
                                                     style={{ 
                                                         backgroundColor: 'var(--surface)', 
-                                                        border: '2px solid #1E6DB7', 
-                                                        borderRadius: '8px', 
-                                                        padding: '0.75rem', 
+                                                        border: isFinished ? '1px solid var(--border)' : '2px solid #1E6DB7', 
+                                                        borderRadius: '12px', 
+                                                        padding: '1rem', 
                                                         display: 'flex',
                                                         justifyContent: 'space-between',
-                                                        alignItems: 'center'
-                                                    }}
-                                                    onClick={() => {
-                                                            setTechFocusDeviceIndex(idx);
-
+                                                        alignItems: 'center',
+                                                        gap: '1rem',
+                                                        boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
                                                     }}
                                                 >
-                                                    <div style={{ flex: 1, paddingRight: '1rem' }}>
-                                                        <div style={{ fontWeight: 800, color: 'var(--text-main)' }}>
-                                                            #{device.deviceNumber} {device.type && device.type !== 'Unbekannt' ? `- ${device.type}` : ''} {device.model && String(device.model).trim() !== '' ? `(${device.model})` : ''}
+                                                    <div style={{ flex: 1 }}>
+                                                        <div style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                                            <span style={{ backgroundColor: 'rgba(30, 109, 183, 0.15)', color: '#1E6DB7', padding: '2px 8px', borderRadius: '6px', fontSize: '0.85rem' }}>
+                                                                #{device.deviceNumber || 'Ohne Nr.'}
+                                                            </span>
+                                                            {device.type && device.type !== 'Unbekannt' ? device.type : 'Gerät'} 
+                                                            {device.model && String(device.model).trim() !== '' ? ` (${device.model})` : ''}
+                                                        </div>
+                                                        <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.3rem' }}>
+                                                            📍 {device.apartment ? `${device.apartment} • ` : ''}{device.room || 'Raum'}
                                                         </div>
                                                         <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
-                                                            {device.room}
+                                                            Start: {device.startDate || '-'} • Zähler Start: {device.counterStart ? `${device.counterStart} kWh` : '-'}
                                                         </div>
                                                     </div>
-                                                    <div style={{ textAlign: 'right', minWidth: '80px' }}>
+                                                    <div style={{ textAlign: 'right', minWidth: '130px', flexShrink: 0 }}>
                                                         {isFinished ? (
-                                                            <>
-                                                                <div style={{ fontWeight: 800, color: 'var(--text-main)' }}>{consumption.toFixed(2)} kWh</div>
-                                                                <div style={{ fontSize: '0.75rem', color: '#475569', marginTop: '0.2rem' }}>{device.hours} h • {getDaysDiff(device.startDate, device.endDate)} Tg.</div>
-                                                            </>
+                                                            <div style={{ backgroundColor: 'rgba(34, 197, 94, 0.1)', border: '1px solid rgba(34, 197, 94, 0.3)', padding: '0.5rem 0.75rem', borderRadius: '8px' }}>
+                                                                <div style={{ fontSize: '0.7rem', color: '#16A34A', fontWeight: 800, textTransform: 'uppercase' }}>✅ Abgemeldet</div>
+                                                                <div style={{ fontWeight: 800, color: 'var(--text-main)', fontSize: '0.9rem', marginTop: '2px' }}>{consumption.toFixed(2)} kWh</div>
+                                                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{device.hours} h • Ende: {device.endDate}</div>
+                                                            </div>
                                                         ) : (
-                                                            <span style={{ fontSize: '0.7rem', color: '#1E6DB7', backgroundColor: 'rgba(30, 109, 183, 0.15)', padding: '4px 8px', borderRadius: '4px', textTransform: 'uppercase', fontWeight: 700 }}>Aktiv</span>
+                                                            <button
+                                                                type="button"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setUnsubscribeStates({
+                                                                        [idx]: {
+                                                                            counterEnd: device.counterEnd || '',
+                                                                            hours: device.hours || '',
+                                                                            endDate: new Date().toISOString().split('T')[0]
+                                                                        }
+                                                                    });
+                                                                    setTechFocusDeviceIndex(idx);
+                                                                }}
+                                                                style={{
+                                                                    backgroundColor: '#EF4444',
+                                                                    color: '#FFFFFF',
+                                                                    border: 'none',
+                                                                    borderRadius: '8px',
+                                                                    padding: '0.55rem 0.9rem',
+                                                                    fontSize: '0.8rem',
+                                                                    fontWeight: 800,
+                                                                    cursor: 'pointer',
+                                                                    display: 'flex',
+                                                                    alignItems: 'center',
+                                                                    gap: '0.4rem',
+                                                                    boxShadow: '0 2px 6px rgba(239, 68, 68, 0.3)'
+                                                                }}
+                                                            >
+                                                                Gerät abmelden
+                                                            </button>
                                                         )}
                                                     </div>
                                                 </div>
                                             );
                                         })}
-                                        {(formData.equipment || []).filter(device => !techSelectedEquipmentRoom?.apartment || (device.apartment || 'Allgemeiner Bereich').trim() === techSelectedEquipmentRoom.apartment).length === 0 && (
+                                        {(formData.equipment || []).length === 0 && (
                                             <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>Keine Geräte vorhanden.</div>
                                         )}
-                                        {(formData.equipment || []).filter(device => !techSelectedEquipmentRoom?.apartment || (device.apartment || 'Allgemeiner Bereich').trim() === techSelectedEquipmentRoom.apartment).length > 0 && (
+                                        {(formData.equipment || []).length > 0 && (
                                             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem', backgroundColor: 'var(--surface)', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)', borderRadius: '8px', border: '2px solid #1E6DB7', marginTop: '0.5rem' }}>
                                                 <div style={{ fontWeight: 800, color: 'var(--text-main)' }}>Gesamt</div>
                                                 <div style={{ textAlign: 'right', fontWeight: 800, color: 'var(--text-main)' }}>
@@ -9140,10 +9237,11 @@ END:VCARD`;
                                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
                                     <thead>
                                         <tr style={{ borderBottom: '2px solid var(--border)' }}>
-                                            <th style={{ textAlign: 'left', padding: '0.75rem' }}>Gerät</th>
+                                            <th style={{ textAlign: 'left', padding: '0.75rem' }}>Gerät & Typ</th>
                                             <th style={{ textAlign: 'center', padding: '0.75rem' }}>Dauer (Tage)</th>
                                             <th style={{ textAlign: 'center', padding: '0.75rem' }}>Betriebsstunden</th>
                                             <th style={{ textAlign: 'right', padding: '0.75rem' }}>Verbrauch (kWh)</th>
+                                            <th style={{ textAlign: 'right', padding: '0.75rem' }}>Aktionen</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -9161,10 +9259,14 @@ END:VCARD`;
                                             return (
                                                 <tr key={idx} style={{ borderBottom: '1px solid var(--border)' }}>
                                                     <td style={{ padding: '0.75rem' }}>
-                                                        <div style={{ fontWeight: 600 }}>#{device.deviceNumber} {device.model ? `- ${device.model}` : (device.type && device.type !== 'Unbekannt' ? `- ${device.type}` : '')}</div>
+                                                        <div style={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                                            <span style={{ backgroundColor: 'rgba(30, 109, 183, 0.15)', color: '#1E6DB7', padding: '1px 6px', borderRadius: '4px', fontSize: '0.8rem' }}>
+                                                                #{device.deviceNumber || 'Ohne Nr.'}
+                                                            </span>
+                                                            {device.type && device.type !== 'Unbekannt' ? device.type : 'Gerät'} {device.model ? `(${device.model})` : ''}
+                                                        </div>
                                                         <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
-                                                            {device.room}
-                                                            {!isFinished && <span style={{ fontSize: '0.65rem', color: '#1E6DB7', marginLeft: '6px', backgroundColor: 'rgba(30, 109, 183, 0.15)', padding: '2px 6px', borderRadius: '4px', textTransform: 'uppercase', fontWeight: 700 }}>Aktiv</span>}
+                                                            📍 {device.apartment ? `${device.apartment} • ` : ''}{device.room || 'Raum'} • Start: {device.startDate || '-'} ({device.counterStart || '0'} kWh)
                                                         </div>
                                                     </td>
                                                     <td style={{ textAlign: 'center', padding: '0.75rem' }}>
@@ -9181,12 +9283,43 @@ END:VCARD`;
                                                             </>
                                                         ) : '-'}
                                                     </td>
+                                                    <td style={{ textAlign: 'right', padding: '0.75rem' }}>
+                                                        {isFinished ? (
+                                                            <span style={{ fontSize: '0.75rem', color: '#16A34A', backgroundColor: 'rgba(34, 197, 94, 0.15)', padding: '4px 8px', borderRadius: '4px', textTransform: 'uppercase', fontWeight: 700 }}>Abgemeldet</span>
+                                                        ) : (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    setUnsubscribeStates({
+                                                                        [idx]: {
+                                                                            counterEnd: device.counterEnd || '',
+                                                                            hours: device.hours || '',
+                                                                            endDate: new Date().toISOString().split('T')[0]
+                                                                        }
+                                                                    });
+                                                                    setTechFocusDeviceIndex(idx);
+                                                                }}
+                                                                style={{
+                                                                    backgroundColor: '#EF4444',
+                                                                    color: '#FFFFFF',
+                                                                    border: 'none',
+                                                                    borderRadius: '6px',
+                                                                    padding: '0.4rem 0.75rem',
+                                                                    fontSize: '0.8rem',
+                                                                    fontWeight: 700,
+                                                                    cursor: 'pointer'
+                                                                }}
+                                                            >
+                                                                Gerät abmelden
+                                                            </button>
+                                                        )}
+                                                    </td>
                                                 </tr>
                                             );
                                         })}
                                         {(formData.equipment || []).length === 0 && (
                                             <tr>
-                                                <td colSpan="4" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>Keine Geräte vorhanden.</td>
+                                                <td colSpan="5" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>Keine Geräte vorhanden.</td>
                                             </tr>
                                         )}
                                         <tr style={{ fontWeight: 700, backgroundColor: 'var(--surface)', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)' }}>
@@ -9194,6 +9327,7 @@ END:VCARD`;
                                             <td style={{ textAlign: 'center', padding: '0.75rem' }}>-</td>
                                             <td style={{ textAlign: 'center', padding: '0.75rem' }}>{totalDryingHours.toFixed(1)} h</td>
                                             <td style={{ textAlign: 'right', padding: '0.75rem' }}>{totalDryingKwh.toFixed(2)} kWh</td>
+                                            <td style={{ textAlign: 'right', padding: '0.75rem' }}>-</td>
                                         </tr>
                                     </tbody>
                                     </table>
@@ -9277,6 +9411,7 @@ END:VCARD`;
                     editingImage && (
                         <ImageEditor
                             image={editingImage}
+                            caseId={formData.id}
                             onSave={(newPreview, newDescription) => {
                                 setFormData(prev => {
                                     // 1. Check if it's the Aussenaufnahme (Special case)

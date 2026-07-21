@@ -221,6 +221,7 @@ DomEX Hauswartungen GmbH, Herrn Szewczyk, Tel. 078 663 61 81
 
 Nicht nur Nachname speichern.
 Wenn Zugang / Schlüssel erwähnt: zweck = "Zugang"
+Wenn für einen Kontakt das Stockwerk oder die Wohnung angegeben ist (z. B. "EG rechts", "3. OG"), speichere dies unter stockwerk und wohnung.
 
 ==================================================
 9. ERLAUBTE ROLLEN IN kontakte[]
@@ -292,7 +293,9 @@ Kurz und sinnvoll. Beispiel: "Schimmel / Feuchtigkeit Heizungsraum Musterstrasse
       "name": "",
       "telefon": "",
       "email": "",
-      "zweck": ""
+      "zweck": "",
+      "stockwerk": "",
+      "wohnung": ""
     }
   ],
   "schadenort": {

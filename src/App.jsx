@@ -156,6 +156,75 @@ function App() {
   // Authentication / User Management State
   const [showUserModal, setShowUserModal] = useState(false);
   const [showMeasurementManager, setShowMeasurementManager] = useState(false);
+  const [unsavedReports, setUnsavedReports] = useState({});
+
+  useEffect(() => {
+    const loadUnsaved = () => {
+      try {
+        const cached = localStorage.getItem('qservice_unsaved_reports');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Object.keys(parsed).length > 0) {
+            setUnsavedReports(parsed);
+          }
+        }
+      } catch (e) {
+        console.warn('[OfflineCache] Fehler beim Laden:', e);
+      }
+    };
+    loadUnsaved();
+  }, []);
+
+  const syncUnsavedReport = async (reportId) => {
+    const report = unsavedReports[reportId];
+    if (!report || !supabase) return;
+    
+    showToast(`Synchronisiere "${report.projectTitle || 'Unbenannt'}"...`, 'info', 0);
+    
+    const now = new Date().toISOString();
+    const { _supabase_updated_at, _offline_saved_at, ...reportForStorage } = report;
+    
+    const rowData = {
+      id: report.id,
+      project_title: report.projectTitle,
+      client: report.client,
+      address: report.address,
+      status: report.status,
+      assigned_to: report.assignedTo,
+      date: report.date,
+      drying_started: report.dryingStarted,
+      report_data: reportForStorage,
+      updated_at: now
+    };
+    
+    // Force write (upsert) to bypass optimistic locking, since the user explicitly forced it
+    const { error } = await supabase.from('damage_reports').upsert(rowData);
+    
+    if (error) {
+      showToast(`⚠️ Synchronisation fehlgeschlagen: ${error.message}`, 'error', 5000);
+    } else {
+      showToast(`✅ "${report.projectTitle || 'Unbenannt'}" erfolgreich synchronisiert!`, 'success', 3000);
+      setUnsavedReports(prev => {
+        const next = { ...prev };
+        delete next[reportId];
+        localStorage.setItem('qservice_unsaved_reports', JSON.stringify(next));
+        return next;
+      });
+      setReports(prev => prev.map(r => r.id === report.id ? { ...r, ...report, _supabase_updated_at: now } : r));
+      setSelectedReport(prev => prev && prev.id === report.id ? { ...prev, ...report, _supabase_updated_at: now } : prev);
+    }
+  };
+
+  const discardUnsavedReport = (reportId) => {
+    setUnsavedReports(prev => {
+      const next = { ...prev };
+      delete next[reportId];
+      localStorage.setItem('qservice_unsaved_reports', JSON.stringify(next));
+      return next;
+    });
+    showToast("Änderungen verworfen.", "success");
+  };
+
   const [currentUser, setCurrentUser] = useState(() => {
     const saved = localStorage.getItem('qtool_current_user');
     return saved ? JSON.parse(saved) : null;
@@ -488,22 +557,11 @@ function App() {
 
         const fetchPromise = supabase
           .from('damage_reports')
-          .select('id, updated_at, created_at, project_title, client, address, status, assigned_to, date, drying_started, deleted_at, projectNumber:report_data->>projectNumber');
+          .select('id, updated_at, created_at, project_title, client, address, status, assigned_to, date, drying_started');
 
         let result = await Promise.race([fetchPromise, timeoutPromise]);
         let data = result.data;
         let error = result.error;
-
-        // Robustes Fallback bei fehlender deleted_at Spalte (Fehler 42703)
-        if (error && error.code === '42703' && String(error.message || '').includes('deleted_at')) {
-          console.warn('[Supabase] Spalte "deleted_at" fehlt in DB. Starte Fallback-Abfrage ohne "deleted_at"...');
-          const fallbackPromise = supabase
-            .from('damage_reports')
-            .select('id, updated_at, created_at, project_title, client, address, status, assigned_to, date, drying_started, projectNumber:report_data->>projectNumber');
-          result = await Promise.race([fallbackPromise, timeoutPromise]);
-          data = result.data;
-          error = result.error;
-        }
 
         // HINWEIS: Client-seitige Sortierung um Statement Timeout bei großen JSONs zu verhindern
 
@@ -575,33 +633,31 @@ function App() {
               .map(r => r.id);
 
             if (activeIds.length > 0) {
-              console.log('[Supabase] Starting background fetch for active projects:', activeIds.length);
+              console.log('[Supabase] Starting background fetch for active projects one-by-one:', activeIds.length);
               (async () => {
                 try {
-                  const { data: detailData, error: detailError } = await supabase
-                    .from('damage_reports')
-                    .select('id, report_data, updated_at')
-                    .in('id', activeIds);
+                  for (const id of activeIds) {
+                    try {
+                      const { data: detail, error: detailError } = await supabase
+                        .from('damage_reports')
+                        .select('id, report_data, updated_at')
+                        .eq('id', id)
+                        .single();
 
-                  if (detailError) {
-                    console.error('[Supabase] Detail background fetch error:', detailError);
-                  } else if (detailData) {
-                    console.log('[Supabase] Background fetch completed. Merged details for:', detailData.length);
-                    setReports(prev => prev.map(r => {
-                      const detail = detailData.find(d => d.id === r.id);
-                      if (detail && detail.report_data) {
+                      if (!detailError && detail && detail.report_data) {
                         const parsedData = typeof detail.report_data === 'string'
                           ? JSON.parse(detail.report_data)
                           : detail.report_data;
-                        return {
+                        setReports(prev => prev.map(r => r.id === id ? {
                           ...r,
                           ...parsedData,
                           isLightweight: false,
                           _supabase_updated_at: detail.updated_at
-                        };
+                        } : r));
                       }
-                      return r;
-                    }));
+                    } catch (singleErr) {
+                      console.warn('[Supabase] Detail background fetch error for ID:', id, singleErr);
+                    }
                   }
                 } catch (err) {
                   console.warn('[Supabase] Detail background fetch failed:', err);
@@ -855,8 +911,43 @@ function App() {
                   setReports(prev => prev.map(r => r.id === finalReport.id ? { ...r, _supabase_updated_at: now } : r));
                   setSelectedReport(prev => prev && prev.id === finalReport.id ? { ...prev, _supabase_updated_at: now } : prev);
                   oneDriveBackup();
+
+                  setUnsavedReports(prev => {
+                    if (!prev[finalReport.id]) return prev;
+                    const next = { ...prev };
+                    delete next[finalReport.id];
+                    localStorage.setItem('qservice_unsaved_reports', JSON.stringify(next));
+                    return next;
+                  });
+                } else if (!error && (!updateResult || updateResult.length === 0)) {
+                  console.warn('[Sync-Konflikt] Autosave abgebrochen – neuere Version in Supabase:', finalReport.id);
+                  showToast('⚠️ Sync-Konflikt: Das Projekt wurde auf einem anderen Gerät aktualisiert! Bitte die Seite neu laden (F5) um Datenverlust zu vermeiden.', 'error', 0);
+                  
+                  setUnsavedReports(prev => {
+                    const next = { ...prev, [finalReport.id]: { ...finalReport, _offline_saved_at: new Date().toISOString() } };
+                    localStorage.setItem('qservice_unsaved_reports', JSON.stringify(next));
+                    return next;
+                  });
+                } else if (error) {
+                  console.warn('[Supabase] Silent update error:', error.message);
+                  showToast(`⚠️ Autosave fehlgeschlagen: ${error.message}. Verbindung prüfen!`, 'error', 5000);
+                  
+                  setUnsavedReports(prev => {
+                    const next = { ...prev, [finalReport.id]: { ...finalReport, _offline_saved_at: new Date().toISOString() } };
+                    localStorage.setItem('qservice_unsaved_reports', JSON.stringify(next));
+                    return next;
+                  });
                 }
-              }).catch(err => console.warn('[Supabase] Silent update failed:', err.message));
+              }).catch(err => {
+                console.warn('[Supabase] Silent update failed:', err.message);
+                showToast(`⚠️ Autosave fehlgeschlagen: ${err.message}`, 'error', 5000);
+                
+                setUnsavedReports(prev => {
+                  const next = { ...prev, [finalReport.id]: { ...finalReport, _offline_saved_at: new Date().toISOString() } };
+                  localStorage.setItem('qservice_unsaved_reports', JSON.stringify(next));
+                  return next;
+                });
+              });
           } else {
             const { data: updateResult, error } = await supabase
               .from('damage_reports')
@@ -868,13 +959,33 @@ function App() {
             if (error) {
               console.error('Error saving to Supabase:', error);
               showToast(`⚠️ Speicherfehler: ${error.message || error.code || 'Supabase-Fehler'}. Daten nur lokal gesichert!`, 'error');
+              
+              setUnsavedReports(prev => {
+                const next = { ...prev, [finalReport.id]: { ...finalReport, _offline_saved_at: new Date().toISOString() } };
+                localStorage.setItem('qservice_unsaved_reports', JSON.stringify(next));
+                return next;
+              });
             } else if (!updateResult || updateResult.length === 0) {
               console.warn('[Sync-Konflikt] Neuere Version in Supabase – abgebrochen:', finalReport.id);
               showToast('⚠️ Neuere Version auf anderem Gerät! Seite neu laden.', 'warning');
+              
+              setUnsavedReports(prev => {
+                const next = { ...prev, [finalReport.id]: { ...finalReport, _offline_saved_at: new Date().toISOString() } };
+                localStorage.setItem('qservice_unsaved_reports', JSON.stringify(next));
+                return next;
+              });
             } else {
               setReports(prev => prev.map(r => r.id === finalReport.id ? { ...r, _supabase_updated_at: now } : r));
               setSelectedReport(prev => prev && prev.id === finalReport.id ? { ...prev, _supabase_updated_at: now } : prev);
               oneDriveBackup();
+
+              setUnsavedReports(prev => {
+                if (!prev[finalReport.id]) return prev;
+                const next = { ...prev };
+                delete next[finalReport.id];
+                localStorage.setItem('qservice_unsaved_reports', JSON.stringify(next));
+                return next;
+              });
             }
           }
         } else {
@@ -888,17 +999,57 @@ function App() {
                   setReports(prev => prev.map(r => r.id === finalReport.id ? { ...r, _supabase_updated_at: now } : r));
                   setSelectedReport(prev => prev && prev.id === finalReport.id ? { ...prev, _supabase_updated_at: now } : prev);
                   oneDriveBackup();
+
+                  setUnsavedReports(prev => {
+                    if (!prev[finalReport.id]) return prev;
+                    const next = { ...prev };
+                    delete next[finalReport.id];
+                    localStorage.setItem('qservice_unsaved_reports', JSON.stringify(next));
+                    return next;
+                  });
+                } else if (error) {
+                  console.warn('[Supabase] Silent upsert error:', error.message);
+                  showToast(`⚠️ Autosave fehlgeschlagen: ${error.message}. Verbindung prüfen!`, 'error', 5000);
+                  
+                  setUnsavedReports(prev => {
+                    const next = { ...prev, [finalReport.id]: { ...finalReport, _offline_saved_at: new Date().toISOString() } };
+                    localStorage.setItem('qservice_unsaved_reports', JSON.stringify(next));
+                    return next;
+                  });
                 }
-              }).catch(err => console.warn('[Supabase] Silent upsert failed:', err.message));
+              }).catch(err => {
+                console.warn('[Supabase] Silent upsert failed:', err.message);
+                showToast(`⚠️ Autosave fehlgeschlagen: ${err.message}`, 'error', 5000);
+                
+                setUnsavedReports(prev => {
+                  const next = { ...prev, [finalReport.id]: { ...finalReport, _offline_saved_at: new Date().toISOString() } };
+                  localStorage.setItem('qservice_unsaved_reports', JSON.stringify(next));
+                  return next;
+                });
+              });
           } else {
             const { error } = await supabase.from('damage_reports').upsert(rowData);
             if (error) {
               console.error('Error saving to Supabase:', error);
               showToast(`⚠️ Speicherfehler: ${error.message || error.code || 'Supabase-Fehler'}. Daten nur lokal gesichert!`, 'error');
+              
+              setUnsavedReports(prev => {
+                const next = { ...prev, [finalReport.id]: { ...finalReport, _offline_saved_at: new Date().toISOString() } };
+                localStorage.setItem('qservice_unsaved_reports', JSON.stringify(next));
+                return next;
+              });
             } else {
               setReports(prev => prev.map(r => r.id === finalReport.id ? { ...r, _supabase_updated_at: now } : r));
               setSelectedReport(prev => prev && prev.id === finalReport.id ? { ...prev, _supabase_updated_at: now } : prev);
               oneDriveBackup();
+
+              setUnsavedReports(prev => {
+                if (!prev[finalReport.id]) return prev;
+                const next = { ...prev };
+                delete next[finalReport.id];
+                localStorage.setItem('qservice_unsaved_reports', JSON.stringify(next));
+                return next;
+              });
             }
           }
         }
@@ -1101,15 +1252,18 @@ function App() {
       // Priorität V4
       priority: importedData.priority || '',
 
-      contacts: (importedData.kontakte || []).map(c => ({
-        name:      c.name || c.firma || '',
-        phone:     c.telefon || '',
-        email:     c.email || '',
-        role:      rolleMap[c.rolle] || 'Sonstiges',
-        apartment: c.wohnung || c.etage || '',
-        floor:     c.stockwerk || c.etage || '',
-        note:      c.zweck || '',
-      })),
+      contacts: (importedData.kontakte || []).map(c => {
+        const role = rolleMap[c.rolle] || 'Sonstiges';
+        return {
+          name:      c.name || c.firma || '',
+          phone:     c.telefon || '',
+          email:     c.email || '',
+          role:      role,
+          apartment: c.wohnung || c.etage || (role === 'Mieter' ? so.wohnung || so.etage_wohnung : '') || '',
+          floor:     c.stockwerk || c.etage || (role === 'Mieter' ? so.stockwerk || so.etage_wohnung : '') || '',
+          note:      c.zweck || '',
+        };
+      }),
 
       rooms: [],
       images: [],
@@ -1156,10 +1310,16 @@ function App() {
   };
 
   const [toast, setToast] = useState(null);
-  const showToast = (message, type = 'success') => {
+  const toastTimeoutRef = useRef(null);
+  const showToast = useCallback((message, type = 'success', duration = 3000) => {
+    if (toastTimeoutRef.current) {
+      clearTimeout(toastTimeoutRef.current);
+    }
     setToast({ message, type });
-    setTimeout(() => setToast(null), 3000);
-  };
+    if (duration > 0) {
+      toastTimeoutRef.current = setTimeout(() => setToast(null), duration);
+    }
+  }, []);
 
   const ToastMarkup = toast && (
     <div style={{
@@ -1632,6 +1792,100 @@ function App() {
           onSelectDeviceId={handleSelectDeviceId}
           onRefreshDevices={refreshDevices}
         />
+      )}
+
+      {/* Render Offline Cache Sync Modal */}
+      {Object.keys(unsavedReports).length > 0 && (
+        <div style={{
+          position: 'fixed',
+          top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(15, 23, 42, 0.6)',
+          backdropFilter: 'blur(8px)',
+          zIndex: 99999,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '1rem',
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: '16px',
+            padding: '2rem',
+            maxWidth: '500px',
+            width: '100%',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+            border: '1px solid rgba(226, 232, 240, 0.8)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
+              <div style={{
+                backgroundColor: '#dc2626',
+                color: 'white',
+                width: '40px',
+                height: '40px',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}>
+                <Database size={22} />
+              </div>
+              <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, color: '#1e293b' }}>
+                Lokale Änderungen gefunden!
+              </h3>
+            </div>
+            <p style={{ color: '#64748b', fontSize: '0.9rem', lineHeight: 1.5, marginBottom: '1.5rem' }}>
+              Es wurden lokale Änderungen gefunden, die nicht in die Cloud gespeichert werden konnten (z. B. durch Offline-Arbeit oder einen Synchronisationskonflikt).
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1.5rem' }}>
+              {Object.keys(unsavedReports).map(id => {
+                const rep = unsavedReports[id];
+                return (
+                  <div key={id} style={{
+                    padding: '0.75rem 1rem',
+                    borderRadius: '8px',
+                    backgroundColor: '#f8fafc',
+                    border: '1px solid #e2e8f0',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '1rem'
+                  }}>
+                    <div style={{ flexGrow: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 600, fontSize: '0.9rem', color: '#334155', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                        {rep.projectTitle || 'Unbenanntes Projekt'}
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+                        Geändert: {rep._offline_saved_at ? new Date(rep._offline_saved_at).toLocaleString() : 'Unbekannt'}
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.5rem', flexShrink: 0 }}>
+                      <button 
+                        onClick={() => discardUnsavedReport(id)}
+                        style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem', border: '1px solid #EF4444', color: '#EF4444', backgroundColor: 'transparent', borderRadius: '6px', cursor: 'pointer', fontWeight: 600 }}
+                      >
+                        Verwerfen
+                      </button>
+                      <button 
+                        onClick={() => syncUnsavedReport(id)}
+                        style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem', backgroundColor: '#10B981', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 600 }}
+                      >
+                        Hochladen
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <button 
+                onClick={() => setUnsavedReports({})}
+                style={{ padding: '0.5rem 1rem', fontSize: '0.9rem', border: '1px solid #cbd5e1', backgroundColor: 'transparent', borderRadius: '6px', cursor: 'pointer', color: '#475569' }}
+              >
+                Später entscheiden
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
