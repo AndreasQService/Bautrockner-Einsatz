@@ -13,6 +13,7 @@ import DeviceManager from './components/DeviceManager'
 import UserManagementModal from './components/UserManagementModal'
 import MeasurementDeviceManager from './components/MeasurementDeviceManager'
 import LoginScreen from './components/LoginScreen'
+import TodoProjectSection from './components/TodoProjectSection'
 import EmailImportModalV2 from './components/EmailImportModalV2'
 import DisponentMockup from './components/mockups/DisponentMockup'
 import i18n from './i18n'
@@ -1858,19 +1859,30 @@ function App() {
                 <span>Projektdaten werden vollständig geladen...</span>
               </div>
             ) : (
-              <DamageForm
-                key={selectedReport ? selectedReport.id : 'new'}
-                onCancel={handleCancelEntry}
-                onSave={handleSaveReport}
-                initialData={selectedReport}
-                mode={projectMode}
-                readOnly={isReadOnly}
-                isDarkMode={isDarkMode}
-                isSyncPending={selectedReport && !!unsavedReports[selectedReport.id]}
-                onModeChange={(newMode) => {
-                  setProjectModeExclusive(newMode);
-                }}
-              />
+              <div>
+                <DamageForm
+                  key={selectedReport ? selectedReport.id : 'new'}
+                  onCancel={handleCancelEntry}
+                  onSave={handleSaveReport}
+                  initialData={selectedReport}
+                  mode={projectMode}
+                  readOnly={isReadOnly}
+                  isDarkMode={isDarkMode}
+                  isSyncPending={selectedReport && !!unsavedReports[selectedReport.id]}
+                  onModeChange={(newMode) => {
+                    setProjectModeExclusive(newMode);
+                  }}
+                />
+                {selectedReport && selectedReport.id !== 'new' && (
+                  <TodoProjectSection
+                    project={selectedReport}
+                    users={users}
+                    currentUser={currentUser}
+                    onReportsChanged={fetchReports}
+                    onCloseProject={handleCancelEntry}
+                  />
+                )}
+              </div>
             )}
           </div>
         )}

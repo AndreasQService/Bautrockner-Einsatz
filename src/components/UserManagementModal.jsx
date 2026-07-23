@@ -123,20 +123,7 @@ const UserManagementModal = ({ onClose, users, setUsers }) => {
                                         </div>
                                     </div>
                                 </div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                                        <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 600, marginBottom: '2px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Passwort</label>
-                                        <input
-                                            type="text"
-                                            value={user.password || ''}
-                                            onChange={(e) => {
-                                                const pwd = e.target.value;
-                                                setUsers(users.map(u => u.id === user.id ? { ...u, password: pwd } : u));
-                                            }}
-                                            className="form-input"
-                                            style={{ width: '120px', padding: '0.25rem 0.5rem', fontSize: '0.85rem', height: '32px' }}
-                                        />
-                                    </div>
+                                <div style={{ display: 'flex', alignItems: 'center' }}>
                                     <button
                                         onClick={() => handleDeleteUser(user.id)}
                                         className="btn btn-ghost"

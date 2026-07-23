@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { Filter, MapPin, Calendar, ArrowRight, Search, Trash2, FileText, RotateCcw, LogOut } from 'lucide-react'
 import InboxTodo from './InboxTodo'
 import WorkflowStatusOverview from './WorkflowStatusOverview'
+import TodoMonitor from './TodoMonitor'
 import RightSidebar from './RightSidebar'
 import OfficeProjectsPage from '../features/projects/OfficeProjectsPage'
 
@@ -598,8 +599,9 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
 
             {/* Pass Filtered Reports to Monitors (only when not in Archive OR Technician Mode) */}
             {!showArchive && mode !== 'technician' && (
-                <div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
                     <WorkflowStatusOverview reports={reports} onSelectReport={onSelectReport} currentUser={currentUser} users={users || []} searchTerm={searchTerm} store={workflowStore} onStoreChange={setWorkflowStore} />
+                    <TodoMonitor reports={reports} users={users || []} currentUser={currentUser} onSelectReport={onSelectReport} onReportsChanged={onReportsChanged} />
                     <DryingMonitor reports={filteredReports} onSelectReport={onSelectReport} workflowStore={workflowStore} />
                     <DeviceInventoryList reports={filteredReports} onSelectReport={onSelectReport} />
                 </div>

@@ -1,5 +1,13 @@
 import { createClient } from '@supabase/supabase-js'
 
+if (typeof window !== 'undefined' && (window.location.hash.includes('type=recovery') || window.location.href.includes('type=recovery'))) {
+  try {
+    sessionStorage.setItem('supabase_recovery_flow', 'true');
+  } catch (e) {
+    console.error('Failed to set sessionStorage:', e);
+  }
+}
+
 // ======================================================================
 // ENHANCED STRICT TEST-ENVIRONMENT GUARD
 // ======================================================================
