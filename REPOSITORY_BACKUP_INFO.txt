@@ -1,0 +1,12 @@
+﻿QTool Test Repository
+
+Erstellt: 23.07.2026 18:38:46
+Quelle: C:\QTool_Test
+Repository: C:\QTool_Sicherungen\QTool_Test_Repo_2026-07-23_18-37-15
+Branch: main
+Commit: f3fdcdeabb2b60ac04c583d487ea00b7ec838409
+Tag: qtool-test-lock-2026-07-23_18-37-15
+
+Hinweis:
+.env-Dateien und Zugangsdaten wurden absichtlich nicht in Git aufgenommen.
+Supabase-Datenbank und Vercel-Umgebungsvariablen müssen separat gesichert werden.
