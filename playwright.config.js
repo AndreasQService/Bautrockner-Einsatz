@@ -28,7 +28,7 @@ export default defineConfig({
     // Globale Einstellungen für alle Tests
     use: {
         // Basis-URL des Dev Servers
-        baseURL: 'http://localhost:5173',
+        baseURL: 'http://localhost:5180',
 
         // Browser-Einstellungen
         headless: true,          // Auf true setzen für CI/CD
@@ -95,7 +95,7 @@ export default defineConfig({
     // Automatischer Dev-Server-Start (startet nur wenn noch nicht läuft)
     webServer: {
         command: 'npm run dev',
-        url: 'http://localhost:5173',
+        url: 'http://localhost:5180',
         reuseExistingServer: true, // Nutzt laufenden Server falls vorhanden
         timeout: 30 * 1000,
     },

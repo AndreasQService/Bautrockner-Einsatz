@@ -15,6 +15,8 @@
 import { v4 as uuidv4 } from 'uuid';
 import { putUploadBlob, putUploadItem } from './db.js';
 import { sha256OfBlob }                from './hash.js';
+import { buildTestRemotePath }        from './oneDrivePathBuilder.js';
+import { applyTestWatermark }         from './testWatermark.js';
 
 /**
  * Wandelt einen Dateinamen in einen sicheren String ohne Sonderzeichen um.
@@ -37,23 +39,57 @@ function sanitizeFilename(name) {
  *
  * @param {string}   projectId       Projekt-ID
  * @param {File[]}   files           Die ausgewählten Dateien
- * @param {string}   remoteBasePath  OneDrive-Zielpfad ohne Dateiname, z.B. "QTool/20260236_Muster/Fotos"
+ * @param {string}   remoteBasePath  OneDrive-Zielpfad oder testRunId
  * @param {Function} [onProgress]    Optionaler Callback (completedIndex, total, item)
+ * @param {string}   [testRunId]     Optionale explicit testRunId
  * @returns {Promise<import('./queueTypes').UploadItem[]>}
  */
-export async function enqueueFiles(projectId, files, remoteBasePath, onProgress) {
+export async function enqueueFiles(projectId, files, remoteBasePath, onProgress, testRunId) {
   const created = [];
   const now = () => new Date().toISOString();
 
+  // If testRunId is passed or embedded, build strictly isolated test remote path
+  const activeTestRunId = testRunId || (remoteBasePath?.startsWith('TESTRUN_') ? remoteBasePath : null);
+
   for (let i = 0; i < files.length; i++) {
-    const file = files[i];
+    let file = files[i];
+
+    // HEIC Blockade
+    const fileNameLower = file.name.toLowerCase();
+    if (file.type === 'image/heic' || file.type === 'image/heif' || fileNameLower.endsWith('.heic') || fileNameLower.endsWith('.heif')) {
+      throw new Error(`[HEIC BLOCKED] HEIC-Datei '${file.name}' im ersten OneDrive-Test nicht zugelassen.`);
+    }
+
+    // Wasserzeichen anwenden (falls Bild)
+    if (activeTestRunId && (file.type?.startsWith('image/') || /\.(jpg|jpeg|png|webp)$/i.test(file.name))) {
+      file = await applyTestWatermark(file, file.name);
+    }
+
     const id   = uuidv4();
 
-    // Eindeutiger Dateiname → verhindert Kollisionen bei gleichnamigen Dateien
-    const safeName      = sanitizeFilename(file.name);
-    const ext           = safeName.includes('.') ? '' : '.jpg';
-    const remoteFileName = `${projectId}_${Date.now()}_${i}_${safeName}${ext}`;
-    const remotePath    = `${remoteBasePath}/${remoteFileName}`;
+    let remotePath;
+    let remoteFileName;
+
+    if (activeTestRunId) {
+      remotePath = buildTestRemotePath({
+        testRunId: activeTestRunId,
+        projectId,
+        subfolder: 'Fotos',
+        originalFileName: file.name,
+        fileIndex: i
+      });
+      const pathParts = remotePath.split('/');
+      remoteFileName = pathParts[pathParts.length - 1];
+    } else {
+      // Direct validation check if using legacy parameter syntax
+      if (remoteBasePath?.includes('QTool/') && !remoteBasePath?.includes('QTool_TEST_ONLY')) {
+        throw new Error(`[QUEUE REPOSITORY ABORT] Produktiver Pfad '${remoteBasePath}' in Testumgebung verboten!`);
+      }
+      const safeName      = sanitizeFilename(file.name);
+      const ext           = safeName.includes('.') ? '' : '.jpg';
+      remoteFileName = `${projectId}_${Date.now()}_${i}_${safeName}${ext}`;
+      remotePath    = `${remoteBasePath}/${remoteFileName}`;
+    }
 
     /** @type {import('./queueTypes').UploadItem} */
     const item = {

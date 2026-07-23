@@ -22,7 +22,8 @@ import { supabase } from '../supabaseClient';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import { buildProjectFolderName, uploadPhotoAndGetUrl, getPhotoDownloadUrl, uploadReport } from '../services/OneDriveService';
-import { savePhotoLocally, updatePhotoSyncStatus, deleteOldSyncedPhotos, getPendingCount } from '../services/PhotoStorage';
+import { savePhotoLocally, updatePhotoSyncStatus, deleteOldSyncedPhotos, getPendingCount, getPhotoBlob, getProjectPhotos } from '../services/PhotoStorage';
+const IS_TEST_ENV = !!(typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_EXPECTED_SUPABASE_PROJECT_ID);
 import { swissPLZ } from '../data/swiss_plz';
 
 import { DEVICE_INVENTORY } from '../data/device_inventory';
@@ -276,7 +277,7 @@ const compressAndResizeImage = (file, maxDimension = 1200, quality = 0.7) => {
 };
 
 
-export default function DamageForm({ onCancel, initialData, onSave, mode = 'desktop', isDarkMode = true }) {
+export default function DamageForm({ onCancel, initialData, onSave, mode = 'desktop', isDarkMode = true, isSyncPending }) {
     // Helper to parse address string if editing
     const parseAddress = (addr) => {
         if (!addr) return { street: '', zip: '', city: '' };
@@ -692,6 +693,123 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
     const [pendingSyncCount, setPendingSyncCount] = useState(0);
     const [isSyncing, setIsSyncing] = useState(false);
 
+    // ── Object URL Tracking and Reload Preview Restoration ────────────────
+    const objectUrlsRef = useRef([]);
+    const trackObjectURL = (url) => {
+        if (url && url.startsWith('blob:') && !objectUrlsRef.current.includes(url)) {
+            objectUrlsRef.current.push(url);
+        }
+        return url;
+    };
+    const revokeImageBlob = (img) => {
+        if (img && img.preview && img.preview.startsWith('blob:')) {
+            try {
+                URL.revokeObjectURL(img.preview);
+            } catch (e) {}
+        }
+    };
+    useEffect(() => {
+        return () => {
+            objectUrlsRef.current.forEach(url => {
+                try {
+                    URL.revokeObjectURL(url);
+                } catch (e) {}
+            });
+        };
+    }, []);
+
+    useEffect(() => {
+        let active = true;
+        const restoreLocalPreviews = async () => {
+            if (!formData.id) return;
+            
+            // 1. Fetch all local photos from IndexedDB for this project
+            let localPhotos = [];
+            try {
+                localPhotos = await getProjectPhotos(formData.id);
+            } catch (idbErr) {
+                console.warn("[restoreLocalPreviews] Failed to fetch project photos from IndexedDB:", idbErr);
+            }
+
+            // 2. Merge local photos with state images
+            let updated = false;
+            let currentImages = Array.isArray(formData.images) ? [...formData.images] : [];
+            const nextImages = [...currentImages];
+
+            // Add local photos missing from state, or update their status
+            for (const localPhoto of localPhotos) {
+                const existingIdx = nextImages.findIndex(img => img.id === localPhoto.id);
+                const previewUrl = await getPhotoBlob(localPhoto.id);
+                
+                if (existingIdx === -1) {
+                    const ext = localPhoto.name?.split('.').pop() || 'jpg';
+                    nextImages.push({
+                        id: localPhoto.id,
+                        name: localPhoto.name,
+                        date: localPhoto.createdAt || new Date().toISOString(),
+                        preview: previewUrl,
+                        includeInReport: localPhoto.meta?.includeInReport !== undefined ? localPhoto.meta.includeInReport : true,
+                        assignedTo: localPhoto.meta?.assignedTo || 'Sonstiges',
+                        uploading: localPhoto.syncStatus !== 'remote_verified' && localPhoto.syncStatus !== 'synced',
+                        error: localPhoto.syncStatus === 'error',
+                        type: ['pdf', 'msg', 'txt'].includes(ext) ? 'document' : 'image',
+                        fileType: ext,
+                        syncStatus: localPhoto.syncStatus,
+                        oneDriveItemId: localPhoto.oneDriveItemId,
+                        oneDrivePath: localPhoto.oneDrivePath,
+                        storagePath: localPhoto.supabasePath
+                    });
+                    updated = true;
+                } else {
+                    const img = nextImages[existingIdx];
+                    let imgChanged = false;
+                    
+                    if (localPhoto.syncStatus && img.syncStatus !== localPhoto.syncStatus) {
+                        img.syncStatus = localPhoto.syncStatus;
+                        img.uploading = localPhoto.syncStatus !== 'remote_verified' && localPhoto.syncStatus !== 'synced';
+                        img.error = localPhoto.syncStatus === 'error';
+                        imgChanged = true;
+                    }
+                    if (previewUrl && (!img.preview || (img.preview.startsWith('blob:') && !objectUrlsRef.current.includes(img.preview)))) {
+                        img.preview = previewUrl;
+                        trackObjectURL(previewUrl);
+                        imgChanged = true;
+                    }
+                    if (imgChanged) {
+                        nextImages[existingIdx] = { ...img };
+                        updated = true;
+                    }
+                }
+            }
+
+            // Restore preview URLs for existing state images
+            for (let i = 0; i < nextImages.length; i++) {
+                const img = nextImages[i];
+                if (img && img.id && (!img.preview || (img.preview.startsWith('blob:') && !objectUrlsRef.current.includes(img.preview)))) {
+                    const freshBlobUrl = await getPhotoBlob(img.id);
+                    if (freshBlobUrl) {
+                        trackObjectURL(freshBlobUrl);
+                        nextImages[i] = { ...img, preview: freshBlobUrl };
+                        updated = true;
+                    }
+                }
+            }
+
+            if (active && updated) {
+                setFormData(prev => ({
+                    ...prev,
+                    images: nextImages
+                }));
+            }
+        };
+
+        const timer = setTimeout(restoreLocalPreviews, 1500);
+        return () => {
+            active = false;
+            clearTimeout(timer);
+        };
+    }, [formData.id]);
+
     // ── Auto-Sync: Pending Fotos hochladen wenn Netz zurückkommt ─────────────
     useEffect(() => {
         const syncPendingPhotos = async () => {
@@ -701,73 +819,60 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
             console.log('[Sync] 🔄 Netz verfügbar – starte Sync ausstehender Fotos...');
 
             try {
-                const { getPendingPhotos } = await import('../services/PhotoStorage');
-                const pending = await getPendingPhotos(formData.id || 'temp');
+                if (IS_TEST_ENV) {
+                    const { syncPendingToSupabase } = await import('../lib/sync/supabaseSyncWorker');
+                    const { synced, failed } = await syncPendingToSupabase();
+                    console.log(`[Sync] test-sync done. Synced: ${synced}, Failed: ${failed}`);
+                } else {
+                    const { getPendingPhotos } = await import('../services/PhotoStorage');
+                    const pending = await getPendingPhotos(formData.id || 'temp');
 
-                if (pending.length === 0) {
-                    console.log('[Sync] ✅ Keine ausstehenden Fotos.');
-                    setPendingSyncCount(0);
-                    return;
-                }
+                    if (pending.length === 0) {
+                        setPendingSyncCount(0);
+                        return;
+                    }
 
-                console.log(`[Sync] ${pending.length} Fotos ausstehend...`);
-                let synced = 0;
+                    let synced = 0;
+                    for (const photo of pending) {
+                        try {
+                            const meta = photo.meta || {};
+                            const subFolder = meta.subFolder || 'Sonstiges';
+                            const odFolder = meta.odFolder || buildProjectFolderName(formData.projectNumber || formData.id || 'Unbekannt', formData);
 
-                for (const photo of pending) {
-                    try {
-                        const meta = photo.meta || {};
-                        const subFolder = meta.subFolder || 'Sonstiges';
-                        const odFolder = meta.odFolder || buildProjectFolderName(formData.projectNumber || formData.id || 'Unbekannt', formData);
-
-                        // Supabase Upload
-                        let supabasePath = photo.supabasePath;
-                        if (!supabasePath && supabase) {
-                            const ext = photo.name.split('.').pop();
-                            const fileName = `cases/${formData.id || 'temp'}/images/${Date.now()}_${photo.id}.${ext}`;
-                            const { error } = await supabase.storage.from('case-files').upload(fileName, photo.blob);
-                            if (!error) supabasePath = fileName;
-                        }
-
-                        // OneDrive Upload
-                        let oneDriveItemId = photo.oneDriveItemId;
-                        let oneDrivePath = photo.oneDrivePath;
-                        if (!oneDriveItemId) {
-                            const odResult = await uploadPhotoAndGetUrl(odFolder, subFolder, new File([photo.blob], photo.name, { type: photo.type }));
-                            if (odResult) {
-                                oneDriveItemId = odResult.itemId;
-                                oneDrivePath = odResult.odPath;
+                            let supabasePath = photo.supabasePath;
+                            if (!supabasePath && supabase) {
+                                const ext = photo.name.split('.').pop();
+                                const fileName = `cases/${formData.id || 'temp'}/images/${Date.now()}_${photo.id}.${ext}`;
+                                const { error } = await supabase.storage.from('case-files').upload(fileName, photo.blob);
+                                if (!error) supabasePath = fileName;
                             }
+
+                            let oneDriveItemId = photo.oneDriveItemId;
+                            let oneDrivePath = photo.oneDrivePath;
+                            if (!oneDriveItemId) {
+                                const odResult = await uploadPhotoAndGetUrl(odFolder, subFolder, new File([photo.blob], photo.name, { type: photo.type }));
+                                if (odResult) {
+                                    oneDriveItemId = odResult.itemId;
+                                    oneDrivePath = odResult.odPath;
+                                }
+                            }
+
+                            await updatePhotoSyncStatus(photo.id, {
+                                supabasePath,
+                                oneDriveItemId,
+                                oneDrivePath,
+                                syncStatus: oneDriveItemId ? 'synced' : (supabasePath ? 'synced' : 'error'),
+                            });
+
+                            synced++;
+                        } catch (photoErr) {
+                            console.warn(`[Sync] Foto ${photo.id} fehlgeschlagen:`, photoErr.message);
                         }
-
-                        // IndexedDB Status aktualisieren
-                        await updatePhotoSyncStatus(photo.id, {
-                            supabasePath,
-                            oneDriveItemId,
-                            oneDrivePath,
-                            syncStatus: oneDriveItemId ? 'synced' : (supabasePath ? 'synced' : 'error'),
-                        });
-
-                        // formData image Eintrag aktualisieren
-                        setFormData(prev => ({
-                            ...prev,
-                            images: prev.images.map(img =>
-                                img.localId === photo.id ? {
-                                    ...img,
-                                    storagePath: supabasePath,
-                                    oneDriveItemId,
-                                    oneDrivePath,
-                                } : img
-                            )
-                        }));
-
-                        synced++;
-                    } catch (photoErr) {
-                        console.warn(`[Sync] Foto ${photo.id} fehlgeschlagen:`, photoErr.message);
                     }
                 }
-
-                console.log(`[Sync] ✅ ${synced}/${pending.length} Fotos synchronisiert`);
-                setPendingSyncCount(pending.length - synced);
+                
+                const count = await getPendingCount();
+                setPendingSyncCount(count);
             } catch (e) {
                 console.warn('[Sync] Fehler:', e.message);
             } finally {
@@ -807,7 +912,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
     // (oneDriveItemId fehlt). Download via Supabase Storage → Upload via User-Token.
     // Funktioniert auf jedem Gerät, da Blobs per HTTP aus Supabase geladen werden.
     useEffect(() => {
-        if (!formData.id || !supabase) return;
+        if (IS_TEST_ENV || !formData.id || !supabase) return;
 
         const backfill = async () => {
             const odFolder = buildProjectFolderName(
@@ -1946,193 +2051,62 @@ END:VCARD`;
         setFormData(prev => ({ ...prev, customMapImage: null }));
     };
 
-    // --- Image Upload Handler: Supabase (Pflicht-Backup) + OneDrive (Primärarchiv) ---
     const handleImageUpload = async (files, contextData = {}) => {
         if (!files || files.length === 0) return;
 
         for (let file of files) {
             const fileExt = file.name.split('.').pop().toLowerCase();
             const isDoc = ['pdf', 'msg', 'txt'].includes(fileExt);
-
-            if (!isDoc && file.type && file.type.startsWith('image/')) {
-                try {
-                    const compressedDataUrl = await compressAndResizeImage(file, 1600, 0.75);
-                    const res = await fetch(compressedDataUrl);
-                    const blob = await res.blob();
-                    file = new File([blob], file.name || 'photo.jpg', { type: 'image/jpeg' });
-                } catch (e) {
-                    console.warn("Universal image compression fallback:", e);
-                }
-            }
-
-            const previewUrl = URL.createObjectURL(file);
-            const tempId = Math.random().toString(36).substring(7);
-
-            const imageEntry = {
-                id: tempId,
-                file,
-                preview: previewUrl,
-                name: file.name,
-                date: new Date().toISOString(),
-                includeInReport: contextData.includeInReport !== undefined ? contextData.includeInReport : true,
-                ...contextData,
-                uploading: true,
-                type: isDoc ? 'document' : 'image',
-                fileType: fileExt,
-            };
-
-            setFormData(prev => ({ ...prev, images: [...prev.images, imageEntry] }));
-
+            const imageId = 'img_' + Math.random().toString(36).substring(2, 15) + '_' + Date.now();
+            
             try {
-                const subFolder = contextData.assignedTo || contextData.roomName || 'Sonstiges';
-                const odFolder = buildProjectFolderName(
-                    formData.projectNumber || formData.id || 'Unbekannt',
-                    formData
-                );
-
-                let supabasePath = null;
-                let supabaseUrl = null;
-                let odResult = null;
-                let localPreviewUrl = previewUrl; // Fallback: blob-URL aus createObjectURL
-
-                // ── SCHRITT 0: IndexedDB (sofort, offline, garantiert) ────────
+                // 1. Immediately and durably save the original blob in IndexedDB (Step 0)
+                let localPreviewUrl = null;
                 if (!isDoc) {
-                    try {
-                        localPreviewUrl = await savePhotoLocally(tempId, formData.id || 'temp', file, {
-                            subFolder, odFolder, contextData
-                        });
-                        // State sofort mit lokaler URL aktualisieren (kein Netz nötig!)
-                        setFormData(prev => ({
-                            ...prev,
-                            images: prev.images.map(img =>
-                                img.id === tempId ? { ...img, preview: localPreviewUrl, localId: tempId } : img
-                            )
-                        }));
-                        console.log('[IndexedDB] ✅ Foto lokal gesichert:', tempId);
-                    } catch (idbErr) {
-                        console.warn('[IndexedDB] Lokaler Speicher fehlgeschlagen:', idbErr.message);
-                    }
+                    localPreviewUrl = await savePhotoLocally(imageId, formData.id || 'temp', file, {
+                        ...contextData,
+                        isSketch: contextData.assignedTo === 'Messprotokolle' || (file.name && file.name.includes('sketch'))
+                    });
+                    trackObjectURL(localPreviewUrl);
+                } else {
+                    localPreviewUrl = trackObjectURL(URL.createObjectURL(file));
                 }
 
-                // ── SCHRITT 1: Supabase (immer – garantierter Backup) ─────────
-                if (supabase) {
-                    try {
-                        const ext = file.name.split('.').pop();
-                        const fileName = `cases/${formData.id || 'temp'}/images/${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${ext}`;
-                        const { error: sbErr } = await supabase.storage.from('case-files').upload(fileName, file);
-                        if (!sbErr) {
-                            const { data: { publicUrl } } = supabase.storage.from('case-files').getPublicUrl(fileName);
-                            supabasePath = fileName;
-                            supabaseUrl = publicUrl;
-                            console.log('[Supabase] ✅ Backup gespeichert:', fileName);
+                // 2. Add to React state only after confirmed local IndexedDB save
+                const imageEntry = {
+                    id: imageId,
+                    name: file.name,
+                    date: new Date().toISOString(),
+                    preview: localPreviewUrl,
+                    includeInReport: contextData.includeInReport !== undefined ? contextData.includeInReport : true,
+                    ...contextData,
+                    uploading: true, // indicates that sync is running/pending
+                    error: false,
+                    type: isDoc ? 'document' : 'image',
+                    fileType: fileExt,
+                    syncStatus: 'local_only'
+                };
 
-                            // IndexedDB-Status auf 'synced' → Badge-Counter geht auf 0
-                            updatePhotoSyncStatus(tempId, 'synced').catch(() => { });
-                        } else {
-                            console.warn('[Supabase] Backup-Fehler:', sbErr.message);
+                setFormData(prev => ({ ...prev, images: [...prev.images, imageEntry] }));
+
+                // 3. Immediately trigger background sync worker without blocking UI
+                import('../lib/sync/supabaseSyncWorker.js').then(({ syncPendingToSupabase }) => {
+                    syncPendingToSupabase().then(({ synced }) => {
+                        if (synced > 0) {
+                            // Fetch reports to update standard project state
+                            fetchReports().catch(() => {});
                         }
-                    } catch (sbEx) {
-                        console.warn('[Supabase] Backup fehlgeschlagen:', sbEx.message);
-                    }
-                }
-
-                // ── SCHRITT 1.5: OneDrive persönlich (direkt, via User-Token) ─────────
-                if (!isDoc) {
-                    try {
-                        const uploadedOd = await uploadPhotoAndGetUrl(odFolder, subFolder, file);
-                        if (uploadedOd?.itemId || uploadedOd?.odPath) {
-                            odResult = uploadedOd;
-                            console.log('[OneDrive] ✅ Foto direkt hochgeladen:', uploadedOd.odPath);
-                        }
-                    } catch (odErr) {
-                        console.warn('[OneDrive] Direkter Upload fehlgeschlagen (Journal übernimmt):', odErr.message);
-                    }
-                }
-
-                // ── SCHRITT 2: Journal-Eintrag für Backend-Upload (Variante C) ───────────
-                // Das Backend (Supabase Edge Function) übernimmt den
-                // eigentlichen Upload nach OneDrive/SharePoint.
-                // Kein direkter OneDrive-Aufruf im Frontend.
-                if (!isDoc && supabasePath) {
-                    try {
-                        const { supabase: sb } = await import('../supabaseClient.js');
-                        if (sb) {
-                            await sb.from('project_image_uploads').upsert({
-                                local_image_id: tempId,
-                                project_id: formData.id || formData.projectNumber || 'tmp',
-                                filename: file.name,
-                                mime_type: file.type || 'image/jpeg',
-                                size_bytes: file.size,
-                                storage_bucket: 'case-files',
-                                storage_path: supabasePath,
-                                storage_status: 'uploaded_to_backend',
-                                remote_path: `QTool/${odFolder}/Fotos/${subFolder.replace(/[^a-zA-Z0-9]/g, '_')}/${file.name}`,
-                                updated_at: new Date().toISOString(),
-                            }, { onConflict: 'local_image_id', ignoreDuplicates: false });
-                            console.log('[Variante C] ✅ Journal-Eintrag erstellt – Backend lädt hoch');
-
-                            // ── Sofortiger Worker-Trigger (fire & forget) ──────
-                            // Ruft den Backend-Worker direkt auf statt auf Cron zu
-                            // warten (max. 1 Minute). Bilder erscheinen so in
-                            // Sekunden in SharePoint statt nach bis zu 1 Minute.
-                            fetch(
-                                `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/onedrive-upload-worker`,
-                                {
-                                    method: 'POST',
-                                    headers: {
-                                        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-                                        'Content-Type': 'application/json',
-                                    },
-                                    body: '{}',
-                                }
-                            ).then(r => {
-                                if (r.ok) console.log('[Variante C] 🚀 Worker sofort getriggert');
-                            }).catch(() => { }); // Fire & forget – niemals UI blockieren
-                        }
-                    } catch (jErr) {
-                        // Journal-Fehler ist nicht kritisch – Bild ist in Supabase Storage gesichert
-                        console.warn('[Variante C] Journal-Fehler (Bild trotzdem gesichert):', jErr.message);
-                    }
-                }
-
-                // ── SCHRITT 3: State mit beiden Pfaden aktualisieren ──────────
-                setFormData(prev => ({
-                    ...prev,
-                    images: prev.images.map(img =>
-                        img.id === tempId ? {
-                            ...img,
-                            // Vorschau: OneDrive → Supabase → blob (Session)
-                            preview: odResult?.downloadUrl || supabaseUrl || previewUrl,
-                            previewFallback: supabaseUrl || previewUrl,
-                            // OneDrive (permanent)
-                            oneDriveItemId: odResult?.itemId || null,
-                            oneDrivePath: odResult?.odPath || null,
-                            // Supabase (temporärer Backup, periodisch bereinigt)
-                            storagePath: supabasePath,
-                            supabaseBackedUpAt: supabasePath ? new Date().toISOString() : null,
-                            uploading: false,
-                            error: !supabasePath && !odResult,
-                        } : img
-                    )
-                }));
+                    }).catch(err => {
+                        console.warn('[handleImageUpload] Background sync failed:', err.message);
+                    });
+                }).catch(() => {});
 
             } catch (error) {
-                console.error('Upload failed:', error);
-                setFormData(prev => ({
-                    ...prev,
-                    images: prev.images.map(img =>
-                        img.id === tempId ? { ...img, error: true, uploading: false } : img
-                    )
-                }));
+                console.error('[handleImageUpload] Failed to save image locally:', error);
+                alert("Fehler bei der lokalen Bildsicherung: " + error.message);
             }
         }
     };
-
-
-
-    // Cleanup in Variante C: Der Backend-Worker (Edge Function) übernimmt
-    // das Löschen verifizierter Blobs nach der Sicherheitsfrist.
-    // Die alte cleanupOldSupabasePhotos()-Funktion wurde entfernt.
 
     const handleRoomImageDrop = (e, room) => {
         e.preventDefault();
@@ -3008,7 +2982,7 @@ END:VCARD`;
                     if (!window.confirm(`Dokument "${img.name}" wirklich löschen?`)) return;
                     setFormData(prev => ({
                         ...prev,
-                        images: prev.images.filter(i => i !== img)
+                        images: prev.images.filter(i => { if (i === img) revokeImageBlob(i); return i !== img; })
                     }));
                 }}
                 style={{
@@ -3252,11 +3226,11 @@ END:VCARD`;
                     onContinueMeasurement={(room) => {
                         setActiveRoomForMeasurement({
                             ...room,
-                            isNewMeasurement: true,
-                            isContinueMeasurement: false,
+                            isNewMeasurement: false,
+                            isContinueMeasurement: true,
                             measurementSessionId: `continue_${room.id}_${Date.now()}`
                         });
-                        setIsNewMeasurement(true);
+                        setIsNewMeasurement(false);
                         setShowMeasurementModal(true);
                     }}
                     onNewRoom={() => {
@@ -3307,7 +3281,11 @@ END:VCARD`;
                         setActiveRoomForMeasurement(null);
                         setIsNewMeasurement(false);
                         setIsMeasurementReadOnly(false);
-                        setTechTab(null);
+                        if (mode === 'technician') {
+                            setTechTab('messung');
+                        } else {
+                            setTechTab(null);
+                        }
                     }}
                     onStartNew={() => setIsNewMeasurement(true)}
                     readOnly={isMeasurementReadOnly}
@@ -3766,6 +3744,24 @@ END:VCARD`;
     return (
         <>
             <div className="card" style={{ maxWidth: mode === 'desktop' ? '1920px' : '800px', margin: '0 auto', padding: mode === 'desktop' ? '1.5rem' : '1rem' }}>
+                {isSyncPending && (
+                    <div style={{
+                        padding: '1rem',
+                        borderRadius: '8px',
+                        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                        border: '1px solid #ef4444',
+                        color: '#ef4444',
+                        fontWeight: 600,
+                        textAlign: 'center',
+                        marginBottom: '1.5rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '0.5rem'
+                    }}>
+                        <span>⚠️ Lokal gespeichert – Synchronisation ausstehend</span>
+                    </div>
+                )}
                 {/* Desktop Tabs Header Selector (Visual Mockup Only) */}
                 {mode === 'desktop' && (
                     <div style={{
@@ -4987,7 +4983,7 @@ END:VCARD`;
                                         img.name?.toLowerCase().endsWith('.pdf') ||
                                         img.name?.toLowerCase().endsWith('.txt');
                                     return img && !img.roomId && !isDoc && img.assignedTo !== 'Schadenfotos' && img.assignedTo !== 'Messprotokolle' && img.assignedTo !== 'Pläne';
-                                }).map((img, idx) => (
+                                  }).map((img, idx) => (
                                     <div key={idx} style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start', border: '1px solid var(--border)', padding: '0.5rem', borderRadius: '6px', backgroundColor: 'var(--background)' }}>
                                         {/* Thumbnail + Controls */}
                                         <div style={{ flex: '0 0 140px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
@@ -5030,13 +5026,31 @@ END:VCARD`;
                                                     setFormData(prev => ({
                                                         ...prev,
                                                         images: prev.images.map(i => i.preview === img.preview ? { ...i, description: newDesc } : i)
-                                                    }));
+                                                     }));
                                                 }}
                                             />
+                                            <div style={{ marginTop: '0.35rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                                <span style={{
+                                                    fontSize: '0.7rem',
+                                                    fontWeight: 600,
+                                                    padding: '2px 6px',
+                                                    borderRadius: '4px',
+                                                    backgroundColor: img.syncStatus === 'remote_verified' || img.syncStatus === 'synced' ? 'rgba(16,185,129,0.1)' : 
+                                                                     img.syncStatus === 'uploaded_to_backend' ? 'rgba(245,158,11,0.1)' : 
+                                                                     img.syncStatus === 'error' ? 'rgba(239,68,68,0.1)' : 'rgba(59,130,246,0.1)',
+                                                    color: img.syncStatus === 'remote_verified' || img.syncStatus === 'synced' ? '#10B981' : 
+                                                           img.syncStatus === 'uploaded_to_backend' ? '#F59E0B' : 
+                                                           img.syncStatus === 'error' ? '#EF4444' : '#3B82F6'
+                                                }}>
+                                                    {img.syncStatus === 'remote_verified' || img.syncStatus === 'synced' ? 'Vollständig verifiziert' : 
+                                                     img.syncStatus === 'uploaded_to_backend' ? 'In Supabase gespeichert' : 
+                                                     img.syncStatus === 'error' ? 'Fehler – erneut versuchen' : 'Lokal gesichert'}
+                                                </span>
+                                            </div>
                                         </div>
                                         {/* Delete */}
                                         <div style={{ display: 'flex', flexDirection: 'column', height: '140px', justifyContent: 'flex-start' }}>
-                                            <button type="button" onClick={() => setFormData(prev => ({ ...prev, images: prev.images.filter(i => i !== img) }))} style={{ color: '#EF4444', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '6px', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}><Trash size={16} /></button>
+                                            <button type="button" onClick={() => setFormData(prev => ({ ...prev, images: prev.images.filter(i => { if (i === img) revokeImageBlob(i); return i !== img; }) }))} style={{ color: '#EF4444', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '6px', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}><Trash size={16} /></button>
                                         </div>
                                     </div>
                                 ))}
@@ -5848,7 +5862,7 @@ END:VCARD`;
                                                                 if (window.confirm('Bild wirklich löschen?')) {
                                                                     setFormData(prev => ({
                                                                         ...prev,
-                                                                        images: prev.images.filter(i => i !== img),
+                                                                        images: prev.images.filter(i => { if (i === img) revokeImageBlob(i); return i !== img; }),
                                                                         damageTypeImage: prev.damageTypeImage === img.preview ? null : prev.damageTypeImage
                                                                     }));
                                                                 }
@@ -6419,6 +6433,24 @@ END:VCARD`;
                                                                                 <Mic size={20} className={isRecording === img.preview ? 'animate-pulse' : ''} />
                                                                             </button>
                                                                         </div>
+                                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '2px' }}>
+                                                                            <span style={{
+                                                                                fontSize: '0.7rem',
+                                                                                fontWeight: 600,
+                                                                                padding: '2px 6px',
+                                                                                borderRadius: '4px',
+                                                                                backgroundColor: img.syncStatus === 'remote_verified' || img.syncStatus === 'synced' ? 'rgba(16,185,129,0.1)' : 
+                                                                                                 img.syncStatus === 'uploaded_to_backend' ? 'rgba(245,158,11,0.1)' : 
+                                                                                                 img.syncStatus === 'error' ? 'rgba(239,68,68,0.1)' : 'rgba(59,130,246,0.1)',
+                                                                                color: img.syncStatus === 'remote_verified' || img.syncStatus === 'synced' ? '#10B981' : 
+                                                                                       img.syncStatus === 'uploaded_to_backend' ? '#F59E0B' : 
+                                                                                       img.syncStatus === 'error' ? '#EF4444' : '#3B82F6'
+                                                                            }}>
+                                                                                {img.syncStatus === 'remote_verified' || img.syncStatus === 'synced' ? 'Vollständig verifiziert' : 
+                                                                                 img.syncStatus === 'uploaded_to_backend' ? 'In Supabase gespeichert' : 
+                                                                                 img.syncStatus === 'error' ? 'Fehler – erneut versuchen' : 'Lokal gesichert'}
+                                                                            </span>
+                                                                        </div>
                                                                     </div>
 
                                                                     {/* Second Thumbnail (Thermal if exists) */}
@@ -6893,7 +6925,7 @@ END:VCARD`;
                                                     }}
                                                     onClick={() => {
                                                         if (window.confirm('Bild wirklich löschen?')) {
-                                                            setFormData(prev => ({ ...prev, images: prev.images.filter(i => i !== item) }))
+                                                            setFormData(prev => ({ ...prev, images: prev.images.filter(i => { if (i === item) revokeImageBlob(i); return i !== item; }) }))
                                                         }
                                                     }}
                                                 >
@@ -7639,7 +7671,7 @@ END:VCARD`;
                                             </div>
                                         )}
                                         {!((item.file && item.file.type === 'application/pdf') || (item.name && item.name.toLowerCase().endsWith('.pdf'))) && <div style={{ flex: 1, fontWeight: 500, color: 'white' }}>{item.name}</div>}
-                                        <button type="button" className="btn btn-ghost" onClick={() => setFormData(prev => ({ ...prev, images: prev.images.filter(i => i !== item) }))} style={{ color: '#EF4444', padding: '0.5rem', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(239, 68, 68, 0.1)' }}><Trash size={18} /></button>
+                                        <button type="button" className="btn btn-ghost" onClick={() => setFormData(prev => ({ ...prev, images: prev.images.filter(i => { if (i === item) revokeImageBlob(i); return i !== item; }) }))} style={{ color: '#EF4444', padding: '0.5rem', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(239, 68, 68, 0.1)' }}><Trash size={18} /></button>
                                     </div>
                                 ))}
                                 {formData.images.filter(img => img.assignedTo === 'Schadensberichte').length === 0 && <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.9rem', fontStyle: 'italic' }}>Keine Schadensberichte vorhanden.</div>}

@@ -6,6 +6,7 @@ const BASE_URL = 'http://localhost:5177';
 test.describe('QTool Offline-Fähigkeit (Techniker Mode)', () => {
 
     test.beforeEach(async ({ page }) => {
+        page.on('console', msg => console.log('[BROWSER]', msg.text()));
         // App laden und Session zurücksetzen für sauberen Test
         await page.goto(BASE_URL);
         await page.evaluate(() => {
@@ -120,6 +121,7 @@ test.describe('QTool Offline-Fähigkeit (Techniker Mode)', () => {
         
         const timestamp = "SYNC-" + Date.now().toString().slice(-4);
         await page.getByRole('button', { name: 'MP hinzufügen' }).click();
+        await expect(page.locator('input[placeholder="B"]')).toHaveCount(5, { timeout: 5000 });
         await page.locator('input[placeholder="B"]').last().fill(timestamp);
         console.log(`📝 Offline Punkt erstellt: ${timestamp}`);
 

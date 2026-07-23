@@ -15,7 +15,7 @@ console.log('--- STARTING SAVEPOINT ---');
 
 // 2. Check for tracked changes
 // git ls-files -m (modified) -d (deleted) gives us exactly what we need
-const trackedChangesOutput = run('git ls-files -m -d');
+let trackedChangesOutput = run('git ls-files -m -d');
 if (!trackedChangesOutput) {
     // Also check for staged changes just in case
     const stagedChanges = run('git diff --cached --name-only');
@@ -49,10 +49,7 @@ try {
 // 4. Commit and Tag
 try {
     console.log('\nCommitting changes...');
-    // Add only tracked changes
-    trackedChanges.forEach(file => {
-        execSync(`git add "${file}"`);
-    });
+    execSync('git add -u');
 
     const commitMsg = `SAVEPOINT: ${description}`;
     execSync(`git commit -m "${commitMsg}"`);

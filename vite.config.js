@@ -5,113 +5,38 @@ import tailwindcss from '@tailwindcss/vite'
 
 // https://vite.dev/config/
 export default defineConfig({
+  envDir: __dirname,
   plugins: [
     tailwindcss(),
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      // Service Worker wird automatisch aktualisiert wenn neue Version verfügbar
-
-      // Welche Dateien gecached werden (Precache = sofort beim ersten Laden)
       includeAssets: ['vite.svg', 'logo.png'],
-
-      // Web App Manifest (für "Zum Homescreen hinzufügen")
       manifest: {
-        name: 'QTool – Q-Service',
-        short_name: 'QTool',
-        description: 'Bautrockner-Einsatz Dokumentation – auch offline',
+        name: 'QTool – Q-Service (Test)',
+        short_name: 'QTool-Test',
+        description: 'Bautrockner-Einsatz Dokumentation – Testumgebung',
         theme_color: '#0F172A',
         background_color: '#0F172A',
         display: 'standalone',
         orientation: 'any',
         lang: 'de',
         icons: [
+          { src: 'app-icon.png', sizes: '192x192', type: 'image/png' },
+          { src: 'app-icon.png', sizes: '512x512', type: 'image/png' }
+        ]
+      },
+      workbox: {
+        cacheId: 'qtool-ipad-test-v1',
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2,ttf}'],
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+        runtimeCaching: [
           {
-            src: 'app-icon.png',
-            sizes: '192x192',
-            type: 'image/png'
-          },
-          {
-            src: 'app-icon.png',
-            sizes: '512x512',
-            type: 'image/png'
-          },
-          {
-            src: 'app-icon.png',
-            sizes: '180x180',
-            type: 'image/png',
-            purpose: 'apple touch icon'
-          },
-          {
-            src: 'app-icon.png',
-            sizes: '512x512',
-            type: 'image/png',
-            purpose: 'any maskable'
+            urlPattern: /supabase\.co/i,
+            handler: 'NetworkOnly',
           }
         ]
       },
-
-      // Workbox Konfiguration: Caching-Strategie
-      workbox: {
-        // Alle JS/CSS/HTML/Assets sofort precachen
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2,ttf}'],
-
-        // Das App-Bundle ist groß (react-pdf, exceljs etc.) → Limit erhöhen
-        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5 MB
-        // Cache-Strategien für verschiedene Request-Typen:
-        runtimeCaching: [
-          {
-            // Google Fonts → Cache First (offline verfügbar)
-            urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'google-fonts-cache',
-              expiration: { maxEntries: 10, maxAgeSeconds: 60 * 60 * 24 * 365 },
-              cacheableResponse: { statuses: [0, 200] },
-            },
-          },
-          {
-            urlPattern: /^https:\/\/fonts\.gstatic\.com\/.*/i,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'gstatic-fonts-cache',
-              expiration: { maxEntries: 10, maxAgeSeconds: 60 * 60 * 24 * 365 },
-              cacheableResponse: { statuses: [0, 200] },
-            },
-          },
-          {
-            // App-eigene Assets → StaleWhileRevalidate (offline OK, im Hintergrund aktualisiert)
-            urlPattern: /\/src\/.*/i,
-            handler: 'StaleWhileRevalidate',
-            options: {
-              cacheName: 'qtool-assets',
-              expiration: { maxEntries: 50, maxAgeSeconds: 60 * 60 * 24 * 30 },
-            },
-          },
-          {
-            // OpenAI API → NetworkOnly (kein Cache – funktioniert nur online)
-            urlPattern: /^https:\/\/api\.openai\.com\/.*/i,
-            handler: 'NetworkOnly',
-          },
-          {
-            // Supabase → NetworkOnly (direkt ans Netz, kein SW-Cache der Bildabrufe blockiert)
-            urlPattern: /supabase\.co/i,
-            handler: 'NetworkOnly',
-          },
-          {
-            // OneDrive / Microsoft Graph → NetworkOnly (Bilder für PDF-Export direkt laden)
-            urlPattern: /graph\.microsoft\.com|sharepoint\.com|1drv\.ms/i,
-            handler: 'NetworkOnly',
-          },
-          {
-            // Google Maps API → NetworkOnly (kein Cache)
-            urlPattern: /maps\.googleapis\.com/i,
-            handler: 'NetworkOnly',
-          },
-        ],
-      },
-
-      // Entwicklungsmodus: Service Worker deaktiviert (stört Netzwerk-IP-Zugriff)
       devOptions: {
         enabled: false,
       },
@@ -131,6 +56,10 @@ export default defineConfig({
     }
   },
   server: {
+    host: '127.0.0.1',
+    port: 5180,
+    strictPort: true,
+    open: false,
     proxy: {
       '/openai-api': {
         target: 'https://api.openai.com/v1',

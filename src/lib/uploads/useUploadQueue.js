@@ -98,7 +98,8 @@ export function useUploadQueue(projectId, remoteFolder) {
       projectId,
       Array.from(files),
       remoteFolder,
-      () => refresh() // Live-Update nach jeder Datei
+      () => refresh(), // Live-Update nach jeder Datei
+      import.meta.env.VITE_ONEDRIVE_TEST_RUN_ID
     );
 
     await refresh();

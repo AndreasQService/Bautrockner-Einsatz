@@ -4,13 +4,16 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --host --open chrome",
+    "dev": "vite --host 127.0.0.1 --port 5180 --strictPort",
+    "test:dev": "vite --host 127.0.0.1 --port 5180 --strictPort",
     "autosave": "node scripts/autosave-watch.cjs",
-    "build": "vite build",
+    "build": "node scripts/vercel-build-guard.cjs && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
     "savepoint": "node scripts/savepoint.cjs",
     "test": "playwright test",
+    "test:guard": "node --test tests/onedrive-test-guard.test.js",
+    "test:onedrive-safety": "node --test tests/*.test.js",
     "test:ui": "playwright test --ui",
     "test:debug": "playwright test --debug",
     "test:report": "playwright show-report"

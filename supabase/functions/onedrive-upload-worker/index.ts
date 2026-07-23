@@ -159,6 +159,94 @@ async function verifyItem(token: string, itemId: string): Promise<boolean> {
   return resp.ok;
 }
 
+// ─── Edge Function Test Guard ────────────────────────────────────────────────
+const EXPECTED_TEST_ROOT = 'QTool_TEST_ONLY';
+const TESTRUN_ID_REGEX = /^TESTRUN_\d{4}-\d{2}-\d{2}_\d{6}_[A-Z0-9]{4,12}$/;
+const ALLOWED_SUBFOLDERS = new Set(['Fotos', 'Dokumente', 'Messprotokolle']);
+const WINDOWS_RESERVED = new Set([
+  'CON', 'PRN', 'AUX', 'NUL',
+  'COM1', 'COM2', 'COM3', 'COM4', 'COM5', 'COM6', 'COM7', 'COM8', 'COM9',
+  'LPT1', 'LPT2', 'LPT3', 'LPT4', 'LPT5', 'LPT6', 'LPT7', 'LPT8', 'LPT9'
+]);
+
+function validateEdgeOneDrivePath(remotePath: string): void {
+  const envTestRoot = Deno.env.get('ONEDRIVE_TEST_ROOT');
+  const envQToolEnv  = Deno.env.get('QTOOL_ENVIRONMENT');
+
+  if (envQToolEnv !== 'test' || envTestRoot !== EXPECTED_TEST_ROOT) {
+    throw new Error(`[EDGE GUARD ABORT] Unzulässige Serverumgebung (ONEDRIVE_TEST_ROOT='${envTestRoot}', QTOOL_ENVIRONMENT='${envQToolEnv}').`);
+  }
+
+  if (!remotePath || typeof remotePath !== 'string' || remotePath.length > 400) {
+    throw new Error('[EDGE GUARD ABORT] Remote Pfad ungültig oder zu lang.');
+  }
+
+  if (/[\%\?\#\\:\x00-\x1F\u2044\u2215\u29F8\uFF0F\uFF3C]/.test(remotePath)) {
+    throw new Error(`[EDGE GUARD ABORT] Illegales Sonderzeichen oder Kodierung in Pfad '${remotePath}'.`);
+  }
+
+  if (/\/\.\.\/|\/\.\.$|^\.\.\//.test(remotePath)) {
+    throw new Error(`[EDGE GUARD ABORT] Path Traversal ('..') in '${remotePath}' erkannt.`);
+  }
+
+  const segments = remotePath.split('/');
+
+  // Individual segment validations
+  for (const seg of segments) {
+    if (!seg || seg.trim() === '') {
+      throw new Error('[EDGE GUARD ABORT] Segment darf nicht leer sein.');
+    }
+    if (seg.length > 150) {
+      throw new Error(`[EDGE GUARD ABORT] Segment '${seg}' überschreitet Maximallänge von 150 Zeichen.`);
+    }
+    if (seg === '.' || seg === '..' || seg.endsWith('.') || seg.endsWith(' ')) {
+      throw new Error(`[EDGE GUARD ABORT] Segment '${seg}' darf nicht auf Punkt/Leerzeichen enden oder '.'/'..' sein.`);
+    }
+    const rawBase = seg.split('.')[0].replace(/^TEST__/, '').toUpperCase();
+    if (WINDOWS_RESERVED.has(rawBase)) {
+      throw new Error(`[EDGE GUARD ABORT] Reservierter Systemname '${seg}' unzulässig.`);
+    }
+  }
+
+  // Segment 0: MUST be QTool_TEST_ONLY
+  if (segments[0] !== EXPECTED_TEST_ROOT) {
+    throw new Error(`[EDGE GUARD ABORT] Stammordner muss exakt '${EXPECTED_TEST_ROOT}' sein, erhalten: '${segments[0]}'.`);
+  }
+
+  // Segment 1: MUST match TESTRUN_ID_REGEX
+  if (!TESTRUN_ID_REGEX.test(segments[1])) {
+    throw new Error(`[EDGE GUARD ABORT] Ungültiges testRunId Format im Pfad: '${segments[1]}'.`);
+  }
+
+  // Manifest case: EXACTLY 3 segments
+  if (segments.length === 3) {
+    if (segments[2] !== 'TEST_MANIFEST.json') {
+      throw new Error(`[EDGE GUARD ABORT] Direkt im Testlauf-Ordner ist nur 'TEST_MANIFEST.json' erlaubt, erhalten: '${segments[2]}'.`);
+    }
+    return;
+  }
+
+  // File case: EXACTLY 5 segments
+  if (segments.length !== 5) {
+    throw new Error(`[EDGE GUARD ABORT] Pfadtiefe für Nutzdateien muss exakt 5 Segmente sein, erhalten: ${segments.length}.`);
+  }
+
+  // Segment 2: Project folder must start with TEST__
+  if (!segments[2].startsWith('TEST__')) {
+    throw new Error(`[EDGE GUARD ABORT] Projektordner '${segments[2]}' muss mit 'TEST__' beginnen.`);
+  }
+
+  // Segment 3: Subfolder must be strictly Fotos, Dokumente, or Messprotokolle
+  if (!ALLOWED_SUBFOLDERS.has(segments[3])) {
+    throw new Error(`[EDGE GUARD ABORT] Unzulässiger Unterordner '${segments[3]}'. Erlaubt: Fotos, Dokumente, Messprotokolle.`);
+  }
+
+  // Segment 4: File name must start with TEST__
+  if (!segments[4].startsWith('TEST__')) {
+    throw new Error(`[EDGE GUARD ABORT] Dateiname '${segments[4]}' muss mit 'TEST__' beginnen.`);
+  }
+}
+
 // ─── Ein Item verarbeiten ─────────────────────────────────────────────────────
 
 async function processItem(
@@ -167,9 +255,12 @@ async function processItem(
 ): Promise<void> {
   const id         = item.id as string;
   const storagePath = item.storage_path as string;
-  const remotePath  = (item.remote_path as string) || 'QTool/Unbekannt';
+  const remotePath  = (item.remote_path as string) || '';
   const filename    = item.filename as string;
   const fileSize    = (item.size_bytes as number) || 0;
+
+  // Strikten Edge Guard vor JEDEM Schritt aufrufen!
+  validateEdgeOneDrivePath(remotePath);
 
   // Status: uploading
   await sb.from('project_image_uploads').update({

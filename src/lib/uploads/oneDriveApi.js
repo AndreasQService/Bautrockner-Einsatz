@@ -9,6 +9,7 @@
  */
 
 import { getGraphAccessToken } from '../onedrive/auth.js';
+import { validateOneDrivePath } from './oneDriveTestGuard.js';
 
 const GRAPH_BASE = 'https://graph.microsoft.com/v1.0';
 
@@ -63,7 +64,10 @@ async function graphFetch(url, options = {}, allowedStatuses = []) {
  * @param {string} parentPath  z.B. "QTool/20260236_Muster"
  * @param {string} folderName  z.B. "Fotos"
  */
-export async function ensureFolder(parentPath, folderName) {
+export async function ensureFolder(parentPath, folderName, testRunId) {
+  const fullPath = `${parentPath}/${folderName}`;
+  validateOneDrivePath(fullPath, testRunId);
+
   const token = await getGraphAccessToken();
   const encoded = encodePath(parentPath);
 
@@ -88,10 +92,13 @@ export async function ensureFolder(parentPath, folderName) {
  * Erstellt eine OneDrive Upload-Session für resumable Uploads.
  * Muss für Dateien jeder Grösse verwendet werden (nicht nur >4 MB).
  *
- * @param {string} remotePath  Voller Pfad inkl. Dateiname, z.B. "QTool/Projekt/Fotos/bild.jpg"
+ * @param {string} remotePath  Voller Pfad inkl. Dateiname, z.B. "QTool_TEST_ONLY/TESTRUN_.../TEST__P001/Fotos/TEST__bild.jpg"
+ * @param {string} testRunId
  * @returns {Promise<{uploadUrl: string, expirationDateTime: string, nextExpectedRanges?: string[]}>}
  */
-export async function createUploadSession(remotePath) {
+export async function createUploadSession(remotePath, testRunId) {
+  validateOneDrivePath(remotePath, testRunId);
+
   const encoded = encodePath(remotePath);
 
   const res = await graphFetch(
@@ -140,6 +147,10 @@ export async function getUploadSessionStatus(uploadUrl) {
  * @returns {Promise<Response>}  202 (Chunk angenommen) oder 200/201 (Upload fertig)
  */
 export async function uploadChunk(uploadUrl, chunk, start, endInclusive, total) {
+  if (!uploadUrl || typeof uploadUrl !== 'string' || !uploadUrl.startsWith('https://')) {
+    throw new Error('[SECURITY ABORT] Session uploadUrl muss ein valider HTTPS String sein.');
+  }
+
   const res = await fetch(uploadUrl, {
     method: 'PUT',
     headers: {
@@ -191,7 +202,7 @@ export async function itemExists(itemId) {
   if (!itemId) return false;
   try {
     const res = await graphFetch(
-      `${GRAPH_BASE}/me/drive/items/${encodeURIComponent(itemId)}?$select=id`,
+      `${GRAPH_BASE}/me/drive/root:/${encodeURIComponent(itemId)}?$select=id`,
       {},
       [404]
     );
@@ -199,4 +210,70 @@ export async function itemExists(itemId) {
   } catch {
     return false;
   }
+}
+
+// ─── Manifest I/O (QTool_TEST_ONLY/<testRunId>/TEST_MANIFEST.json) ────────────
+
+/**
+ * Liest das entfernte TEST_MANIFEST.json für einen Testlauf.
+ * @param {string} testRunId
+ * @returns {Promise<{json: string, eTag: string}|null>}
+ */
+export async function readManifestFile(testRunId) {
+  const manifestPath = `QTool_TEST_ONLY/${testRunId}/TEST_MANIFEST.json`;
+  validateOneDrivePath(manifestPath, testRunId);
+
+  const encoded = encodePath(manifestPath);
+  const token = await getGraphAccessToken();
+
+  const res = await fetch(`${GRAPH_BASE}/me/drive/root:/${encoded}:/content`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    throw new Error(`[Graph] Manifest lesen fehlgeschlagen: HTTP ${res.status}`);
+  }
+
+  const json = await res.text();
+  const eTag = res.headers.get('ETag') || res.headers.get('etag') || '';
+  return { json, eTag };
+}
+
+/**
+ * Schreib-/Aktualisierungsfunktion für TEST_MANIFEST.json mit If-Match ETag Header.
+ * @param {string} testRunId
+ * @param {string} jsonContent
+ * @param {string|null} matchETag
+ * @returns {Promise<{ok: boolean, status: number, newETag?: string}>}
+ */
+export async function writeManifestFile(testRunId, jsonContent, matchETag) {
+  const manifestPath = `QTool_TEST_ONLY/${testRunId}/TEST_MANIFEST.json`;
+  validateOneDrivePath(manifestPath, testRunId);
+
+  const encoded = encodePath(manifestPath);
+  const token = await getGraphAccessToken();
+
+  const headers = {
+    Authorization: `Bearer ${token}`,
+    'Content-Type': 'application/json',
+  };
+
+  if (matchETag) {
+    headers['If-Match'] = matchETag;
+  }
+
+  const res = await fetch(`${GRAPH_BASE}/me/drive/root:/${encoded}:/content`, {
+    method: 'PUT',
+    headers,
+    body: jsonContent
+  });
+
+  const newETag = res.headers.get('ETag') || res.headers.get('etag') || undefined;
+
+  return {
+    ok: res.ok,
+    status: res.status,
+    newETag
+  };
 }

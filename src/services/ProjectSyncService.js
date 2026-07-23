@@ -155,6 +155,14 @@ export async function processProjectQueue() {
       try {
         if (!supabase) throw new Error('Supabase client ist nicht initialisiert.');
 
+        const IS_TEST_ENV = !!(typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_EXPECTED_SUPABASE_PROJECT_ID);
+        if (IS_TEST_ENV) {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (!session) {
+            throw new Error('Schreiben blockiert: Keine aktive Supabase-Session im Testmodus.');
+          }
+        }
+
         const originalSizeKB = getPayloadSizeKB(item.data);
         console.log(`[ProjectSync] originalSizeKB: ${originalSizeKB.toFixed(2)}`);
 

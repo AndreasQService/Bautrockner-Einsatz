@@ -11,7 +11,7 @@
 import { test, expect } from '@playwright/test';
 import path from 'path';
 
-const BASE_URL = 'http://localhost:5173'; // Vite Dev Server (npm run dev)
+const BASE_URL = 'http://localhost:5180'; // Vite Dev Server (npm run dev)
 
 test.describe('Offline-Betrieb und Foto-Sync', () => {
 

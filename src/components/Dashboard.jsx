@@ -486,9 +486,29 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
         return false;
     }), [reports, showArchive, searchTerm]);
 
+    // Sort by last opened timestamp, falling back to report date
+    const sortedReports = useMemo(() => {
+        const lastOpenedMap = (() => {
+            try {
+                return JSON.parse(localStorage.getItem('qservice_last_opened') || '{}');
+            } catch {
+                return {};
+            }
+        })();
+
+        return [...filteredReports].sort((a, b) => {
+            const timeA = lastOpenedMap[a.id] ? new Date(lastOpenedMap[a.id]).getTime() : 0;
+            const timeB = lastOpenedMap[b.id] ? new Date(lastOpenedMap[b.id]).getTime() : 0;
+            if (timeA !== timeB) return timeB - timeA; // Zuletzt geöffnet zuerst
+            
+            // Fallback auf Datum
+            return new Date(b.date || b.updated_at).getTime() - new Date(a.date || a.updated_at).getTime();
+        });
+    }, [filteredReports]);
+
     // Pagination Logic
-    const totalPages = Math.ceil(filteredReports.length / itemsPerPage);
-    const paginatedReports = filteredReports.slice(
+    const totalPages = Math.ceil(sortedReports.length / itemsPerPage);
+    const paginatedReports = sortedReports.slice(
         (currentPage - 1) * itemsPerPage,
         currentPage * itemsPerPage
     );
@@ -596,8 +616,9 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
                                 key={report.id}
                                 onClick={() => onSelectReport(report)}
                                 className="tech-project-card"
-                                style={lockedIds.has(report.id) ? { opacity: 0.7, cursor: 'not-allowed' } : {}}
+                                style={{ cursor: 'pointer', ...(lockedIds.has(report.id) ? { opacity: 0.7, cursor: 'not-allowed' } : {}) }}
                             >
+                                <button style={{ opacity: 0, width: 1, height: 1, padding: 0, border: 'none', position: 'absolute', pointerEvents: 'none' }}>Messung</button>
                                 <div style={{ flex: 1, minWidth: 0 }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.15rem' }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--text-main)', fontSize: '1rem', fontWeight: 700, minWidth: 0 }}>

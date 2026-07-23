@@ -13,6 +13,8 @@ const EmailImportModalV2 = ({ onClose, onImport, audioDevices, selectedDeviceId,
     const [loading, setLoading] = useState(false);
     const [useAI, setUseAI] = useState(true);
     const [isDragging, setIsDragging] = useState(false);
+    const [previewData, setPreviewData] = useState(null);
+    const [openAiKey, setOpenAiKey] = useState('');
 
     const onDragOver = (e) => {
         e.preventDefault();
@@ -55,9 +57,6 @@ const EmailImportModalV2 = ({ onClose, onImport, audioDevices, selectedDeviceId,
         const storedOpenAiKey = localStorage.getItem('openai_api_key') || import.meta.env.VITE_OPENAI_API_KEY || '';
         setOpenAiKey(storedOpenAiKey);
     }, []);
-
-    const [previewData, setPreviewData] = useState(null);
-    const [openAiKey, setOpenAiKey] = useState('');
 
     const saveApiKey = (key) => {
         setApiKey(key);
@@ -705,9 +704,9 @@ ${text}`;
                                     style={{ flex: 1 }}
                                 >
                                     {audioDevices && audioDevices.length > 0 ? (
-                                        audioDevices.map(device => (
-                                            <option key={device.deviceId} value={device.deviceId}>
-                                                {device.label || `Mikrofon ${device.deviceId.slice(0, 5)}...`}
+                                        audioDevices.map((device, dIdx) => (
+                                            <option key={device.deviceId || dIdx} value={device.deviceId || ''}>
+                                                {device.label || `Mikrofon ${(device.deviceId || '').slice(0, 5)}...`}
                                             </option>
                                         ))
                                     ) : (
