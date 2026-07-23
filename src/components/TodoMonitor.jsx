@@ -24,6 +24,7 @@ const TodoMonitor = ({
     const [modalOpen, setModalOpen] = useState(false);
     const [editingTodo, setEditingTodo] = useState(null);
     const [followUpTodo, setFollowUpTodo] = useState(null);
+    const [selectedWarningProject, setSelectedWarningProject] = useState(null);
 
     // Block & Confirmation Dialog states
     const [blockDialog, setBlockDialog] = useState(null); // { todo, otherTodos }
@@ -134,7 +135,6 @@ const TodoMonitor = ({
             return projA.localeCompare(projB);
         });
     }, [todos, reports, activeProjects, activeFilter, searchTerm, currentUser]);
-
     // Historical completed todos
     const processedHistoryTodos = useMemo(() => {
         let list = todos.filter(t => t.status === 'done');
@@ -257,150 +257,107 @@ const TodoMonitor = ({
                 }
             `}</style>
 
-            {/* Header Area */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-                <h2 style={{ margin: 0, fontSize: '1.35rem', display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700 }}>
-                    <ClipboardList size={24} style={{ color: 'var(--q-primary, #1e6db7)' }} />
+            {/* Header / Filter / Search Container - Compact Row Layout */}
+            <div style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'space-between', 
+                gap: '0.75rem', 
+                flexWrap: 'nowrap', 
+                width: '100%',
+                marginBottom: '0.5rem'
+            }}>
+                {/* Title */}
+                <h2 style={{ margin: 0, fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>
+                    <ClipboardList size={18} style={{ color: 'var(--q-primary, #1e6db7)' }} />
                     To-do-Übersicht
                 </h2>
-                <button
-                    onClick={() => { setEditingTodo(null); setModalOpen(true); }}
-                    className="btn btn-primary"
-                    style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', height: '36px', fontSize: '0.88rem' }}
-                >
-                    <Plus size={16} />
-                    <span>To-do neu</span>
-                </button>
-            </div>
 
-            {/* Counter Tabs Widgets */}
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.5rem' }}>
-                <button
-                    onClick={() => { setActiveFilter('all'); setShowHistory(false); }}
-                    style={{
-                        padding: '0.4rem 0.8rem', borderRadius: '6px', border: '1px solid var(--border)',
-                        background: activeFilter === 'all' && !showHistory ? 'var(--q-primary, #1e6db7)' : 'var(--surface-hover, rgba(0,0,0,0.02))',
-                        color: activeFilter === 'all' && !showHistory ? '#fff' : 'var(--text-main)',
-                        fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s'
-                    }}
-                >
-                    Alle offen ({counters.allOpen})
-                </button>
-                <button
-                    onClick={() => { setActiveFilter('mine'); setShowHistory(false); }}
-                    style={{
-                        padding: '0.4rem 0.8rem', borderRadius: '6px', border: '1px solid var(--border)',
-                        background: activeFilter === 'mine' && !showHistory ? 'var(--q-primary, #1e6db7)' : 'var(--surface-hover, rgba(0,0,0,0.02))',
-                        color: activeFilter === 'mine' && !showHistory ? '#fff' : 'var(--text-main)',
-                        fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer'
-                    }}
-                >
-                    Meine ({counters.mine})
-                </button>
-                <button
-                    onClick={() => { setActiveFilter('overdue'); setShowHistory(false); }}
-                    style={{
-                        padding: '0.4rem 0.8rem', borderRadius: '6px',
-                        border: '1px solid var(--todo-overdue-border)',
-                        background: activeFilter === 'overdue' && !showHistory ? 'var(--todo-overdue-text)' : 'var(--todo-overdue-bg)',
-                        color: activeFilter === 'overdue' && !showHistory ? '#fff' : 'var(--todo-overdue-text)',
-                        fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer'
-                    }}
-                >
-                    Überfällig ({counters.overdue})
-                </button>
-                <button
-                    onClick={() => { setActiveFilter('today'); setShowHistory(false); }}
-                    style={{
-                        padding: '0.4rem 0.8rem', borderRadius: '6px',
-                        border: '1px solid var(--todo-today-border)',
-                        background: activeFilter === 'today' && !showHistory ? 'var(--todo-today-text)' : 'var(--todo-today-bg)',
-                        color: activeFilter === 'today' && !showHistory ? '#fff' : 'var(--todo-today-text)',
-                        fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer'
-                    }}
-                >
-                    Heute ({counters.today})
-                </button>
-
-                {/* Control Warning Tab for active projects without To-dos */}
-                {counters.noTodos > 0 && (
+                {/* Counter Tabs Widgets */}
+                <div style={{ display: 'flex', gap: '0.35rem', flexShrink: 0 }}>
                     <button
-                        onClick={() => { setActiveFilter('no_todos'); setShowHistory(false); }}
+                        onClick={() => { setActiveFilter('all'); setShowHistory(false); }}
                         style={{
-                            padding: '0.4rem 0.8rem', borderRadius: '6px',
-                            border: '1px solid #dc2626',
-                            background: activeFilter === 'no_todos' && !showHistory ? '#dc2626' : 'rgba(220,38,38,0.08)',
-                            color: activeFilter === 'no_todos' && !showHistory ? '#fff' : '#dc2626',
-                            fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer',
-                            display: 'flex', alignItems: 'center', gap: '0.35rem'
+                            padding: '0.3rem 0.6rem', borderRadius: '6px', border: '1px solid var(--border)',
+                            background: activeFilter === 'all' && !showHistory ? 'var(--q-primary, #1e6db7)' : 'var(--surface-hover, rgba(0,0,0,0.02))',
+                            color: activeFilter === 'all' && !showHistory ? '#fff' : 'var(--text-main)',
+                            fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s'
                         }}
-                        title="Aktive Projekte ohne zugeordnete offene To-dos!"
                     >
-                        <AlertCircle size={14} />
-                        <span>Fehler: Projekte ohne To-do ({counters.noTodos})</span>
+                        Alle offen ({counters.allOpen})
                     </button>
-                )}
+                    <button
+                        onClick={() => { setActiveFilter('mine'); setShowHistory(false); }}
+                        style={{
+                            padding: '0.3rem 0.6rem', borderRadius: '6px', border: '1px solid var(--border)',
+                            background: activeFilter === 'mine' && !showHistory ? 'var(--q-primary, #1e6db7)' : 'var(--surface-hover, rgba(0,0,0,0.02))',
+                            color: activeFilter === 'mine' && !showHistory ? '#fff' : 'var(--text-main)',
+                            fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer'
+                        }}
+                    >
+                        Meine ({counters.mine})
+                    </button>
+                    <button
+                        onClick={() => { setActiveFilter('overdue'); setShowHistory(false); }}
+                        style={{
+                            padding: '0.3rem 0.6rem', borderRadius: '6px',
+                            border: '1px solid var(--todo-overdue-border)',
+                            background: activeFilter === 'overdue' && !showHistory ? 'var(--todo-overdue-text)' : 'var(--todo-overdue-bg)',
+                            color: activeFilter === 'overdue' && !showHistory ? '#fff' : 'var(--todo-overdue-text)',
+                            fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer'
+                        }}
+                    >
+                        Überfällig ({counters.overdue})
+                    </button>
+                    <button
+                        onClick={() => { setActiveFilter('today'); setShowHistory(false); }}
+                        style={{
+                            padding: '0.3rem 0.6rem', borderRadius: '6px',
+                            border: '1px solid var(--todo-today-border)',
+                            background: activeFilter === 'today' && !showHistory ? 'var(--todo-today-text)' : 'var(--todo-today-bg)',
+                            color: activeFilter === 'today' && !showHistory ? '#fff' : 'var(--todo-today-text)',
+                            fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer'
+                        }}
+                    >
+                        Heute ({counters.today})
+                    </button>
 
-                {/* History Umschalter */}
-                <button
-                    onClick={() => { setShowHistory(!showHistory); }}
-                    style={{
-                        padding: '0.4rem 0.8rem', borderRadius: '6px', border: '1px solid var(--border)',
-                        background: showHistory ? 'var(--q-primary, #1e6db7)' : 'var(--surface-hover, rgba(0,0,0,0.02))',
-                        color: showHistory ? '#fff' : 'var(--text-main)',
-                        fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer',
-                        marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.35rem'
-                    }}
-                >
-                    <Clock size={14} />
-                    <span>{showHistory ? 'History ausblenden' : 'History anzeigen'}</span>
-                </button>
-            </div>
-
-            {/* Filter and Search Bar */}
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center', marginTop: '0.5rem' }}>
-                {/* Secondary Filters (Only shown when not in History mode) */}
-                {!showHistory && (
-                    <div style={{ display: 'flex', gap: '0.35rem' }}>
+                    {/* Control Warning Tab for active projects without To-dos */}
+                    {counters.noTodos > 0 && (
                         <button
-                            onClick={() => setActiveFilter('week')}
+                            onClick={() => { setActiveFilter('no_todos'); setShowHistory(false); }}
                             style={{
-                                padding: '0.3rem 0.6rem', borderRadius: '4px', border: '1px solid var(--border)',
-                                background: activeFilter === 'week' ? 'var(--surface-active, rgba(0,0,0,0.08))' : 'transparent',
-                                color: 'var(--text-main)', fontSize: '0.78rem', cursor: 'pointer'
+                                padding: '0.3rem 0.6rem', borderRadius: '6px',
+                                border: '1px solid #dc2626',
+                                background: activeFilter === 'no_todos' && !showHistory ? '#dc2626' : 'rgba(220,38,38,0.08)',
+                                color: activeFilter === 'no_todos' && !showHistory ? '#fff' : '#dc2626',
+                                fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer',
+                                display: 'flex', alignItems: 'center', gap: '0.25rem'
                             }}
+                            title="Aktive Projekte ohne zugeordnete offene To-dos!"
                         >
-                            Diese Woche
+                            <AlertCircle size={12} />
+                            <span>Fehler ({counters.noTodos})</span>
                         </button>
-                        <button
-                            onClick={() => setActiveFilter('closes')}
-                            style={{
-                                padding: '0.3rem 0.6rem', borderRadius: '4px', border: '1px solid var(--border)',
-                                background: activeFilter === 'closes' ? 'var(--surface-active, rgba(0,0,0,0.08))' : 'transparent',
-                                color: 'var(--text-main)', fontSize: '0.78rem', cursor: 'pointer'
-                            }}
-                        >
-                            Abschluss vorgesehen
-                        </button>
-                    </div>
-                )}
+                    )}
+                </div>
 
                 {/* Search Bar */}
-                <div style={{ position: 'relative', flex: 1, minWidth: '200px' }}>
-                    <Search size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                <div style={{ position: 'relative', flex: 1, minWidth: '150px' }}>
+                    <Search size={14} style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
                     <input
                         type="text"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        placeholder="Aufgabe, Mitarbeiter, Projekt oder Adresse suchen..."
+                        placeholder="Aufgabe, Mitarbeiter, Projekt..."
                         className="form-input"
-                        style={{ width: '100%', paddingLeft: '32px', height: '32px', fontSize: '0.85rem' }}
+                        style={{ width: '100%', paddingLeft: '28px', height: '30px', fontSize: '0.8rem' }}
                     />
                     {searchTerm && (
                         <button
                             onClick={() => setSearchTerm('')}
                             style={{
-                                position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)',
+                                position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)',
                                 background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer'
                             }}
                         >
@@ -408,6 +365,16 @@ const TodoMonitor = ({
                         </button>
                     )}
                 </div>
+
+                {/* "To-do neu" Button */}
+                <button
+                    onClick={() => { setEditingTodo(null); setModalOpen(true); }}
+                    className="btn btn-primary"
+                    style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', height: '30px', fontSize: '0.8rem', padding: '0 0.75rem', flexShrink: 0 }}
+                >
+                    <Plus size={14} />
+                    <span>To-do neu</span>
+                </button>
             </div>
 
             {/* ERROR Display */}
@@ -426,19 +393,26 @@ const TodoMonitor = ({
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' }}>
                         <thead>
                             <tr style={{ borderBottom: '1px solid var(--border)', background: 'var(--surface-hover, rgba(0,0,0,0.015))', color: 'var(--text-muted)' }}>
-                                <th style={{ padding: '0.65rem 0.8rem', textAlign: 'left', fontWeight: 600 }}>Erledigt am</th>
-                                <th style={{ padding: '0.65rem 0.8rem', textAlign: 'left', fontWeight: 600 }}>Projekt / Adresse</th>
-                                <th style={{ padding: '0.65rem 0.8rem', textAlign: 'left', fontWeight: 600 }}>Wer</th>
+                                <th style={{ padding: '0.65rem 0.8rem', textAlign: 'left', width: '140px', fontWeight: 600 }}>Erledigt am</th>
+                                <th style={{ padding: '0.65rem 0.8rem', textAlign: 'left', width: '110px', fontWeight: 600 }}>Projektnummer</th>
+                                <th style={{ padding: '0.65rem 0.8rem', textAlign: 'left', width: '25%', fontWeight: 600 }}>Projekt / Adresse</th>
+                                <th style={{ padding: '0.65rem 0.8rem', textAlign: 'left', width: '100px', fontWeight: 600 }}>Wer</th>
                                 <th style={{ padding: '0.65rem 0.8rem', textAlign: 'left', fontWeight: 600 }}>Was</th>
-                                <th style={{ padding: '0.65rem 0.8rem', textAlign: 'left', fontWeight: 600 }}>Erledigt durch</th>
-                                <th style={{ padding: '0.65rem 0.8rem', textAlign: 'center', fontWeight: 600 }}>Fälligkeit</th>
-                                <th style={{ padding: '0.65rem 0.8rem', textAlign: 'center', fontWeight: 600 }}>Abschluss</th>
+                                <th style={{ padding: '0.65rem 0.8rem', textAlign: 'left', width: '120px', fontWeight: 600 }}>Erledigt durch</th>
+                                <th style={{ padding: '0.65rem 0.8rem', textAlign: 'center', width: '100px', fontWeight: 600 }}>Fälligkeit</th>
+                                <th style={{ padding: '0.65rem 0.8rem', textAlign: 'center', width: '80px', fontWeight: 600 }}>Abschluss</th>
+                                <th 
+                                    onClick={() => setShowHistory(false)}
+                                    style={{ padding: '0.65rem 0.8rem', textAlign: 'center', width: '130px', fontWeight: 600, cursor: 'pointer', color: 'var(--q-primary, #1e6db7)', textDecoration: 'underline', userSelect: 'none' }}
+                                >
+                                    History ausblenden
+                                </th>
                             </tr>
                         </thead>
                         <tbody>
                             {processedHistoryTodos.length === 0 ? (
                                 <tr>
-                                    <td colSpan={7} style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>Kein Aufgabenverlauf vorhanden.</td>
+                                    <td colSpan={9} style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>Kein Aufgabenverlauf vorhanden.</td>
                                 </tr>
                             ) : (
                                 processedHistoryTodos.map(todoItem => {
@@ -448,14 +422,26 @@ const TodoMonitor = ({
                                             <td style={{ padding: '0.65rem 0.8rem', color: 'var(--text-muted)' }}>
                                                 {new Date(todoItem.completed_at).toLocaleString('de-CH', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                                             </td>
+                                            <td style={{ padding: '0.65rem 0.8rem', fontWeight: 500 }}>
+                                                {proj?.projectNumber || '-'}
+                                            </td>
                                             <td style={{ padding: '0.65rem 0.8rem' }}>
-                                                <button
-                                                    onClick={() => proj && onSelectReport(proj)}
-                                                    style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--q-primary, #1e6db7)', textDecoration: 'underline', fontWeight: 500, fontSize: 'inherit', textAlign: 'left' }}
-                                                >
-                                                    {proj?.projectTitle || proj?.id || 'Unbekanntes Projekt'}
-                                                </button>
-                                                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{proj?.address}</div>
+                                                {(() => {
+                                                    const displayTitle = (proj?.projectTitle && proj?.projectTitle !== proj?.id && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(proj?.projectTitle)) ? proj.projectTitle : (proj?.address || proj?.client || proj?.id || 'Unbekanntes Projekt');
+                                                    return (
+                                                        <>
+                                                            <button
+                                                                onClick={() => proj && onSelectReport(proj)}
+                                                                style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--q-primary, #1e6db7)', textDecoration: 'underline', fontWeight: 600, fontSize: 'inherit', textAlign: 'left' }}
+                                                            >
+                                                                {displayTitle}
+                                                            </button>
+                                                            {proj?.address && displayTitle !== proj.address && (
+                                                                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{proj.address}</div>
+                                                            )}
+                                                        </>
+                                                    );
+                                                })()}
                                             </td>
                                             <td style={{ padding: '0.65rem 0.8rem' }}>{todoItem.assigned_user_name}</td>
                                             <td style={{ padding: '0.65rem 0.8rem' }}>
@@ -469,6 +455,7 @@ const TodoMonitor = ({
                                             <td style={{ padding: '0.65rem 0.8rem', textAlign: 'center', color: todoItem.closes_project ? '#10B981' : 'var(--text-muted)' }}>
                                                 {todoItem.closes_project ? 'Ja' : 'Nein'}
                                             </td>
+                                            <td style={{ padding: '0.65rem 0.8rem', textAlign: 'center', color: 'var(--text-muted)' }}>-</td>
                                         </tr>
                                     );
                                 })
@@ -495,7 +482,7 @@ const TodoMonitor = ({
                                             onClick={() => onSelectReport(proj)}
                                             style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--q-primary, #1e6db7)', textDecoration: 'underline', fontWeight: 600, fontSize: 'inherit', textAlign: 'left' }}
                                         >
-                                            {proj.projectTitle || proj.id}
+                                            {(proj.projectTitle && proj.projectTitle !== proj.id && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(proj.projectTitle)) ? proj.projectTitle : (proj.address || proj.client || proj.id)}
                                         </button>
                                         <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{proj.projectNumber}</div>
                                     </td>
@@ -505,8 +492,7 @@ const TodoMonitor = ({
                                     <td style={{ padding: '0.65rem 0.8rem', textAlign: 'center' }}>
                                         <button
                                             onClick={() => {
-                                                setSelectedProject(proj);
-                                                setProjectSearch(proj.projectTitle || proj.address || proj.id);
+                                                setSelectedWarningProject(proj);
                                                 setEditingTodo(null);
                                                 setModalOpen(true);
                                             }}
@@ -526,19 +512,27 @@ const TodoMonitor = ({
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' }}>
                         <thead>
                             <tr style={{ borderBottom: '1px solid var(--border)', background: 'var(--surface-hover, rgba(0,0,0,0.015))', color: 'var(--text-muted)' }}>
-                                <th style={{ padding: '0.65rem 0.8rem', textAlign: 'center', width: '80px', fontWeight: 600 }}>Erledigt</th>
-                                <th style={{ padding: '0.65rem 0.8rem', textAlign: 'left', width: '100px', fontWeight: 600 }}>Fällig</th>
-                                <th style={{ padding: '0.65rem 0.8rem', textAlign: 'left', fontWeight: 600 }}>Projekt / Adresse</th>
-                                <th style={{ padding: '0.65rem 0.8rem', textAlign: 'left', width: '120px', fontWeight: 600 }}>Wer</th>
+                                <th style={{ padding: '0.65rem 0.8rem', textAlign: 'left', width: '90px', fontWeight: 600 }}>Fällig</th>
+                                <th style={{ padding: '0.65rem 0.8rem', textAlign: 'left', width: '110px', fontWeight: 600 }}>Projektnummer</th>
+                                <th style={{ padding: '0.65rem 0.8rem', textAlign: 'left', width: '25%', fontWeight: 600 }}>Projekt / Adresse</th>
+                                <th style={{ padding: '0.65rem 0.8rem', textAlign: 'left', width: '100px', fontWeight: 600 }}>Wer</th>
                                 <th style={{ padding: '0.65rem 0.8rem', textAlign: 'left', fontWeight: 600 }}>Was</th>
-                                <th style={{ padding: '0.65rem 0.8rem', textAlign: 'center', width: '90px', fontWeight: 600 }}>Abschluss</th>
-                                <th style={{ padding: '0.65rem 0.8rem', textAlign: 'center', width: '100px', fontWeight: 600 }}>Aktionen</th>
+                                <th style={{ padding: '0.65rem 0.8rem', textAlign: 'left', fontWeight: 600 }}>Notiz</th>
+                                <th style={{ padding: '0.65rem 0.8rem', textAlign: 'center', width: '80px', fontWeight: 600 }}>Erledigt</th>
+                                <th style={{ padding: '0.65rem 0.8rem', textAlign: 'center', width: '80px', fontWeight: 600 }}>Abschluss</th>
+                                <th style={{ padding: '0.65rem 0.8rem', textAlign: 'center', width: '85px', fontWeight: 600 }}>Bearbeiten</th>
+                                <th 
+                                    onClick={() => setShowHistory(true)}
+                                    style={{ padding: '0.65rem 0.8rem', textAlign: 'center', width: '130px', fontWeight: 600, cursor: 'pointer', color: 'var(--q-primary, #1e6db7)', textDecoration: 'underline', userSelect: 'none' }}
+                                >
+                                    History anzeigen
+                                </th>
                             </tr>
                         </thead>
                         <tbody>
                             {processedOpenTodos.length === 0 ? (
                                 <tr>
-                                    <td colSpan={7} style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>Keine offenen Aufgaben vorhanden.</td>
+                                    <td colSpan={10} style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>Keine offenen Aufgaben vorhanden.</td>
                                 </tr>
                             ) : (
                                 processedOpenTodos.map(todoItem => {
@@ -572,45 +566,65 @@ const TodoMonitor = ({
 
                                     return (
                                         <tr key={todoItem.id} style={{ borderBottom: '1px solid var(--border)', backgroundColor: 'var(--surface)' }}>
-                                            {/* 1. Checkbox erledigt */}
-                                            <td style={{ padding: '0.65rem 0.8rem', textAlign: 'center' }}>
-                                                <input
-                                                    type="checkbox"
-                                                    checked={pendingActionTodoId === todoItem.id}
-                                                    disabled={pendingActionTodoId !== null && pendingActionTodoId !== todoItem.id}
-                                                    onChange={(e) => handleToggleDone(todoItem, e.target.checked)}
-                                                    style={{ width: '22px', height: '22px', cursor: 'pointer', verticalAlign: 'middle' }}
-                                                />
-                                            </td>
-                                            {/* 2. Fällig */}
+                                            {/* 1. Fällig */}
                                             <td style={{ padding: '0.65rem 0.8rem' }}>
                                                 <span style={dueStyle}>{dueLabel}</span>
                                             </td>
-                                            {/* 3. Projekt / Adresse */}
-                                            <td style={{ padding: '0.65rem 0.8rem' }}>
-                                                <button
-                                                    onClick={() => proj && onSelectReport(proj)}
-                                                    style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--q-primary, #1e6db7)', textDecoration: 'underline', fontWeight: 600, fontSize: 'inherit', textAlign: 'left' }}
-                                                >
-                                                    {proj?.projectTitle || proj?.id || 'Unbekanntes Projekt'}
-                                                </button>
-                                                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{proj?.address}</div>
+                                            {/* 1b. Projektnummer */}
+                                            <td style={{ padding: '0.65rem 0.8rem', fontWeight: 500 }}>
+                                                {proj?.projectNumber || '-'}
                                             </td>
-                                            {/* 4. Wer */}
+                                            {/* 2. Projekt / Adresse */}
+                                            <td style={{ padding: '0.65rem 0.8rem' }}>
+                                                {(() => {
+                                                    const displayTitle = (proj?.projectTitle && proj?.projectTitle !== proj?.id && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(proj?.projectTitle)) ? proj.projectTitle : (proj?.address || proj?.client || proj?.id || 'Unbekanntes Projekt');
+                                                    return (
+                                                        <>
+                                                            <button
+                                                                onClick={() => proj && onSelectReport(proj)}
+                                                                style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--q-primary, #1e6db7)', textDecoration: 'underline', fontWeight: 600, fontSize: 'inherit', textAlign: 'left' }}
+                                                            >
+                                                                {displayTitle}
+                                                            </button>
+                                                            {proj?.address && displayTitle !== proj.address && (
+                                                                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{proj.address}</div>
+                                                            )}
+                                                        </>
+                                                    );
+                                                })()}
+                                            </td>
+                                            {/* 3. Wer */}
                                             <td style={{ padding: '0.65rem 0.8rem' }}>{todoItem.assigned_user_name}</td>
-                                            {/* 5. Was */}
+                                            {/* 4. Was */}
                                             <td style={{ padding: '0.65rem 0.8rem' }}>
                                                 <div style={{ fontWeight: 500 }}>{todoItem.task}</div>
-                                                {todoItem.note && <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>{todoItem.note}</div>}
                                             </td>
-                                            {/* 6. Abschluss */}
-                                            <td style={{ padding: '0.65rem 0.8rem', textAlign: 'center' }}>
-                                                <input
-                                                    type="checkbox"
-                                                    checked={todoItem.closes_project}
-                                                    disabled
-                                                    style={{ width: '16px', height: '16px' }}
-                                                />
+                                            {/* 5. Notiz */}
+                                            <td style={{ padding: '0.65rem 0.8rem', fontSize: '0.82rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                                                {todoItem.note || ''}
+                                            </td>
+                                            {/* 6. Checkbox erledigt */}
+                                            <td style={{ padding: '0.65rem 0.8rem', textAlign: 'center', verticalAlign: 'middle' }}>
+                                                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '22px' }}>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={pendingActionTodoId === todoItem.id}
+                                                        disabled={pendingActionTodoId !== null && pendingActionTodoId !== todoItem.id}
+                                                        onChange={(e) => handleToggleDone(todoItem, e.target.checked)}
+                                                        style={{ width: '16px', height: '16px', cursor: 'pointer', margin: 0, padding: 0 }}
+                                                    />
+                                                </div>
+                                            </td>
+                                            {/* 7. Abschluss */}
+                                            <td style={{ padding: '0.65rem 0.8rem', textAlign: 'center', verticalAlign: 'middle' }}>
+                                                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '22px' }}>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={todoItem.closes_project}
+                                                        readOnly
+                                                        style={{ width: '16px', height: '16px', margin: 0, padding: 0, cursor: 'default', pointerEvents: 'none' }}
+                                                    />
+                                                </div>
                                             </td>
                                             {/* 7. Aktionen */}
                                             <td style={{ padding: '0.65rem 0.8rem', textAlign: 'center' }}>
@@ -623,6 +637,10 @@ const TodoMonitor = ({
                                                 >
                                                     <Edit2 size={16} />
                                                 </button>
+                                            </td>
+                                            {/* 8. History placeholder cell */}
+                                            <td style={{ padding: '0.65rem 0.8rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                                                -
                                             </td>
                                         </tr>
                                     );
@@ -637,7 +655,8 @@ const TodoMonitor = ({
             {modalOpen && (
                 <TodoModal
                     todo={editingTodo}
-                    onClose={() => { setModalOpen(false); setEditingTodo(null); }}
+                    initialProject={selectedWarningProject}
+                    onClose={() => { setModalOpen(false); setEditingTodo(null); setSelectedWarningProject(null); }}
                     onSaveSuccess={() => { loadTodos(); onReportsChanged?.(); }}
                     users={users}
                     reports={reports}

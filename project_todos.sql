@@ -284,30 +284,57 @@ GRANT EXECUTE ON FUNCTION public.fn_complete_and_create_todo TO authenticated;
 REVOKE EXECUTE ON FUNCTION public.fn_complete_todo_and_archive_project FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.fn_complete_todo_and_archive_project TO authenticated;
 
--- 9. Insert the silent backend test user into auth.users (if not exists)
--- This allows the front-end to log in as 'authenticated' silently in the background
-INSERT INTO auth.users (
-  instance_id,
-  id,
-  aud,
-  role,
-  email,
-  encrypted_password,
-  email_confirmed_at,
-  raw_app_meta_data,
-  raw_user_meta_data,
-  created_at,
-  updated_at
-) VALUES (
-  '00000000-0000-0000-0000-000000000000',
-  '99999999-9999-9999-9999-999999999999', -- fixed UUID for silent user
-  'authenticated',
-  'authenticated',
-  'test-env-user@qtool.local',
-  crypt('TestEnvPassword123!', gen_salt('bf')),
-  now(),
-  '{"provider":"email","providers":["email"]}',
-  '{}',
-  now(),
-  now()
-) ON CONFLICT (email) DO NOTHING;
+-- 9. Test-Benutzer für stillen Hintergrund-Login erstellen
+-- Ein DO-Block verhindert Fehler bei fehlenden Unique Constraints auf der E-Mail-Spalte
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM auth.users WHERE email = 'test-env-user@qtool.local') THEN
+        INSERT INTO auth.users (
+            instance_id,
+            id,
+            aud,
+            role,
+            email,
+            encrypted_password,
+            email_confirmed_at,
+            raw_app_meta_data,
+            raw_user_meta_data,
+            created_at,
+            updated_at
+        ) VALUES (
+            '00000000-0000-0000-0000-000000000000',
+            '99999999-9999-9999-9999-999999999999',
+            'authenticated',
+            'authenticated',
+            'test-env-user@qtool.local',
+            '$2a$10$wSrBpOxdfxM4ECe8onsbSeHUMw7LsGM8r4TE9z6jTg6Lv6lUwBD86',
+            now(),
+            '{"provider":"email","providers":["email"]}',
+            '{}',
+            now(),
+            now()
+        );
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM auth.identities WHERE provider_id = 'test-env-user@qtool.local') THEN
+        INSERT INTO auth.identities (
+            id,
+            user_id,
+            identity_data,
+            provider,
+            provider_id,
+            last_sign_in_at,
+            created_at,
+            updated_at
+        ) VALUES (
+            '99999999-9999-9999-9999-999999999999',
+            '99999999-9999-9999-9999-999999999999',
+            '{"sub": "99999999-9999-9999-9999-999999999999", "email": "test-env-user@qtool.local", "email_verified": true}',
+            'email',
+            'test-env-user@qtool.local',
+            now(),
+            now(),
+            now()
+        );
+    END IF;
+END $$;

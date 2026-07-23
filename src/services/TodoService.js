@@ -3,6 +3,8 @@ import { supabase } from '../supabaseClient';
 export const SILENT_USER_EMAIL = 'test-env-user@qtool.local';
 export const SILENT_USER_PASSWORD = 'TestEnvPassword123!';
 
+export let lastAuthError = null;
+
 /**
  * Performs a silent background sign-in to Supabase Auth so that RLS 'authenticated' policies are satisfied.
  */
@@ -10,18 +12,54 @@ export async function ensureAuthenticated() {
     if (!supabase) return false;
     try {
         const { data: { session } } = await supabase.auth.getSession();
-        if (session) return true;
+        if (session) {
+            lastAuthError = null;
+            return true;
+        }
 
-        const { error } = await supabase.auth.signInWithPassword({
+        // 1. Attempt to sign in
+        const { error: signInError } = await supabase.auth.signInWithPassword({
             email: SILENT_USER_EMAIL,
             password: SILENT_USER_PASSWORD
         });
 
-        if (error) {
-            console.error('[TodoService] Silent sign-in failed:', error.message);
+        if (!signInError) {
+            console.log('[TodoService] Silent sign-in successful');
+            lastAuthError = null;
+            return true;
+        }
+
+        lastAuthError = signInError.message;
+        console.warn('[TodoService] Silent sign-in failed, attempting silent registration...', signInError.message);
+
+        // 2. Fallback: Attempt to register/sign up the user
+        const { error: signUpError } = await supabase.auth.signUp({
+            email: SILENT_USER_EMAIL,
+            password: SILENT_USER_PASSWORD
+        });
+
+        if (signUpError) {
+            lastAuthError = signUpError.message;
+            console.error('[TodoService] Silent registration failed:', signUpError.message);
             return false;
         }
-        console.log('[TodoService] Silent sign-in successful');
+
+        console.log('[TodoService] Silent registration successful, retrying sign-in...');
+
+        // 3. Retry sign in
+        const { error: retryError } = await supabase.auth.signInWithPassword({
+            email: SILENT_USER_EMAIL,
+            password: SILENT_USER_PASSWORD
+        });
+
+        if (retryError) {
+            lastAuthError = retryError.message;
+            console.error('[TodoService] Silent sign-in retry failed:', retryError.message);
+            return false;
+        }
+
+        lastAuthError = null;
+        console.log('[TodoService] Silent sign-in successful after registration');
         return true;
     } catch (err) {
         console.error('[TodoService] Silent sign-in error:', err);

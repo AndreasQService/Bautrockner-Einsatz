@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useMemo, useEffect } from "react"
 import { createPortal } from "react-dom"
-import { X, Check, Minus, CalendarDays, CheckCircle2, MinusCircle, MessageSquare, Zap, AlertTriangle, Bell, Clock, Search, MoreVertical } from "lucide-react"
+import { X, Check, Minus, CalendarDays, CheckCircle2, MinusCircle, MessageSquare, Zap, AlertTriangle, Bell, Clock, Search, MoreVertical, ChevronDown, ChevronRight } from "lucide-react"
 
 // ─── Workflow Config ───────────────────────────────────────────────────────────
 const STEPS = [
@@ -698,9 +698,14 @@ export default function WorkflowStatusOverview({ reports, onSelectReport, curren
     <div style={{ fontFamily: '"Segoe UI", "Roboto", Arial, sans-serif', marginBottom: "1.5rem", background: "var(--color-surface, #FFFFFF)", borderRadius: 12, border: "1px solid var(--color-border,rgba(255,255,255,0.08))", overflow: "hidden" }}>
 
       {/* Header */}
-      <div style={{ padding: "0.75rem 1rem 0", borderBottom: "1px solid var(--color-border,rgba(255,255,255,0.08))" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1rem" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer" }} onClick={() => setCollapsed(c => !c)}>
+      <div style={{
+        padding: collapsed ? "0.75rem 1rem" : "0.75rem 1rem 0",
+        borderBottom: collapsed ? "none" : "1px solid var(--color-border,rgba(255,255,255,0.08))",
+        transition: "all 0.15s ease-in-out"
+      }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: collapsed ? 0 : "1rem" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer", userSelect: "none" }} onClick={() => setCollapsed(c => !c)}>
+            {collapsed ? <ChevronRight size={18} style={{ color: "var(--text-muted, #64748B)" }} /> : <ChevronDown size={18} style={{ color: "var(--text-muted, #64748B)" }} />}
             <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#10B981", flexShrink: 0 }} />
             <h2 style={{ margin: 0, fontSize: "1.25rem", fontWeight: 700, color: "var(--text-main)" }}>Workflow-Übersicht</h2>
             <span style={{ fontSize: "0.72rem", color: "#475569", fontWeight: 400 }}>{allActive.length} aktive Projekte</span>
@@ -742,14 +747,16 @@ export default function WorkflowStatusOverview({ reports, onSelectReport, curren
             </select>
           </div>
         </div>
-        <div style={{ display: "flex", gap: "0.2rem" }}>
-          {tabs.map(t => (
-            <button key={t.id} onClick={() => setTab(t.id)} style={{ padding: "0.35rem 0.65rem", borderRadius: "6px 6px 0 0", border: "1px solid var(--color-border,rgba(255,255,255,0.08))", borderBottom: tab === t.id ? "1px solid var(--color-surface,#0F172A)" : "1px solid var(--color-border,rgba(255,255,255,0.08))", background: tab === t.id ? "var(--color-surface,#0F172A)" : "var(--color-surface-alt,#1E293B)", color: tab === t.id ? "var(--text-main)" : "var(--text-muted, #64748B)", fontWeight: tab === t.id ? 700 : 400, fontSize: "0.72rem", cursor: "pointer", transition: "all 0.1s" }}>
-              {t.label}{" "}
-              <span style={{ padding: "0px 5px", borderRadius: 8, background: tab === t.id ? (t.color || "#3B82F6") + "22" : "rgba(255,255,255,0.05)", color: tab === t.id ? (t.color || "#94A3B8") : "#475569", fontSize: "0.68rem", fontWeight: 700 }}>{t.count}</span>
-            </button>
-          ))}
-        </div>
+        {!collapsed && (
+          <div style={{ display: "flex", gap: "0.2rem" }}>
+            {tabs.map(t => (
+              <button key={t.id} onClick={() => setTab(t.id)} style={{ padding: "0.35rem 0.65rem", borderRadius: "6px 6px 0 0", border: "1px solid var(--color-border,rgba(255,255,255,0.08))", borderBottom: tab === t.id ? "1px solid var(--color-surface,#0F172A)" : "1px solid var(--color-border,rgba(255,255,255,0.08))", background: tab === t.id ? "var(--color-surface,#0F172A)" : "var(--color-surface-alt,#1E293B)", color: tab === t.id ? "var(--text-main)" : "var(--text-muted, #64748B)", fontWeight: tab === t.id ? 700 : 400, fontSize: "0.72rem", cursor: "pointer", transition: "all 0.1s" }}>
+                {t.label}{" "}
+                <span style={{ padding: "0px 5px", borderRadius: 8, background: tab === t.id ? (t.color || "#3B82F6") + "22" : "rgba(255,255,255,0.05)", color: tab === t.id ? (t.color || "#94A3B8") : "#475569", fontSize: "0.68rem", fontWeight: 700 }}>{t.count}</span>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Table */}

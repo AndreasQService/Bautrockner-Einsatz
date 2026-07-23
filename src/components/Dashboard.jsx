@@ -448,6 +448,55 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
     });
     const itemsPerPage = 20;
     const [showArchive, setShowArchive] = useState(false);
+    const [showWorkflow, setShowWorkflow] = useState(() => {
+        try {
+            const saved = localStorage.getItem('qtool_show_workflow');
+            return saved !== null ? JSON.parse(saved) : true;
+        } catch {
+            return true;
+        }
+    });
+    const [showDrying, setShowDrying] = useState(() => {
+        try {
+            const saved = localStorage.getItem('qtool_show_drying');
+            return saved !== null ? JSON.parse(saved) : true;
+        } catch {
+            return true;
+        }
+    });
+    const [showDevices, setShowDevices] = useState(() => {
+        try {
+            const saved = localStorage.getItem('qtool_show_devices');
+            return saved !== null ? JSON.parse(saved) : true;
+        } catch {
+            return true;
+        }
+    });
+
+    useEffect(() => {
+        try {
+            localStorage.setItem('qtool_show_workflow', JSON.stringify(showWorkflow));
+        } catch (e) {
+            console.error(e);
+        }
+    }, [showWorkflow]);
+
+    useEffect(() => {
+        try {
+            localStorage.setItem('qtool_show_drying', JSON.stringify(showDrying));
+        } catch (e) {
+            console.error(e);
+        }
+    }, [showDrying]);
+
+    useEffect(() => {
+        try {
+            localStorage.setItem('qtool_show_devices', JSON.stringify(showDevices));
+        } catch (e) {
+            console.error(e);
+        }
+    }, [showDevices]);
+
     const lockedIds = lockedProjectIds instanceof Set ? lockedProjectIds : new Set();
 
     // Filter Logic
@@ -569,6 +618,38 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
                             Archiv
                         </button>
                     </div>
+                    {/* Workflow/Drying/Devices Toggles */}
+                    {!showArchive && mode !== 'technician' && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginLeft: '0.75rem', flexWrap: 'wrap' }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.78rem', cursor: 'pointer', userSelect: 'none', color: 'var(--text-muted)' }}>
+                                <input
+                                    type="checkbox"
+                                    checked={showWorkflow}
+                                    onChange={(e) => setShowWorkflow(e.target.checked)}
+                                    style={{ cursor: 'pointer', width: '14px', height: '14px', margin: 0 }}
+                                />
+                                <span>Workflow</span>
+                            </label>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.78rem', cursor: 'pointer', userSelect: 'none', color: 'var(--text-muted)' }}>
+                                <input
+                                    type="checkbox"
+                                    checked={showDrying}
+                                    onChange={(e) => setShowDrying(e.target.checked)}
+                                    style={{ cursor: 'pointer', width: '14px', height: '14px', margin: 0 }}
+                                />
+                                <span>Trocknungen</span>
+                            </label>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.78rem', cursor: 'pointer', userSelect: 'none', color: 'var(--text-muted)' }}>
+                                <input
+                                    type="checkbox"
+                                    checked={showDevices}
+                                    onChange={(e) => setShowDevices(e.target.checked)}
+                                    style={{ cursor: 'pointer', width: '14px', height: '14px', margin: 0 }}
+                                />
+                                <span>Geräte</span>
+                            </label>
+                        </div>
+                    )}
                 </div>
 
                 {/* Search Input */}
@@ -600,10 +681,16 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
             {/* Pass Filtered Reports to Monitors (only when not in Archive OR Technician Mode) */}
             {!showArchive && mode !== 'technician' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                    <WorkflowStatusOverview reports={reports} onSelectReport={onSelectReport} currentUser={currentUser} users={users || []} searchTerm={searchTerm} store={workflowStore} onStoreChange={setWorkflowStore} />
                     <TodoMonitor reports={reports} users={users || []} currentUser={currentUser} onSelectReport={onSelectReport} onReportsChanged={onReportsChanged} />
-                    <DryingMonitor reports={filteredReports} onSelectReport={onSelectReport} workflowStore={workflowStore} />
-                    <DeviceInventoryList reports={filteredReports} onSelectReport={onSelectReport} />
+                    {showWorkflow && (
+                        <WorkflowStatusOverview reports={reports} onSelectReport={onSelectReport} currentUser={currentUser} users={users || []} searchTerm={searchTerm} store={workflowStore} onStoreChange={setWorkflowStore} />
+                    )}
+                    {showDrying && (
+                        <DryingMonitor reports={filteredReports} onSelectReport={onSelectReport} workflowStore={workflowStore} />
+                    )}
+                    {showDevices && (
+                        <DeviceInventoryList reports={filteredReports} onSelectReport={onSelectReport} />
+                    )}
                 </div>
             )}
 

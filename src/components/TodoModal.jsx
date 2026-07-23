@@ -10,7 +10,8 @@ const TodoModal = ({
     users = [],
     reports = [],
     currentUser = null,
-    isFollowUpMode = false  // If true, we are creating a follow-up todo for `todo`
+    isFollowUpMode = false, // If true, we are creating a follow-up todo for `todo`
+    initialProject = null   // Optional project to pre-select
 }) => {
     const [selectedProject, setSelectedProject] = useState(null);
     const [projectSearch, setProjectSearch] = useState('');
@@ -34,7 +35,7 @@ const TodoModal = ({
             const proj = reports.find(r => r.id === todo.project_id);
             if (proj) {
                 setSelectedProject(proj);
-                setProjectSearch(proj.project_title || proj.address || proj.id);
+                setProjectSearch(proj.projectTitle || proj.project_title || proj.address || proj.id);
             }
 
             if (!isFollowUpMode) {
@@ -48,8 +49,14 @@ const TodoModal = ({
                 // Follow-up mode: prefill some values if desired, but keep task/due_date clean
                 setAssignedUserId(todo.assigned_user_id || '');
             }
+        } else if (initialProject) {
+            setSelectedProject(initialProject);
+            setProjectSearch(initialProject.projectTitle || initialProject.project_title || initialProject.address || initialProject.id);
+        } else if (reports.length === 1) {
+            setSelectedProject(reports[0]);
+            setProjectSearch(reports[0].projectTitle || reports[0].project_title || reports[0].address || reports[0].id);
         }
-    }, [todo, isFollowUpMode, reports]);
+    }, [todo, isFollowUpMode, reports, initialProject]);
 
     // Active/open todos for selected project
     const activeProjectTodosCount = useMemo(() => {
@@ -226,7 +233,7 @@ const TodoModal = ({
                             onChange={(e) => {
                                 setProjectSearch(e.target.value);
                                 setShowProjectDropdown(true);
-                                if (selectedProject && e.target.value !== (selectedProject.project_title || selectedProject.address)) {
+                                if (selectedProject && e.target.value !== (selectedProject.projectTitle || selectedProject.project_title || selectedProject.address || selectedProject.id)) {
                                     setSelectedProject(null);
                                 }
                             }}
@@ -249,7 +256,7 @@ const TodoModal = ({
                                         key={proj.id}
                                         onClick={() => {
                                             setSelectedProject(proj);
-                                            setProjectSearch(proj.projectTitle || proj.address || proj.id);
+                                            setProjectSearch((proj.projectTitle && proj.projectTitle !== proj.id && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(proj.projectTitle)) ? proj.projectTitle : (proj.address || proj.id));
                                             setShowProjectDropdown(false);
                                             setError('');
                                         }}
@@ -261,7 +268,9 @@ const TodoModal = ({
                                         onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--surface-hover, rgba(0,0,0,0.04))'}
                                         onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                                     >
-                                        <div style={{ fontWeight: 600 }}>{proj.projectTitle || 'Unbenanntes Projekt'}</div>
+                                        <div style={{ fontWeight: 600 }}>
+                                            {(proj.projectTitle && proj.projectTitle !== proj.id && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(proj.projectTitle)) ? proj.projectTitle : (proj.address || 'Unbenanntes Projekt')}
+                                        </div>
                                         <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
                                             {proj.projectNumber || proj.id} | {proj.address}
                                         </div>
@@ -360,18 +369,18 @@ const TodoModal = ({
                     </div>
 
                     {/* Closes Project Checkbox */}
-                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6rem', marginTop: '0.2rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '0.2rem', padding: '0.4rem 0' }}>
+                        <label htmlFor="closesProject" style={{ fontSize: '0.88rem', fontWeight: 500, cursor: 'pointer', select: 'none' }}>
+                            Abschluss – Projekt nach Erledigung abschliessen und archivieren
+                        </label>
                         <input
                             type="checkbox"
                             id="closesProject"
                             checked={closesProject}
                             onChange={(e) => setClosesProject(e.target.checked)}
-                            style={{ width: '18px', height: '18px', marginTop: '1px', cursor: 'pointer' }}
+                            style={{ width: '18px', height: '18px', cursor: 'pointer' }}
                             disabled={saving}
                         />
-                        <label htmlFor="closesProject" style={{ fontSize: '0.88rem', fontWeight: 500, cursor: 'pointer', select: 'none', lineHeight: '1.3' }}>
-                            Abschluss – Projekt nach Erledigung abschliessen und archivieren
-                        </label>
                     </div>
 
                     {/* Error display */}
@@ -412,7 +421,8 @@ const TodoModal = ({
                     </div>
                 </form>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };
 
