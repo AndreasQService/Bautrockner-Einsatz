@@ -22,7 +22,7 @@ import { supabase } from '../supabaseClient';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import { buildProjectFolderName, uploadPhotoAndGetUrl, getPhotoDownloadUrl, uploadReport } from '../services/OneDriveService';
-import { savePhotoLocally, updatePhotoSyncStatus, deleteOldSyncedPhotos, getPendingCount } from '../services/PhotoStorage';
+import { savePhotoLocally, updatePhotoSyncStatus, deleteOldSyncedPhotos, getPendingCount, getPhotoBlob, getProjectPhotos } from '../services/PhotoStorage';
 import { swissPLZ } from '../data/swiss_plz';
 
 import { DEVICE_INVENTORY } from '../data/device_inventory';
@@ -276,7 +276,7 @@ const compressAndResizeImage = (file, maxDimension = 1200, quality = 0.7) => {
 };
 
 
-export default function DamageForm({ onCancel, initialData, onSave, mode = 'desktop', isDarkMode = true }) {
+export default function DamageForm({ onCancel, initialData, onSave, mode = 'desktop', isDarkMode = true, fetchReports }) {
     // Helper to parse address string if editing
     const parseAddress = (addr) => {
         if (!addr) return { street: '', zip: '', city: '' };
@@ -692,8 +692,129 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
     const [pendingSyncCount, setPendingSyncCount] = useState(0);
     const [isSyncing, setIsSyncing] = useState(false);
 
+    const IS_TEST_ENV = !!(typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_EXPECTED_SUPABASE_PROJECT_ID);
+
+    // ── Object URL Tracking and Reload Preview Restoration ────────────────
+    const objectUrlsRef = useRef([]);
+    const trackObjectURL = (url) => {
+        if (url && url.startsWith('blob:') && !objectUrlsRef.current.includes(url)) {
+            objectUrlsRef.current.push(url);
+        }
+        return url;
+    };
+    const revokeImageBlob = (img) => {
+        if (img && img.preview && img.preview.startsWith('blob:')) {
+            try {
+                URL.revokeObjectURL(img.preview);
+            } catch (e) {}
+        }
+    };
+    useEffect(() => {
+        return () => {
+            objectUrlsRef.current.forEach(url => {
+                try {
+                    URL.revokeObjectURL(url);
+                } catch (e) {}
+            });
+        };
+    }, []);
+
+    useEffect(() => {
+        let active = true;
+        const restoreLocalPreviews = async () => {
+            if (!formData.id) return;
+            
+            // 1. Fetch all local photos from IndexedDB for this project
+            let localPhotos = [];
+            try {
+                localPhotos = await getProjectPhotos(formData.id);
+            } catch (idbErr) {
+                console.warn("[restoreLocalPreviews] Failed to fetch project photos from IndexedDB:", idbErr);
+            }
+
+            // 2. Merge local photos with state images
+            let updated = false;
+            let currentImages = Array.isArray(formData.images) ? [...formData.images] : [];
+            const nextImages = [...currentImages];
+
+            // Add local photos missing from state, or update their status
+            for (const localPhoto of localPhotos) {
+                const existingIdx = nextImages.findIndex(img => img.id === localPhoto.id);
+                const previewUrl = await getPhotoBlob(localPhoto.id);
+                
+                if (existingIdx === -1) {
+                    const ext = localPhoto.name?.split('.').pop() || 'jpg';
+                    nextImages.push({
+                        id: localPhoto.id,
+                        name: localPhoto.name,
+                        date: localPhoto.createdAt || new Date().toISOString(),
+                        preview: previewUrl,
+                        includeInReport: localPhoto.meta?.includeInReport !== undefined ? localPhoto.meta.includeInReport : true,
+                        assignedTo: localPhoto.meta?.assignedTo || 'Sonstiges',
+                        uploading: localPhoto.syncStatus !== 'remote_verified' && localPhoto.syncStatus !== 'synced',
+                        error: localPhoto.syncStatus === 'error',
+                        type: ['pdf', 'msg', 'txt'].includes(ext) ? 'document' : 'image',
+                        fileType: ext,
+                        syncStatus: localPhoto.syncStatus,
+                        oneDriveItemId: localPhoto.oneDriveItemId,
+                        oneDrivePath: localPhoto.oneDrivePath,
+                        storagePath: localPhoto.supabasePath
+                    });
+                    updated = true;
+                } else {
+                    const img = nextImages[existingIdx];
+                    let imgChanged = false;
+                    
+                    if (localPhoto.syncStatus && img.syncStatus !== localPhoto.syncStatus) {
+                        img.syncStatus = localPhoto.syncStatus;
+                        img.uploading = localPhoto.syncStatus !== 'remote_verified' && localPhoto.syncStatus !== 'synced';
+                        img.error = localPhoto.syncStatus === 'error';
+                        imgChanged = true;
+                    }
+                    if (previewUrl && (!img.preview || (img.preview.startsWith('blob:') && !objectUrlsRef.current.includes(img.preview)))) {
+                        img.preview = previewUrl;
+                        trackObjectURL(previewUrl);
+                        imgChanged = true;
+                    }
+                    if (imgChanged) {
+                        nextImages[existingIdx] = { ...img };
+                        updated = true;
+                    }
+                }
+            }
+
+            // Restore preview URLs for existing state images
+            for (let i = 0; i < nextImages.length; i++) {
+                const img = nextImages[i];
+                if (img && img.id && (!img.preview || (img.preview.startsWith('blob:') && !objectUrlsRef.current.includes(img.preview)))) {
+                    const freshBlobUrl = await getPhotoBlob(img.id);
+                    if (freshBlobUrl) {
+                        trackObjectURL(freshBlobUrl);
+                        nextImages[i] = { ...img, preview: freshBlobUrl };
+                        updated = true;
+                    }
+                }
+            }
+
+            if (active && updated) {
+                setFormData(prev => ({
+                    ...prev,
+                    images: nextImages
+                }));
+            }
+        };
+
+        const timer = setTimeout(restoreLocalPreviews, 1500);
+        return () => {
+            active = false;
+            clearTimeout(timer);
+        };
+    }, [formData.id]);
+
     // ── Auto-Sync: Pending Fotos hochladen wenn Netz zurückkommt ─────────────
     useEffect(() => {
+        const isCloudFirstEnabled = import.meta.env.VITE_CLOUD_FIRST_IMAGES === 'true' || import.meta.env.VITE_CLOUD_FIRST_IMAGES === true;
+
         const syncPendingPhotos = async () => {
             if (isSyncing) return;
             setIsSyncing(true);
@@ -701,73 +822,62 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
             console.log('[Sync] 🔄 Netz verfügbar – starte Sync ausstehender Fotos...');
 
             try {
-                const { getPendingPhotos } = await import('../services/PhotoStorage');
-                const pending = await getPendingPhotos(formData.id || 'temp');
+                if (isCloudFirstEnabled) {
+                    const { syncPendingToSupabase } = await import('../lib/sync/supabaseSyncWorker');
+                    const { synced, failed } = await syncPendingToSupabase();
+                    console.log(`[Sync] Cloud-first sync done. Synced: ${synced}, Failed: ${failed}`);
+                } else {
+                    // Legacy sync loop
+                    const { getPendingPhotos } = await import('../services/PhotoStorage');
+                    const pending = await getPendingPhotos(formData.id || 'temp');
 
-                if (pending.length === 0) {
-                    console.log('[Sync] ✅ Keine ausstehenden Fotos.');
-                    setPendingSyncCount(0);
-                    return;
-                }
+                    if (pending.length === 0) {
+                        setPendingSyncCount(0);
+                        return;
+                    }
 
-                console.log(`[Sync] ${pending.length} Fotos ausstehend...`);
-                let synced = 0;
+                    let synced = 0;
+                    for (const photo of pending) {
+                        try {
+                            const meta = photo.meta || {};
+                            const subFolder = meta.subFolder || 'Sonstiges';
+                            const odFolder = meta.odFolder || buildProjectFolderName(formData.projectNumber || formData.id || 'Unbekannt', formData);
 
-                for (const photo of pending) {
-                    try {
-                        const meta = photo.meta || {};
-                        const subFolder = meta.subFolder || 'Sonstiges';
-                        const odFolder = meta.odFolder || buildProjectFolderName(formData.projectNumber || formData.id || 'Unbekannt', formData);
-
-                        // Supabase Upload
-                        let supabasePath = photo.supabasePath;
-                        if (!supabasePath && supabase) {
-                            const ext = photo.name.split('.').pop();
-                            const fileName = `cases/${formData.id || 'temp'}/images/${Date.now()}_${photo.id}.${ext}`;
-                            const { error } = await supabase.storage.from('case-files').upload(fileName, photo.blob);
-                            if (!error) supabasePath = fileName;
-                        }
-
-                        // OneDrive Upload
-                        let oneDriveItemId = photo.oneDriveItemId;
-                        let oneDrivePath = photo.oneDrivePath;
-                        if (!oneDriveItemId) {
-                            const odResult = await uploadPhotoAndGetUrl(odFolder, subFolder, new File([photo.blob], photo.name, { type: photo.type }));
-                            if (odResult) {
-                                oneDriveItemId = odResult.itemId;
-                                oneDrivePath = odResult.odPath;
+                            // Supabase Upload
+                            let supabasePath = photo.supabasePath;
+                            if (!supabasePath && supabase) {
+                                const ext = photo.name.split('.').pop();
+                                const fileName = `cases/${formData.id || 'temp'}/images/${Date.now()}_${photo.id}.${ext}`;
+                                const { error } = await supabase.storage.from('case-files').upload(fileName, photo.blob);
+                                if (!error) supabasePath = fileName;
                             }
+
+                            // OneDrive Upload
+                            let oneDriveItemId = photo.oneDriveItemId;
+                            let oneDrivePath = photo.oneDrivePath;
+                            if (!oneDriveItemId) {
+                                const odResult = await uploadPhotoAndGetUrl(odFolder, subFolder, new File([photo.blob], photo.name, { type: photo.type }));
+                                if (odResult) {
+                                    oneDriveItemId = odResult.itemId;
+                                    oneDrivePath = odResult.odPath;
+                                }
+                            }
+
+                            await updatePhotoSyncStatus(photo.id, {
+                                supabasePath,
+                                oneDriveItemId,
+                                oneDrivePath,
+                                syncStatus: oneDriveItemId ? 'synced' : (supabasePath ? 'synced' : 'error'),
+                            });
+
+                            synced++;
+                        } catch (photoErr) {
+                            console.warn(`[Sync] Foto ${photo.id} failed:`, photoErr.message);
                         }
-
-                        // IndexedDB Status aktualisieren
-                        await updatePhotoSyncStatus(photo.id, {
-                            supabasePath,
-                            oneDriveItemId,
-                            oneDrivePath,
-                            syncStatus: oneDriveItemId ? 'synced' : (supabasePath ? 'synced' : 'error'),
-                        });
-
-                        // formData image Eintrag aktualisieren
-                        setFormData(prev => ({
-                            ...prev,
-                            images: prev.images.map(img =>
-                                img.localId === photo.id ? {
-                                    ...img,
-                                    storagePath: supabasePath,
-                                    oneDriveItemId,
-                                    oneDrivePath,
-                                } : img
-                            )
-                        }));
-
-                        synced++;
-                    } catch (photoErr) {
-                        console.warn(`[Sync] Foto ${photo.id} fehlgeschlagen:`, photoErr.message);
                     }
                 }
-
-                console.log(`[Sync] ✅ ${synced}/${pending.length} Fotos synchronisiert`);
-                setPendingSyncCount(pending.length - synced);
+                const count = await getPendingCount();
+                setPendingSyncCount(count);
             } catch (e) {
                 console.warn('[Sync] Fehler:', e.message);
             } finally {
@@ -1949,6 +2059,71 @@ END:VCARD`;
     // --- Image Upload Handler: Supabase (Pflicht-Backup) + OneDrive (Primärarchiv) ---
     const handleImageUpload = async (files, contextData = {}) => {
         if (!files || files.length === 0) return;
+
+        const isCloudFirstEnabled = import.meta.env.VITE_CLOUD_FIRST_IMAGES === 'true' || import.meta.env.VITE_CLOUD_FIRST_IMAGES === true;
+
+        if (isCloudFirstEnabled) {
+            for (let file of files) {
+                const fileExt = file.name.split('.').pop().toLowerCase();
+                const isDoc = ['pdf', 'msg', 'txt'].includes(fileExt);
+                const imageId = 'img_' + Math.random().toString(36).substring(2, 15) + '_' + Date.now();
+                
+                try {
+                    // 1. Immediately and durably save the original blob in IndexedDB (Step 0)
+                    let localPreviewUrl = null;
+                    if (!isDoc) {
+                        const subFolder = contextData.assignedTo || contextData.roomName || 'Sonstiges';
+                        const odFolder = buildProjectFolderName(
+                            formData.projectNumber || formData.id || 'Unbekannt',
+                            formData
+                        );
+                        localPreviewUrl = await savePhotoLocally(imageId, formData.id || 'temp', file, {
+                            ...contextData,
+                            subFolder,
+                            odFolder,
+                            isSketch: contextData.assignedTo === 'Messprotokolle' || (file.name && file.name.includes('sketch'))
+                        });
+                        trackObjectURL(localPreviewUrl);
+                    } else {
+                        localPreviewUrl = trackObjectURL(URL.createObjectURL(file));
+                    }
+
+                    // 2. Add to React state only after confirmed local IndexedDB save
+                    const imageEntry = {
+                        id: imageId,
+                        name: file.name,
+                        date: new Date().toISOString(),
+                        preview: localPreviewUrl,
+                        includeInReport: contextData.includeInReport !== undefined ? contextData.includeInReport : true,
+                        ...contextData,
+                        uploading: true, // indicates that sync is running/pending
+                        error: false,
+                        type: isDoc ? 'document' : 'image',
+                        fileType: fileExt,
+                        syncStatus: 'local_only'
+                    };
+
+                    setFormData(prev => ({ ...prev, images: [...prev.images, imageEntry] }));
+
+                    // 3. Immediately trigger background sync worker without blocking UI
+                    import('../lib/sync/supabaseSyncWorker.js').then(({ syncPendingToSupabase }) => {
+                        syncPendingToSupabase().then(({ synced }) => {
+                            if (synced > 0 && fetchReports) {
+                                // Fetch reports to update standard project state
+                                fetchReports().catch(() => {});
+                            }
+                        }).catch(err => {
+                            console.warn('[handleImageUpload] Background sync failed:', err.message);
+                        });
+                    }).catch(() => {});
+
+                } catch (error) {
+                    console.error('[handleImageUpload] Failed to save image locally:', error);
+                    alert("Fehler bei der lokalen Bildsicherung: " + error.message);
+                }
+            }
+            return;
+        }
 
         for (let file of files) {
             const fileExt = file.name.split('.').pop().toLowerCase();
@@ -5033,10 +5208,28 @@ END:VCARD`;
                                                     }));
                                                 }}
                                             />
+                                            <div style={{ marginTop: '0.35rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                                <span style={{
+                                                    fontSize: '0.7rem',
+                                                    fontWeight: 600,
+                                                    padding: '2px 6px',
+                                                    borderRadius: '4px',
+                                                    backgroundColor: img.syncStatus === 'remote_verified' || img.syncStatus === 'synced' ? 'rgba(16,185,129,0.1)' : 
+                                                                     img.syncStatus === 'uploaded_to_backend' ? 'rgba(245,158,11,0.1)' : 
+                                                                     img.syncStatus === 'error' ? 'rgba(239,68,68,0.1)' : 'rgba(59,130,246,0.1)',
+                                                    color: img.syncStatus === 'remote_verified' || img.syncStatus === 'synced' ? '#10B981' : 
+                                                           img.syncStatus === 'uploaded_to_backend' ? '#F59E0B' : 
+                                                           img.syncStatus === 'error' ? '#EF4444' : '#3B82F6'
+                                                }}>
+                                                    {img.syncStatus === 'remote_verified' || img.syncStatus === 'synced' ? 'Vollständig verifiziert' : 
+                                                     img.syncStatus === 'uploaded_to_backend' ? 'In Supabase gespeichert' : 
+                                                     img.syncStatus === 'error' ? 'Fehler – erneut versuchen' : 'Lokal gesichert'}
+                                                </span>
+                                            </div>
                                         </div>
                                         {/* Delete */}
                                         <div style={{ display: 'flex', flexDirection: 'column', height: '140px', justifyContent: 'flex-start' }}>
-                                            <button type="button" onClick={() => setFormData(prev => ({ ...prev, images: prev.images.filter(i => i !== img) }))} style={{ color: '#EF4444', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '6px', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}><Trash size={16} /></button>
+                                            <button type="button" onClick={() => setFormData(prev => ({ ...prev, images: prev.images.filter(i => { if (i === img) revokeImageBlob(i); return i !== img; }) }))} style={{ color: '#EF4444', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '6px', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}><Trash size={16} /></button>
                                         </div>
                                     </div>
                                 ))}
@@ -5848,7 +6041,7 @@ END:VCARD`;
                                                                 if (window.confirm('Bild wirklich löschen?')) {
                                                                     setFormData(prev => ({
                                                                         ...prev,
-                                                                        images: prev.images.filter(i => i !== img),
+                                                                        images: prev.images.filter(i => { if (i === img) revokeImageBlob(i); return i !== img; }),
                                                                         damageTypeImage: prev.damageTypeImage === img.preview ? null : prev.damageTypeImage
                                                                     }));
                                                                 }
@@ -6865,6 +7058,24 @@ END:VCARD`;
                                                         {isRecording === `imgdesc-${idx}` ? <MicOff size={20} className="animate-pulse" /> : <Mic size={20} />}
                                                     </button>
                                                 </div>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '2px' }}>
+                                                    <span style={{
+                                                        fontSize: '0.7rem',
+                                                        fontWeight: 600,
+                                                        padding: '2px 6px',
+                                                        borderRadius: '4px',
+                                                        backgroundColor: item.syncStatus === 'remote_verified' || item.syncStatus === 'synced' ? 'rgba(16,185,129,0.1)' : 
+                                                                         item.syncStatus === 'uploaded_to_backend' ? 'rgba(245,158,11,0.1)' : 
+                                                                         item.syncStatus === 'error' ? 'rgba(239,68,68,0.1)' : 'rgba(59,130,246,0.1)',
+                                                        color: item.syncStatus === 'remote_verified' || item.syncStatus === 'synced' ? '#10B981' : 
+                                                               item.syncStatus === 'uploaded_to_backend' ? '#F59E0B' : 
+                                                               item.syncStatus === 'error' ? '#EF4444' : '#3B82F6'
+                                                    }}>
+                                                        {item.syncStatus === 'remote_verified' || item.syncStatus === 'synced' ? 'Vollständig verifiziert' : 
+                                                         item.syncStatus === 'uploaded_to_backend' ? 'In Supabase gespeichert' : 
+                                                         item.syncStatus === 'error' ? 'Fehler – erneut versuchen' : 'Lokal gesichert'}
+                                                    </span>
+                                                </div>
                                             </div>
                                             {/* Delete */}
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
@@ -6893,7 +7104,7 @@ END:VCARD`;
                                                     }}
                                                     onClick={() => {
                                                         if (window.confirm('Bild wirklich löschen?')) {
-                                                            setFormData(prev => ({ ...prev, images: prev.images.filter(i => i !== item) }))
+                                                            setFormData(prev => ({ ...prev, images: prev.images.filter(i => { if (i === item) revokeImageBlob(i); return i !== item; }) }))
                                                         }
                                                     }}
                                                 >

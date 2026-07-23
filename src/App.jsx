@@ -18,6 +18,16 @@ import DisponentMockup from './components/mockups/DisponentMockup'
 import i18n from './i18n'
 import { buildProjectFolderName, uploadProjectJson } from "./services/OneDriveService";
 
+const safeSetItem = (key, value) => {
+  try {
+    localStorage.setItem(key, value);
+    return true;
+  } catch (e) {
+    console.warn(`[LocalStorage] Schreibfehler für Key "${key}":`, e.message);
+    return false;
+  }
+};
+
 function sanitizeMeasurementStorage(reportData) {
   if (!reportData) return reportData;
 
@@ -176,7 +186,16 @@ function App() {
   }, []);
 
   const syncUnsavedReport = async (reportId) => {
-    const report = unsavedReports[reportId];
+    let report = null;
+    try {
+      const cached = localStorage.getItem('qservice_unsaved_reports');
+      if (cached) {
+        report = JSON.parse(cached)[reportId];
+      }
+    } catch {}
+    if (!report) {
+      report = unsavedReports[reportId];
+    }
     if (!report || !supabase) return;
     
     showToast(`Synchronisiere "${report.projectTitle || 'Unbenannt'}"...`, 'info', 0);
@@ -207,7 +226,7 @@ function App() {
       setUnsavedReports(prev => {
         const next = { ...prev };
         delete next[reportId];
-        localStorage.setItem('qservice_unsaved_reports', JSON.stringify(next));
+        safeSetItem('qservice_unsaved_reports', JSON.stringify(next));
         return next;
       });
       setReports(prev => prev.map(r => r.id === report.id ? { ...r, ...report, _supabase_updated_at: now } : r));
@@ -215,11 +234,37 @@ function App() {
     }
   };
 
+  // Automatic Sync when online
+  useEffect(() => {
+    const handleOnlineSync = () => {
+      if (navigator.onLine) {
+        try {
+          const cached = localStorage.getItem('qservice_unsaved_reports');
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            Object.keys(parsed).forEach(id => {
+              syncUnsavedReport(id);
+            });
+          }
+        } catch (e) {}
+      }
+    };
+    
+    window.addEventListener('online', handleOnlineSync);
+    if (navigator.onLine) {
+      handleOnlineSync();
+    }
+    
+    return () => {
+      window.removeEventListener('online', handleOnlineSync);
+    };
+  }, [unsavedReports]);
+
   const discardUnsavedReport = (reportId) => {
     setUnsavedReports(prev => {
       const next = { ...prev };
       delete next[reportId];
-      localStorage.setItem('qservice_unsaved_reports', JSON.stringify(next));
+      safeSetItem('qservice_unsaved_reports', JSON.stringify(next));
       return next;
     });
     showToast("Änderungen verworfen.", "success");
@@ -267,6 +312,16 @@ function App() {
     return false;
   });
   const [supabaseStatus, setSupabaseStatus] = useState(null); // null | { ok: bool, count: number, error: string }
+
+  // Automatisches Ausblenden des Status-Banners nach 7 Sekunden (bei Erfolgen & Soft-Timeouts)
+  useEffect(() => {
+    if (supabaseStatus && (supabaseStatus.ok === true || supabaseStatus.error?.toLowerCase().includes('timeout') || supabaseStatus.error?.includes('57014'))) {
+      const timer = setTimeout(() => {
+        setSupabaseStatus(null);
+      }, 7000);
+      return () => clearTimeout(timer);
+    }
+  }, [supabaseStatus]);
 
   // ── Dark / Light Mode ────────────────────────────────────────────────────
   const [isDarkMode, setIsDarkMode] = useState(() => {
@@ -537,143 +592,149 @@ function App() {
     }
   }, [view, selectedReport]);
 
-
-
-
-  // Fetch reports from Supabase on mount
-  useEffect(() => {
+  const fetchReports = useCallback(async () => {
     if (!supabase) {
       setSupabaseStatus({ ok: false, count: 0, error: 'Supabase nicht konfiguriert (kein Client)' });
       return;
     }
 
-    const fetchReports = async () => {
-      setSupabaseStatus({ ok: null, count: null, error: null }); // Laden...
-      try {
-        // 25-Sekunden-Timeout für die initiale Supabase-Abfrage (große JSON-Datenmengen über Mobilfunk)
-        const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Timeout nach 25 Sekunden')), 25000)
-        );
+    setSupabaseStatus({ ok: null, count: null, error: null }); // Laden...
+    try {
+      // 25-Sekunden-Timeout für die initiale Supabase-Abfrage (große JSON-Datenmengen über Mobilfunk)
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Timeout nach 25 Sekunden')), 25000)
+      );
 
-        const fetchPromise = supabase
-          .from('damage_reports')
-          .select('id, updated_at, created_at, project_title, client, address, status, assigned_to, date, drying_started');
+      const fetchPromise = supabase
+        .from('damage_reports')
+        .select('id, updated_at, created_at, project_title, client, address, status, assigned_to, date, drying_started');
 
-        let result = await Promise.race([fetchPromise, timeoutPromise]);
-        let data = result.data;
-        let error = result.error;
+      let result = await Promise.race([fetchPromise, timeoutPromise]);
+      let data = result.data;
+      let error = result.error;
 
-        // HINWEIS: Client-seitige Sortierung um Statement Timeout bei großen JSONs zu verhindern
+      // HINWEIS: Client-seitige Sortierung um Statement Timeout bei großen JSONs zu verhindern
 
-        if (error) {
-          console.error('[Supabase] Fehler beim Laden:', error);
-          setSupabaseStatus({ ok: false, count: 0, error: `${error.code}: ${error.message}` });
-        } else if (data) {
-          const loadedReports = data
-            // Sortierung auf dem Client um DB Statement Timeouts zu vermeiden
-            .sort((a, b) => new Date(b.date || b.updated_at).getTime() - new Date(a.date || a.updated_at).getTime())
-            .map(row => {
-              return {
-                id: row.id,
-                _supabase_updated_at: row.updated_at,
-                created_at: row.created_at,
-                projectTitle: row.project_title || '',
-                projectNumber: row.projectNumber || '',
-                client: row.client || '',
-                address: row.address || '',
-                status: row.status || 'Schadenaufnahme',
-                assignedTo: row.assigned_to || '',
-                date: row.date || new Date().toISOString(),
-                dryingStarted: row.drying_started || null,
-                deletedAt: row.deleted_at || null,
-                rooms: [],
-                images: [],
-                equipment: [],
-                contacts: [],
-                isLightweight: true
-              };
-            })
-            // Robuster Filter: Session-Einträge der DB (__session__) sowie gelöschte Projekte herausfiltern
-            .filter(r => r && r.id !== '__session__' && !r.id.startsWith('session_') && r.projectTitle !== '__session__' && !r.deletedAt); // Session + soft-deleted ausblenden
+      if (error) {
+        console.error('[Supabase] Fehler beim Laden:', error);
+        setSupabaseStatus({ ok: false, count: 0, error: `${error.code}: ${error.message}` });
+      } else if (data) {
+        const loadedReports = data
+          // Sortierung auf dem Client um DB Statement Timeouts zu vermeiden
+          .sort((a, b) => new Date(b.date || b.updated_at).getTime() - new Date(a.date || a.updated_at).getTime())
+          .map(row => {
+            return {
+              id: row.id,
+              _supabase_updated_at: row.updated_at,
+              created_at: row.created_at,
+              projectTitle: row.project_title || '',
+              projectNumber: row.projectNumber || '',
+              client: row.client || '',
+              address: row.address || '',
+              status: row.status || 'Schadenaufnahme',
+              assignedTo: row.assigned_to || '',
+              date: row.date || new Date().toISOString(),
+              dryingStarted: row.drying_started || null,
+              deletedAt: row.deleted_at || null,
+              rooms: [],
+              images: [],
+              equipment: [],
+              contacts: [],
+              isLightweight: true
+            };
+          })
+          // Robuster Filter: Session-Einträge der DB (__session__) sowie gelöschte Projekte herausfiltern
+          .filter(r => r && r.id !== '__session__' && !r.id.startsWith('session_') && r.projectTitle !== '__session__' && !r.deletedAt); // Session + soft-deleted ausblenden
 
-          console.log(`[Supabase] ${loadedReports.length} Projekte geladen (${data.length} DB-Einträge gesamt).`);
-          console.log('[MEASROOM TRACE] fetchReports loaded', {
-             measurementRoomsLength: loadedReports[0]?.measurementRooms?.length,
-             names: loadedReports[0]?.measurementRooms?.map(r=>r.name)
-          });
-          setSupabaseStatus({ ok: true, count: loadedReports.length, total: data.length, error: null });
+        console.log(`[Supabase] ${loadedReports.length} Projekte geladen (${data.length} DB-Einträge gesamt).`);
+        console.log('[MEASROOM TRACE] fetchReports loaded', {
+           measurementRoomsLength: loadedReports[0]?.measurementRooms?.length,
+           names: loadedReports[0]?.measurementRooms?.map(r=>r.name)
+        });
+        setSupabaseStatus({ ok: true, count: loadedReports.length, total: data.length, error: null });
 
-          if (loadedReports.length > 0) {
-            setReports(loadedReports);
-            setSelectedReport(prev => {
-              if (prev && prev.id) {
-                const fresh = loadedReports.find(r => r.id === prev.id);
-                return fresh ? fresh : prev;
+        if (loadedReports.length > 0) {
+          setReports(prev => {
+            return loadedReports.map(fresh => {
+              const existing = prev.find(r => r.id === fresh.id);
+              if (existing && !existing.isLightweight) {
+                return { ...fresh, ...existing, isLightweight: false };
               }
-              return prev;
+              return fresh;
             });
-            try {
-              const cachedReports = loadedReports.slice(0, 10).map(r => ({
-                ...r,
-                damageTypeImage: (r.damageTypeImage && r.damageTypeImage.startsWith('data:')) ? null : r.damageTypeImage,
-                exteriorPhoto: (r.exteriorPhoto && r.exteriorPhoto.startsWith('data:')) ? null : r.exteriorPhoto,
-                images: r.images ? r.images.map(img => ({
-                  ...img,
-                  preview: (img.preview && (img.preview.startsWith('blob:') || img.preview.startsWith('data:'))) ? null : img.preview
-                })) : []
-              }));
-              localStorage.setItem('qservice_reports_prod', JSON.stringify(cachedReports));
-            } catch (e) {
-              console.warn('LocalStorage cache fehlgeschlagen:', e.message);
+          });
+          setSelectedReport(prev => {
+            if (prev && prev.id) {
+              const fresh = loadedReports.find(r => r.id === prev.id);
+              if (fresh) {
+                return prev.isLightweight ? fresh : prev;
+              }
             }
+            return prev;
+          });
+          try {
+            const cachedReports = loadedReports.slice(0, 10).map(r => ({
+              ...r,
+              damageTypeImage: (r.damageTypeImage && r.damageTypeImage.startsWith('data:')) ? null : r.damageTypeImage,
+              exteriorPhoto: (r.exteriorPhoto && r.exteriorPhoto.startsWith('data:')) ? null : r.exteriorPhoto,
+              images: r.images ? r.images.map(img => ({
+                ...img,
+                preview: (img.preview && (img.preview.startsWith('blob:') || img.preview.startsWith('data:'))) ? null : img.preview
+              })) : []
+            }));
+            localStorage.setItem('qservice_reports_prod', JSON.stringify(cachedReports));
+          } catch (e) {
+            console.warn('LocalStorage cache fehlgeschlagen:', e.message);
+          }
 
-            // Asynchrones Nachladen der detaillierten report_data für aktive Projekte im Hintergrund
-            const activeIds = loadedReports
-              .filter(r => r.status !== 'Abgeschlossen')
-              .map(r => r.id);
+          // Asynchrones Nachladen der detaillierten report_data für aktive Projekte im Hintergrund
+          const activeIds = loadedReports
+            .filter(r => r.status !== 'Abgeschlossen')
+            .map(r => r.id);
 
-            if (activeIds.length > 0) {
-              console.log('[Supabase] Starting background fetch for active projects one-by-one:', activeIds.length);
-              (async () => {
-                try {
-                  for (const id of activeIds) {
-                    try {
-                      const { data: detail, error: detailError } = await supabase
-                        .from('damage_reports')
-                        .select('id, report_data, updated_at')
-                        .eq('id', id)
-                        .single();
+          if (activeIds.length > 0) {
+            console.log('[Supabase] Starting background fetch for active projects one-by-one:', activeIds.length);
+            (async () => {
+              try {
+                for (const id of activeIds) {
+                  try {
+                    const { data: detail, error: detailError } = await supabase
+                      .from('damage_reports')
+                      .select('id, report_data, updated_at')
+                      .eq('id', id)
+                      .single();
 
-                      if (!detailError && detail && detail.report_data) {
-                        const parsedData = typeof detail.report_data === 'string'
-                          ? JSON.parse(detail.report_data)
-                          : detail.report_data;
-                        setReports(prev => prev.map(r => r.id === id ? {
-                          ...r,
-                          ...parsedData,
-                          isLightweight: false,
-                          _supabase_updated_at: detail.updated_at
-                        } : r));
-                      }
-                    } catch (singleErr) {
-                      console.warn('[Supabase] Detail background fetch error for ID:', id, singleErr);
+                    if (!detailError && detail && detail.report_data) {
+                      const parsedData = typeof detail.report_data === 'string'
+                        ? JSON.parse(detail.report_data)
+                        : detail.report_data;
+                      setReports(prev => prev.map(r => r.id === id ? {
+                        ...r,
+                        ...parsedData,
+                        isLightweight: false,
+                        _supabase_updated_at: detail.updated_at
+                      } : r));
                     }
+                  } catch (singleErr) {
+                    console.warn('[Supabase] Detail background fetch error for ID:', id, singleErr);
                   }
-                } catch (err) {
-                  console.warn('[Supabase] Detail background fetch failed:', err);
                 }
-              })();
-            }
+              } catch (err) {
+                console.warn('[Supabase] Detail background fetch failed:', err);
+              }
+            })();
           }
         }
-      } catch (e) {
-        console.error('[Supabase] Unerwarteter Fehler:', e);
-        setSupabaseStatus({ ok: false, count: 0, error: `Unerwarteter Fehler: ${e.message}` });
       }
-    };
+    } catch (e) {
+      console.error('[Supabase] Unerwarteter Fehler:', e);
+      setSupabaseStatus({ ok: false, count: 0, error: `Unerwarteter Fehler: ${e.message}` });
+    }
+  }, [supabase]);
 
+  useEffect(() => {
     fetchReports();
-  }, []);
+  }, [fetchReports]);
 
   const handleSelectReport = async (report) => {
     let activeReport = report;
@@ -818,11 +879,11 @@ function App() {
         }));
 
         try {
-          localStorage.setItem('qservice_reports_prod', JSON.stringify(minimalReports));
+          safeSetItem('qservice_reports_prod', JSON.stringify(minimalReports));
         } catch (innerE) {
           if (innerE.name === 'QuotaExceededError') {
             // If still failing, keep only the most recent 5
-            localStorage.setItem('qservice_reports_prod', JSON.stringify(minimalReports.slice(0, 5)));
+            safeSetItem('qservice_reports_prod', JSON.stringify(minimalReports.slice(0, 5)));
           }
         }
       } catch (e) {
@@ -916,7 +977,7 @@ function App() {
                     if (!prev[finalReport.id]) return prev;
                     const next = { ...prev };
                     delete next[finalReport.id];
-                    localStorage.setItem('qservice_unsaved_reports', JSON.stringify(next));
+                    safeSetItem('qservice_unsaved_reports', JSON.stringify(next));
                     return next;
                   });
                 } else if (!error && (!updateResult || updateResult.length === 0)) {
@@ -925,7 +986,7 @@ function App() {
                   
                   setUnsavedReports(prev => {
                     const next = { ...prev, [finalReport.id]: { ...finalReport, _offline_saved_at: new Date().toISOString() } };
-                    localStorage.setItem('qservice_unsaved_reports', JSON.stringify(next));
+                    safeSetItem('qservice_unsaved_reports', JSON.stringify(next));
                     return next;
                   });
                 } else if (error) {
@@ -934,7 +995,7 @@ function App() {
                   
                   setUnsavedReports(prev => {
                     const next = { ...prev, [finalReport.id]: { ...finalReport, _offline_saved_at: new Date().toISOString() } };
-                    localStorage.setItem('qservice_unsaved_reports', JSON.stringify(next));
+                    safeSetItem('qservice_unsaved_reports', JSON.stringify(next));
                     return next;
                   });
                 }
@@ -944,7 +1005,7 @@ function App() {
                 
                 setUnsavedReports(prev => {
                   const next = { ...prev, [finalReport.id]: { ...finalReport, _offline_saved_at: new Date().toISOString() } };
-                  localStorage.setItem('qservice_unsaved_reports', JSON.stringify(next));
+                  safeSetItem('qservice_unsaved_reports', JSON.stringify(next));
                   return next;
                 });
               });
@@ -962,7 +1023,7 @@ function App() {
               
               setUnsavedReports(prev => {
                 const next = { ...prev, [finalReport.id]: { ...finalReport, _offline_saved_at: new Date().toISOString() } };
-                localStorage.setItem('qservice_unsaved_reports', JSON.stringify(next));
+                safeSetItem('qservice_unsaved_reports', JSON.stringify(next));
                 return next;
               });
             } else if (!updateResult || updateResult.length === 0) {
@@ -971,7 +1032,7 @@ function App() {
               
               setUnsavedReports(prev => {
                 const next = { ...prev, [finalReport.id]: { ...finalReport, _offline_saved_at: new Date().toISOString() } };
-                localStorage.setItem('qservice_unsaved_reports', JSON.stringify(next));
+                safeSetItem('qservice_unsaved_reports', JSON.stringify(next));
                 return next;
               });
             } else {
@@ -983,7 +1044,7 @@ function App() {
                 if (!prev[finalReport.id]) return prev;
                 const next = { ...prev };
                 delete next[finalReport.id];
-                localStorage.setItem('qservice_unsaved_reports', JSON.stringify(next));
+                safeSetItem('qservice_unsaved_reports', JSON.stringify(next));
                 return next;
               });
             }
@@ -1004,7 +1065,7 @@ function App() {
                     if (!prev[finalReport.id]) return prev;
                     const next = { ...prev };
                     delete next[finalReport.id];
-                    localStorage.setItem('qservice_unsaved_reports', JSON.stringify(next));
+                    safeSetItem('qservice_unsaved_reports', JSON.stringify(next));
                     return next;
                   });
                 } else if (error) {
@@ -1013,7 +1074,7 @@ function App() {
                   
                   setUnsavedReports(prev => {
                     const next = { ...prev, [finalReport.id]: { ...finalReport, _offline_saved_at: new Date().toISOString() } };
-                    localStorage.setItem('qservice_unsaved_reports', JSON.stringify(next));
+                    safeSetItem('qservice_unsaved_reports', JSON.stringify(next));
                     return next;
                   });
                 }
@@ -1023,7 +1084,7 @@ function App() {
                 
                 setUnsavedReports(prev => {
                   const next = { ...prev, [finalReport.id]: { ...finalReport, _offline_saved_at: new Date().toISOString() } };
-                  localStorage.setItem('qservice_unsaved_reports', JSON.stringify(next));
+                  safeSetItem('qservice_unsaved_reports', JSON.stringify(next));
                   return next;
                 });
               });
@@ -1035,7 +1096,7 @@ function App() {
               
               setUnsavedReports(prev => {
                 const next = { ...prev, [finalReport.id]: { ...finalReport, _offline_saved_at: new Date().toISOString() } };
-                localStorage.setItem('qservice_unsaved_reports', JSON.stringify(next));
+                safeSetItem('qservice_unsaved_reports', JSON.stringify(next));
                 return next;
               });
             } else {
@@ -1047,7 +1108,7 @@ function App() {
                 if (!prev[finalReport.id]) return prev;
                 const next = { ...prev };
                 delete next[finalReport.id];
-                localStorage.setItem('qservice_unsaved_reports', JSON.stringify(next));
+                safeSetItem('qservice_unsaved_reports', JSON.stringify(next));
                 return next;
               });
             }
@@ -1593,18 +1654,18 @@ function App() {
               ? 'rgba(99,102,241,0.1)'
               : supabaseStatus.ok
                 ? 'rgba(16,185,129,0.1)'
-                : (supabaseStatus.error?.includes('Timeout') || supabaseStatus.error?.toLowerCase().includes('fetch') || supabaseStatus.error?.toLowerCase().includes('load failed') || supabaseStatus.error?.toLowerCase().includes('failed') || supabaseStatus.error?.toLowerCase().includes('network'))
+                : (supabaseStatus.error?.toLowerCase().includes('timeout') || supabaseStatus.error?.includes('57014') || supabaseStatus.error?.toLowerCase().includes('fetch') || supabaseStatus.error?.toLowerCase().includes('load failed') || supabaseStatus.error?.toLowerCase().includes('failed') || supabaseStatus.error?.toLowerCase().includes('network'))
                   ? 'rgba(245,158,11,0.1)'
                   : 'rgba(239,68,68,0.1)',
-            border: `1px solid ${supabaseStatus.ok === null ? '#6366f1' : supabaseStatus.ok ? '#10B981' : (supabaseStatus.error?.includes('Timeout') || supabaseStatus.error?.toLowerCase().includes('fetch') || supabaseStatus.error?.toLowerCase().includes('load failed') || supabaseStatus.error?.toLowerCase().includes('failed') || supabaseStatus.error?.toLowerCase().includes('network')) ? '#F59E0B' : '#EF4444'}44`,
-            color: supabaseStatus.ok === null ? '#6366f1' : supabaseStatus.ok ? '#10B981' : (supabaseStatus.error?.includes('Timeout') || supabaseStatus.error?.toLowerCase().includes('fetch') || supabaseStatus.error?.toLowerCase().includes('load failed') || supabaseStatus.error?.toLowerCase().includes('failed') || supabaseStatus.error?.toLowerCase().includes('network')) ? '#D97706' : '#EF4444',
+            border: `1px solid ${supabaseStatus.ok === null ? '#6366f1' : supabaseStatus.ok ? '#10B981' : (supabaseStatus.error?.toLowerCase().includes('timeout') || supabaseStatus.error?.includes('57014') || supabaseStatus.error?.toLowerCase().includes('fetch') || supabaseStatus.error?.toLowerCase().includes('load failed') || supabaseStatus.error?.toLowerCase().includes('failed') || supabaseStatus.error?.toLowerCase().includes('network')) ? '#F59E0B' : '#EF4444'}44`,
+            color: supabaseStatus.ok === null ? '#6366f1' : supabaseStatus.ok ? '#10B981' : (supabaseStatus.error?.toLowerCase().includes('timeout') || supabaseStatus.error?.includes('57014') || supabaseStatus.error?.toLowerCase().includes('fetch') || supabaseStatus.error?.toLowerCase().includes('load failed') || supabaseStatus.error?.toLowerCase().includes('failed') || supabaseStatus.error?.toLowerCase().includes('network')) ? '#D97706' : '#EF4444',
           }}>
             <span>
               {supabaseStatus.ok === null && '⏳ Verbinde mit Supabase...'}
               {supabaseStatus.ok === true && `✅ ${supabaseStatus.count} Projekte geladen (${supabaseStatus.total} DB-Einträge)`}
               {supabaseStatus.ok === false && (
-                (supabaseStatus.error?.includes('Timeout') || supabaseStatus.error?.toLowerCase().includes('fetch') || supabaseStatus.error?.toLowerCase().includes('load failed') || supabaseStatus.error?.toLowerCase().includes('failed') || supabaseStatus.error?.toLowerCase().includes('network'))
-                  ? '⚠️ Offline-Modus: Daten lokal aus dem Cache geladen (Verbindung zzt. offline/blockiert)'
+                (supabaseStatus.error?.toLowerCase().includes('timeout') || supabaseStatus.error?.includes('57014') || supabaseStatus.error?.toLowerCase().includes('fetch') || supabaseStatus.error?.toLowerCase().includes('load failed') || supabaseStatus.error?.toLowerCase().includes('failed') || supabaseStatus.error?.toLowerCase().includes('network'))
+                  ? '⚠️ Offline-Modus: Daten lokal aus dem Cache geladen (Server-Zeitüberschreitung)'
                   : `❌ Supabase Fehler: ${supabaseStatus.error}`
               )}
             </span>
@@ -1771,6 +1832,7 @@ function App() {
                 mode={projectMode}
                 readOnly={isReadOnly}
                 isDarkMode={isDarkMode}
+                fetchReports={fetchReports}
                 onModeChange={(newMode) => {
                   setProjectModeExclusive(newMode);
                 }}
