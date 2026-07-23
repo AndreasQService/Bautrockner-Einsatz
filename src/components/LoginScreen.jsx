@@ -17,7 +17,7 @@ const LoginScreen = ({ users, onLogin, isTestEnv, supabase }) => {
     const isRealTestEnv = isTestEnv && !(typeof navigator !== 'undefined' && navigator.webdriver);
 
     useEffect(() => {
-        if (!supabase) return;
+        if (!supabase || typeof supabase.auth.onAuthStateChange !== 'function') return;
         const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
             if (event === 'PASSWORD_RECOVERY') {
                 setView('recovery');
@@ -78,6 +78,14 @@ const LoginScreen = ({ users, onLogin, isTestEnv, supabase }) => {
         }
     };
 
+    const handleForgotPasswordClick = () => {
+        const currentEmail = name.trim();
+        setEmailForReset(currentEmail);
+        setError('');
+        setSuccessMessage('');
+        setView('forgot');
+    };
+
     const handleRequestReset = async (e) => {
         e.preventDefault();
         const trimmedEmail = emailForReset.trim();
@@ -107,7 +115,7 @@ const LoginScreen = ({ users, onLogin, isTestEnv, supabase }) => {
             if (resetError) {
                 setError(resetError.message);
             } else {
-                setSuccessMessage('Link zum Zurücksetzen des Passworts wurde gesendet. Bitte prüfen Sie Ihr E-Mail-Postfach.');
+                setSuccessMessage('Falls für diese E-Mail-Adresse ein Konto besteht, wurde eine E-Mail zum Zurücksetzen des Passworts versendet.');
                 setEmailForReset('');
                 setView('login');
             }
@@ -256,7 +264,7 @@ const LoginScreen = ({ users, onLogin, isTestEnv, supabase }) => {
                             <div style={{ textAlign: 'right', marginBottom: '1.5rem', marginTop: '-0.75rem' }}>
                                 <button
                                     type="button"
-                                    onClick={() => { setView('forgot'); setError(''); setSuccessMessage(''); }}
+                                    onClick={handleForgotPasswordClick}
                                     style={{
                                         background: 'none',
                                         border: 'none',
@@ -266,6 +274,7 @@ const LoginScreen = ({ users, onLogin, isTestEnv, supabase }) => {
                                         padding: 0,
                                         textDecoration: 'underline'
                                     }}
+                                    disabled={loading}
                                 >
                                     Passwort vergessen?
                                 </button>
@@ -365,6 +374,7 @@ const LoginScreen = ({ users, onLogin, isTestEnv, supabase }) => {
                                     padding: 0,
                                     textDecoration: 'underline'
                                 }}
+                                disabled={loading}
                             >
                                 Zurück zum Login
                             </button>
@@ -464,6 +474,7 @@ const LoginScreen = ({ users, onLogin, isTestEnv, supabase }) => {
                                     padding: 0,
                                     textDecoration: 'underline'
                                 }}
+                                disabled={loading}
                             >
                                 Abbrechen
                             </button>

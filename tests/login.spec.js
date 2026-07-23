@@ -50,7 +50,7 @@ test.describe('Login', () => {
         await expect(page.locator('header.app-header')).toBeVisible();
 
         // Username im Header (exakter Match, da Toast auch "Admin User" enthält)
-        await expect(page.getByText('Admin User', { exact: true })).toBeVisible();
+        await expect(page.locator('header.app-header').getByText('Admin User', { exact: true })).toBeVisible();
     });
 
     test('Erfolgreicher Login als Techniker', async ({ page }) => {
@@ -59,7 +59,7 @@ test.describe('Login', () => {
         await page.getByRole('button', { name: /anmelden/i }).click();
 
         await expect(page.locator('header.app-header')).toBeVisible();
-        await expect(page.getByText('Techniker 1', { exact: true })).toBeVisible();
+        await expect(page.locator('header.app-header').getByText('Techniker 1', { exact: true })).toBeVisible();
     });
 
     test('Logout funktioniert', async ({ page }) => {

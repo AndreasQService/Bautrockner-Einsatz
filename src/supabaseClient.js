@@ -272,6 +272,9 @@ if (isWebDriver) {
           return Promise.resolve({ data: { user: { id: user.id, email: user.name } }, error: null });
         }
         return Promise.resolve({ data: { user: null }, error: { message: 'Invalid credentials' } });
+      },
+      onAuthStateChange: (cb) => {
+        return { data: { subscription: { unsubscribe: () => {} } } };
       }
     }
   };
