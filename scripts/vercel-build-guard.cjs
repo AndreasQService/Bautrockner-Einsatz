@@ -52,14 +52,16 @@ console.log('[BUILD GUARD] Environment variables loaded:', {
     QTOOL_ENVIRONMENT: env.QTOOL_ENVIRONMENT || env.VITE_QTOOL_ENVIRONMENT,
 });
 
-// 1. Determine expected target environment based on project name or config
+// 1. Determine expected target environment based on Vercel environment variables
 let expectedProjectIdForEnv = null;
 
 if (isVercel) {
-    if (vercelProjectName === 'bautrockner-einsatz') {
+    if (vercelEnv === 'production') {
         expectedProjectIdForEnv = liveProjectId;
+    } else if (vercelEnv === 'preview') {
+        expectedProjectIdForEnv = testProjectId;
     } else {
-        // Any other Vercel project name is treated as the test/preview project
+        // Fallback for development/other on Vercel
         expectedProjectIdForEnv = testProjectId;
     }
 } else {
