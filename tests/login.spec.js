@@ -23,7 +23,7 @@ test.describe('Login', () => {
     });
 
     test('Login-Screen wird angezeigt wenn nicht eingeloggt', async ({ page }) => {
-        await expect(page.locator('h2')).toContainText('Willkommen');
+        await expect(page.locator('h2')).toContainText('Anmelden');
         await expect(page.locator('input[type="text"]')).toBeVisible();
         await expect(page.locator('input[type="password"]')).toBeVisible();
         await expect(page.getByRole('button', { name: /anmelden/i })).toBeVisible();
@@ -73,7 +73,7 @@ test.describe('Login', () => {
         await page.locator('button[title="Abmelden"]').click();
 
         // Login-Screen soll erscheinen
-        await expect(page.locator('h2')).toContainText('Willkommen');
+        await expect(page.locator('h2')).toContainText('Anmelden');
     });
 
 });
