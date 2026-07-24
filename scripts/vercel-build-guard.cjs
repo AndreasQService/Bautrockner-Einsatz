@@ -35,7 +35,8 @@ const testProjectId = 'aoxduqspiezzyqeqyzzl';
 const liveProjectId = 'yxdoecdqttgdncgbzyus';
 const expectedOneDriveRoot = 'QTool_TEST_ONLY';
 
-const vercelEnv = env.VERCEL_ENV; // 'production', 'preview', 'development'
+const vercelEnv = env.VERCEL_ENV;
+const vercelProjectName = env.VERCEL_PROJECT_NAME;
 const isVercel = !!env.VERCEL || !!vercelEnv;
 
 const currentProjectId = env.VITE_EXPECTED_SUPABASE_PROJECT_ID || env.EXPECTED_SUPABASE_PROJECT_ID;
@@ -43,6 +44,7 @@ const supabaseUrl = env.VITE_SUPABASE_URL || '';
 
 console.log('[BUILD GUARD] Environment variables loaded:', {
     VERCEL_ENV: vercelEnv,
+    VERCEL_PROJECT_NAME: vercelProjectName,
     isVercel: isVercel,
     VITE_EXPECTED_SUPABASE_PROJECT_ID: currentProjectId,
     VITE_SUPABASE_URL: supabaseUrl,
@@ -50,26 +52,35 @@ console.log('[BUILD GUARD] Environment variables loaded:', {
     QTOOL_ENVIRONMENT: env.QTOOL_ENVIRONMENT || env.VITE_QTOOL_ENVIRONMENT,
 });
 
-// 1. Determine environment type
-let targetEnv = 'unknown'; // 'production' or 'test'
-if (vercelEnv === 'production') {
-    targetEnv = 'production';
-} else if (vercelEnv === 'preview' || vercelEnv === 'development') {
-    targetEnv = 'test';
+// 1. Determine expected target environment based on project name or config
+let expectedProjectIdForEnv = null;
+
+if (isVercel) {
+    if (vercelProjectName === 'bautrockner-einsatz') {
+        expectedProjectIdForEnv = liveProjectId;
+    } else {
+        // Any other Vercel project name is treated as the test/preview project
+        expectedProjectIdForEnv = testProjectId;
+    }
 } else {
-    // Local build - determine by database URL or currentProjectId
+    // Local build - determine by current local configuration
     if (supabaseUrl.includes(liveProjectId) || currentProjectId === liveProjectId) {
-        targetEnv = 'production';
+        expectedProjectIdForEnv = liveProjectId;
     } else if (supabaseUrl.includes(testProjectId) || currentProjectId === testProjectId) {
-        targetEnv = 'test';
+        expectedProjectIdForEnv = testProjectId;
     }
 }
 
-console.log(`[BUILD GUARD] Detected target environment: ${targetEnv.toUpperCase()}`);
+if (!expectedProjectIdForEnv) {
+    console.log('[BUILD GUARD] ⚠️ Ambiguous environment, skipping strict checks.');
+    process.exit(0);
+}
 
-// 2. Validate Supabase configuration based on target environment
-if (targetEnv === 'production') {
-    // In production mode, only live ID is allowed
+console.log(`[BUILD GUARD] Expected Supabase Project ID for this environment: "${expectedProjectIdForEnv}"`);
+
+// 2. Validate configuration against the expected environment
+if (expectedProjectIdForEnv === liveProjectId) {
+    // PRODUCTION checks
     if (!supabaseUrl.includes(liveProjectId)) {
         console.error(`[BUILD GUARD] ❌ ABORT: Production build must use Supabase URL belonging to project "${liveProjectId}". Found: "${supabaseUrl}"`);
         process.exit(1);
@@ -78,13 +89,12 @@ if (targetEnv === 'production') {
         console.error(`[BUILD GUARD] ❌ ABORT: Production build cannot use test Supabase ID "${testProjectId}"!`);
         process.exit(1);
     }
-    // If VITE_EXPECTED_SUPABASE_PROJECT_ID is provided, it must match the live ID
     if (currentProjectId && currentProjectId !== liveProjectId) {
         console.error(`[BUILD GUARD] ❌ ABORT: Vertauschte Zuordnung! VITE_EXPECTED_SUPABASE_PROJECT_ID is "${currentProjectId}" but Supabase URL is Production.`);
         process.exit(1);
     }
-} else if (targetEnv === 'test') {
-    // In test mode, only test ID is allowed
+} else if (expectedProjectIdForEnv === testProjectId) {
+    // TEST checks
     if (!supabaseUrl.includes(testProjectId)) {
         console.error(`[BUILD GUARD] ❌ ABORT: Test build must use Supabase URL belonging to project "${testProjectId}". Found: "${supabaseUrl}"`);
         process.exit(1);
@@ -93,19 +103,18 @@ if (targetEnv === 'production') {
         console.error(`[BUILD GUARD] ❌ ABORT: Test build cannot use live Supabase ID "${liveProjectId}"!`);
         process.exit(1);
     }
-    // If VITE_EXPECTED_SUPABASE_PROJECT_ID is provided, it must match the test ID
     if (currentProjectId && currentProjectId !== testProjectId) {
         console.error(`[BUILD GUARD] ❌ ABORT: Vertauschte Zuordnung! VITE_EXPECTED_SUPABASE_PROJECT_ID is "${currentProjectId}" but Supabase URL is Test.`);
         process.exit(1);
     }
 
-    // In Vercel Test/Preview builds, we mandate the correct project ID to be set
+    // In Vercel Test/Preview builds, mandate that the project ID is explicitly set
     if (isVercel && currentProjectId !== testProjectId) {
         console.error(`[BUILD GUARD] ❌ ABORT: Vercel Preview build requires VITE_EXPECTED_SUPABASE_PROJECT_ID to be exactly "${testProjectId}". Found: "${currentProjectId}"`);
         process.exit(1);
     }
 
-    // These checks only apply in test environment
+    // Additional strict checks for test environment
     const oneDriveRoot = env.ONEDRIVE_TEST_ROOT || env.VITE_ONEDRIVE_TEST_ROOT;
     if (oneDriveRoot !== expectedOneDriveRoot) {
         console.error(`[BUILD GUARD] ❌ ABORT: OneDrive test root must be exactly "${expectedOneDriveRoot}". Found: "${oneDriveRoot}"`);
@@ -117,13 +126,10 @@ if (targetEnv === 'production') {
         console.error(`[BUILD GUARD] ❌ ABORT: QTOOL_ENVIRONMENT must be exactly "test". Found: "${qtoolEnv}"`);
         process.exit(1);
     }
-} else {
-    // Local build with no clear environment indicators
-    console.log('[BUILD GUARD] ⚠️ Ambiguous local environment, skipping strict checks.');
 }
 
-// 3. Scan codebase for hardcoded forbidden Live ID in test environment
-if (targetEnv === 'test') {
+// 3. Scan codebase for hardcoded forbidden Live ID (only in test environment)
+if (expectedProjectIdForEnv === testProjectId) {
     const srcDir = path.join(__dirname, '..', 'src');
     let violationsFound = false;
 
