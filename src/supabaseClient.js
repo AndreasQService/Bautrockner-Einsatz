@@ -287,8 +287,13 @@ if (isWebDriver) {
     }
   };
 } else if (rawUrl || rawKey || expectedProjectId) {
-  validatedUrl = validateSupabaseConfig(rawUrl, rawKey, expectedProjectId);
-  supabaseInstance = createClient(validatedUrl.href, rawKey);
+  if (expectedProjectId === LIVE_PROJECT_ID) {
+    // In Production direkt ohne Test-Isolations-Guard initialisieren
+    supabaseInstance = createClient(rawUrl, rawKey);
+  } else {
+    validatedUrl = validateSupabaseConfig(rawUrl, rawKey, expectedProjectId);
+    supabaseInstance = createClient(validatedUrl.href, rawKey);
+  }
 }
 
 export const supabase = supabaseInstance;

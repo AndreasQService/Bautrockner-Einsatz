@@ -56,12 +56,10 @@ console.log('[BUILD GUARD] Environment variables loaded:', {
 let expectedProjectIdForEnv = null;
 
 if (isVercel) {
-    if (vercelEnv === 'production') {
+    if (vercelEnv === 'production' && (vercelProjectName === 'bautrockner-einsatz-by7w' || vercelProjectName === 'bautrockner-einsatz')) {
         expectedProjectIdForEnv = liveProjectId;
-    } else if (vercelEnv === 'preview') {
-        expectedProjectIdForEnv = testProjectId;
     } else {
-        // Fallback for development/other on Vercel
+        // Any other project (like qtool-test) or preview builds are TEST
         expectedProjectIdForEnv = testProjectId;
     }
 } else {
