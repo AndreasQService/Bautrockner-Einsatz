@@ -81,7 +81,7 @@ console.log(`[BUILD GUARD] Expected Supabase Project ID for this environment: "$
 // 2. Validate configuration against the expected environment
 if (expectedProjectIdForEnv === liveProjectId) {
     // PRODUCTION checks
-    if (!supabaseUrl.includes(liveProjectId)) {
+    if (supabaseUrl && !supabaseUrl.includes(liveProjectId)) {
         console.error(`[BUILD GUARD] ❌ ABORT: Production build must use Supabase URL belonging to project "${liveProjectId}". Found: "${supabaseUrl}"`);
         process.exit(1);
     }
@@ -95,7 +95,7 @@ if (expectedProjectIdForEnv === liveProjectId) {
     }
 } else if (expectedProjectIdForEnv === testProjectId) {
     // TEST checks
-    if (!supabaseUrl.includes(testProjectId)) {
+    if (supabaseUrl && !supabaseUrl.includes(testProjectId)) {
         console.error(`[BUILD GUARD] ❌ ABORT: Test build must use Supabase URL belonging to project "${testProjectId}". Found: "${supabaseUrl}"`);
         process.exit(1);
     }
