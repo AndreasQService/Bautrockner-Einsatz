@@ -1,18 +1,83 @@
-﻿node_modules/
-dist/
-build/
-.vite/
-.vercel/
-coverage/
-*.log
-npm-debug.log*
-.DS_Store
-Thumbs.db
+# QTool – Gitignore
+# --------------------------------------------------
 
+# Environment & Secrets
 .env
 .env.local
-.env.development
 .env.production
 .env.*.local
 
+# Dependencies
+node_modules
+dist
+build
+
+# Logs & Debugging
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# OS specific files
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# IDEs
+.vscode
+.idea
+*.sublime-project
+*.sublime-workspace
+
+# Testing & Coverage
+coverage
+.cache
+test-results/
+
+# Temporary & Backups
+tmp/
+*.bak
+*.old
+*.bak2
+*__TIMESTAMP__*
+_backup_*/
+backup_*/
+artifacts/
+brain/
+scratch/
+reports/
+
+# Root Backups (Specific)
+DamageForm_clean_utf8.jsx
+temp_*.js
+temp_*.jsx
+*.jsx.bak
+*.js.bak
+
+# Database
+*.sqlite
+*.db
+
+# Binary / Media (Strict)
 *.zip
+*.pdf
+*.jpg
+*.jpeg
+*.png
+*.heic
+*.webp
+*.gif
+*.mp4
+*.mov
+
+# Local Scripts & Traces
+*.cjs
+*.js.bak
+trace_*.txt
+esbuild_error*.txt
+.vercel
+.env*
