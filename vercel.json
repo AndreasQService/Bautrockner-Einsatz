@@ -1,5 +1,5 @@
 {
-  "ignoreCommand": "if [ \"$VERCEL_PROJECT_ID\" != \"prj_mv6JRxbLJJiwMJtLbgQ8j2pNwM47\" ] && ( [ \"$VERCEL_GIT_COMMIT_REF\" = \"test\" ] || [ \"$VERCEL_GIT_COMMIT_REF\" = \"qtool-test-env\" ] ); then echo 'Skipping test branch build for non-test project'; exit 0; else exit 1; fi",
+  "ignoreCommand": "node scripts/vercel-ignore.js",
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/$1" },
     { "source": "/(.*)", "destination": "/index.html" }
