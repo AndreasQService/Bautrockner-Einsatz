@@ -277,7 +277,7 @@ const compressAndResizeImage = (file, maxDimension = 1200, quality = 0.7) => {
 };
 
 
-export default function DamageForm({ onCancel, initialData, onSave, mode = 'desktop', isDarkMode = true, isSyncPending }) {
+export default function DamageForm({ onCancel, initialData, onSave, mode = 'desktop', isDarkMode = true, isSyncPending, fetchReports }) {
     // Helper to parse address string if editing
     const parseAddress = (addr) => {
         if (!addr) return { street: '', zip: '', city: '' };
@@ -693,6 +693,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
     const [pendingSyncCount, setPendingSyncCount] = useState(0);
     const [isSyncing, setIsSyncing] = useState(false);
 
+
     // ── Object URL Tracking and Reload Preview Restoration ────────────────
     const objectUrlsRef = useRef([]);
     const trackObjectURL = (url) => {
@@ -812,6 +813,8 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
 
     // ── Auto-Sync: Pending Fotos hochladen wenn Netz zurückkommt ─────────────
     useEffect(() => {
+        const isCloudFirstEnabled = import.meta.env.VITE_CLOUD_FIRST_IMAGES === 'true' || import.meta.env.VITE_CLOUD_FIRST_IMAGES === true;
+
         const syncPendingPhotos = async () => {
             if (isSyncing) return;
             setIsSyncing(true);
@@ -819,11 +822,12 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
             console.log('[Sync] 🔄 Netz verfügbar – starte Sync ausstehender Fotos...');
 
             try {
-                if (IS_TEST_ENV) {
+                if (IS_TEST_ENV || isCloudFirstEnabled) {
                     const { syncPendingToSupabase } = await import('../lib/sync/supabaseSyncWorker');
                     const { synced, failed } = await syncPendingToSupabase();
-                    console.log(`[Sync] test-sync done. Synced: ${synced}, Failed: ${failed}`);
+                    console.log(`[Sync] Cloud-first sync done. Synced: ${synced}, Failed: ${failed}`);
                 } else {
+                    // Legacy sync loop
                     const { getPendingPhotos } = await import('../services/PhotoStorage');
                     const pending = await getPendingPhotos(formData.id || 'temp');
 
@@ -839,6 +843,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                             const subFolder = meta.subFolder || 'Sonstiges';
                             const odFolder = meta.odFolder || buildProjectFolderName(formData.projectNumber || formData.id || 'Unbekannt', formData);
 
+                            // Supabase Upload
                             let supabasePath = photo.supabasePath;
                             if (!supabasePath && supabase) {
                                 const ext = photo.name.split('.').pop();
@@ -847,6 +852,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                                 if (!error) supabasePath = fileName;
                             }
 
+                            // OneDrive Upload
                             let oneDriveItemId = photo.oneDriveItemId;
                             let oneDrivePath = photo.oneDrivePath;
                             if (!oneDriveItemId) {
@@ -870,7 +876,6 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                         }
                     }
                 }
-                
                 const count = await getPendingCount();
                 setPendingSyncCount(count);
             } catch (e) {
@@ -2053,6 +2058,71 @@ END:VCARD`;
 
     const handleImageUpload = async (files, contextData = {}) => {
         if (!files || files.length === 0) return;
+
+        const isCloudFirstEnabled = import.meta.env.VITE_CLOUD_FIRST_IMAGES === 'true' || import.meta.env.VITE_CLOUD_FIRST_IMAGES === true;
+
+        if (isCloudFirstEnabled) {
+            for (let file of files) {
+                const fileExt = file.name.split('.').pop().toLowerCase();
+                const isDoc = ['pdf', 'msg', 'txt'].includes(fileExt);
+                const imageId = 'img_' + Math.random().toString(36).substring(2, 15) + '_' + Date.now();
+                
+                try {
+                    // 1. Immediately and durably save the original blob in IndexedDB (Step 0)
+                    let localPreviewUrl = null;
+                    if (!isDoc) {
+                        const subFolder = contextData.assignedTo || contextData.roomName || 'Sonstiges';
+                        const odFolder = buildProjectFolderName(
+                            formData.projectNumber || formData.id || 'Unbekannt',
+                            formData
+                        );
+                        localPreviewUrl = await savePhotoLocally(imageId, formData.id || 'temp', file, {
+                            ...contextData,
+                            subFolder,
+                            odFolder,
+                            isSketch: contextData.assignedTo === 'Messprotokolle' || (file.name && file.name.includes('sketch'))
+                        });
+                        trackObjectURL(localPreviewUrl);
+                    } else {
+                        localPreviewUrl = trackObjectURL(URL.createObjectURL(file));
+                    }
+
+                    // 2. Add to React state only after confirmed local IndexedDB save
+                    const imageEntry = {
+                        id: imageId,
+                        name: file.name,
+                        date: new Date().toISOString(),
+                        preview: localPreviewUrl,
+                        includeInReport: contextData.includeInReport !== undefined ? contextData.includeInReport : true,
+                        ...contextData,
+                        uploading: true, // indicates that sync is running/pending
+                        error: false,
+                        type: isDoc ? 'document' : 'image',
+                        fileType: fileExt,
+                        syncStatus: 'local_only'
+                    };
+
+                    setFormData(prev => ({ ...prev, images: [...prev.images, imageEntry] }));
+
+                    // 3. Immediately trigger background sync worker without blocking UI
+                    import('../lib/sync/supabaseSyncWorker.js').then(({ syncPendingToSupabase }) => {
+                        syncPendingToSupabase().then(({ synced }) => {
+                            if (synced > 0 && fetchReports) {
+                                // Fetch reports to update standard project state
+                                fetchReports().catch(() => {});
+                            }
+                        }).catch(err => {
+                            console.warn('[handleImageUpload] Background sync failed:', err.message);
+                        });
+                    }).catch(() => {});
+
+                } catch (error) {
+                    console.error('[handleImageUpload] Failed to save image locally:', error);
+                    alert("Fehler bei der lokalen Bildsicherung: " + error.message);
+                }
+            }
+            return;
+        }
 
         for (let file of files) {
             const fileExt = file.name.split('.').pop().toLowerCase();
@@ -6896,6 +6966,24 @@ END:VCARD`;
                                                     >
                                                         {isRecording === `imgdesc-${idx}` ? <MicOff size={20} className="animate-pulse" /> : <Mic size={20} />}
                                                     </button>
+                                                </div>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '2px' }}>
+                                                    <span style={{
+                                                        fontSize: '0.7rem',
+                                                        fontWeight: 600,
+                                                        padding: '2px 6px',
+                                                        borderRadius: '4px',
+                                                        backgroundColor: item.syncStatus === 'remote_verified' || item.syncStatus === 'synced' ? 'rgba(16,185,129,0.1)' : 
+                                                                         item.syncStatus === 'uploaded_to_backend' ? 'rgba(245,158,11,0.1)' : 
+                                                                         item.syncStatus === 'error' ? 'rgba(239,68,68,0.1)' : 'rgba(59,130,246,0.1)',
+                                                        color: item.syncStatus === 'remote_verified' || item.syncStatus === 'synced' ? '#10B981' : 
+                                                               item.syncStatus === 'uploaded_to_backend' ? '#F59E0B' : 
+                                                               item.syncStatus === 'error' ? '#EF4444' : '#3B82F6'
+                                                    }}>
+                                                        {item.syncStatus === 'remote_verified' || item.syncStatus === 'synced' ? 'Vollständig verifiziert' : 
+                                                         item.syncStatus === 'uploaded_to_backend' ? 'In Supabase gespeichert' : 
+                                                         item.syncStatus === 'error' ? 'Fehler – erneut versuchen' : 'Lokal gesichert'}
+                                                    </span>
                                                 </div>
                                             </div>
                                             {/* Delete */}

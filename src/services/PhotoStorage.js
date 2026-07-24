@@ -61,6 +61,7 @@ export async function savePhotoLocally(photoId, projectId, file, meta = {}) {
     }
 
     const testRunId = import.meta.env.VITE_ONEDRIVE_TEST_RUN_ID || 'TESTRUN_DEFAULT';
+    const isCloudFirstEnabled = import.meta.env.VITE_CLOUD_FIRST_IMAGES === 'true' || import.meta.env.VITE_CLOUD_FIRST_IMAGES === true;
 
     const entry = {
         id: photoId,
@@ -74,10 +75,10 @@ export async function savePhotoLocally(photoId, projectId, file, meta = {}) {
         supabasePath: null,
         oneDrivePath: null,
         oneDriveItemId: null,
-        syncStatus: 'local_only', // 'local_only' | 'queued_for_sync' | 'uploaded_to_backend' | 'queued_for_remote' | 'remote_uploading' | 'remote_uploaded_manifest_pending' | 'remote_verified'
+        syncStatus: isCloudFirstEnabled ? 'local_only' : 'pending',
         testRunId,
         
-        // Detailed data model
+        // Detailed data model for Cloud-First pipeline
         original: {
             blob: file,
             size: file.size,
@@ -96,7 +97,7 @@ export async function savePhotoLocally(photoId, projectId, file, meta = {}) {
             const tx = db.transaction(STORE_PHOTOS, 'readwrite');
             tx.objectStore(STORE_PHOTOS).put(entry);
             tx.oncomplete = () => {
-                console.log(`[PhotoStorage] 📸 Original-Foto lokal gesichert (local_only): ${photoId}`);
+                console.log(`[PhotoStorage] 📸 Original-Foto lokal gesichert (${entry.syncStatus}): ${photoId}`);
                 resolve(URL.createObjectURL(file));
             };
             tx.onerror = () => reject(tx.error);
@@ -242,6 +243,11 @@ export async function getProjectPhotos(projectId) {
  * Foto löschen (erst wenn vollständig verifiziert auf Supabase und OneDrive)
  */
 export async function deleteOldSyncedPhotos(olderThanDays = 30) {
+    if (import.meta.env.VITE_CLOUD_FIRST_IMAGES === 'true' || import.meta.env.VITE_CLOUD_FIRST_IMAGES === true) {
+        console.log(`[PhotoStorage] deleteOldSyncedPhotos bypassed due to VITE_CLOUD_FIRST_IMAGES rollout protection`);
+        return 0;
+    }
+
     const db = await openDB();
     if (!db.objectStoreNames.contains(STORE_PHOTOS)) {
         console.warn(`[PhotoStorage] Object Store "${STORE_PHOTOS}" fehlt. Cleanup übersprungen.`);
