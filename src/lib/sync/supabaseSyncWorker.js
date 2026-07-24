@@ -1,6 +1,6 @@
 /**
  * supabaseSyncWorker.js
- * Cloud-first Image Sync Worker
+ * Cloud-first Image Sync Worker for Production QTool
  */
 
 import { supabase } from '../../supabaseClient.js';
@@ -99,6 +99,8 @@ async function syncOnePhoto(photo) {
     const compressedBlob = photo.compressed.blob;
     if (!compressedBlob) throw new Error('Compressed Blob is missing');
 
+    const sha256 = photo.compressed.sha256;
+
     // 2. Storage Upload (queued_for_sync -> uploaded_to_backend)
     if (photo.syncStatus === 'queued_for_sync') {
         console.log(`[SyncWorker] ☁️ Uploading photo ${photo.id} to Supabase storage...`);
@@ -131,6 +133,10 @@ async function syncOnePhoto(photo) {
 
         console.log(`[SyncWorker] ✅ Storage verified: ${storagePath} (${uploadedFile.size} bytes)`);
 
+        // Construct OneDrive remote path for database journal
+        const subFolder = photo.meta?.subFolder || 'Sonstiges';
+        const odFolder = photo.meta?.odFolder || 'Unbekannt';
+        const remotePath = `QTool/${odFolder}/Fotos/${subFolder.replace(/[^a-zA-Z0-9]/g, '_')}/${photo.name}`;
         // 4. Update project_image_uploads journal table in database
         const { error: journalErr } = await supabase
             .from('project_image_uploads')
@@ -140,10 +146,11 @@ async function syncOnePhoto(photo) {
                 filename: photo.name,
                 mime_type: photo.compressed.mimeType,
                 size_bytes: photo.compressed.size,
-                sha256: photo.compressed.sha256,
+                sha256: sha256,
                 storage_bucket: 'case-files',
                 storage_path: storagePath,
                 storage_status: 'uploaded_to_backend',
+                remote_path: remotePath,
                 updated_at: new Date().toISOString()
             }, { onConflict: 'local_image_id' });
 
@@ -190,7 +197,9 @@ async function syncOnePhoto(photo) {
                 type: 'image',
                 fileType: ext,
                 size: photo.compressed.size,
-                sha256: photo.compressed.sha256
+                sha256: sha256,
+                assignedTo: photo.meta?.assignedTo || 'Sonstiges',
+                includeInReport: photo.meta?.includeInReport !== undefined ? photo.meta.includeInReport : true
             });
 
             const { error: updateErr } = await supabase
