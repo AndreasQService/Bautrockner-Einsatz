@@ -155,7 +155,7 @@ export async function processProjectQueue() {
       try {
         if (!supabase) throw new Error('Supabase client ist nicht initialisiert.');
 
-        const IS_TEST_ENV = !!(typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_EXPECTED_SUPABASE_PROJECT_ID);
+        const IS_TEST_ENV = !!(typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_EXPECTED_SUPABASE_PROJECT_ID === 'aoxduqspiezzyqeqyzzl');
         if (IS_TEST_ENV) {
           const { data: { session } } = await supabase.auth.getSession();
           if (!session) {

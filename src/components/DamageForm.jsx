@@ -23,7 +23,7 @@ import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import { buildProjectFolderName, uploadPhotoAndGetUrl, getPhotoDownloadUrl, uploadReport } from '../services/OneDriveService';
 import { savePhotoLocally, updatePhotoSyncStatus, deleteOldSyncedPhotos, getPendingCount, getPhotoBlob, getProjectPhotos } from '../services/PhotoStorage';
-const IS_TEST_ENV = !!(typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_EXPECTED_SUPABASE_PROJECT_ID);
+const IS_TEST_ENV = !!(typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_EXPECTED_SUPABASE_PROJECT_ID === 'aoxduqspiezzyqeqyzzl');
 import { swissPLZ } from '../data/swiss_plz';
 
 import { DEVICE_INVENTORY } from '../data/device_inventory';
