@@ -41,6 +41,7 @@ import { applyDryingCheck } from '../features/projects/dryingCheckService';
 import { generateMeasurementExcel } from '../utils/MeasurementExcelExporter';
 import { PDFService } from '../services/PDFService';
 import { RoomService } from '../services/RoomService';
+import { statusColors, ROOM_OPTIONS } from '../config/damageFormConfig';
 
 /* Custom PDF Icon */
 const PdfIcon = ({ size = 24, style = {} }) => (
@@ -76,36 +77,6 @@ const CalendarIcon = ({ size = 24, style = {} }) => (
 
 const STEPS = ['Schadenaufnahme', 'Leckortung', 'Trocknung', 'Kontrolle*', 'Instandsetzung', 'Abgeschlossen']
 
-const statusColors = {
-    'Schadenaufnahme': 'bg-gray-100',
-    'Leckortung': 'bg-blue-100',
-    'Trocknung': 'bg-yellow-100',
-    'Kontrolle*': 'bg-orange-100',
-    'Instandsetzung': 'bg-green-100',
-    'Abgeschlossen': 'bg-gray-200'
-}
-
-const ROOM_OPTIONS = [
-    "Wohnzimmer",
-    "Bad",
-    "Dusche",
-    "Flur",
-    "Schlafzimmer",
-    "Treppenhaus",
-    "Keller",
-    "Garage",
-    "Küche",
-    "Abstellraum",
-    "Gäste-WC",
-    "Kinderzimmer 1",
-    "Kinderzimmer 2",
-    "Esszimmer",
-    "Arbeitszimmer / Büro",
-    "Hauswirtschaftsraum (HWR)",
-    "Reduit",
-    "Estrich",
-    "Sonstiges / Eigener Name"
-];
 
 const getDaysDiff = (start, end) => {
     if (!start || !end) return 0;
