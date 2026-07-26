@@ -141,6 +141,108 @@ function sanitizeMeasurementStorage(reportData) {
   };
 }
 
+const getOrCreateClientId = () => {
+  let cid = localStorage.getItem('qservice_client_id');
+  if (!cid) {
+    cid = (typeof crypto !== 'undefined' && crypto.randomUUID)
+      ? crypto.randomUUID()
+      : `CLIENT-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    localStorage.setItem('qservice_client_id', cid);
+  }
+  return cid;
+};
+
+function diffReports(base, current) {
+  const changedPaths = [];
+  const operations = [];
+
+  const baseData = base?.report_data || base || {};
+  const currentData = current?.report_data || current || {};
+
+  const allKeys = new Set([...Object.keys(baseData), ...Object.keys(currentData)]);
+  
+  for (const key of allKeys) {
+    if (key.startsWith('_') || key === 'id' || key === 'isLightweight' || key === 'created_at' || key === 'updated_at') continue;
+
+    const baseVal = baseData[key];
+    const currVal = currentData[key];
+
+    if (baseVal !== undefined && currVal === undefined) {
+      changedPaths.push(key);
+      operations.push({ type: 'deleteField', path: key });
+      continue;
+    }
+
+    if (baseVal === undefined && currVal !== undefined) {
+      changedPaths.push(key);
+      operations.push({ type: 'set', path: key, value: currVal });
+      continue;
+    }
+
+    if (Array.isArray(baseVal) || Array.isArray(currVal)) {
+      const baseArr = Array.isArray(baseVal) ? baseVal : [];
+      const currArr = Array.isArray(currVal) ? currVal : [];
+      
+      let arrayChanged = false;
+      
+      for (const item of currArr) {
+        const itemId = item?.id;
+        if (itemId) {
+          const baseItem = baseArr.find(x => x?.id === itemId);
+          if (!baseItem) {
+            arrayChanged = true;
+            operations.push({ type: 'array_add', path: key, itemId, value: item });
+          } else if (JSON.stringify(baseItem) !== JSON.stringify(item)) {
+            arrayChanged = true;
+            operations.push({ type: 'array_update', path: key, itemId, value: item });
+          }
+        } else {
+          if (!baseArr.some(x => JSON.stringify(x) === JSON.stringify(item))) {
+            arrayChanged = true;
+          }
+        }
+      }
+      
+      for (const item of baseArr) {
+        const itemId = item?.id;
+        if (itemId) {
+          if (!currArr.some(x => x?.id === itemId)) {
+            arrayChanged = true;
+            operations.push({ type: 'array_delete', path: key, itemId });
+          }
+        } else {
+          if (!currArr.some(x => JSON.stringify(x) === JSON.stringify(item))) {
+            arrayChanged = true;
+          }
+        }
+      }
+
+      if (arrayChanged || JSON.stringify(baseVal) !== JSON.stringify(currVal)) {
+        changedPaths.push(key);
+        if (!operations.some(op => op.path === key)) {
+          operations.push({ type: 'set', path: key, value: currVal });
+        }
+      }
+      continue;
+    }
+
+    if (typeof baseVal === 'object' && baseVal !== null && typeof currVal === 'object' && currVal !== null) {
+      if (JSON.stringify(baseVal) !== JSON.stringify(currVal)) {
+        changedPaths.push(key);
+        operations.push({ type: 'set', path: key, value: currVal });
+      }
+      continue;
+    }
+
+    if (baseVal !== currVal) {
+      changedPaths.push(key);
+      operations.push({ type: 'set', path: key, value: currVal });
+    }
+  }
+
+  return { changedPaths, operations };
+}
+
 function App() {
   // Neuer Tab = neue sessionStorage → startet immer auf Dashboard
   // damit nicht alle Tabs dasselbe Projekt aus localStorage öffnen
@@ -189,68 +291,346 @@ function App() {
     loadUnsaved();
   }, []);
 
-  const syncUnsavedReport = async (reportId) => {
-    let report = null;
+  const syncInProgressRef = useRef(new Set());
+
+  const saveToUnsavedReports = (finalReport, isConflict = false, dbUpdatedAt = null) => {
+    const existingRecord = openedReportBackupRef.current[finalReport.id] || reportsRef.current.find(r => r.id === finalReport.id);
+    console.log('[DEBUG-SYNC] saveToUnsavedReports triggered:', {
+      finalReportId: finalReport.id,
+      finalReportSupabaseUpdatedAt: finalReport._supabase_updated_at,
+      existingRecordFound: !!existingRecord,
+      existingRecordSupabaseUpdatedAt: existingRecord?._supabase_updated_at,
+      allAvailableReportIds: reportsRef.current.map(r => r.id)
+    });
+    const baseUpdatedAt = finalReport._supabase_updated_at || existingRecord?._supabase_updated_at || null;
+    const { changedPaths, operations } = diffReports(existingRecord, finalReport);
+
+    let prev = {};
+    try {
+      const cached = localStorage.getItem('qservice_unsaved_reports');
+      if (cached) prev = JSON.parse(cached);
+    } catch (e) {}
+
+    const existingEntry = prev[finalReport.id] || {};
+    const mergedPaths = Array.from(new Set([...(existingEntry.changedPaths || []), ...changedPaths]));
+    const mergedOps = [...(existingEntry.operations || [])];
+    for (const op of operations) {
+      const idx = mergedOps.findIndex(x => x.path === op.path && x.type === op.type && x.itemId === op.itemId);
+      if (idx >= 0) {
+        mergedOps[idx] = op;
+      } else {
+        mergedOps.push(op);
+      }
+    }
+
+    const next = {
+      ...prev,
+      [finalReport.id]: {
+        reportId: finalReport.id,
+        baseUpdatedAt: baseUpdatedAt,
+        localUpdatedAt: new Date().toISOString(),
+        reportData: finalReport,
+        changedPaths: mergedPaths,
+        operations: mergedOps,
+        clientId: getOrCreateClientId(),
+        userId: currentUser || 'unknown',
+        schemaVersion: 'v1',
+        _sync_conflict: isConflict || !!existingEntry._sync_conflict,
+        _db_updated_at: dbUpdatedAt || existingEntry._db_updated_at || null,
+        projectTitle: finalReport.projectTitle || 'Unbenanntes Projekt',
+        _offline_saved_at: existingEntry._offline_saved_at || new Date().toISOString()
+      }
+    };
+
+    safeSetItem('qservice_unsaved_reports', JSON.stringify(next));
+    setUnsavedReports(next);
+
+    if (navigator.onLine && !isConflict) {
+      setTimeout(() => {
+        syncUnsavedReport(finalReport.id);
+      }, 100);
+    }
+  };
+
+  const syncUnsavedReport = async (reportId, forceOverwrite = false) => {
+    if (syncInProgressRef.current.has(reportId)) {
+      console.log('[Sync] Bereits aktive Synchronisation für:', reportId);
+      return;
+    }
+    syncInProgressRef.current.add(reportId);
+
+    let offlineEntry = null;
     try {
       const cached = localStorage.getItem('qservice_unsaved_reports');
       if (cached) {
-        report = JSON.parse(cached)[reportId];
+        offlineEntry = JSON.parse(cached)[reportId];
       }
-    } catch {}
-    if (!report) {
-      report = unsavedReports[reportId];
+    } catch (e) {
+      console.error('[Sync] Fehler beim Lesen des Cache:', e);
     }
-    if (!report || !supabase) return;
-    
-    showToast(`Synchronisiere "${report.projectTitle || 'Unbenannt'}"...`, 'info', 0);
-    
-    const now = new Date().toISOString();
-    const { _supabase_updated_at, _offline_saved_at, ...reportForStorage } = report;
-    
-    const rowData = {
-      id: report.id,
-      project_title: report.projectTitle,
-      client: report.client,
-      address: report.address,
-      status: report.status,
-      assigned_to: report.assignedTo,
-      date: report.date,
-      drying_started: report.dryingStarted,
-      report_data: reportForStorage,
-      updated_at: now
-    };
-    
-    // Force write (upsert) to bypass optimistic locking, since the user explicitly forced it
-    const { error } = await supabase.from('damage_reports').upsert(rowData);
-    
-    if (error) {
-      showToast(`⚠️ Synchronisation fehlgeschlagen: ${error.message}`, 'error', 5000);
-    } else {
-      showToast(`✅ "${report.projectTitle || 'Unbenannt'}" erfolgreich synchronisiert!`, 'success', 3000);
+
+    if (!offlineEntry) {
+      syncInProgressRef.current.delete(reportId);
+      return;
+    }
+
+    if (!offlineEntry.reportId) {
+      console.error('[Sync] Ungültiger Offline-Eintrag (Fehlende ID):', reportId);
+      syncInProgressRef.current.delete(reportId);
+      return;
+    }
+
+    if (!offlineEntry.baseUpdatedAt) {
+      console.warn('[Sync] Offline-Eintrag ohne baseUpdatedAt (Legacy). Blockiere automatischen Sync:', reportId);
       setUnsavedReports(prev => {
-        const next = { ...prev };
-        delete next[reportId];
+        const next = { ...prev, [reportId]: { ...offlineEntry, _sync_conflict: true, _legacy_unsafe: true } };
         safeSetItem('qservice_unsaved_reports', JSON.stringify(next));
         return next;
       });
-      setReports(prev => prev.map(r => r.id === report.id ? { ...r, ...report, _supabase_updated_at: now } : r));
-      setSelectedReport(prev => prev && prev.id === report.id ? { ...prev, ...report, _supabase_updated_at: now } : prev);
+      syncInProgressRef.current.delete(reportId);
+      return;
     }
+
+    const logAudit = (result, errorMsg = null) => {
+      try {
+        const historyCached = localStorage.getItem('qtool_sync_history') || '[]';
+        const history = JSON.parse(historyCached);
+        history.push({
+          reportId,
+          userId: offlineEntry.userId,
+          clientId: offlineEntry.clientId,
+          baseUpdatedAt: offlineEntry.baseUpdatedAt,
+          localUpdatedAt: offlineEntry.localUpdatedAt,
+          schemaVersion: offlineEntry.schemaVersion,
+          changedPaths: offlineEntry.changedPaths,
+          syncTime: new Date().toISOString(),
+          result,
+          errorMsg
+        });
+        localStorage.setItem('qtool_sync_history', JSON.stringify(history.slice(-50)));
+      } catch (err) {
+        console.warn('Sync history log failed:', err);
+      }
+    };
+
+    const saveBackupRecord = (id, dbRecord) => {
+      try {
+        const backupsCached = localStorage.getItem('qtool_sync_history_backup') || '{}';
+        const backups = JSON.parse(backupsCached);
+        backups[id] = {
+          timestamp: new Date().toISOString(),
+          record: dbRecord
+        };
+        localStorage.setItem('qtool_sync_history_backup', JSON.stringify(backups));
+      } catch (err) {
+        console.warn('Server record backup failed:', err);
+      }
+    };
+
+    showToast(`Synchronisiere "${offlineEntry.projectTitle || 'Unbenannt'}"...`, 'info', 0);
+
+    try {
+      if (!supabase) throw new Error('Supabase client ist nicht initialisiert.');
+
+      const { data: dbRecord, error: fetchError } = await supabase
+        .from('damage_reports')
+        .select('id, updated_at, report_data')
+        .eq('id', reportId)
+        .single();
+
+      if (fetchError && fetchError.code !== 'PGRST116') {
+        throw new Error(`Fehler beim Laden des Serverstands: ${fetchError.message}`);
+      }
+
+      let mergedReportData = {};
+      let isConflict = false;
+
+      if (dbRecord) {
+        const dbTime = new Date(dbRecord.updated_at).getTime();
+        const baseTime = new Date(offlineEntry.baseUpdatedAt).getTime();
+
+        if (dbTime !== baseTime && !forceOverwrite) {
+          isConflict = true;
+        } else {
+          const serverReportData = dbRecord.report_data || {};
+          mergedReportData = { ...serverReportData };
+
+          for (const op of (offlineEntry.operations || [])) {
+            const path = op.path;
+            if (op.type === 'set') {
+              mergedReportData[path] = op.value;
+            } else if (op.type === 'deleteField') {
+              delete mergedReportData[path];
+            } else if (op.type === 'array_add') {
+              const arr = Array.isArray(mergedReportData[path]) ? mergedReportData[path] : [];
+              if (!arr.some(x => x?.id === op.itemId)) {
+                mergedReportData[path] = [...arr, op.value];
+              }
+            } else if (op.type === 'array_update') {
+              const arr = Array.isArray(mergedReportData[path]) ? mergedReportData[path] : [];
+              mergedReportData[path] = arr.map(x => x?.id === op.itemId ? op.value : x);
+            } else if (op.type === 'array_delete') {
+              const arr = Array.isArray(mergedReportData[path]) ? mergedReportData[path] : [];
+              mergedReportData[path] = arr.filter(x => x?.id !== op.itemId);
+            }
+          }
+
+          const criticalArrays = ['rooms', 'measurementRooms', 'images', 'contacts', 'equipment', 'selectedMeasures', 'documents'];
+          for (const key of criticalArrays) {
+            const serverArr = serverReportData[key];
+            const mergedArr = mergedReportData[key];
+            if (Array.isArray(serverArr) && serverArr.length > 0) {
+              const hasExplicitDelete = (offlineEntry.operations || []).some(op => 
+                (op.path === key && (op.type === 'deleteField' || op.type === 'set')) ||
+                (op.path === key && op.type === 'array_delete')
+              );
+              if ((!Array.isArray(mergedArr) || mergedArr.length === 0) && !hasExplicitDelete) {
+                mergedReportData[key] = serverArr;
+                console.warn(`[Sync-Schutz] Server-Array '${key}' geschützt!`);
+              }
+            }
+          }
+        }
+      } else {
+        mergedReportData = offlineEntry.reportData;
+      }
+
+      if (isConflict) {
+        console.warn('[Sync-Konflikt] Automatischer Sync blockiert - neuere Version in Supabase:', reportId);
+        showToast(`⚠️ Sync-Konflikt bei "${offlineEntry.projectTitle || 'Projekt'}": Dieses Projekt wurde zwischenzeitlich auf einem anderen Gerät geändert. Der ältere Offline-Stand wurde nicht automatisch übernommen.`, 'error', 15000);
+        
+        setUnsavedReports(prev => {
+          const next = { 
+            ...prev, 
+            [reportId]: { 
+              ...offlineEntry, 
+              _sync_conflict: true, 
+              _db_updated_at: dbRecord.updated_at 
+            } 
+          };
+          safeSetItem('qservice_unsaved_reports', JSON.stringify(next));
+          return next;
+        });
+        logAudit('conflict');
+        syncInProgressRef.current.delete(reportId);
+        return;
+      }
+
+      const now = new Date().toISOString();
+      const localReportData = offlineEntry.reportData;
+      const rowData = {
+        id: reportId,
+        project_title: localReportData.projectTitle,
+        client: localReportData.client,
+        address: localReportData.address,
+        status: localReportData.status,
+        assigned_to: localReportData.assignedTo,
+        date: localReportData.date,
+        drying_started: localReportData.dryingStarted,
+        report_data: mergedReportData,
+        updated_at: now
+      };
+
+      if (dbRecord) saveBackupRecord(reportId, dbRecord);
+
+      let success = false;
+      if (dbRecord) {
+        const { data: updateResult, error: updateError } = await supabase
+          .from('damage_reports')
+          .update(rowData)
+          .eq('id', reportId)
+          .eq('updated_at', offlineEntry.baseUpdatedAt)
+          .select('id');
+
+        if (updateError) throw updateError;
+        success = updateResult && updateResult.length === 1;
+      } else {
+        const { error: insertError } = await supabase
+          .from('damage_reports')
+          .insert(rowData);
+        if (insertError) throw insertError;
+        success = true;
+      }
+
+      if (!success) {
+        console.warn('[Sync-Konflikt] Atomares Update fehlgeschlagen: 0 Zeilen aktualisiert.');
+        showToast(`⚠️ Sync-Konflikt bei "${offlineEntry.projectTitle}": Zeitgleiches Update auf anderem Gerät erkannt! Bitte Seite neu laden.`, 'error', 15000);
+        
+        setUnsavedReports(prev => {
+          const next = { ...prev, [reportId]: { ...offlineEntry, _sync_conflict: true } };
+          safeSetItem('qservice_unsaved_reports', JSON.stringify(next));
+          return next;
+        });
+        logAudit('conditional_update_failed');
+      } else {
+        showToast(`✅ "${offlineEntry.projectTitle || 'Unbenannt'}" erfolgreich synchronisiert!`, 'success', 3000);
+        setUnsavedReports(prev => {
+          const next = { ...prev };
+          delete next[reportId];
+          safeSetItem('qservice_unsaved_reports', JSON.stringify(next));
+          return next;
+        });
+        
+        const finalSyncedReport = {
+          ...localReportData,
+          report_data: mergedReportData,
+          _supabase_updated_at: now
+        };
+        setReports(prev => prev.map(r => r.id === reportId ? finalSyncedReport : r));
+        setSelectedReport(prev => prev && prev.id === reportId ? finalSyncedReport : prev);
+        openedReportBackupRef.current[reportId] = JSON.parse(JSON.stringify(finalSyncedReport));
+        logAudit('success');
+
+        try {
+          const odFolder = buildProjectFolderName(
+            finalSyncedReport.projectNumber || finalSyncedReport.id || 'Unbekannt',
+            finalSyncedReport
+          );
+          uploadProjectJson(odFolder, finalSyncedReport).catch(e =>
+            console.warn('[OneDrive] Sync JSON-Backup failed:', e.message)
+          );
+        } catch {}
+      }
+
+    } catch (err) {
+      console.error('[Sync-Fehler]', err);
+      showToast(`⚠️ Synchronisation fehlgeschlagen: ${err.message}`, 'error', 5000);
+      logAudit('network_failed', err.message);
+    } finally {
+      syncInProgressRef.current.delete(reportId);
+    }
+  };
+
+  const discardUnsavedReport = (reportId) => {
+    setUnsavedReports(prev => {
+      const next = { ...prev };
+      delete next[reportId];
+      safeSetItem('qservice_unsaved_reports', JSON.stringify(next));
+      return next;
+    });
+    showToast("Änderungen verworfen.", "success");
   };
 
   // Automatic Sync when online
   useEffect(() => {
     const handleOnlineSync = () => {
+      console.log('[DEBUG-SYNC] handleOnlineSync triggered, navigator.onLine:', navigator.onLine);
       if (navigator.onLine) {
         try {
           const cached = localStorage.getItem('qservice_unsaved_reports');
+          console.log('[DEBUG-SYNC] handleOnlineSync cached content:', cached);
           if (cached) {
             const parsed = JSON.parse(cached);
             Object.keys(parsed).forEach(id => {
-              syncUnsavedReport(id);
+              console.log('[DEBUG-SYNC] checking sync for ID:', id, 'conflict:', parsed[id]._sync_conflict);
+              if (!parsed[id]._sync_conflict) {
+                syncUnsavedReport(id);
+              }
             });
           }
-        } catch (e) {}
+        } catch (e) {
+          console.error('[DEBUG-SYNC] handleOnlineSync error:', e);
+        }
       }
     };
     
@@ -264,16 +644,6 @@ function App() {
     };
   }, []);
 
-  const discardUnsavedReport = (reportId) => {
-    setUnsavedReports(prev => {
-      const next = { ...prev };
-      delete next[reportId];
-      safeSetItem('qservice_unsaved_reports', JSON.stringify(next));
-      return next;
-    });
-    showToast("Änderungen verworfen.", "success");
-  };
-
   const [currentUser, setCurrentUser] = useState(() => {
     const saved = localStorage.getItem('qtool_current_user');
     return saved ? JSON.parse(saved) : null;
@@ -282,6 +652,7 @@ function App() {
   const isSessionActiveRef = useRef(true);
   const selectedReportRef = useRef(null);
   const reportsRef = useRef([]);
+  const openedReportBackupRef = useRef({});
   const sessionStartedAtRef = useRef(Date.now());
   const silentSaveDebounceTimers = useRef({});
 
@@ -690,7 +1061,7 @@ function App() {
             return loadedReports.map(fresh => {
               const existing = prev.find(r => r.id === fresh.id);
               if (existing && !existing.isLightweight) {
-                return { ...fresh, ...existing, isLightweight: false };
+                return { ...fresh, ...existing, _supabase_updated_at: fresh._supabase_updated_at || existing._supabase_updated_at, isLightweight: false };
               }
               return fresh;
             });
@@ -791,6 +1162,7 @@ function App() {
         console.error("Failed to fetch full report details:", err);
       }
     }
+    openedReportBackupRef.current[activeReport.id] = JSON.parse(JSON.stringify(activeReport));
     setSelectedReport(activeReport);
     setView('details');
     setIsSessionActive(true);
@@ -899,7 +1271,11 @@ function App() {
       const exists = currentReports.find(r => r.id === finalReport.id);
 
       if (exists) {
-        newReports = currentReports.map(r => r.id === finalReport.id ? finalReport : r);
+        const mergedReport = {
+          ...finalReport,
+          _supabase_updated_at: finalReport._supabase_updated_at || exists._supabase_updated_at
+        };
+        newReports = currentReports.map(r => r.id === finalReport.id ? mergedReport : r);
       } else {
         newReports = [finalReport, ...currentReports];
       }
@@ -935,7 +1311,12 @@ function App() {
 
     if (!silent || (!updatedReport.id && finalReport.id)) {
       setSelectedReport(prev => {
-        if (!prev || prev.id === finalReport.id || !updatedReport.id) return finalReport;
+        if (!prev || prev.id === finalReport.id || !updatedReport.id) {
+          return {
+            ...finalReport,
+            _supabase_updated_at: finalReport._supabase_updated_at || prev?._supabase_updated_at
+          };
+        }
         return prev;
       });
       if (!silent) setView('details');
@@ -1000,12 +1381,7 @@ function App() {
         const handleSaveError = (err) => {
           console.error('[Supabase Save Error/Exception]', err);
           showToast(`⚠️ Offline: Speicherfehler (${err.message || 'Verbindungsfehler'}). Daten wurden lokal gesichert!`, 'warning', 5000);
-          
-          setUnsavedReports(prev => {
-            const next = { ...prev, [finalReport.id]: { ...finalReport, _offline_saved_at: new Date().toISOString() } };
-            safeSetItem('qservice_unsaved_reports', JSON.stringify(next));
-            return next;
-          });
+          saveToUnsavedReports(finalReport, false);
         };
 
         try {
@@ -1022,7 +1398,6 @@ function App() {
             if (!silent) setView('details');
             showToast('✅ Projekt erfolgreich gespeichert!', 'success');
 
-            // Clean up any unsaved queue entry for this report upon success
             setUnsavedReports(prev => {
               if (!prev[finalReport.id]) return prev;
               const next = { ...prev };
@@ -1046,6 +1421,7 @@ function App() {
                   if (!error && updateResult && updateResult.length > 0) {
                     setReports(prev => prev.map(r => r.id === finalReport.id ? { ...r, _supabase_updated_at: now } : r));
                     setSelectedReport(prev => prev && prev.id === finalReport.id ? { ...prev, _supabase_updated_at: now } : prev);
+                    openedReportBackupRef.current[finalReport.id] = JSON.parse(JSON.stringify({ ...finalReport, _supabase_updated_at: now }));
                     oneDriveBackup();
 
                     setUnsavedReports(prev => {
@@ -1058,12 +1434,7 @@ function App() {
                   } else if (!error && (!updateResult || updateResult.length === 0)) {
                     console.warn('[Sync-Konflikt] Autosave abgebrochen – neuere Version in Supabase:', finalReport.id);
                     showToast('⚠️ Sync-Konflikt: Das Projekt wurde auf einem anderen Gerät aktualisiert! Bitte die Seite neu laden (F5) um Datenverlust zu vermeiden.', 'error', 0);
-                    
-                    setUnsavedReports(prev => {
-                      const next = { ...prev, [finalReport.id]: { ...finalReport, _offline_saved_at: new Date().toISOString() } };
-                      safeSetItem('qservice_unsaved_reports', JSON.stringify(next));
-                      return next;
-                    });
+                    saveToUnsavedReports(finalReport, true);
                   } else if (error) {
                     handleSaveError(error);
                   }
@@ -1083,15 +1454,11 @@ function App() {
               } else if (!updateResult || updateResult.length === 0) {
                 console.warn('[Sync-Konflikt] Neuere Version in Supabase – abgebrochen:', finalReport.id);
                 showToast('⚠️ Neuere Version auf anderem Gerät! Seite neu laden.', 'warning');
-                
-                setUnsavedReports(prev => {
-                  const next = { ...prev, [finalReport.id]: { ...finalReport, _offline_saved_at: new Date().toISOString() } };
-                  safeSetItem('qservice_unsaved_reports', JSON.stringify(next));
-                  return next;
-                });
+                saveToUnsavedReports(finalReport, true);
               } else {
                 setReports(prev => prev.map(r => r.id === finalReport.id ? { ...r, _supabase_updated_at: now } : r));
                 setSelectedReport(prev => prev && prev.id === finalReport.id ? { ...prev, _supabase_updated_at: now } : prev);
+                openedReportBackupRef.current[finalReport.id] = JSON.parse(JSON.stringify({ ...finalReport, _supabase_updated_at: now }));
                 oneDriveBackup();
 
                 setUnsavedReports(prev => {
@@ -1112,6 +1479,7 @@ function App() {
                   if (!error) {
                     setReports(prev => prev.map(r => r.id === finalReport.id ? { ...r, _supabase_updated_at: now } : r));
                     setSelectedReport(prev => prev && prev.id === finalReport.id ? { ...prev, _supabase_updated_at: now } : prev);
+                    openedReportBackupRef.current[finalReport.id] = JSON.parse(JSON.stringify({ ...finalReport, _supabase_updated_at: now }));
                     oneDriveBackup();
 
                     setUnsavedReports(prev => {
@@ -1134,6 +1502,7 @@ function App() {
               } else {
                 setReports(prev => prev.map(r => r.id === finalReport.id ? { ...r, _supabase_updated_at: now } : r));
                 setSelectedReport(prev => prev && prev.id === finalReport.id ? { ...prev, _supabase_updated_at: now } : prev);
+                openedReportBackupRef.current[finalReport.id] = JSON.parse(JSON.stringify({ ...finalReport, _supabase_updated_at: now }));
                 oneDriveBackup();
 
                 setUnsavedReports(prev => {
@@ -1950,7 +2319,7 @@ function App() {
             background: 'white',
             borderRadius: '16px',
             padding: '2rem',
-            maxWidth: '500px',
+            maxWidth: '550px',
             width: '100%',
             boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
             border: '1px solid rgba(226, 232, 240, 0.8)',
@@ -1978,37 +2347,66 @@ function App() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1.5rem' }}>
               {Object.keys(unsavedReports).map(id => {
                 const rep = unsavedReports[id];
+                const isConflict = rep._sync_conflict;
                 return (
                   <div key={id} style={{
-                    padding: '0.75rem 1rem',
-                    borderRadius: '8px',
-                    backgroundColor: '#f8fafc',
-                    border: '1px solid #e2e8f0',
+                    padding: '1rem',
+                    borderRadius: '12px',
+                    backgroundColor: isConflict ? '#fffbeb' : '#f8fafc',
+                    border: isConflict ? '1px solid #fef3c7' : '1px solid #e2e8f0',
                     display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: '1rem'
+                    flexDirection: 'column',
+                    gap: '0.75rem'
                   }}>
-                    <div style={{ flexGrow: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 600, fontSize: '0.9rem', color: '#334155', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
-                        {rep.projectTitle || 'Unbenanntes Projekt'}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem' }}>
+                      <div style={{ flexGrow: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#1e293b', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                          {rep.projectTitle || 'Unbenanntes Projekt'}
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.25rem' }}>
+                          Lokale Änderung: {rep.localUpdatedAt ? new Date(rep.localUpdatedAt).toLocaleString() : 'Unbekannt'}
+                        </div>
+                        {isConflict && (
+                          <div style={{ fontSize: '0.75rem', color: '#b45309', marginTop: '0.25rem', fontWeight: 500 }}>
+                            Server-Stand: {rep._db_updated_at ? new Date(rep._db_updated_at).toLocaleString() : 'Neuere Version vorhanden'}
+                          </div>
+                        )}
                       </div>
-                      <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
-                        Geändert: {rep._offline_saved_at ? new Date(rep._offline_saved_at).toLocaleString() : 'Unbekannt'}
-                      </div>
+                      {isConflict && (
+                        <span style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', backgroundColor: '#fef3c7', color: '#b45309', padding: '0.25rem 0.5rem', borderRadius: '4px' }}>
+                          Konflikt
+                        </span>
+                      )}
                     </div>
-                    <div style={{ display: 'flex', gap: '0.5rem', flexShrink: 0 }}>
+
+                    {isConflict && (
+                      <div style={{
+                        fontSize: '0.8rem',
+                        color: '#92400e',
+                        backgroundColor: '#fffbeb',
+                        padding: '0.75rem',
+                        borderRadius: '6px',
+                        borderLeft: '4px solid #f59e0b',
+                        lineHeight: '1.4'
+                      }}>
+                        <strong>Synchronisationskonflikt:</strong> Dieses Projekt wurde zwischenzeitlich auf einem anderen Gerät geändert.
+                        Der ältere Offline-Stand wurde nicht automatisch übernommen, damit keine neueren Projektdaten verloren gehen.
+                        Die lokalen Änderungen bleiben auf diesem Gerät erhalten.
+                      </div>
+                    )}
+
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.25rem' }}>
                       <button 
                         onClick={() => discardUnsavedReport(id)}
-                        style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem', border: '1px solid #EF4444', color: '#EF4444', backgroundColor: 'transparent', borderRadius: '6px', cursor: 'pointer', fontWeight: 600 }}
+                        style={{ padding: '0.45rem 0.9rem', fontSize: '0.8rem', border: '1px solid #dc2626', color: '#dc2626', backgroundColor: 'transparent', borderRadius: '8px', cursor: 'pointer', fontWeight: 600 }}
                       >
-                        Verwerfen
+                        {isConflict ? 'Eigene Änderungen verwerfen' : 'Verwerfen'}
                       </button>
                       <button 
-                        onClick={() => syncUnsavedReport(id)}
-                        style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem', backgroundColor: '#10B981', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 600 }}
+                        onClick={() => syncUnsavedReport(id, isConflict)}
+                        style={{ padding: '0.45rem 0.9rem', fontSize: '0.8rem', backgroundColor: isConflict ? '#f59e0b' : '#10b981', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600 }}
                       >
-                        Hochladen
+                        {isConflict ? 'Lokalen Stand erzwingen' : 'Hochladen'}
                       </button>
                     </div>
                   </div>
