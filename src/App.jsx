@@ -2069,7 +2069,12 @@ function App() {
         {/* ── Supabase Debug-Banner: zeigt Verbindungsstatus für iPad-Diagnose ── */}
         {view === 'dashboard' && supabaseStatus && !(typeof navigator !== 'undefined' && navigator.webdriver) && (
           <div style={{
-            marginBottom: '1rem',
+            position: 'fixed',
+            bottom: '20px',
+            right: '20px',
+            zIndex: 9999,
+            maxWidth: '400px',
+            boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.2)',
             padding: '0.6rem 1rem',
             borderRadius: '8px',
             fontSize: '0.8rem',
@@ -2079,14 +2084,14 @@ function App() {
             justifyContent: 'space-between',
             gap: '1rem',
             backgroundColor: supabaseStatus.ok === null
-              ? 'rgba(99,102,241,0.1)'
+              ? 'rgba(30, 41, 59, 0.95)'
               : supabaseStatus.ok
-                ? 'rgba(16,185,129,0.1)'
+                ? 'rgba(16, 185, 129, 0.95)'
                 : (supabaseStatus.error?.toLowerCase().includes('timeout') || supabaseStatus.error?.includes('57014') || supabaseStatus.error?.toLowerCase().includes('fetch') || supabaseStatus.error?.toLowerCase().includes('load failed') || supabaseStatus.error?.toLowerCase().includes('failed') || supabaseStatus.error?.toLowerCase().includes('network'))
-                  ? 'rgba(245,158,11,0.1)'
-                  : 'rgba(239,68,68,0.1)',
-            border: `1px solid ${supabaseStatus.ok === null ? '#6366f1' : supabaseStatus.ok ? '#10B981' : (supabaseStatus.error?.toLowerCase().includes('timeout') || supabaseStatus.error?.includes('57014') || supabaseStatus.error?.toLowerCase().includes('fetch') || supabaseStatus.error?.toLowerCase().includes('load failed') || supabaseStatus.error?.toLowerCase().includes('failed') || supabaseStatus.error?.toLowerCase().includes('network')) ? '#F59E0B' : '#EF4444'}44`,
-            color: supabaseStatus.ok === null ? '#6366f1' : supabaseStatus.ok ? '#10B981' : (supabaseStatus.error?.toLowerCase().includes('timeout') || supabaseStatus.error?.includes('57014') || supabaseStatus.error?.toLowerCase().includes('fetch') || supabaseStatus.error?.toLowerCase().includes('load failed') || supabaseStatus.error?.toLowerCase().includes('failed') || supabaseStatus.error?.toLowerCase().includes('network')) ? '#D97706' : '#EF4444',
+                  ? 'rgba(245, 158, 11, 0.95)'
+                  : 'rgba(239, 68, 68, 0.95)',
+            border: `1px solid ${supabaseStatus.ok === null ? '#6366f1' : supabaseStatus.ok ? '#10B981' : (supabaseStatus.error?.toLowerCase().includes('timeout') || supabaseStatus.error?.includes('57014') || supabaseStatus.error?.toLowerCase().includes('fetch') || supabaseStatus.error?.toLowerCase().includes('load failed') || supabaseStatus.error?.toLowerCase().includes('failed') || supabaseStatus.error?.toLowerCase().includes('network')) ? '#F59E0B' : '#EF4444'}`,
+            color: '#FFFFFF',
           }}>
             <span>
               {supabaseStatus.ok === null && '⏳ Verbinde mit Supabase...'}
