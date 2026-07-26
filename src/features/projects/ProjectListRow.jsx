@@ -12,6 +12,7 @@ import { normalizeReason } from './normalizeReason.js';
 import Sep from '../../components/ProjectListSeparator.jsx';
 import ProjectStatusLabel from '../../components/ProjectStatusLabel.jsx';
 import ProjectNextActionInfo from '../../components/ProjectNextActionInfo.jsx';
+import { formatNextAction } from '../../utils/projectUtils.js';
 
 // ─── Farben ───────────────────────────────────────────────────────────────────
 
@@ -115,9 +116,7 @@ export default function ProjectListRow({ row, onOpen, onChangeStatus, isChanging
   const showReason = reason && reason !== 'Alles im Zeitplan' && row.priority !== 'green';
 
   // nextAction: kürzen auf ~45 Zeichen für Einzeilen-Flow
-  const action = (row.nextAction || '').length > 48
-    ? row.nextAction.slice(0, 46) + '…'
-    : (row.nextAction || '');
+  const action = formatNextAction(row.nextAction);
 
   const dDays = row.daysInStatus ?? 0;
   const daysColor = dDays >= 6 ? '#F87171' : dDays >= 3 ? '#FCD34D' : '#94A3B8';
