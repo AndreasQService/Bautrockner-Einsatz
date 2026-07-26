@@ -10,6 +10,7 @@ import { ChevronRight, User } from 'lucide-react';
 import { getAllowedNextStatuses, getTransitionLabel } from './statusTransitions.js';
 import { normalizeReason } from './normalizeReason.js';
 import Sep from '../../components/ProjectListSeparator.jsx';
+import ProjectStatusLabel from '../../components/ProjectStatusLabel.jsx';
 
 // ─── Farben ───────────────────────────────────────────────────────────────────
 
@@ -173,12 +174,7 @@ export default function ProjectListRow({ row, onOpen, onChangeStatus, isChanging
         <Sep />
 
         {/* 3 · Status */}
-        <span style={{
-          fontSize: '0.72rem', color: '#60A5FA', fontWeight: 600,
-          whiteSpace: 'nowrap', flexShrink: 0,
-        }}>
-          {row.currentStatusLabel}
-        </span>
+        <ProjectStatusLabel currentStatusLabel={row.currentStatusLabel} />
 
         <Sep />
 
