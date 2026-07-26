@@ -11,9 +11,10 @@ import { getAllowedNextStatuses, getTransitionLabel } from './statusTransitions.
 import { normalizeReason } from './normalizeReason.js';
 import Sep from '../../components/ProjectListSeparator.jsx';
 import ProjectStatusLabel from '../../components/ProjectStatusLabel.jsx';
+import ProjectStatusDuration from '../../components/ProjectStatusDuration.jsx';
 import ProjectNextActionInfo from '../../components/ProjectNextActionInfo.jsx';
 import ProjectListMetadata from '../../components/ProjectListMetadata.jsx';
-import { formatNextAction, formatStatusDuration } from '../../utils/projectUtils.js';
+import { formatNextAction } from '../../utils/projectUtils.js';
 import { PROJECT_LIST_PALETTE as PAL } from '../../config/projectListConfig.js';
 
 // ─── Status-Dropdown ──────────────────────────────────────────────────────────
@@ -143,13 +144,7 @@ export default function ProjectListRow({ row, onOpen, onChangeStatus, isChanging
 
         <Sep />
 
-        {/* 4 · Dauer (EINMALIG) */}
-        <span style={{
-          fontSize: '0.72rem', fontWeight: dDays >= 3 ? 700 : 400,
-          color: daysColor, whiteSpace: 'nowrap', flexShrink: 0,
-        }}>
-          {formatStatusDuration(row.daysInStatus)}
-        </span>
+        <ProjectStatusDuration dDays={dDays} daysColor={daysColor} daysInStatus={row.daysInStatus} />
 
 
         <Sep />
