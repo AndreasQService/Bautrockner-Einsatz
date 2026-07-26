@@ -295,13 +295,6 @@ function App() {
 
   const saveToUnsavedReports = (finalReport, isConflict = false, dbUpdatedAt = null) => {
     const existingRecord = openedReportBackupRef.current[finalReport.id] || reportsRef.current.find(r => r.id === finalReport.id);
-    console.log('[DEBUG-SYNC] saveToUnsavedReports triggered:', {
-      finalReportId: finalReport.id,
-      finalReportSupabaseUpdatedAt: finalReport._supabase_updated_at,
-      existingRecordFound: !!existingRecord,
-      existingRecordSupabaseUpdatedAt: existingRecord?._supabase_updated_at,
-      allAvailableReportIds: reportsRef.current.map(r => r.id)
-    });
     const baseUpdatedAt = finalReport._supabase_updated_at || existingRecord?._supabase_updated_at || null;
     const { changedPaths, operations } = diffReports(existingRecord, finalReport);
 
@@ -535,12 +528,16 @@ function App() {
 
       let success = false;
       if (dbRecord) {
-        const { data: updateResult, error: updateError } = await supabase
+        let query = supabase
           .from('damage_reports')
           .update(rowData)
-          .eq('id', reportId)
-          .eq('updated_at', offlineEntry.baseUpdatedAt)
-          .select('id');
+          .eq('id', reportId);
+        
+        if (!forceOverwrite) {
+          query = query.eq('updated_at', offlineEntry.baseUpdatedAt);
+        }
+        
+        const { data: updateResult, error: updateError } = await query.select('id');
 
         if (updateError) throw updateError;
         success = updateResult && updateResult.length === 1;
@@ -614,22 +611,19 @@ function App() {
   // Automatic Sync when online
   useEffect(() => {
     const handleOnlineSync = () => {
-      console.log('[DEBUG-SYNC] handleOnlineSync triggered, navigator.onLine:', navigator.onLine);
       if (navigator.onLine) {
         try {
           const cached = localStorage.getItem('qservice_unsaved_reports');
-          console.log('[DEBUG-SYNC] handleOnlineSync cached content:', cached);
           if (cached) {
             const parsed = JSON.parse(cached);
             Object.keys(parsed).forEach(id => {
-              console.log('[DEBUG-SYNC] checking sync for ID:', id, 'conflict:', parsed[id]._sync_conflict);
               if (!parsed[id]._sync_conflict) {
                 syncUnsavedReport(id);
               }
             });
           }
         } catch (e) {
-          console.error('[DEBUG-SYNC] handleOnlineSync error:', e);
+          console.error('[OfflineSync] handleOnlineSync error:', e);
         }
       }
     };
@@ -2319,7 +2313,7 @@ function App() {
             background: 'white',
             borderRadius: '16px',
             padding: '2rem',
-            maxWidth: '550px',
+            maxWidth: '500px',
             width: '100%',
             boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
             border: '1px solid rgba(226, 232, 240, 0.8)',
