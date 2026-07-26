@@ -12,3 +12,5 @@ export const buildDisplayName = (project) => {
 export const formatNextAction = (nextAction) => (nextAction || '').length > 48
   ? nextAction.slice(0, 46) + '…'
   : (nextAction || '');
+
+export const formatStatusDuration = (d) => d == null ? '' : d === 0 ? 'Heute' : d === 1 ? '1T' : `${d}T`;

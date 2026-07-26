@@ -13,7 +13,7 @@ import Sep from '../../components/ProjectListSeparator.jsx';
 import ProjectStatusLabel from '../../components/ProjectStatusLabel.jsx';
 import ProjectNextActionInfo from '../../components/ProjectNextActionInfo.jsx';
 import ProjectListMetadata from '../../components/ProjectListMetadata.jsx';
-import { formatNextAction } from '../../utils/projectUtils.js';
+import { formatNextAction, formatStatusDuration } from '../../utils/projectUtils.js';
 
 // ─── Farben ───────────────────────────────────────────────────────────────────
 
@@ -22,8 +22,6 @@ const PAL = {
   yellow: { bg: 'rgba(245,158,11,0.04)', hover: 'rgba(245,158,11,0.09)', strip: '#F59E0B', dot: '#F59E0B', badge: 'rgba(245,158,11,0.15)', badgeBorder: 'rgba(245,158,11,0.35)', badgeText: '#FCD34D', reasonC: '#FCD34D', label: '🟡 Verzögert' },
   green:  { bg: 'transparent',           hover: 'rgba(255,255,255,0.03)', strip: '#10B981', dot: '#10B981', badge: 'rgba(16,185,129,0.12)', badgeBorder: 'rgba(16,185,129,0.25)', badgeText: '#6EE7B7', reasonC: '#64748B', label: '🟢 OK'        },
 };
-
-const dT = (d) => d == null ? '' : d === 0 ? 'Heute' : d === 1 ? '1T' : `${d}T`;
 
 // ─── Status-Dropdown ──────────────────────────────────────────────────────────
 
@@ -157,7 +155,7 @@ export default function ProjectListRow({ row, onOpen, onChangeStatus, isChanging
           fontSize: '0.72rem', fontWeight: dDays >= 3 ? 700 : 400,
           color: daysColor, whiteSpace: 'nowrap', flexShrink: 0,
         }}>
-          {dT(row.daysInStatus)}
+          {formatStatusDuration(row.daysInStatus)}
         </span>
 
 
