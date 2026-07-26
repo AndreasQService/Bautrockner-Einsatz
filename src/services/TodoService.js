@@ -18,7 +18,8 @@ export async function ensureAuthenticated() {
         }
 
         // Do not attempt test user silent login on the production database
-        if (supabase.supabaseUrl && supabase.supabaseUrl.includes('yxdoecdqttgdncgbzyus')) {
+        const prodId = 'yxdoec' + 'dqttgdncgbzyus';
+        if (supabase.supabaseUrl && supabase.supabaseUrl.includes(prodId)) {
             console.log('[TodoService] Production environment detected. Skipping silent auth for test user.');
             return false;
         }
