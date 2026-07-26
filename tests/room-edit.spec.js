@@ -33,6 +33,15 @@ test.describe('Room Inline Editing', () => {
         await raeumeTabBtn.click({ force: true });
 
         // 2. Add a new room
+        const addRoomBtn = page.locator('button:has-text("Raum hinzufügen")').first();
+        await expect(addRoomBtn).toBeVisible();
+        await addRoomBtn.click();
+
+        // Select "Sonstiges" (Neue Wohnung) to show the free text input field
+        const aptSelect = page.locator('select').filter({ has: page.locator('option[value="Sonstiges"]') }).first();
+        await expect(aptSelect).toBeVisible();
+        await aptSelect.selectOption('Sonstiges');
+
         // Fill custom apartment name
         const aptInput = page.locator('input[placeholder="Wohnung eingeben"]').filter({ visible: true }).first();
         await expect(aptInput).toBeVisible();
@@ -49,9 +58,9 @@ test.describe('Room Inline Editing', () => {
         await selectRoom.selectOption('Wohnzimmer');
 
         // Click Save to add the room
-        const saveAddRoomBtn = page.locator('div').filter({ has: page.locator('select') }).locator('button', { hasText: /Speichern/i }).first();
+        const saveAddRoomBtn = page.locator('button:has-text("Speichern")').filter({ visible: true }).first();
         await expect(saveAddRoomBtn).toBeVisible();
-        await saveAddRoomBtn.click({ force: true });
+        await saveAddRoomBtn.click();
 
         // Verify that the room has been added
         const roomCardHeader = page.locator('div.card').first();
@@ -61,12 +70,13 @@ test.describe('Room Inline Editing', () => {
         await expect(roomCardHeader.getByText(/Links/)).toBeVisible();
 
         // 3. Click "Bearbeiten" (pen icon button)
-        const editBtn = page.locator('button[title="Bearbeiten"]').filter({ visible: true }).first();
+        const editBtn = page.locator('button[title="Raum bearbeiten"]').filter({ visible: true }).first();
         await expect(editBtn).toBeVisible();
-        await editBtn.click({ force: true });
+        await editBtn.scrollIntoViewIfNeeded();
+        await editBtn.click();
 
         // 4. Verify editing inputs are populated and modify them
-        const editNameInput = page.locator('input[placeholder="Raumname"]').filter({ visible: true }).first();
+        const editNameInput = page.locator('input[placeholder="Raum Name"]').filter({ visible: true }).first();
         await expect(editNameInput).toBeVisible();
         await expect(editNameInput).toHaveValue('Wohnzimmer');
         await editNameInput.fill('Wohnbereich');
@@ -84,10 +94,11 @@ test.describe('Room Inline Editing', () => {
         // 5. Click Save (check icon button)
         const saveEditBtn = page.locator('button[title="Speichern"]').filter({ visible: true }).first();
         await expect(saveEditBtn).toBeVisible();
-        await saveEditBtn.click({ force: true });
+        await saveEditBtn.scrollIntoViewIfNeeded();
+        await saveEditBtn.click();
 
         // 6. Verify that the updated room header details are displayed
-        await expect(page.locator('input[placeholder="Raumname"]').filter({ visible: true })).toHaveCount(0); // input is gone
+        await expect(page.locator('input[placeholder="Raum Name"]').filter({ visible: true })).toHaveCount(0); // input is gone
         await expect(roomCardHeader.getByText('Wohnbereich')).toBeVisible();
         await expect(roomCardHeader.getByText(/EG/)).toBeVisible();
         await expect(roomCardHeader.getByText(/Rechts/)).toBeVisible();

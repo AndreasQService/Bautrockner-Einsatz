@@ -104,7 +104,7 @@ const expectedProjectId = env.VITE_EXPECTED_SUPABASE_PROJECT_ID;
 let validatedUrl = null;
 let supabaseInstance = null;
 
-const isWebDriver = typeof navigator !== 'undefined' && navigator.webdriver;
+const isWebDriver = typeof navigator !== 'undefined' && navigator.webdriver && !navigator.userAgent.includes('QToolDeepTest');
 
 if (isWebDriver) {
   // SessionStorage helpers for persistent mock DB state across reloads
@@ -170,6 +170,15 @@ if (isWebDriver) {
   function makeMockQuery(tableName, data, error = null) {
     const promise = Promise.resolve({ data, error });
     promise.order = (col, opts) => promise;
+    promise.gte = (col, val) => promise;
+    promise.lte = (col, val) => promise;
+    promise.gt = (col, val) => promise;
+    promise.lt = (col, val) => promise;
+    promise.neq = (col, val) => promise;
+    promise.in = (col, val) => promise;
+    promise.limit = (num) => promise;
+    promise.range = (from, to) => promise;
+    promise.is = (col, val) => promise;
     promise.eq = (col, val) => {
       console.log('[MOCK DB] eq called:', tableName, col, val);
       if (tableName === 'damage_reports' && val === 'SYSTEM_SETTINGS') {

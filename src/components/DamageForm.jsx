@@ -645,11 +645,14 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                         }
                     });
 
-                    return {
+                    const nextData = {
                         ...prev,
                         rooms: rList,
                         measurementRooms: mList
                     };
+                    lastSavedData.current = nextData;
+                    latestFormData.current = nextData;
+                    return nextData;
                 });
             }
         }
@@ -668,7 +671,12 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                     }
                     return img;
                 });
-                return changed ? { ...prev, images: nextImages } : prev;
+                const nextData = changed ? { ...prev, images: nextImages } : prev;
+                if (changed) {
+                    lastSavedData.current = nextData;
+                    latestFormData.current = nextData;
+                }
+                return nextData;
             });
         }
     }, [initialData?.exteriorPhoto, initialData?.exteriorPhotoDeleted, initialData?.customMapImage, initialData?.damageTypeImage, initialData?.images, initialData?.isLightweight, initialData?.measurementRooms, initialData?.rooms]);

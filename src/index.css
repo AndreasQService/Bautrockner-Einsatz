@@ -104,7 +104,10 @@
   --glass-border:   rgba(255, 255, 255, 0.08);
 }
 
-/* ── Global Mobile Fixes ─────────────────────────────────────────────────── */
+html {
+  scrollbar-gutter: stable;
+}
+
 html, body {
   margin: 0;
   padding: 0;
