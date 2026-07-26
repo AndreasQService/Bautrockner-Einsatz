@@ -23,7 +23,7 @@ import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import { buildProjectFolderName, uploadPhotoAndGetUrl, getPhotoDownloadUrl, uploadReport } from '../services/OneDriveService';
 import { savePhotoLocally, updatePhotoSyncStatus, deleteOldSyncedPhotos, getPendingCount, getPhotoBlob, getProjectPhotos } from '../services/PhotoStorage';
-const IS_TEST_ENV = !!(typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_EXPECTED_SUPABASE_PROJECT_ID === 'aoxduqspiezzyqeqyzzl');
+const IS_TEST_ENV = !!(typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_EXPECTED_SUPABASE_PROJECT_ID);
 import { swissPLZ } from '../data/swiss_plz';
 
 import { DEVICE_INVENTORY } from '../data/device_inventory';
@@ -335,8 +335,8 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         ownerIsResident: initialData.ownerIsResident || false,
         clientIsResident: initialData.clientIsResident || false,
 
-        contacts: (initialData?.contacts && initialData.contacts.filter(c => c.name || c.phone).length > 0)
-            ? initialData.contacts.filter(c => c.name || c.phone)
+        contacts: (initialData?.contacts && initialData.contacts.filter(c => c.name || c.phone || c.role === 'Auftraggeber' || c.role === 'Eigentümer').length > 0)
+            ? initialData.contacts.filter(c => c.name || c.phone || c.role === 'Auftraggeber' || c.role === 'Eigentümer')
             : [
                 { apartment: '', name: '', phone: '', role: 'Mieter' },
                 { apartment: '', name: '', phone: '', role: 'Mieter' },
@@ -645,11 +645,14 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                         }
                     });
 
-                    return {
+                    const nextData = {
                         ...prev,
                         rooms: rList,
                         measurementRooms: mList
                     };
+                    lastSavedData.current = nextData;
+                    latestFormData.current = nextData;
+                    return nextData;
                 });
             }
         }
@@ -668,7 +671,12 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                     }
                     return img;
                 });
-                return changed ? { ...prev, images: nextImages } : prev;
+                const nextData = changed ? { ...prev, images: nextImages } : prev;
+                if (changed) {
+                    lastSavedData.current = nextData;
+                    latestFormData.current = nextData;
+                }
+                return nextData;
             });
         }
     }, [initialData?.exteriorPhoto, initialData?.exteriorPhotoDeleted, initialData?.customMapImage, initialData?.damageTypeImage, initialData?.images, initialData?.isLightweight, initialData?.measurementRooms, initialData?.rooms]);
@@ -5527,9 +5535,18 @@ END:VCARD`;
                                                             autoComplete="off"
                                                             value={contact.name}
                                                             onChange={(e) => {
-                                                                const newContacts = [...formData.contacts];
-                                                                newContacts[idx].name = e.target.value;
-                                                                setFormData({ ...formData, contacts: newContacts });
+                                                                const val = e.target.value;
+                                                                setFormData(prev => {
+                                                                    const newContacts = [...prev.contacts];
+                                                                    newContacts[idx].name = val;
+                                                                    const updated = { ...prev, contacts: newContacts };
+                                                                    if (contact.role === 'Auftraggeber') {
+                                                                        updated.client = val;
+                                                                    } else if (contact.role === 'Eigentümer') {
+                                                                        updated.ownerName = val;
+                                                                    }
+                                                                    return updated;
+                                                                });
                                                             }}
                                                             style={{ fontWeight: 700, fontSize: '0.85rem', padding: '0.45rem 0.7rem', width: '100%' }}
                                                         />
@@ -5711,29 +5728,31 @@ END:VCARD`;
                                                     </button>
 
                                                     {/* Delete Button */}
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => {
-                                                            if (window.confirm('Kontakt wirklich löschen?')) {
-                                                                handleRemoveContact(idx);
-                                                            }
-                                                        }}
-                                                        className="btn-glass"
-                                                        style={{
-                                                            padding: '0.45rem',
-                                                            borderRadius: '8px',
-                                                            color: '#EF4444',
-                                                            cursor: 'pointer',
-                                                            display: 'flex',
-                                                            alignItems: 'center',
-                                                            justifyContent: 'center',
-                                                            backgroundColor: 'rgba(239, 68, 68, 0.08)',
-                                                            border: '1px solid rgba(239, 68, 68, 0.15)'
-                                                        }}
-                                                        title="Löschen"
-                                                    >
-                                                        <Trash size={16} />
-                                                    </button>
+                                                     {!['Auftraggeber', 'Eigentümer'].includes(contact.role) && (
+                                                         <button
+                                                             type="button"
+                                                             onClick={() => {
+                                                                 if (window.confirm('Kontakt wirklich löschen?')) {
+                                                                     handleRemoveContact(idx);
+                                                                 }
+                                                             }}
+                                                             className="btn-glass"
+                                                             style={{
+                                                                 padding: '0.45rem',
+                                                                 borderRadius: '8px',
+                                                                 color: '#EF4444',
+                                                                 cursor: 'pointer',
+                                                                 display: 'flex',
+                                                                 alignItems: 'center',
+                                                                 justifyContent: 'center',
+                                                                 backgroundColor: 'rgba(239, 68, 68, 0.08)',
+                                                                 border: '1px solid rgba(239, 68, 68, 0.15)'
+                                                             }}
+                                                             title="Löschen"
+                                                         >
+                                                             <Trash size={16} />
+                                                         </button>
+                                                     )}
                                                 </div>
 
                                                 {/* Delete Button (Absolute top-right or separate) */}

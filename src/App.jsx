@@ -1279,21 +1279,28 @@ function App() {
         // Only save metadata and limited content to LocalStorage to prevent QuotaExceededError
         // We keep full data in memory and in Supabase
         const minimalReports = newReports.slice(0, 15).map(r => ({
-          ...r,
-          // Strip heavy image content from LocalStorage
-          damageTypeImage: (r.damageTypeImage && r.damageTypeImage.startsWith('data:')) ? null : r.damageTypeImage,
-          exteriorPhoto: (r.exteriorPhoto && r.exteriorPhoto.startsWith('data:')) ? null : r.exteriorPhoto,
-          images: r.images ? r.images.map(img => ({
-            ...img,
-            preview: (img.preview && (img.preview.startsWith('blob:') || img.preview.startsWith('data:'))) ? null : img.preview
-          })) : []
+          id: r.id,
+          projectTitle: r.projectTitle,
+          projectNumber: r.projectNumber,
+          client: r.client,
+          address: r.address,
+          status: r.status,
+          assignedTo: r.assignedTo,
+          date: r.date,
+          dryingStarted: r.dryingStarted,
+          deletedAt: r.deletedAt || null,
+          isLightweight: true,
+          rooms: [],
+          measurementRooms: [],
+          images: [],
+          equipment: [],
+          contacts: []
         }));
 
         try {
           safeSetItem('qservice_reports_prod', JSON.stringify(minimalReports));
         } catch (innerE) {
           if (innerE.name === 'QuotaExceededError') {
-            // If still failing, keep only the most recent 5
             safeSetItem('qservice_reports_prod', JSON.stringify(minimalReports.slice(0, 5)));
           }
         }
