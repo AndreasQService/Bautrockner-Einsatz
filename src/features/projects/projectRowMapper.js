@@ -14,17 +14,8 @@
 import { getProjectPriority, getDaysInStatus, getStatusLabel } from './statusRules.js';
 import { getAllOpenTasks, getOpenTasksCount, getOverdueTasksCount } from './tasks.js';
 import { getNextAction } from './nextAction.js';
+import { buildDisplayName } from '../../utils/projectUtils.js';
 
-/**
- * Builds a display name from address fields.
- * @param {ProjectRecord} project
- * @returns {string}
- */
-const buildDisplayName = (project) => {
-  if (project.street) return `${project.street}${project.city ? ', ' + project.city : ''}`;
-  if (project.address) return project.address.split(',')[0];
-  return project.projectTitle || project.id || '—';
-};
 
 /**
  * Main mapper function.
