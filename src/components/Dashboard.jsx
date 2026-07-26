@@ -5,6 +5,7 @@ import WorkflowStatusOverview from './WorkflowStatusOverview'
 import TodoMonitor from './TodoMonitor'
 import RightSidebar from './RightSidebar'
 import OfficeProjectsPage from '../features/projects/OfficeProjectsPage'
+import { formatDate } from '../utils/formatUtils'
 
 // Helper to calculate days difference
 const getDaysDiff = (startDate) => {
@@ -17,18 +18,6 @@ const getDaysDiff = (startDate) => {
     return Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
 }
 
-// Helper to format date as tt/mm/jj hh:mm
-const formatDate = (dateString) => {
-    if (!dateString) return '-';
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) return dateString;
-    const day = String(date.getDate()).padStart(2, '0');
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const year = String(date.getFullYear()).slice(-2);
-    const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
-    return `${day}/${month}/${year} ${hours}:${minutes}`;
-}
 
 const statusColors = {
     'Schadenaufnahme': 'bg-gray-100 text-gray-800',
