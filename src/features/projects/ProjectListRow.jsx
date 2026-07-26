@@ -11,6 +11,7 @@ import { getAllowedNextStatuses, getTransitionLabel } from './statusTransitions.
 import { normalizeReason } from './normalizeReason.js';
 import Sep from '../../components/ProjectListSeparator.jsx';
 import ProjectStatusLabel from '../../components/ProjectStatusLabel.jsx';
+import ProjectNextActionInfo from '../../components/ProjectNextActionInfo.jsx';
 
 // ─── Farben ───────────────────────────────────────────────────────────────────
 
@@ -190,14 +191,7 @@ export default function ProjectListRow({ row, onOpen, onChangeStatus, isChanging
         <Sep />
 
         {/* 6 · Nächste Aktion — visuell dominant */}
-        <span style={{
-          fontSize: '0.77rem', fontWeight: 600,
-          color: '#E2E8F0',
-          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-          flex: '1 1 180px', minWidth: 0,
-        }}>
-          → {action}
-        </span>
+        <ProjectNextActionInfo action={action} />
 
         {/* ── Ab hier: rechte Meta-Zone (stopPropagation) ─────────── */}
         <div
