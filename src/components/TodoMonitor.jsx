@@ -44,10 +44,15 @@ const TodoMonitor = ({
         }
     };
 
-    // Load on mount and when reports change
+    // Load on mount and only when the number of reports or their IDs change (avoids loops during background detail fetches)
+    const reportsLength = reports.length;
+    const reportsIdsKey = useMemo(() => {
+        return reports.map(r => r.id).join(',');
+    }, [reports]);
+
     useEffect(() => {
         loadTodos();
-    }, [reports]);
+    }, [reportsLength, reportsIdsKey]);
 
     // Grouping / filtering of active reports
     const activeProjects = useMemo(() => {
