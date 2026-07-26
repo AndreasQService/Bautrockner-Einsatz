@@ -9,6 +9,7 @@ import { useState, useRef, useEffect } from 'react';
 import { ChevronRight, User } from 'lucide-react';
 import { getAllowedNextStatuses, getTransitionLabel } from './statusTransitions.js';
 import { normalizeReason } from './normalizeReason.js';
+import Sep from '../../components/ProjectListSeparator.jsx';
 
 // ─── Farben ───────────────────────────────────────────────────────────────────
 
@@ -101,12 +102,6 @@ function DropMenu({ currentStatus, projectId, onChangeStatus, isChanging }) {
     </div>
   );
 }
-
-// ─── Trennzeichen ─────────────────────────────────────────────────────────────
-
-const Sep = () => (
-  <span style={{ color: 'rgba(255,255,255,0.15)', fontSize: '0.75rem', flexShrink: 0, userSelect: 'none' }}>·</span>
-);
 
 // ─── Hauptzeile ───────────────────────────────────────────────────────────────
 
