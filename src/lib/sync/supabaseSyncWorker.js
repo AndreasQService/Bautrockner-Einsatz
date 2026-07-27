@@ -7,14 +7,14 @@ import { supabase } from '../../supabaseClient.js';
 import { updatePhotoSyncStatus, openDB } from '../../services/PhotoStorage.js';
 import { queueImageCompression } from '../../utils/imageCompressor.js';
 
-const SYNC_FLAG = 'qtool_sync_running';
+let isSyncRunning = false;
 
 /**
  * Run background sync for all local photos
  */
 export async function syncPendingToSupabase() {
-    if (sessionStorage.getItem(SYNC_FLAG) === '1') return { synced: 0, failed: 0 };
-    sessionStorage.setItem(SYNC_FLAG, '1');
+    if (isSyncRunning) return { synced: 0, failed: 0 };
+    isSyncRunning = true;
 
     let synced = 0;
     let failed = 0;
@@ -38,8 +38,10 @@ export async function syncPendingToSupabase() {
                 }).catch(() => {});
             }
         }
+    } catch (globalErr) {
+        console.error('[SyncWorker] 💥 Global sync error:', globalErr);
     } finally {
-        sessionStorage.removeItem(SYNC_FLAG);
+        isSyncRunning = false;
     }
 
     return { synced, failed };

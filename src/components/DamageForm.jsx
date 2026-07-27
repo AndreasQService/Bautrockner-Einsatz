@@ -812,7 +812,13 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                                 ...prev,
                                 images: (prev.images || []).map(img => {
                                     const lp = updatedLocal.find(p => p.id === img.id);
-                                    return lp && lp.syncStatus ? { ...img, syncStatus: lp.syncStatus, uploading: lp.syncStatus !== 'remote_verified' && lp.syncStatus !== 'synced' } : img;
+                                    return lp && lp.syncStatus ? { 
+                                        ...img, 
+                                        syncStatus: lp.syncStatus, 
+                                        supabasePath: lp.supabasePath || img.supabasePath,
+                                        oneDriveItemId: lp.oneDriveItemId || img.oneDriveItemId,
+                                        uploading: lp.syncStatus !== 'remote_verified' && lp.syncStatus !== 'synced' 
+                                    } : img;
                                 })
                             }));
                         } catch (e) {}
@@ -2104,7 +2110,13 @@ END:VCARD`;
                                         ...prev,
                                         images: (prev.images || []).map(img => {
                                             const lp = localPhotos.find(p => p.id === img.id);
-                                            return lp && lp.syncStatus ? { ...img, syncStatus: lp.syncStatus, uploading: lp.syncStatus !== 'remote_verified' && lp.syncStatus !== 'synced' } : img;
+                                            return lp && lp.syncStatus ? { 
+                                                ...img, 
+                                                syncStatus: lp.syncStatus, 
+                                                supabasePath: lp.supabasePath || img.supabasePath,
+                                                oneDriveItemId: lp.oneDriveItemId || img.oneDriveItemId,
+                                                uploading: lp.syncStatus !== 'remote_verified' && lp.syncStatus !== 'synced' 
+                                            } : img;
                                         })
                                     }));
                                 }).catch(() => {});
@@ -2167,7 +2179,13 @@ END:VCARD`;
                                     ...prev,
                                     images: (prev.images || []).map(img => {
                                         const lp = localPhotos.find(p => p.id === img.id);
-                                        return lp && lp.syncStatus ? { ...img, syncStatus: lp.syncStatus, uploading: lp.syncStatus !== 'remote_verified' && lp.syncStatus !== 'synced' } : img;
+                                        return lp && lp.syncStatus ? { 
+                                            ...img, 
+                                            syncStatus: lp.syncStatus, 
+                                            supabasePath: lp.supabasePath || img.supabasePath,
+                                            oneDriveItemId: lp.oneDriveItemId || img.oneDriveItemId,
+                                            uploading: lp.syncStatus !== 'remote_verified' && lp.syncStatus !== 'synced' 
+                                        } : img;
                                     })
                                 }));
                             }).catch(() => {});
