@@ -44,3 +44,6 @@ export const formatCompletedEquipmentRuntime = (startDateStr, endDateStr) => {
     const diffTime = end - start;
     return `${Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)))} d`;
 };
+
+export const formatEquipmentTypeModel = (equipment) =>
+    [equipment.type, equipment.model].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i).join(' - ');

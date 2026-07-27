@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+import { formatEquipmentTypeModel } from '../src/utils/dashboardUtils.js';
+
 const previousEquipmentTypeModel = (equipment) =>
   [equipment.type, equipment.model]
     .filter(Boolean)
@@ -28,6 +30,7 @@ const cases = [
 
 for (const [name, equipment, expected] of cases) {
   test(name, () => {
+    assert.strictEqual(formatEquipmentTypeModel(equipment), previousEquipmentTypeModel(equipment));
     assert.strictEqual(previousEquipmentTypeModel(equipment), expected);
   });
 }
@@ -35,6 +38,6 @@ for (const [name, equipment, expected] of cases) {
 test('equipment type-model derivation does not mutate its input', () => {
   const equipment = { type: 'Bautrockner', model: 'Trotec TTK 100', deviceNumber: 'BT-42' };
   const before = structuredClone(equipment);
-  previousEquipmentTypeModel(equipment);
+  formatEquipmentTypeModel(equipment);
   assert.deepEqual(equipment, before);
 });
