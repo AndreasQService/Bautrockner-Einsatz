@@ -704,15 +704,6 @@ function App() {
   });
   const [supabaseStatus, setSupabaseStatus] = useState(null); // null | { ok: bool, count: number, error: string }
 
-  // Automatisches Ausblenden des Status-Banners nach 7 Sekunden (bei Erfolgen & Soft-Timeouts)
-  useEffect(() => {
-    if (supabaseStatus && (supabaseStatus.ok === true || supabaseStatus.error?.toLowerCase().includes('timeout') || supabaseStatus.error?.includes('57014'))) {
-      const timer = setTimeout(() => {
-        setSupabaseStatus(null);
-      }, 7000);
-      return () => clearTimeout(timer);
-    }
-  }, [supabaseStatus]);
 
   // ── Dark / Light Mode ────────────────────────────────────────────────────
   const [isDarkMode, setIsDarkMode] = useState(() => {
@@ -1898,6 +1889,49 @@ function App() {
           </div>
 
           <nav style={{ flexGrow: 1, display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '0.5rem' }}>
+            {/* Supabase Datenbank-Status Badge */}
+            {supabaseStatus && (
+              <div
+                id="supabase-status-badge"
+                title={
+                  supabaseStatus.ok === null ? 'Verbinde mit Supabase...'
+                  : supabaseStatus.ok ? `${supabaseStatus.count} Projekte geladen (Gesamte DB: ${supabaseStatus.total} Einträge)`
+                  : `Supabase Fehler: ${supabaseStatus.error}`
+                }
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.35rem',
+                  padding: '0.3rem 0.65rem',
+                  borderRadius: '6px',
+                  border: `1px solid ${
+                    supabaseStatus.ok === null ? '#6366f1' 
+                    : supabaseStatus.ok ? '#10B981' 
+                    : (supabaseStatus.error?.toLowerCase().includes('timeout') || supabaseStatus.error?.includes('57014')) ? '#F59E0B' : '#EF4444'
+                  }`,
+                  backgroundColor: supabaseStatus.ok === null ? 'rgba(99, 102, 241, 0.06)' : supabaseStatus.ok ? 'rgba(16, 185, 129, 0.06)' : 'rgba(239, 68, 68, 0.06)',
+                  fontSize: '0.78rem',
+                  color: supabaseStatus.ok === null ? '#6366f1' : supabaseStatus.ok ? '#10B981' : '#EF4444',
+                  whiteSpace: 'nowrap',
+                  userSelect: 'none',
+                  transition: 'all 0.3s ease',
+                  cursor: 'default',
+                  flexShrink: 0
+                }}
+              >
+                <span style={{
+                  width: '7px', height: '7px', borderRadius: '50%',
+                  backgroundColor: supabaseStatus.ok === null ? '#6366f1' : supabaseStatus.ok ? '#10B981' : '#EF4444',
+                  flexShrink: 0,
+                }} />
+                <span>
+                  {supabaseStatus.ok === null && '⏳ Verbinde...'}
+                  {supabaseStatus.ok === true && 'Datenbank'}
+                  {supabaseStatus.ok === false && 'Offline'}
+                </span>
+              </div>
+            )}
+
             {view !== 'dashboard' && (
               <button className="btn btn-outline" onClick={handleCancelEntry} style={{ padding: '0.5rem 1rem' }}>
                 <LayoutDashboard size={18} />
@@ -2096,48 +2130,6 @@ function App() {
 
       <main className="container" style={{ marginTop: effectiveMode === 'technician' ? '0.5rem' : '1rem', padding: effectiveMode === 'technician' ? '0.5rem' : '1rem 1.25rem', maxWidth: effectiveMode === 'technician' ? undefined : 'none' }}>
 
-        {/* ── Supabase Debug-Banner: zeigt Verbindungsstatus für iPad-Diagnose ── */}
-        {view === 'dashboard' && supabaseStatus && !(typeof navigator !== 'undefined' && navigator.webdriver) && (
-          <div style={{
-            position: 'fixed',
-            bottom: '20px',
-            right: '20px',
-            zIndex: 9999,
-            maxWidth: '400px',
-            boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.2)',
-            padding: '0.6rem 1rem',
-            borderRadius: '8px',
-            fontSize: '0.8rem',
-            fontWeight: 600,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: '1rem',
-            backgroundColor: supabaseStatus.ok === null
-              ? 'rgba(30, 41, 59, 0.95)'
-              : supabaseStatus.ok
-                ? 'rgba(16, 185, 129, 0.95)'
-                : (supabaseStatus.error?.toLowerCase().includes('timeout') || supabaseStatus.error?.includes('57014') || supabaseStatus.error?.toLowerCase().includes('fetch') || supabaseStatus.error?.toLowerCase().includes('load failed') || supabaseStatus.error?.toLowerCase().includes('failed') || supabaseStatus.error?.toLowerCase().includes('network'))
-                  ? 'rgba(245, 158, 11, 0.95)'
-                  : 'rgba(239, 68, 68, 0.95)',
-            border: `1px solid ${supabaseStatus.ok === null ? '#6366f1' : supabaseStatus.ok ? '#10B981' : (supabaseStatus.error?.toLowerCase().includes('timeout') || supabaseStatus.error?.includes('57014') || supabaseStatus.error?.toLowerCase().includes('fetch') || supabaseStatus.error?.toLowerCase().includes('load failed') || supabaseStatus.error?.toLowerCase().includes('failed') || supabaseStatus.error?.toLowerCase().includes('network')) ? '#F59E0B' : '#EF4444'}`,
-            color: '#FFFFFF',
-          }}>
-            <span>
-              {supabaseStatus.ok === null && '⏳ Verbinde mit Supabase...'}
-              {supabaseStatus.ok === true && `✅ ${supabaseStatus.count} Projekte geladen (${supabaseStatus.total} DB-Einträge)`}
-              {supabaseStatus.ok === false && (
-                (supabaseStatus.error?.toLowerCase().includes('timeout') || supabaseStatus.error?.includes('57014') || supabaseStatus.error?.toLowerCase().includes('fetch') || supabaseStatus.error?.toLowerCase().includes('load failed') || supabaseStatus.error?.toLowerCase().includes('failed') || supabaseStatus.error?.toLowerCase().includes('network'))
-                  ? '⚠️ Offline-Modus: Daten lokal aus dem Cache geladen (Server-Zeitüberschreitung)'
-                  : `❌ Supabase Fehler: ${supabaseStatus.error}`
-              )}
-            </span>
-            <button
-              onClick={() => setSupabaseStatus(null)}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', opacity: 0.6, fontSize: '1rem', color: 'inherit' }}
-            >✕</button>
-          </div>
-        )}
 
         {view === 'dashboard' && <Dashboard
           reports={reports}
