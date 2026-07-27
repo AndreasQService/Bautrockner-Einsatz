@@ -60,6 +60,15 @@ const LoginScreen = ({ users, onLogin }) => {
                     color: #64748b !important;
                     opacity: 1 !important;
                 }
+                /* Webkit Autofill Override to prevent browser from forcing white/yellow backgrounds */
+                .login-input:-webkit-autofill,
+                .login-input:-webkit-autofill:hover, 
+                .login-input:-webkit-autofill:focus, 
+                .login-input:-webkit-autofill:active {
+                    -webkit-box-shadow: 0 0 0 1000px #131929 inset !important;
+                    -webkit-text-fill-color: #f8fafc !important;
+                    transition: background-color 5000s ease-in-out 0s !important;
+                }
             `}</style>
 
             <div style={{
