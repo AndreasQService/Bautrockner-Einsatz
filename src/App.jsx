@@ -1549,11 +1549,11 @@ function App() {
         }
         await performCloudSave();
       } else if (silent) {
-        // Debounce cloud autosave by 20 seconds to dramatically reduce Supabase Disk IO and OneDrive bandwidth consumption
+        // Fast debounced cloud autosave (2 seconds) so changes save smoothly in background
         silentSaveDebounceTimers.current[finalReport.id] = setTimeout(() => {
           performCloudSave();
           delete silentSaveDebounceTimers.current[finalReport.id];
-        }, 20000);
+        }, 2000);
       }
     }
 

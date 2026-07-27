@@ -1811,18 +1811,18 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
     }, [formData]);
 
     useEffect(() => {
-        const timeoutId = setTimeout(() => {
+        const timeoutId = setTimeout(async () => {
             if (onSave) {
-                // DIRTY CHECK: Only save if data has actually changed
-                // Performance optimization: Avoid JSON.stringify on large objects (images)
-                // We trust that state updates create new object references.
                 if (formData !== lastSavedData.current) {
-                    // console.log("Auto-Save triggered. Equipment:", formData.equipment.length);
-                    onSave(formData, true);
+                    setIsSaving(true);
+                    try {
+                        await onSave(formData, true);
+                    } catch (e) {}
                     lastSavedData.current = formData;
+                    setTimeout(() => setIsSaving(false), 800);
                 }
             }
-        }, 1000);
+        }, 800);
 
         return () => clearTimeout(timeoutId);
     }, [formData, onSave]);
