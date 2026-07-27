@@ -17,7 +17,53 @@ const HEARTBEAT_INTERVAL = 10_000;  // alle 10s heartbeat senden
 const POLL_INTERVAL      =  5_000;  // alle 5s Poll
 const SESSION_TIMEOUT    = 25_000;  // Session gilt als tot nach 25s
 
-export function useSessionLock(supabase, sessionToken, selectedReportId, view, resolvedMode, sessionStartedAt) {
+export function startSessionLockLifecycle({
+  enabledRef,
+  tokenRef,
+  supabase,
+  upsertSession,
+  pollSessions,
+  cleanupOldSessions,
+  deleteSession,
+  eventTarget = window,
+  setIntervalFn = setInterval,
+  clearIntervalFn = clearInterval,
+  fetchFn = fetch,
+}) {
+  if (!enabledRef.current || !supabase) return undefined;
+
+  upsertSession();
+  pollSessions();
+
+  const heartbeatTimer = setIntervalFn(() => enabledRef.current && upsertSession(), HEARTBEAT_INTERVAL);
+  const pollTimer = setIntervalFn(() => enabledRef.current && pollSessions(), POLL_INTERVAL);
+  const cleanupTimer = setIntervalFn(() => enabledRef.current && cleanupOldSessions(), 5 * 60_000);
+
+  const handleUnload = () => {
+    if (!enabledRef.current) return;
+    const url = `${supabase.supabaseUrl}/rest/v1/project_sessions?session_token=eq.${encodeURIComponent(tokenRef.current)}`;
+    fetchFn(url, {
+      method: 'DELETE',
+      headers: {
+        apikey: supabase.supabaseKey,
+        Authorization: `Bearer ${supabase.supabaseKey}`,
+      },
+      keepalive: true,
+    });
+  };
+
+  eventTarget.addEventListener('beforeunload', handleUnload);
+
+  return () => {
+    clearIntervalFn(heartbeatTimer);
+    clearIntervalFn(pollTimer);
+    clearIntervalFn(cleanupTimer);
+    eventTarget.removeEventListener('beforeunload', handleUnload);
+    if (enabledRef.current) deleteSession();
+  };
+}
+
+export function useSessionLock(supabase, sessionToken, selectedReportId, view, resolvedMode, sessionStartedAt, enabled = true) {
   const [lockedProjectIds, setLockedProjectIds]   = useState(new Set());
   const [isSessionActive,  setIsSessionActive]    = useState(true);
 
@@ -25,6 +71,9 @@ export function useSessionLock(supabase, sessionToken, selectedReportId, view, r
   const reportIdRef   = useRef(selectedReportId);
   const modeRef       = useRef(resolvedMode);
   const viewRef       = useRef(view);
+  const enabledRef    = useRef(enabled);
+  // eslint-disable-next-line react-hooks/refs -- synchronous gate blocks callbacks during the disabling commit
+  enabledRef.current = enabled;
 
   // Refs synchron halten
   useEffect(() => { tokenRef.current    = sessionToken;    }, [sessionToken]);
@@ -35,6 +84,7 @@ export function useSessionLock(supabase, sessionToken, selectedReportId, view, r
   // ── Eigene Session upserten ────────────────────────────────────────────
   const upsertSession = useCallback(async () => {
     if (!supabase) return;
+    if (!enabledRef.current) return;
     const openProjectId = (viewRef.current === 'details' || viewRef.current === 'new-report')
       ? (reportIdRef.current ?? null)
       : null;
@@ -59,6 +109,7 @@ export function useSessionLock(supabase, sessionToken, selectedReportId, view, r
   // ── Andere Sessions abfragen und Locks berechnen ──────────────────────
   const pollSessions = useCallback(async () => {
     if (!supabase) return;
+    if (!enabledRef.current) return;
 
     // Timeout-Grenze: Sessions älter als SESSION_TIMEOUT gelten als inaktiv
     const cutoff = new Date(Date.now() - SESSION_TIMEOUT).toISOString();
@@ -135,6 +186,7 @@ export function useSessionLock(supabase, sessionToken, selectedReportId, view, r
   // ── Session löschen ───────────────────────────────────────────────────
   const deleteSession = useCallback(async () => {
     if (!supabase) return;
+    if (!enabledRef.current) return;
     await supabase
       .from('project_sessions')
       .delete()
@@ -145,6 +197,7 @@ export function useSessionLock(supabase, sessionToken, selectedReportId, view, r
   // ── Alte (inaktive) Sessions bereinigen ───────────────────────────────
   const cleanupOldSessions = useCallback(async () => {
     if (!supabase) return;
+    if (!enabledRef.current) return;
     const cutoff = new Date(Date.now() - SESSION_TIMEOUT).toISOString();
     await supabase
       .from('project_sessions')
@@ -152,53 +205,28 @@ export function useSessionLock(supabase, sessionToken, selectedReportId, view, r
       .lt('last_seen', cutoff);
   }, [supabase]);
 
-  // ── Heartbeat + Poll Loop ─────────────────────────────────────────────
+  // Heartbeat + Poll Loop
   useEffect(() => {
-    if (!supabase) return;
-
-    // Sofort beim Start
-    upsertSession();
-    pollSessions();
-
-    const heartbeatTimer = setInterval(upsertSession, HEARTBEAT_INTERVAL);
-    const pollTimer      = setInterval(pollSessions,  POLL_INTERVAL);
-    // Cleanup alter Sessions alle 5 Minuten
-    const cleanupTimer   = setInterval(cleanupOldSessions, 5 * 60_000);
-
-    // Tab-Schließen: Session sofort entfernen
-    const handleUnload = () => {
-      // Synchrones Fetch (navigator.sendBeacon geht nicht für DELETE)
-      // Wir nutzen fetch mit keepalive
-      const url = `${supabase.supabaseUrl}/rest/v1/project_sessions?session_token=eq.${encodeURIComponent(tokenRef.current)}`;
-      fetch(url, {
-        method: 'DELETE',
-        headers: {
-          apikey: supabase.supabaseKey,
-          Authorization: `Bearer ${supabase.supabaseKey}`,
-        },
-        keepalive: true,
-      });
-    };
-
-    window.addEventListener('beforeunload', handleUnload);
-
-    return () => {
-      clearInterval(heartbeatTimer);
-      clearInterval(pollTimer);
-      clearInterval(cleanupTimer);
-      window.removeEventListener('beforeunload', handleUnload);
-      deleteSession();
-    };
-  }, [supabase, upsertSession, pollSessions, cleanupOldSessions, deleteSession]);
-
+    return startSessionLockLifecycle({
+      enabledRef,
+      tokenRef,
+      supabase,
+      upsertSession,
+      pollSessions,
+      cleanupOldSessions,
+      deleteSession,
+    });
+  }, [enabled, supabase, upsertSession, pollSessions, cleanupOldSessions, deleteSession]);
   // ── Sofortiger Upsert wenn sich Projekt/Modus ändert ─────────────────
   useEffect(() => {
+    if (!enabled) return;
     upsertSession();
     pollSessions();
-  }, [view, selectedReportId, resolvedMode, upsertSession, pollSessions]);
+  }, [enabled, view, selectedReportId, resolvedMode, upsertSession, pollSessions]);
 
   // ── Session übernehmen (Force Lock) ──────────────────────────────────
   const takeOverLock = useCallback(async () => {
+    if (!enabledRef.current) return;
     try {
       if (!supabase) {
         alert("Fehler: Supabase nicht initialisiert");
