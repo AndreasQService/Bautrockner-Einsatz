@@ -5112,15 +5112,15 @@ END:VCARD`;
                                                     fontWeight: 600,
                                                     padding: '2px 6px',
                                                     borderRadius: '4px',
-                                                    backgroundColor: img.syncStatus === 'remote_verified' || img.syncStatus === 'synced' ? 'rgba(16,185,129,0.1)' : 
-                                                                     img.syncStatus === 'uploaded_to_backend' ? 'rgba(245,158,11,0.1)' : 
+                                                    backgroundColor: (img.syncStatus === 'remote_verified' || img.syncStatus === 'synced' || img.oneDriveItemId) ? 'rgba(16,185,129,0.1)' : 
+                                                                     (img.syncStatus === 'uploaded_to_backend' || img.storagePath || img.supabasePath || img.supabaseBackedUpAt) ? 'rgba(245,158,11,0.1)' : 
                                                                      img.syncStatus === 'error' ? 'rgba(239,68,68,0.1)' : 'rgba(59,130,246,0.1)',
-                                                    color: img.syncStatus === 'remote_verified' || img.syncStatus === 'synced' ? '#10B981' : 
-                                                           img.syncStatus === 'uploaded_to_backend' ? '#F59E0B' : 
+                                                    color: (img.syncStatus === 'remote_verified' || img.syncStatus === 'synced' || img.oneDriveItemId) ? '#10B981' : 
+                                                           (img.syncStatus === 'uploaded_to_backend' || img.storagePath || img.supabasePath || img.supabaseBackedUpAt) ? '#F59E0B' : 
                                                            img.syncStatus === 'error' ? '#EF4444' : '#3B82F6'
                                                 }}>
-                                                    {img.syncStatus === 'remote_verified' || img.syncStatus === 'synced' ? 'Vollständig verifiziert' : 
-                                                     img.syncStatus === 'uploaded_to_backend' ? 'In Supabase gespeichert' : 
+                                                    {(img.syncStatus === 'remote_verified' || img.syncStatus === 'synced' || img.oneDriveItemId) ? 'Vollständig verifiziert' : 
+                                                     (img.syncStatus === 'uploaded_to_backend' || img.storagePath || img.supabasePath || img.supabaseBackedUpAt) ? 'In Supabase gespeichert' : 
                                                      img.syncStatus === 'error' ? 'Fehler – erneut versuchen' : 'Lokal gesichert'}
                                                 </span>
                                             </div>
@@ -6527,15 +6527,15 @@ END:VCARD`;
                                                                                 fontWeight: 600,
                                                                                 padding: '2px 6px',
                                                                                 borderRadius: '4px',
-                                                                                backgroundColor: img.syncStatus === 'remote_verified' || img.syncStatus === 'synced' ? 'rgba(16,185,129,0.1)' : 
-                                                                                                 img.syncStatus === 'uploaded_to_backend' ? 'rgba(245,158,11,0.1)' : 
+                                                                                backgroundColor: (img.syncStatus === 'remote_verified' || img.syncStatus === 'synced' || img.oneDriveItemId) ? 'rgba(16,185,129,0.1)' : 
+                                                                                                 (img.syncStatus === 'uploaded_to_backend' || img.storagePath || img.supabasePath || img.supabaseBackedUpAt) ? 'rgba(245,158,11,0.1)' : 
                                                                                                  img.syncStatus === 'error' ? 'rgba(239,68,68,0.1)' : 'rgba(59,130,246,0.1)',
-                                                                                color: img.syncStatus === 'remote_verified' || img.syncStatus === 'synced' ? '#10B981' : 
-                                                                                       img.syncStatus === 'uploaded_to_backend' ? '#F59E0B' : 
+                                                                                color: (img.syncStatus === 'remote_verified' || img.syncStatus === 'synced' || img.oneDriveItemId) ? '#10B981' : 
+                                                                                       (img.syncStatus === 'uploaded_to_backend' || img.storagePath || img.supabasePath || img.supabaseBackedUpAt) ? '#F59E0B' : 
                                                                                        img.syncStatus === 'error' ? '#EF4444' : '#3B82F6'
-                                                                            }}>
-                                                                                {img.syncStatus === 'remote_verified' || img.syncStatus === 'synced' ? 'Vollständig verifiziert' : 
-                                                                                 img.syncStatus === 'uploaded_to_backend' ? 'In Supabase gespeichert' : 
+                                                                             }}>
+                                                                                {(img.syncStatus === 'remote_verified' || img.syncStatus === 'synced' || img.oneDriveItemId) ? 'Vollständig verifiziert' : 
+                                                                                 (img.syncStatus === 'uploaded_to_backend' || img.storagePath || img.supabasePath || img.supabaseBackedUpAt) ? 'In Supabase gespeichert' : 
                                                                                  img.syncStatus === 'error' ? 'Fehler – erneut versuchen' : 'Lokal gesichert'}
                                                                             </span>
                                                                         </div>
@@ -6991,15 +6991,15 @@ END:VCARD`;
                                                         fontWeight: 600,
                                                         padding: '2px 6px',
                                                         borderRadius: '4px',
-                                                        backgroundColor: item.syncStatus === 'remote_verified' || item.syncStatus === 'synced' ? 'rgba(16,185,129,0.1)' : 
-                                                                         item.syncStatus === 'uploaded_to_backend' ? 'rgba(245,158,11,0.1)' : 
+                                                        backgroundColor: (item.syncStatus === 'remote_verified' || item.syncStatus === 'synced' || item.oneDriveItemId) ? 'rgba(16,185,129,0.1)' : 
+                                                                         (item.syncStatus === 'uploaded_to_backend' || item.storagePath || item.supabasePath || item.supabaseBackedUpAt) ? 'rgba(245,158,11,0.1)' : 
                                                                          item.syncStatus === 'error' ? 'rgba(239,68,68,0.1)' : 'rgba(59,130,246,0.1)',
-                                                        color: item.syncStatus === 'remote_verified' || item.syncStatus === 'synced' ? '#10B981' : 
-                                                               item.syncStatus === 'uploaded_to_backend' ? '#F59E0B' : 
+                                                        color: (item.syncStatus === 'remote_verified' || item.syncStatus === 'synced' || item.oneDriveItemId) ? '#10B981' : 
+                                                               (item.syncStatus === 'uploaded_to_backend' || item.storagePath || item.supabasePath || item.supabaseBackedUpAt) ? '#F59E0B' : 
                                                                item.syncStatus === 'error' ? '#EF4444' : '#3B82F6'
                                                     }}>
-                                                        {item.syncStatus === 'remote_verified' || item.syncStatus === 'synced' ? 'Vollständig verifiziert' : 
-                                                         item.syncStatus === 'uploaded_to_backend' ? 'In Supabase gespeichert' : 
+                                                        {(item.syncStatus === 'remote_verified' || item.syncStatus === 'synced' || item.oneDriveItemId) ? 'Vollständig verifiziert' : 
+                                                         (item.syncStatus === 'uploaded_to_backend' || item.storagePath || item.supabasePath || item.supabaseBackedUpAt) ? 'In Supabase gespeichert' : 
                                                          item.syncStatus === 'error' ? 'Fehler – erneut versuchen' : 'Lokal gesichert'}
                                                     </span>
                                                 </div>
