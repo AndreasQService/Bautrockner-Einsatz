@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { formatActiveEquipmentRuntime } from '../src/utils/dashboardUtils.js';
 
 const previousActiveEquipmentRuntime = (startDateStr, referenceNow) => {
   if (!startDateStr) return '-';
@@ -35,6 +36,7 @@ const cases = [
 
 for (const [name, startDate, now, expected] of cases) {
   test(name, () => {
+    assert.equal(formatActiveEquipmentRuntime(startDate, now), previousActiveEquipmentRuntime(startDate, now));
     assert.equal(previousActiveEquipmentRuntime(startDate, now), expected);
   });
 }
@@ -45,7 +47,7 @@ test('active runtime calculation does not mutate Date inputs', () => {
   const startBefore = startDate.getTime();
   const nowBefore = now.getTime();
 
-  previousActiveEquipmentRuntime(startDate, now);
+  formatActiveEquipmentRuntime(startDate, now);
 
   assert.equal(startDate.getTime(), startBefore);
   assert.equal(now.getTime(), nowBefore);

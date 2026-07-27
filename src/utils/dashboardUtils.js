@@ -45,6 +45,18 @@ export const formatCompletedEquipmentRuntime = (startDateStr, endDateStr) => {
     return `${Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)))} d`;
 };
 
+export const formatActiveEquipmentRuntime = (startDateStr, referenceDate) => {
+    if (!startDateStr) return '-';
+    const start = new Date(startDateStr);
+    if (isNaN(start.getTime())) return '-';
+    const end = new Date(referenceDate);
+    if (isNaN(end.getTime())) return '-';
+    start.setHours(0,0,0,0);
+    end.setHours(0,0,0,0);
+    const diffTime = end - start;
+    return `${Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)))} d`;
+};
+
 export const formatEquipmentTypeModel = (equipment) =>
     [equipment.type, equipment.model].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i).join(' - ');
 

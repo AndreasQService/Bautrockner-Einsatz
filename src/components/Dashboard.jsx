@@ -8,7 +8,7 @@ import DashboardReportTableHeader from './DashboardReportTableHeader'
 import DashboardTechnicianProjectInfo from './DashboardTechnicianProjectInfo'
 import OfficeProjectsPage from '../features/projects/OfficeProjectsPage'
 import { formatDate } from '../utils/formatUtils'
-import { formatCompletedEquipmentRuntime, formatEquipmentDate, formatEquipmentLocation, formatEquipmentProjectAddress, formatEquipmentTypeModel, getDryingStartDate, getEquipmentStatus } from '../utils/dashboardUtils'
+import { formatActiveEquipmentRuntime, formatCompletedEquipmentRuntime, formatEquipmentDate, formatEquipmentLocation, formatEquipmentProjectAddress, formatEquipmentTypeModel, getDryingStartDate, getEquipmentStatus } from '../utils/dashboardUtils'
 import { DASHBOARD_STATUS_COLORS as statusColors } from '../config/dashboardConfig'
 
 // Helper to calculate days difference
@@ -280,15 +280,7 @@ const DeviceInventoryList = ({ reports, onSelectReport }) => {
 
     const getDaysRunning = (startDateStr, endDateStr) => {
         if (endDateStr) return formatCompletedEquipmentRuntime(startDateStr, endDateStr);
-        if (!startDateStr) return '-';
-        const start = new Date(startDateStr);
-        if (isNaN(start.getTime())) return '-';
-        const end = endDateStr ? new Date(endDateStr) : new Date();
-        if (isNaN(end.getTime())) return '-';
-        start.setHours(0,0,0,0);
-        end.setHours(0,0,0,0);
-        const diffTime = end - start;
-        return `${Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)))} d`;
+        return formatActiveEquipmentRuntime(startDateStr, new Date());
     };
 
     return (
