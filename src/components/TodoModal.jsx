@@ -85,16 +85,16 @@ const TodoModal = ({
     // Search results for project selection
     const filteredProjects = useMemo(() => {
         if (!projectSearch.trim()) return [];
-        const q = projectSearch.toLowerCase();
+        const q = projectSearch.toLowerCase().trim();
         return reports.filter(r => {
             if (r.id === 'SYSTEM_SETTINGS') return false;
             if (r.status === 'Abgeschlossen') return false; // Exclude archived
             return (
-                r.id?.toLowerCase().includes(q) ||
-                r.projectTitle?.toLowerCase().includes(q) ||
-                r.projectNumber?.toLowerCase().includes(q) ||
-                r.address?.toLowerCase().includes(q) ||
-                r.client?.toLowerCase().includes(q)
+                String(r.id || '').toLowerCase().includes(q) ||
+                String(r.projectTitle || '').toLowerCase().includes(q) ||
+                String(r.projectNumber || '').toLowerCase().includes(q) ||
+                String(r.address || '').toLowerCase().includes(q) ||
+                String(r.client || '').toLowerCase().includes(q)
             );
         });
     }, [projectSearch, reports]);

@@ -1562,10 +1562,16 @@ function App() {
 
   const handleNavigateToReport = (identifier) => {
     if (!identifier) return;
-    const report = reports.find(r => r.id === identifier || r.projectTitle === identifier || r.projectNumber === identifier);
+    const strIdent = String(identifier).trim().toLowerCase();
+    const report = reports.find(r => 
+      String(r.id || '').toLowerCase() === strIdent || 
+      String(r.projectTitle || '').toLowerCase() === strIdent || 
+      String(r.projectNumber || '').toLowerCase() === strIdent ||
+      String(r.address || '').toLowerCase().includes(strIdent)
+    );
     if (report) {
       handleSelectReport(report);
-      showToast(`Auftrag "${report.projectTitle || report.id}" geöffnet`, 'success');
+      showToast(`Auftrag "${report.projectTitle || report.projectNumber || report.id}" geöffnet`, 'success');
     } else {
       showToast(`Auftrag "${identifier}" nicht gefunden`, 'error');
     }
