@@ -57,3 +57,22 @@ export const formatEquipmentProjectAddress = (report) => ({
     street: report.street || 'Keine Strasse',
     details: `${[report.zip, report.city].filter(Boolean).join(' ')} ${report.projectNumber ? `(${report.projectNumber})` : ''}`,
 });
+
+export const getEquipmentStatus = (equipment) => {
+    const isAktiv = !equipment.endDate;
+    const statusStyle = isAktiv ? {
+        bg: 'rgba(16, 185, 129, 0.15)',
+        color: '#10B981',
+        border: '1px solid rgba(16, 185, 129, 0.25)'
+    } : {
+        bg: 'rgba(59, 130, 246, 0.15)',
+        color: '#3B82F6',
+        border: '1px solid rgba(59, 130, 246, 0.25)'
+    };
+
+    return {
+        isAktiv,
+        label: isAktiv ? 'Aktiv' : 'Deinstalliert',
+        statusStyle
+    };
+};

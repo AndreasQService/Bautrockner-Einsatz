@@ -8,7 +8,7 @@ import DashboardReportTableHeader from './DashboardReportTableHeader'
 import DashboardTechnicianProjectInfo from './DashboardTechnicianProjectInfo'
 import OfficeProjectsPage from '../features/projects/OfficeProjectsPage'
 import { formatDate } from '../utils/formatUtils'
-import { formatCompletedEquipmentRuntime, formatEquipmentDate, formatEquipmentLocation, formatEquipmentProjectAddress, formatEquipmentTypeModel, getDryingStartDate } from '../utils/dashboardUtils'
+import { formatCompletedEquipmentRuntime, formatEquipmentDate, formatEquipmentLocation, formatEquipmentProjectAddress, formatEquipmentTypeModel, getDryingStartDate, getEquipmentStatus } from '../utils/dashboardUtils'
 import { DASHBOARD_STATUS_COLORS as statusColors } from '../config/dashboardConfig'
 
 // Helper to calculate days difference
@@ -316,17 +316,7 @@ const DeviceInventoryList = ({ reports, onSelectReport }) => {
                             {devicesList.map(({ report, item }, idx) => {
                                 const typeModel = formatEquipmentTypeModel(item);
                                 const projectAddress = formatEquipmentProjectAddress(report);
-                                const isAktiv = !item.endDate;
-                                
-                                const statusStyle = isAktiv ? {
-                                    bg: 'rgba(16, 185, 129, 0.15)',
-                                    color: '#10B981',
-                                    border: '1px solid rgba(16, 185, 129, 0.25)'
-                                } : {
-                                    bg: 'rgba(59, 130, 246, 0.15)',
-                                    color: '#3B82F6',
-                                    border: '1px solid rgba(59, 130, 246, 0.25)'
-                                };
+                                const { label: statusLabel, statusStyle } = getEquipmentStatus(item);
 
                                 return (
                                     <tr
@@ -380,7 +370,7 @@ const DeviceInventoryList = ({ reports, onSelectReport }) => {
                                                 border: statusStyle.border,
                                                 display: 'inline-block'
                                             }}>
-                                                {isAktiv ? 'Aktiv' : 'Deinstalliert'}
+                                                {statusLabel}
                                             </span>
                                         </td>
                                         <td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: 700, color: 'var(--text-main)' }}>

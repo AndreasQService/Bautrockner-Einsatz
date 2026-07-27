@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { getEquipmentStatus } from '../src/utils/dashboardUtils.js';
 
 const previousEquipmentStatus = (equipment) => {
   const isAktiv = !equipment.endDate;
@@ -59,6 +60,7 @@ const cases = [
 
 for (const [name, equipment, expected] of cases) {
   test(name, () => {
+    assert.deepEqual(getEquipmentStatus(equipment), previousEquipmentStatus(equipment));
     assert.deepEqual(previousEquipmentStatus(equipment), expected);
   });
 }
@@ -66,6 +68,6 @@ for (const [name, equipment, expected] of cases) {
 test('equipment status derivation does not mutate its input', () => {
   const equipment = { type: 'Bautrockner', endDate: '2026-07-15', deviceNumber: 'BT-42' };
   const before = structuredClone(equipment);
-  previousEquipmentStatus(equipment);
+  getEquipmentStatus(equipment);
   assert.deepEqual(equipment, before);
 });
