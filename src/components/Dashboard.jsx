@@ -8,7 +8,7 @@ import DashboardReportTableHeader from './DashboardReportTableHeader'
 import DashboardTechnicianProjectInfo from './DashboardTechnicianProjectInfo'
 import OfficeProjectsPage from '../features/projects/OfficeProjectsPage'
 import { formatDate } from '../utils/formatUtils'
-import { formatCompletedEquipmentRuntime, formatEquipmentDate, formatEquipmentTypeModel, getDryingStartDate } from '../utils/dashboardUtils'
+import { formatCompletedEquipmentRuntime, formatEquipmentDate, formatEquipmentLocation, formatEquipmentTypeModel, getDryingStartDate } from '../utils/dashboardUtils'
 import { DASHBOARD_STATUS_COLORS as statusColors } from '../config/dashboardConfig'
 
 // Helper to calculate days difference
@@ -357,7 +357,7 @@ const DeviceInventoryList = ({ reports, onSelectReport }) => {
                                         </td>
                                         <td style={{ padding: '0.75rem', color: 'var(--text-main)' }}>
                                             {item.room ? (
-                                                <span>{item.apartment ? `${item.apartment} - ` : ''}{item.room}</span>
+                                                <span>{formatEquipmentLocation(item)}</span>
                                             ) : (
                                                 <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>kein Raum zugeordnet</span>
                                             )}

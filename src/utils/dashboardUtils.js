@@ -47,3 +47,8 @@ export const formatCompletedEquipmentRuntime = (startDateStr, endDateStr) => {
 
 export const formatEquipmentTypeModel = (equipment) =>
     [equipment.type, equipment.model].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i).join(' - ');
+
+export const formatEquipmentLocation = (equipment) => {
+    if (!equipment.room) return '';
+    return `${equipment.apartment ? `${equipment.apartment} - ` : ''}${equipment.room}`;
+};

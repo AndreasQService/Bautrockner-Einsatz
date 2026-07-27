@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+import { formatEquipmentLocation } from '../src/utils/dashboardUtils.js';
+
 const previousEquipmentLocation = (equipment) => {
   if (!equipment.room) return '';
   return `${equipment.apartment ? `${equipment.apartment} - ` : ''}${equipment.room}`;
@@ -27,6 +29,7 @@ const cases = [
 
 for (const [name, equipment, expected] of cases) {
   test(name, () => {
+    assert.strictEqual(formatEquipmentLocation(equipment), previousEquipmentLocation(equipment));
     assert.strictEqual(previousEquipmentLocation(equipment), expected);
   });
 }
@@ -34,6 +37,6 @@ for (const [name, equipment, expected] of cases) {
 test('equipment location derivation does not mutate its input', () => {
   const equipment = { apartment: 'Wohnung 2', room: 'Badezimmer', deviceNumber: 'BT-42' };
   const before = structuredClone(equipment);
-  previousEquipmentLocation(equipment);
+  formatEquipmentLocation(equipment);
   assert.deepEqual(equipment, before);
 });
