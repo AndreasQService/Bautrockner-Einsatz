@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { ClipboardList, Plus, Clock, Edit2, ShieldAlert, Check, HelpCircle } from 'lucide-react';
-import { fetchTodosForProject, completeTodoAndArchiveProjectRpc } from '../services/TodoService';
+import { ClipboardList, Plus, Clock, Edit2, ShieldAlert, Check, HelpCircle, Trash2 } from 'lucide-react';
+import { fetchTodosForProject, completeTodoAndArchiveProjectRpc, deleteTodo } from '../services/TodoService';
 import TodoModal from './TodoModal';
 
 const TodoProjectSection = ({
@@ -187,14 +187,26 @@ const TodoProjectSection = ({
                                     </div>
                                 )}
                             </div>
-                            <button
-                                type="button"
-                                onClick={() => { setEditingTodo(t); setModalOpen(true); }}
-                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '0.25rem' }}
-                                disabled={pendingActionTodoId !== null}
-                            >
-                                <Edit2 size={14} />
-                            </button>
+                            <div style={{ display: 'flex', gap: '0.25rem', alignItems: 'center' }}>
+                                <button
+                                    type="button"
+                                    title="To-do bearbeiten"
+                                    onClick={() => { setEditingTodo(t); setModalOpen(true); }}
+                                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '0.25rem' }}
+                                    disabled={pendingActionTodoId !== null}
+                                >
+                                    <Edit2 size={14} />
+                                </button>
+                                <button
+                                    type="button"
+                                    title="To-do löschen"
+                                    onClick={() => handleDeleteTodo(t.id)}
+                                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: '0.25rem' }}
+                                    disabled={pendingActionTodoId !== null}
+                                >
+                                    <Trash2 size={14} />
+                                </button>
+                            </div>
                         </div>
                     ))
                 )}

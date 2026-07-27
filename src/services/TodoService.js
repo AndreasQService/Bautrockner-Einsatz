@@ -169,6 +169,35 @@ export async function createTodo(todoData) {
 }
 
 /**
+ * Deletes a To-do by ID from Supabase and local storage.
+ */
+export async function deleteTodo(todoId) {
+    if (!todoId) return false;
+
+    // 1. Remove from local storage
+    try {
+        const local = JSON.parse(localStorage.getItem('qservice_local_todos') || '[]');
+        const filtered = local.filter(t => t.id !== todoId);
+        localStorage.setItem('qservice_local_todos', JSON.stringify(filtered));
+    } catch (e) {}
+
+    // 2. Remove from Supabase
+    if (supabase) {
+        await ensureAuthenticated().catch(() => {});
+        try {
+            await supabase
+                .from('project_todos')
+                .delete()
+                .eq('id', todoId);
+        } catch (e) {
+            console.warn('[TodoService] Supabase delete failed:', e.message);
+        }
+    }
+
+    return true;
+}
+
+/**
  * Updates a To-do with optimistic locking (checks updated_at and status = 'open').
  */
 export async function updateTodo(todoId, updateData, expectedUpdatedAt) {

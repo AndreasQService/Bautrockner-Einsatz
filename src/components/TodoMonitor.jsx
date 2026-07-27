@@ -1,7 +1,15 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { ClipboardList, Plus, Search, Calendar, User, Check, Edit2, AlertTriangle, HelpCircle, Archive, AlertCircle, Clock } from 'lucide-react';
-import { fetchAllTodos, completeTodoAndArchiveProjectRpc } from '../services/TodoService';
+import { ClipboardList, Plus, Search, Calendar, User, Check, Edit2, AlertTriangle, HelpCircle, Archive, AlertCircle, Clock, Trash2 } from 'lucide-react';
+import { fetchAllTodos, completeTodoAndArchiveProjectRpc, deleteTodo } from '../services/TodoService';
 import TodoModal from './TodoModal';
+
+function getCleanProjectTitle(proj) {
+    if (!proj) return 'Unbekanntes Projekt';
+    const title = proj.projectTitle ? String(proj.projectTitle).trim() : '';
+    const isDummy = !title || /^\d{1,3}$/.test(title) || /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(title);
+    if (!isDummy) return title;
+    return proj.address || proj.client || (proj.projectNumber ? `Projekt ${proj.projectNumber}` : proj.id);
+}
 
 const TodoMonitor = ({
     reports = [],
@@ -432,7 +440,7 @@ const TodoMonitor = ({
                                             </td>
                                             <td style={{ padding: '0.65rem 0.8rem' }}>
                                                 {(() => {
-                                                    const displayTitle = (proj?.projectTitle && proj?.projectTitle !== proj?.id && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(proj?.projectTitle)) ? proj.projectTitle : (proj?.address || proj?.client || proj?.id || 'Unbekanntes Projekt');
+                                                    const displayTitle = getCleanProjectTitle(proj);
                                                     return (
                                                         <>
                                                             <button
@@ -582,7 +590,7 @@ const TodoMonitor = ({
                                             {/* 2. Projekt / Adresse */}
                                             <td style={{ padding: '0.65rem 0.8rem' }}>
                                                 {(() => {
-                                                    const displayTitle = (proj?.projectTitle && proj?.projectTitle !== proj?.id && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(proj?.projectTitle)) ? proj.projectTitle : (proj?.address || proj?.client || proj?.id || 'Unbekanntes Projekt');
+                                                    const displayTitle = getCleanProjectTitle(proj);
                                                     return (
                                                         <>
                                                             <button
@@ -633,15 +641,32 @@ const TodoMonitor = ({
                                             </td>
                                             {/* 7. Aktionen */}
                                             <td style={{ padding: '0.65rem 0.8rem', textAlign: 'center' }}>
-                                                <button
-                                                    onClick={() => { setEditingTodo(todoItem); setModalOpen(true); }}
-                                                    className="btn btn-ghost"
-                                                    disabled={pendingActionTodoId !== null}
-                                                    style={{ padding: '0.35rem', color: 'var(--text-muted)' }}
-                                                    title="Aufgabe bearbeiten"
-                                                >
-                                                    <Edit2 size={16} />
-                                                </button>
+                                                <div style={{ display: 'flex', justifyContent: 'center', gap: '0.25rem', alignItems: 'center' }}>
+                                                    <button
+                                                        onClick={() => { setEditingTodo(todoItem); setModalOpen(true); }}
+                                                        className="btn btn-ghost"
+                                                        disabled={pendingActionTodoId !== null}
+                                                        style={{ padding: '0.35rem', color: 'var(--text-muted)' }}
+                                                        title="Aufgabe bearbeiten"
+                                                    >
+                                                        <Edit2 size={16} />
+                                                    </button>
+                                                    <button
+                                                        onClick={async () => {
+                                                            if (window.confirm('Möchten Sie dieses To-do wirklich löschen?')) {
+                                                                setTodos(prev => prev.filter(t => t.id !== todoItem.id));
+                                                                await deleteTodo(todoItem.id);
+                                                                onReportsChanged?.();
+                                                            }
+                                                        }}
+                                                        className="btn btn-ghost"
+                                                        disabled={pendingActionTodoId !== null}
+                                                        style={{ padding: '0.35rem', color: '#ef4444' }}
+                                                        title="Aufgabe löschen"
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                </div>
                                             </td>
                                             {/* 8. History placeholder cell */}
                                             <td style={{ padding: '0.65rem 0.8rem', textAlign: 'center', color: 'var(--text-muted)' }}>
