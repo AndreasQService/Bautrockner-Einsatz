@@ -762,16 +762,44 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                 }
             }
 
-            // Restore preview URLs for existing state images
+            // Restore preview URLs for existing state images (including Supabase Storage downloads for edited/remote images)
             for (let i = 0; i < nextImages.length; i++) {
                 const img = nextImages[i];
-                if (img && img.id && (!img.preview || (img.preview.startsWith('blob:') && !objectUrlsRef.current.includes(img.preview)))) {
-                    const freshBlobUrl = await getPhotoBlob(img.id);
-                    if (freshBlobUrl) {
-                        trackObjectURL(freshBlobUrl);
-                        nextImages[i] = { ...img, preview: freshBlobUrl };
-                        updated = true;
+                if (!img) continue;
+
+                let freshBlobUrl = null;
+                const isInvalidPreview = !img.preview || 
+                                         (img.preview.startsWith('blob:') && !objectUrlsRef.current.includes(img.preview)) ||
+                                         img.preview.startsWith('http');
+
+                if (img.id && isInvalidPreview) {
+                    freshBlobUrl = await getPhotoBlob(img.id);
+                }
+
+                // If not found in IndexedDB but has a Supabase storage path or URL, download the Blob!
+                if (!freshBlobUrl && isInvalidPreview && supabase) {
+                    let storagePath = img.storagePath || img.supabasePath;
+                    if (!storagePath && (img.preview?.includes('case-files/') || img.url?.includes('case-files/'))) {
+                        const rawUrl = img.preview || img.url;
+                        storagePath = rawUrl.substring(rawUrl.indexOf('case-files/') + 11);
                     }
+
+                    if (storagePath) {
+                        try {
+                            const { data: blobData, error: dlErr } = await supabase.storage.from('case-files').download(storagePath);
+                            if (!dlErr && blobData) {
+                                freshBlobUrl = trackObjectURL(URL.createObjectURL(blobData));
+                                if (img.id) {
+                                    savePhotoLocally(img.id, formData.id || 'temp', blobData, { description: img.description }).catch(() => {});
+                                }
+                            }
+                        } catch (e) {}
+                    }
+                }
+
+                if (freshBlobUrl && freshBlobUrl !== img.preview) {
+                    nextImages[i] = { ...img, preview: freshBlobUrl };
+                    updated = true;
                 }
             }
 
