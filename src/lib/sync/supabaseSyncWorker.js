@@ -176,7 +176,13 @@ async function syncOnePhoto(photo) {
             .single();
 
         if (fetchErr || !projectRow) {
-            throw new Error(`Project fetch failed during commit: ${fetchErr?.message || 'Row not found'}`);
+            console.log(`[SyncWorker] ℹ️ Project row ${projectId} not in DB yet. Photo ${photo.id} uploaded to storage successfully.`);
+            await updatePhotoSyncStatus(photo.id, {
+                syncStatus: 'uploaded_to_backend',
+                supabasePath: storagePath
+            });
+            photo.syncStatus = 'uploaded_to_backend';
+            return;
         }
 
         const reportData = projectRow.report_data || {};
