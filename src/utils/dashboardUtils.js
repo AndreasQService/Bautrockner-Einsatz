@@ -7,3 +7,9 @@ export const formatTechnicianLocation = (report) => {
     }
     return loc;
 };
+
+export const formatTechnicianProjectReference = (report) => {
+    const isId = (s) => typeof s === 'string' && (s.match(/-/g) || []).length >= 3 && !s.includes(' ');
+    const parts = [report.projectNumber, report.projectTitle].filter(s => s && s.trim() && !isId(s));
+    return parts.length > 0 ? parts.join(' - ') : '-';
+};

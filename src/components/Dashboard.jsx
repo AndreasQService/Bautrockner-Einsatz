@@ -6,7 +6,7 @@ import TodoMonitor from './TodoMonitor'
 import RightSidebar from './RightSidebar'
 import OfficeProjectsPage from '../features/projects/OfficeProjectsPage'
 import { formatDate } from '../utils/formatUtils'
-import { formatTechnicianLocation } from '../utils/dashboardUtils'
+import { formatTechnicianLocation, formatTechnicianProjectReference } from '../utils/dashboardUtils'
 import { DASHBOARD_STATUS_COLORS as statusColors } from '../config/dashboardConfig'
 
 // Helper to calculate days difference
@@ -716,11 +716,7 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
                                     </div>
 
                                     <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginLeft: '1.25rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                        {(() => {
-                                            const isId = (s) => typeof s === 'string' && (s.match(/-/g) || []).length >= 3 && !s.includes(' ');
-                                            const parts = [report.projectNumber, report.projectTitle].filter(s => s && s.trim() && !isId(s));
-                                            return parts.length > 0 ? parts.join(' - ') : '-';
-                                        })()}
+                                        {formatTechnicianProjectReference(report)}
                                     </div>
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', marginLeft: '0.5rem', flexShrink: 0 }}>
