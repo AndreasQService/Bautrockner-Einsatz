@@ -6,6 +6,7 @@ import TodoMonitor from './TodoMonitor'
 import RightSidebar from './RightSidebar'
 import OfficeProjectsPage from '../features/projects/OfficeProjectsPage'
 import { formatDate } from '../utils/formatUtils'
+import { formatTechnicianLocation } from '../utils/dashboardUtils'
 import { DASHBOARD_STATUS_COLORS as statusColors } from '../config/dashboardConfig'
 
 // Helper to calculate days difference
@@ -695,15 +696,7 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--text-main)', fontSize: '1rem', fontWeight: 700, minWidth: 0 }}>
                                             <MapPin size={14} style={{ flexShrink: 0, color: 'var(--primary)' }} />
                                             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                                {(() => {
-                                                    const streetPart = report.street?.trim();
-                                                    const cityPart = [report.zip, report.city].filter(p => p && p.trim()).join(' ');
-                                                    let loc = [streetPart, cityPart].filter(Boolean).join(', ');
-                                                    if (!loc || loc === ', , ' || loc === ',') {
-                                                        loc = report.address ? report.address.split(',')[0] : 'Keine Adresse';
-                                                    }
-                                                    return loc;
-                                                })()}
+                                                {formatTechnicianLocation(report)}
                                             </span>
                                         </div>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexShrink: 0, marginLeft: '0.5rem' }}>
