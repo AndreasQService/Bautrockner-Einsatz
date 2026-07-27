@@ -9836,6 +9836,35 @@ END:VCARD`;
                                                         setEditingImageIndex(i);
                                                     }}
                                                 />
+                                                {/* DB Sync Status Badge */}
+                                                {(() => {
+                                                    const isCloudSaved = !!(img.supabasePath || img.oneDriveItemId || img.synced || img.supabaseUrl || (typeof img.url === 'string' && img.url.startsWith('http')));
+                                                    return (
+                                                        <div 
+                                                            style={{
+                                                                position: 'absolute',
+                                                                top: '8px',
+                                                                left: '8px',
+                                                                backgroundColor: isCloudSaved ? 'rgba(16, 185, 129, 0.92)' : 'rgba(217, 119, 6, 0.92)',
+                                                                color: '#FFFFFF',
+                                                                borderRadius: '6px',
+                                                                padding: '3px 7px',
+                                                                fontSize: '0.72rem',
+                                                                fontWeight: 700,
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                gap: '4px',
+                                                                boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+                                                                zIndex: 2,
+                                                                backdropFilter: 'blur(4px)'
+                                                            }}
+                                                            title={isCloudSaved ? 'In Supabase/Cloud gespeichert' : 'Lokal gesichert'}
+                                                        >
+                                                            <Database size={13} style={{ strokeWidth: 2.5 }} />
+                                                            <span>{isCloudSaved ? 'In Supabase' : 'Lokal gesichert'}</span>
+                                                        </div>
+                                                    );
+                                                })()}
                                                 <button
                                                     type="button"
                                                     onClick={() => {
