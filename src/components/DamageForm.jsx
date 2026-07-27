@@ -10015,30 +10015,24 @@ END:VCARD`;
                                         return { ...prev, customMapImage: newPreview };
                                     }
 
-                                    // 2. Standard Case: List of Images (Keep original AND add edited image side-by-side)
-                                    const nextImages = [];
-                                    (prev.images || []).forEach(img => {
+                                    // 2. Standard Case: List of Images (Update/Replace the image directly with the edited version with drawings)
+                                    const nextImages = (prev.images || []).map(img => {
                                         const isMatch = img === editingImage || 
                                                         (img.id && editingImage.id && img.id === editingImage.id) ||
                                                         (img.preview && editingImage.preview && img.preview === editingImage.preview) ||
                                                         (img.url && editingImage.url && img.url === editingImage.url);
 
                                         if (isMatch) {
-                                            // 1. Keep the ORIGINAL photo active & included
-                                            nextImages.push({ ...img, includeInReport: true });
-                                            // 2. Add the EDITED photo with drawings right next to it
-                                            nextImages.push({
+                                            return {
                                                 ...img,
-                                                id: `edited_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
-                                                name: img.name ? `${img.name} (Bearbeitet)` : 'Bearbeitetes Bild',
                                                 preview: newPreview,
                                                 url: newPreview,
-                                                description: newDescription || img.description || '',
-                                                includeInReport: true
-                                            });
-                                        } else {
-                                            nextImages.push(img);
+                                                description: newDescription !== undefined ? newDescription : img.description,
+                                                includeInReport: true,
+                                                syncStatus: 'local_only'
+                                            };
                                         }
+                                        return img;
                                     });
                                     return { ...prev, images: nextImages };
                                 });
