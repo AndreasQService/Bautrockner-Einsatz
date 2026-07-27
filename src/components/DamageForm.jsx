@@ -805,6 +805,18 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                     const { syncPendingToSupabase } = await import('../lib/sync/supabaseSyncWorker');
                     const { synced, failed } = await syncPendingToSupabase();
                     console.log(`[Sync] Cloud-first sync done. Synced: ${synced}, Failed: ${failed}`);
+                    if (synced > 0) {
+                        try {
+                            const updatedLocal = await getProjectPhotos(formData.id || 'temp');
+                            setFormData(prev => ({
+                                ...prev,
+                                images: (prev.images || []).map(img => {
+                                    const lp = updatedLocal.find(p => p.id === img.id);
+                                    return lp && lp.syncStatus ? { ...img, syncStatus: lp.syncStatus, uploading: lp.syncStatus !== 'remote_verified' && lp.syncStatus !== 'synced' } : img;
+                                })
+                            }));
+                        } catch (e) {}
+                    }
                 } else {
                     // Legacy sync loop
                     const { getPendingPhotos } = await import('../services/PhotoStorage');
@@ -2086,9 +2098,17 @@ END:VCARD`;
                     // 3. Immediately trigger background sync worker without blocking UI
                     import('../lib/sync/supabaseSyncWorker.js').then(({ syncPendingToSupabase }) => {
                         syncPendingToSupabase().then(({ synced }) => {
-                            if (synced > 0 && fetchReports) {
-                                // Fetch reports to update standard project state
-                                fetchReports().catch(() => {});
+                            if (synced > 0) {
+                                getProjectPhotos(formData.id || 'temp').then(localPhotos => {
+                                    setFormData(prev => ({
+                                        ...prev,
+                                        images: (prev.images || []).map(img => {
+                                            const lp = localPhotos.find(p => p.id === img.id);
+                                            return lp && lp.syncStatus ? { ...img, syncStatus: lp.syncStatus, uploading: lp.syncStatus !== 'remote_verified' && lp.syncStatus !== 'synced' } : img;
+                                        })
+                                    }));
+                                }).catch(() => {});
+                                if (fetchReports) fetchReports().catch(() => {});
                             }
                         }).catch(err => {
                             console.warn('[handleImageUpload] Background sync failed:', err.message);
@@ -2142,8 +2162,16 @@ END:VCARD`;
                 import('../lib/sync/supabaseSyncWorker.js').then(({ syncPendingToSupabase }) => {
                     syncPendingToSupabase().then(({ synced }) => {
                         if (synced > 0) {
-                            // Fetch reports to update standard project state
-                            fetchReports().catch(() => {});
+                            getProjectPhotos(formData.id || 'temp').then(localPhotos => {
+                                setFormData(prev => ({
+                                    ...prev,
+                                    images: (prev.images || []).map(img => {
+                                        const lp = localPhotos.find(p => p.id === img.id);
+                                        return lp && lp.syncStatus ? { ...img, syncStatus: lp.syncStatus, uploading: lp.syncStatus !== 'remote_verified' && lp.syncStatus !== 'synced' } : img;
+                                    })
+                                }));
+                            }).catch(() => {});
+                            if (fetchReports) fetchReports().catch(() => {});
                         }
                     }).catch(err => {
                         console.warn('[handleImageUpload] Background sync failed:', err.message);
