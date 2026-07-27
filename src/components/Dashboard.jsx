@@ -8,7 +8,7 @@ import DashboardReportTableHeader from './DashboardReportTableHeader'
 import DashboardTechnicianProjectInfo from './DashboardTechnicianProjectInfo'
 import OfficeProjectsPage from '../features/projects/OfficeProjectsPage'
 import { formatDate } from '../utils/formatUtils'
-import { formatCompletedEquipmentRuntime, formatEquipmentDate, formatEquipmentLocation, formatEquipmentTypeModel, getDryingStartDate } from '../utils/dashboardUtils'
+import { formatCompletedEquipmentRuntime, formatEquipmentDate, formatEquipmentLocation, formatEquipmentProjectAddress, formatEquipmentTypeModel, getDryingStartDate } from '../utils/dashboardUtils'
 import { DASHBOARD_STATUS_COLORS as statusColors } from '../config/dashboardConfig'
 
 // Helper to calculate days difference
@@ -315,6 +315,7 @@ const DeviceInventoryList = ({ reports, onSelectReport }) => {
                         <tbody>
                             {devicesList.map(({ report, item }, idx) => {
                                 const typeModel = formatEquipmentTypeModel(item);
+                                const projectAddress = formatEquipmentProjectAddress(report);
                                 const isAktiv = !item.endDate;
                                 
                                 const statusStyle = isAktiv ? {
@@ -349,10 +350,10 @@ const DeviceInventoryList = ({ reports, onSelectReport }) => {
                                         </td>
                                         <td style={{ padding: '0.75rem' }}>
                                             <div style={{ fontWeight: 600, color: 'var(--text-main)' }}>
-                                                {report.street || 'Keine Strasse'}
+                                                {projectAddress.street}
                                             </div>
                                             <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                                                {[report.zip, report.city].filter(Boolean).join(' ')} {report.projectNumber ? `(${report.projectNumber})` : ''}
+                                                {projectAddress.details}
                                             </div>
                                         </td>
                                         <td style={{ padding: '0.75rem', color: 'var(--text-main)' }}>

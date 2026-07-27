@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+import { formatEquipmentProjectAddress } from '../src/utils/dashboardUtils.js';
+
 const previousEquipmentProjectAddress = (report) => ({
   street: report.street || 'Keine Strasse',
   details: `${[report.zip, report.city].filter(Boolean).join(' ')} ${report.projectNumber ? `(${report.projectNumber})` : ''}`,
@@ -27,6 +29,7 @@ const cases = [
 
 for (const [name, report, expected] of cases) {
   test(name, () => {
+    assert.deepEqual(formatEquipmentProjectAddress(report), previousEquipmentProjectAddress(report));
     assert.deepEqual(previousEquipmentProjectAddress(report), expected);
   });
 }
@@ -34,6 +37,6 @@ for (const [name, report, expected] of cases) {
 test('equipment project-address derivation does not mutate its input', () => {
   const report = { street: 'Musterstrasse 12', zip: '8000', city: 'Zürich', projectNumber: 'Q-2026-001' };
   const before = structuredClone(report);
-  previousEquipmentProjectAddress(report);
+  formatEquipmentProjectAddress(report);
   assert.deepEqual(report, before);
 });

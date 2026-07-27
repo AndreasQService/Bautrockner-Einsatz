@@ -52,3 +52,8 @@ export const formatEquipmentLocation = (equipment) => {
     if (!equipment.room) return '';
     return `${equipment.apartment ? `${equipment.apartment} - ` : ''}${equipment.room}`;
 };
+
+export const formatEquipmentProjectAddress = (report) => ({
+    street: report.street || 'Keine Strasse',
+    details: `${[report.zip, report.city].filter(Boolean).join(' ')} ${report.projectNumber ? `(${report.projectNumber})` : ''}`,
+});
