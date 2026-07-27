@@ -1483,6 +1483,7 @@ function App() {
                   safeSetItem('qservice_unsaved_reports', JSON.stringify(next));
                   return next;
                 });
+                showToast('✅ Projekt erfolgreich gespeichert!', 'success');
               }
             }
           } else {
@@ -1527,6 +1528,7 @@ function App() {
                   safeSetItem('qservice_unsaved_reports', JSON.stringify(next));
                   return next;
                 });
+                showToast('✅ Projekt erfolgreich gespeichert!', 'success');
               }
             }
           }
