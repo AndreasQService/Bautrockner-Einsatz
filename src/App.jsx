@@ -1354,12 +1354,12 @@ function App() {
         throw new Error('SAVE BLOCKED: report is not fully loaded from Supabase.');
       }
 
-      // ── Sitzungsschutz: Kein Supabase-Save wenn anderes Gerät aktiv ist ───────────
-      // Techniker-Modus darf IMMER in die Cloud speichern, selbst bei Modus-Konflikt
+      // ── Sitzungsschutz: Stummes Autosave nur ausführen wenn Sitzung aktiv ───────────
       const isTechSave = projectMode === 'technician' || isTechnicianMode;
-      if (!isSessionActiveRef.current && !isTechSave) {
-        console.warn('[Session] Sitzung inaktiv – Supabase-Save blockiert für:', finalReport.id);
-        return finalReport; // Nur lokal im Memory, kein Supabase-Write
+      const isNewProjectSave = !finalReport.id || finalReport.id.startsWith('TMP-') || finalReport.id === 'temp';
+      if (!isSessionActiveRef.current && !isTechSave && !isNewProjectSave && silent) {
+        console.warn('[Session] Sitzung inaktiv – stummes Autosave übersprungen für:', finalReport.id);
+        return finalReport;
       }
 
       const performCloudSave = async () => {
