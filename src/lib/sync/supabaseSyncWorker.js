@@ -77,15 +77,15 @@ async function syncOnePhoto(photo) {
     const ext = photo.name?.split('.').pop().toLowerCase() || 'jpg';
     const storagePath = `${testRunId}/${projectId}/Fotos/TEST__${photo.id}.${ext}`;
     
-    // 1. Compression Phase (local_only -> queued_for_sync)
-    if (photo.syncStatus === 'local_only' || !photo.compressed) {
+    // 1. Compression Phase
+    if (!photo.compressed || !photo.compressed.blob) {
         console.log(`[SyncWorker] ⚙️ Compressing photo ${photo.id}...`);
-        const result = await queueImageCompression(photo.blob, photo.meta?.isSketch);
+        const result = await queueImageCompression(photo.blob || photo.original?.blob, photo.meta?.isSketch);
         
-        // Save compressed blobs back to IndexedDB
         photo.compressed = result.compressed;
         photo.pdf = result.pdf;
         photo.preview = result.preview;
+        photo.original = photo.original || {};
         photo.original.sha256 = result.original.sha256;
         photo.syncStatus = 'queued_for_sync';
         
@@ -98,13 +98,13 @@ async function syncOnePhoto(photo) {
         });
     }
 
-    const compressedBlob = photo.compressed.blob;
+    const compressedBlob = photo.compressed?.blob || photo.compressed || photo.blob || photo.original?.blob;
     if (!compressedBlob) throw new Error('Compressed Blob is missing');
 
-    const sha256 = photo.compressed.sha256;
+    const sha256 = photo.compressed?.sha256 || photo.original?.sha256 || 'SHA_FALLBACK';
 
-    // 2. Storage Upload (queued_for_sync -> uploaded_to_backend)
-    if (photo.syncStatus === 'queued_for_sync') {
+    // 2. Storage Upload (run for any photo not yet uploaded)
+    if (photo.syncStatus !== 'uploaded_to_backend' && photo.syncStatus !== 'remote_verified' && photo.syncStatus !== 'synced') {
         console.log(`[SyncWorker] ☁️ Uploading photo ${photo.id} to Supabase storage...`);
         
         const { error: uploadErr } = await supabase.storage
