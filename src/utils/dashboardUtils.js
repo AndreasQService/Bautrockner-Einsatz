@@ -32,3 +32,15 @@ export const formatEquipmentDate = (dateString) => {
     const year = String(date.getFullYear()).slice(-2);
     return `${day}.${month}.${year}`;
 };
+
+export const formatCompletedEquipmentRuntime = (startDateStr, endDateStr) => {
+    if (!startDateStr) return '-';
+    const start = new Date(startDateStr);
+    if (isNaN(start.getTime())) return '-';
+    const end = new Date(endDateStr);
+    if (isNaN(end.getTime())) return '-';
+    start.setHours(0,0,0,0);
+    end.setHours(0,0,0,0);
+    const diffTime = end - start;
+    return `${Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)))} d`;
+};

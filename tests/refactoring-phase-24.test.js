@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+import { formatCompletedEquipmentRuntime } from '../src/utils/dashboardUtils.js';
+
 const previousGetDaysRunning = (startDateStr, endDateStr) => {
   if (!startDateStr) return '-';
   const start = new Date(startDateStr);
@@ -32,6 +34,7 @@ const completedCases = [
 
 for (const [name, startDate, endDate, expected] of completedCases) {
   test(name, () => {
+    assert.strictEqual(formatCompletedEquipmentRuntime(startDate, endDate), previousGetDaysRunning(startDate, endDate));
     assert.strictEqual(previousGetDaysRunning(startDate, endDate), expected);
   });
 }
@@ -42,6 +45,7 @@ test('completed runtime calculation does not mutate Date inputs', () => {
   const startBefore = startDate.getTime();
   const endBefore = endDate.getTime();
 
+  assert.strictEqual(formatCompletedEquipmentRuntime(startDate, endDate), previousGetDaysRunning(startDate, endDate));
   assert.strictEqual(previousGetDaysRunning(startDate, endDate), '3 d');
   assert.strictEqual(startDate.getTime(), startBefore);
   assert.strictEqual(endDate.getTime(), endBefore);
