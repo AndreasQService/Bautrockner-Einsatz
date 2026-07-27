@@ -6,6 +6,7 @@ import TodoMonitor from './TodoMonitor'
 import RightSidebar from './RightSidebar'
 import OfficeProjectsPage from '../features/projects/OfficeProjectsPage'
 import { formatDate } from '../utils/formatUtils'
+import { DASHBOARD_STATUS_COLORS as statusColors } from '../config/dashboardConfig'
 
 // Helper to calculate days difference
 const getDaysDiff = (startDate) => {
@@ -19,14 +20,6 @@ const getDaysDiff = (startDate) => {
 }
 
 
-const statusColors = {
-    'Schadenaufnahme': 'bg-gray-100 text-gray-800',
-    'Leckortung': 'bg-blue-100 text-blue-800',
-    'Trocknung': 'bg-yellow-100 text-yellow-800',
-    'Kontrolle*': 'bg-orange-100 text-orange-800',
-    'Instandsetzung': 'bg-green-100 text-green-800',
-    'Abgeschlossen': 'bg-gray-200 text-gray-600'
-}
 
 // Helper to find latest measurement date across all rooms (moved to global scope for reuse)
 const getLatestMeasurementDays = (report) => {
