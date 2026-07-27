@@ -247,31 +247,30 @@ const ImageEditor = ({ image, caseId, onSave, onCancel }) => {
             mergeCtx.drawImage(bgCanvasRef.current, 0, 0);
             mergeCtx.drawImage(canvasRef.current, 0, 0);
 
-            const dataUrl = mergeCanvas.toDataURL('image/jpeg', 0.82);
+            const dataUrl = mergeCanvas.toDataURL('image/jpeg', 0.85);
 
-            if (supabase) {
-                try {
-                    // Convert base64 to Blob
-                    const res = await fetch(dataUrl);
-                    const blob = await res.blob();
-                    const ext = 'jpg';
-                    const fileName = `cases/${caseId || 'temp'}/images/edited_${Date.now()}.${ext}`;
-                    
-                    const { error } = await supabase.storage.from('case-files').upload(fileName, blob);
-                    if (error) throw error;
-                    
-                    const { data: { publicUrl } } = supabase.storage.from('case-files').getPublicUrl(fileName);
-                    onSave(publicUrl, localDescription);
-                    return;
-                } catch (uploadErr) {
-                    console.warn('Failed to upload edited image to Supabase Storage, falling back to base64:', uploadErr);
-                }
+            // Convert base64 to Blob & save in IndexedDB so preview persists permanently across reloads
+            try {
+                const res = await fetch(dataUrl);
+                const blob = await res.blob();
+                const newPhotoId = 'img_edited_' + Math.random().toString(36).substring(2, 9) + '_' + Date.now();
+                const { savePhotoLocally } = await import('../services/PhotoStorage.js');
+                await savePhotoLocally(newPhotoId, caseId || 'temp', blob, {
+                    description: localDescription,
+                    isEdited: true
+                });
+
+                // Immediately trigger background sync for edited photo
+                import('../lib/sync/supabaseSyncWorker.js').then(({ syncPendingToSupabase }) => {
+                    syncPendingToSupabase().catch(() => {});
+                }).catch(() => {});
+            } catch (storageErr) {
+                console.warn('Failed to save edited photo locally:', storageErr);
             }
-            
-            // Fallback if supabase is not available or upload fails
+
             onSave(dataUrl, localDescription);
         } catch (err) {
-            console.error('Error saving/uploading edited image:', err);
+            console.error('Error saving edited image:', err);
             alert('Fehler beim Speichern des Bildes.');
         } finally {
             setIsSaving(false);
