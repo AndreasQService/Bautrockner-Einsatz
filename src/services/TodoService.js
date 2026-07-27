@@ -47,43 +47,63 @@ export async function ensureAuthenticated() {
     }
 }
 
+function getLocalTodos() {
+    try {
+        return JSON.parse(localStorage.getItem('qservice_local_todos') || '[]');
+    } catch (e) {
+        return [];
+    }
+}
+
 /**
- * Fetches all todos from Supabase.
+ * Fetches all todos from Supabase & local storage.
  */
 export async function fetchAllTodos() {
-    await ensureAuthenticated();
-    if (!supabase) return [];
-
-    const { data, error } = await supabase
-        .from('project_todos')
-        .select('*')
-        .order('due_date', { ascending: true });
-
-    if (error) {
-        console.error('[TodoService] Error fetching todos:', error.message);
-        throw error;
+    await ensureAuthenticated().catch(() => {});
+    let remoteData = [];
+    if (supabase) {
+        try {
+            const { data, error } = await supabase
+                .from('project_todos')
+                .select('*')
+                .order('due_date', { ascending: true });
+            if (!error && data) remoteData = data;
+        } catch (e) {}
     }
-    return data || [];
+    const local = getLocalTodos();
+    const combined = [...remoteData];
+    local.forEach(loc => {
+        if (!combined.some(r => r.id === loc.id)) {
+            combined.push(loc);
+        }
+    });
+    return combined;
 }
 
 /**
  * Fetches todos specifically for a given project.
  */
 export async function fetchTodosForProject(projectId) {
-    await ensureAuthenticated();
-    if (!supabase) return [];
-
-    const { data, error } = await supabase
-        .from('project_todos')
-        .select('*')
-        .eq('project_id', projectId)
-        .order('due_date', { ascending: true });
-
-    if (error) {
-        console.error('[TodoService] Error fetching project todos:', error.message);
-        throw error;
+    await ensureAuthenticated().catch(() => {});
+    let remoteData = [];
+    if (supabase) {
+        try {
+            const { data, error } = await supabase
+                .from('project_todos')
+                .select('*')
+                .eq('project_id', projectId)
+                .order('due_date', { ascending: true });
+            if (!error && data) remoteData = data;
+        } catch (e) {}
     }
-    return data || [];
+    const local = getLocalTodos().filter(t => t.project_id === projectId);
+    const combined = [...remoteData];
+    local.forEach(loc => {
+        if (!combined.some(r => r.id === loc.id)) {
+            combined.push(loc);
+        }
+    });
+    return combined;
 }
 
 /**
