@@ -38,18 +38,17 @@ const LoginScreen = ({ users, onLogin }) => {
             padding: '1rem',
             fontFamily: 'system-ui, -apple-system, sans-serif'
         }}>
-            {/* Custom styles to override global CSS '!important' rules */}
             <style>{`
                 .login-input {
                     width: 100% !important;
                     height: 48px !important;
                     padding: 0.75rem 1rem 0.75rem 2.5rem !important;
-                    backgroundColor: #131929 !important;
+                    background-color: #131929 !important;
                     background: #131929 !important;
                     border: 1px solid #2a324a !important;
-                    borderRadius: 6px !important;
+                    border-radius: 6px !important;
                     color: #f8fafc !important;
-                    fontSize: 0.95rem !important;
+                    font-size: 0.95rem !important;
                     outline: none !important;
                     box-sizing: border-box !important;
                 }
