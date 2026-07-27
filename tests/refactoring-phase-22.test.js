@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+import { formatEquipmentDate } from '../src/utils/dashboardUtils.js';
+
 const previousFormatEquipmentDate = (dateString) => {
   if (!dateString) return '-';
   const date = new Date(dateString);
@@ -28,6 +30,7 @@ const cases = [
 
 for (const [name, input, expected] of cases) {
   test(name, () => {
+    assert.strictEqual(formatEquipmentDate(input), previousFormatEquipmentDate(input));
     assert.strictEqual(previousFormatEquipmentDate(input), expected);
   });
 }
@@ -35,6 +38,6 @@ for (const [name, input, expected] of cases) {
 test('formatting does not mutate a Date-compatible object', () => {
   const input = new String('2026-07-15');
   const before = input.toString();
-  previousFormatEquipmentDate(input);
+  formatEquipmentDate(input);
   assert.strictEqual(input.toString(), before);
 });
