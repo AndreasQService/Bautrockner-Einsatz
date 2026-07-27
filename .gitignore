@@ -81,3 +81,12 @@ trace_*.txt
 esbuild_error*.txt
 .vercel
 .env*
+
+# Playwright Test Artifacts
+playwright-report/
+test-results/
+*.webm
+*.png
+room-edit-debug*.png
+tests/offline/*.png
+tests/offline/*.webm

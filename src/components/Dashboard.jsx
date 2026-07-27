@@ -4,7 +4,12 @@ import InboxTodo from './InboxTodo'
 import WorkflowStatusOverview from './WorkflowStatusOverview'
 import TodoMonitor from './TodoMonitor'
 import RightSidebar from './RightSidebar'
+import DashboardReportTableHeader from './DashboardReportTableHeader'
+import DashboardTechnicianProjectInfo from './DashboardTechnicianProjectInfo'
 import OfficeProjectsPage from '../features/projects/OfficeProjectsPage'
+import { formatDate } from '../utils/formatUtils'
+import { formatActiveEquipmentRuntime, formatCompletedEquipmentRuntime, formatEquipmentDate, formatEquipmentLocation, formatEquipmentProjectAddress, formatEquipmentTypeModel, getDryingStartDate, getEquipmentStatus } from '../utils/dashboardUtils'
+import { DASHBOARD_STATUS_COLORS as statusColors } from '../config/dashboardConfig'
 
 // Helper to calculate days difference
 const getDaysDiff = (startDate) => {
@@ -17,27 +22,7 @@ const getDaysDiff = (startDate) => {
     return Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
 }
 
-// Helper to format date as tt/mm/jj hh:mm
-const formatDate = (dateString) => {
-    if (!dateString) return '-';
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) return dateString;
-    const day = String(date.getDate()).padStart(2, '0');
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const year = String(date.getFullYear()).slice(-2);
-    const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
-    return `${day}/${month}/${year} ${hours}:${minutes}`;
-}
 
-const statusColors = {
-    'Schadenaufnahme': 'bg-gray-100 text-gray-800',
-    'Leckortung': 'bg-blue-100 text-blue-800',
-    'Trocknung': 'bg-yellow-100 text-yellow-800',
-    'Kontrolle*': 'bg-orange-100 text-orange-800',
-    'Instandsetzung': 'bg-green-100 text-green-800',
-    'Abgeschlossen': 'bg-gray-200 text-gray-600'
-}
 
 // Helper to find latest measurement date across all rooms (moved to global scope for reuse)
 const getLatestMeasurementDays = (report) => {
@@ -113,19 +98,8 @@ const DryingMonitor = ({ reports, onSelectReport, workflowStore = {} }) => {
         return !isMilestoneDone;
     });
 
-    // Helper to get start date (from first device or report date)
-    const getStartDate = (report) => {
-        if (report.dryingStarted) return report.dryingStarted;
-        if (report.equipment && report.equipment.length > 0) {
-            // Find earliest device start date
-            const dates = report.equipment.map(e => e.startDate).filter(d => d).sort();
-            if (dates.length > 0) return dates[0];
-        }
-        return report.date; // Fallback to report creation date
-    };
-
     // Sort by duration desc (using new helper)
-    dryingReports.sort((a, b) => getDaysDiff(getStartDate(b)) - getDaysDiff(getStartDate(a)));
+    dryingReports.sort((a, b) => getDaysDiff(getDryingStartDate(b)) - getDaysDiff(getDryingStartDate(a)));
 
     return (
         <div className="card" style={{ marginBottom: '2rem', borderTop: '4px solid #F59E0B' }}>
@@ -136,7 +110,7 @@ const DryingMonitor = ({ reports, onSelectReport, workflowStore = {} }) => {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1rem' }}>
                 {dryingReports.length > 0 ? (
                     dryingReports.map(report => {
-                        const startDate = getStartDate(report);
+                        const startDate = getDryingStartDate(report);
                         const days = getDaysDiff(startDate);
                         const uStyle = getUrgencyStyle(days, [15, 30]);
 
@@ -304,26 +278,9 @@ const DeviceInventoryList = ({ reports, onSelectReport }) => {
         });
     }, [reports]);
 
-    const formatEquipmentDate = (dateString) => {
-        if (!dateString) return '-';
-        const date = new Date(dateString);
-        if (isNaN(date.getTime())) return dateString;
-        const day = String(date.getDate()).padStart(2, '0');
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const year = String(date.getFullYear()).slice(-2);
-        return `${day}.${month}.${year}`;
-    };
-
     const getDaysRunning = (startDateStr, endDateStr) => {
-        if (!startDateStr) return '-';
-        const start = new Date(startDateStr);
-        if (isNaN(start.getTime())) return '-';
-        const end = endDateStr ? new Date(endDateStr) : new Date();
-        if (isNaN(end.getTime())) return '-';
-        start.setHours(0,0,0,0);
-        end.setHours(0,0,0,0);
-        const diffTime = end - start;
-        return `${Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)))} d`;
+        if (endDateStr) return formatCompletedEquipmentRuntime(startDateStr, endDateStr);
+        return formatActiveEquipmentRuntime(startDateStr, new Date());
     };
 
     return (
@@ -349,18 +306,9 @@ const DeviceInventoryList = ({ reports, onSelectReport }) => {
                         </thead>
                         <tbody>
                             {devicesList.map(({ report, item }, idx) => {
-                                const typeModel = [item.type, item.model].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i).join(' - ');
-                                const isAktiv = !item.endDate;
-                                
-                                const statusStyle = isAktiv ? {
-                                    bg: 'rgba(16, 185, 129, 0.15)',
-                                    color: '#10B981',
-                                    border: '1px solid rgba(16, 185, 129, 0.25)'
-                                } : {
-                                    bg: 'rgba(59, 130, 246, 0.15)',
-                                    color: '#3B82F6',
-                                    border: '1px solid rgba(59, 130, 246, 0.25)'
-                                };
+                                const typeModel = formatEquipmentTypeModel(item);
+                                const projectAddress = formatEquipmentProjectAddress(report);
+                                const { label: statusLabel, statusStyle } = getEquipmentStatus(item);
 
                                 return (
                                     <tr
@@ -384,15 +332,15 @@ const DeviceInventoryList = ({ reports, onSelectReport }) => {
                                         </td>
                                         <td style={{ padding: '0.75rem' }}>
                                             <div style={{ fontWeight: 600, color: 'var(--text-main)' }}>
-                                                {report.street || 'Keine Strasse'}
+                                                {projectAddress.street}
                                             </div>
                                             <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                                                {[report.zip, report.city].filter(Boolean).join(' ')} {report.projectNumber ? `(${report.projectNumber})` : ''}
+                                                {projectAddress.details}
                                             </div>
                                         </td>
                                         <td style={{ padding: '0.75rem', color: 'var(--text-main)' }}>
                                             {item.room ? (
-                                                <span>{item.apartment ? `${item.apartment} - ` : ''}{item.room}</span>
+                                                <span>{formatEquipmentLocation(item)}</span>
                                             ) : (
                                                 <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>kein Raum zugeordnet</span>
                                             )}
@@ -414,7 +362,7 @@ const DeviceInventoryList = ({ reports, onSelectReport }) => {
                                                 border: statusStyle.border,
                                                 display: 'inline-block'
                                             }}>
-                                                {isAktiv ? 'Aktiv' : 'Deinstalliert'}
+                                                {statusLabel}
                                             </span>
                                         </td>
                                         <td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: 700, color: 'var(--text-main)' }}>
@@ -708,46 +656,7 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
                                 style={{ cursor: 'pointer', ...(lockedIds.has(report.id) ? { opacity: 0.7, cursor: 'not-allowed' } : {}) }}
                             >
                                 <button style={{ opacity: 0, width: 1, height: 1, padding: 0, border: 'none', position: 'absolute', pointerEvents: 'none' }}>Messung</button>
-                                <div style={{ flex: 1, minWidth: 0 }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.15rem' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--text-main)', fontSize: '1rem', fontWeight: 700, minWidth: 0 }}>
-                                            <MapPin size={14} style={{ flexShrink: 0, color: 'var(--primary)' }} />
-                                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                                {(() => {
-                                                    const streetPart = report.street?.trim();
-                                                    const cityPart = [report.zip, report.city].filter(p => p && p.trim()).join(' ');
-                                                    let loc = [streetPart, cityPart].filter(Boolean).join(', ');
-                                                    if (!loc || loc === ', , ' || loc === ',') {
-                                                        loc = report.address ? report.address.split(',')[0] : 'Keine Adresse';
-                                                    }
-                                                    return loc;
-                                                })()}
-                                            </span>
-                                        </div>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexShrink: 0, marginLeft: '0.5rem' }}>
-                                            {lockedIds.has(report.id) && (
-                                                <span title="In anderem Tab geöffnet" style={{
-                                                    fontSize: '0.65rem', padding: '0.1rem 0.4rem',
-                                                    backgroundColor: 'rgba(239,68,68,0.15)',
-                                                    color: '#EF4444', borderRadius: '6px',
-                                                    fontWeight: 700, border: '1px solid rgba(239,68,68,0.3)',
-                                                    whiteSpace: 'nowrap'
-                                                }}>🔒 In Bearbeitung</span>
-                                            )}
-                                            <span className={`status-badge ${statusColors[report.status] || 'bg-gray-100'}`} style={{ fontSize: '0.65rem', padding: '0.15rem 0.5rem', whiteSpace: 'nowrap' }}>
-                                                {report.status}
-                                            </span>
-                                        </div>
-                                    </div>
-
-                                    <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginLeft: '1.25rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                        {(() => {
-                                            const isId = (s) => typeof s === 'string' && (s.match(/-/g) || []).length >= 3 && !s.includes(' ');
-                                            const parts = [report.projectNumber, report.projectTitle].filter(s => s && s.trim() && !isId(s));
-                                            return parts.length > 0 ? parts.join(' - ') : '-';
-                                        })()}
-                                    </div>
-                                </div>
+                                <DashboardTechnicianProjectInfo report={report} lockedIds={lockedIds} />
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', marginLeft: '0.5rem', flexShrink: 0 }}>
                                     <button
                                         onClick={(e) => {
@@ -805,24 +714,7 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
 
                     <div className="table-container" style={{ maxHeight: 'calc(100vh - 200px)', overflowY: 'auto' }}>
                         <table className="data-table">
-                            <thead>
-                                <tr>
-                                    <th style={{ width: '36px', position: 'sticky', top: 0, zIndex: 20, backgroundColor: 'var(--background)' }}></th>
-                                    <th style={{ width: '100px', position: 'sticky', top: 0, zIndex: 20, backgroundColor: 'var(--background)', textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.05em' }}>Nr.</th>
-                                    <th style={{ width: '100px', position: 'sticky', top: 0, zIndex: 20, backgroundColor: 'var(--background)', textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.05em' }}>Datum</th>
-                                    <th style={{ minWidth: '150px', position: 'sticky', top: 0, zIndex: 20, backgroundColor: 'var(--background)', textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.05em' }}>Schadenort</th>
-                                    <th style={{ minWidth: '180px', position: 'sticky', top: 0, zIndex: 20, backgroundColor: 'var(--background)', textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.05em' }}>Adresse</th>
-                                    <th style={{ minWidth: '140px', position: 'sticky', top: 0, zIndex: 20, backgroundColor: 'var(--background)', textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.05em' }}>Auftraggeber</th>
-                                    <th style={{ minWidth: '110px', position: 'sticky', top: 0, zIndex: 20, backgroundColor: 'var(--background)', textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.05em' }}>Bewirtschafter/in</th>
-                                    <th style={{ minWidth: '140px', position: 'sticky', top: 0, zIndex: 20, backgroundColor: 'var(--background)', textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.05em' }}>Schaden</th>
-                                    <th style={{ width: '130px', position: 'sticky', top: 0, zIndex: 20, backgroundColor: 'var(--background)', textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.05em' }}>Status</th>
-                                    <th style={{ minWidth: '120px', position: 'sticky', top: 0, zIndex: 20, backgroundColor: 'var(--background)', textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.05em' }}>Kunde von</th>
-
-                                    <th style={{ width: '80px', textAlign: 'center', position: 'sticky', top: 0, zIndex: 20, backgroundColor: 'var(--background)', textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.05em' }}>Geräte</th>
-                                    <th style={{ width: '90px', textAlign: 'center', position: 'sticky', top: 0, zIndex: 20, backgroundColor: 'var(--background)', textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.05em' }}>Rechnung</th>
-                                    <th style={{ width: '80px', position: 'sticky', top: 0, zIndex: 20, backgroundColor: 'var(--background)' }}></th>
-                                </tr>
-                            </thead>
+                            <DashboardReportTableHeader />
                             <tbody>
                                 {paginatedReports.map((report) => {
                                     const activeDevices = report.equipment ? report.equipment.length : 0;

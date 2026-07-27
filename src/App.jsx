@@ -765,7 +765,8 @@ function App() {
     selectedReport?.id ?? null,
     view,
     resolvedProjectMode,
-    sessionStartedAtRef.current
+    sessionStartedAtRef.current,
+    Boolean(currentUser)
   );
 
   // isSessionActive-Ref synchron halten (für handleSaveReport)
