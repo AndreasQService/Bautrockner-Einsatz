@@ -13,3 +13,12 @@ export const formatTechnicianProjectReference = (report) => {
     const parts = [report.projectNumber, report.projectTitle].filter(s => s && s.trim() && !isId(s));
     return parts.length > 0 ? parts.join(' - ') : '-';
 };
+
+export const getDryingStartDate = (report) => {
+    if (report.dryingStarted) return report.dryingStarted;
+    if (report.equipment && report.equipment.length > 0) {
+        const dates = report.equipment.map(e => e.startDate).filter(d => d).sort();
+        if (dates.length > 0) return dates[0];
+    }
+    return report.date;
+};

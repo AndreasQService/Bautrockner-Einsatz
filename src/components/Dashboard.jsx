@@ -8,6 +8,7 @@ import DashboardReportTableHeader from './DashboardReportTableHeader'
 import DashboardTechnicianProjectInfo from './DashboardTechnicianProjectInfo'
 import OfficeProjectsPage from '../features/projects/OfficeProjectsPage'
 import { formatDate } from '../utils/formatUtils'
+import { getDryingStartDate } from '../utils/dashboardUtils'
 import { DASHBOARD_STATUS_COLORS as statusColors } from '../config/dashboardConfig'
 
 // Helper to calculate days difference
@@ -97,19 +98,8 @@ const DryingMonitor = ({ reports, onSelectReport, workflowStore = {} }) => {
         return !isMilestoneDone;
     });
 
-    // Helper to get start date (from first device or report date)
-    const getStartDate = (report) => {
-        if (report.dryingStarted) return report.dryingStarted;
-        if (report.equipment && report.equipment.length > 0) {
-            // Find earliest device start date
-            const dates = report.equipment.map(e => e.startDate).filter(d => d).sort();
-            if (dates.length > 0) return dates[0];
-        }
-        return report.date; // Fallback to report creation date
-    };
-
     // Sort by duration desc (using new helper)
-    dryingReports.sort((a, b) => getDaysDiff(getStartDate(b)) - getDaysDiff(getStartDate(a)));
+    dryingReports.sort((a, b) => getDaysDiff(getDryingStartDate(b)) - getDaysDiff(getDryingStartDate(a)));
 
     return (
         <div className="card" style={{ marginBottom: '2rem', borderTop: '4px solid #F59E0B' }}>
@@ -120,7 +110,7 @@ const DryingMonitor = ({ reports, onSelectReport, workflowStore = {} }) => {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1rem' }}>
                 {dryingReports.length > 0 ? (
                     dryingReports.map(report => {
-                        const startDate = getStartDate(report);
+                        const startDate = getDryingStartDate(report);
                         const days = getDaysDiff(startDate);
                         const uStyle = getUrgencyStyle(days, [15, 30]);
 

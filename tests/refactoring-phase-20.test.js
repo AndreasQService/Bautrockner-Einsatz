@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+import { getDryingStartDate } from '../src/utils/dashboardUtils.js';
+
 const previousDryingStartDate = (report) => {
   if (report.dryingStarted) return report.dryingStarted;
   if (report.equipment && report.equipment.length > 0) {
@@ -25,6 +27,7 @@ const cases = [
 
 for (const [name, report, expected] of cases) {
   test(name, () => {
+    assert.strictEqual(getDryingStartDate(report), previousDryingStartDate(report));
     assert.strictEqual(previousDryingStartDate(report), expected);
   });
 }
@@ -35,6 +38,6 @@ test('previousDryingStartDate does not mutate report or equipment', () => {
     equipment: [{ startDate: '2026-03-03' }, { startDate: '2026-02-02' }],
   };
   const before = structuredClone(report);
-  previousDryingStartDate(report);
+  getDryingStartDate(report);
   assert.deepEqual(report, before);
 });
