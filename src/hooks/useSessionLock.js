@@ -126,7 +126,6 @@ export function useSessionLock(supabase, sessionToken, selectedReportId, view, r
 
     const myToken     = tokenRef.current;
     const myProjectId = reportIdRef.current;
-    const myMode      = modeRef.current;
     const myView      = viewRef.current;
 
     // ── Dashboard-Lock: Projekte die andere Tabs offen haben ──────────
@@ -137,18 +136,16 @@ export function useSessionLock(supabase, sessionToken, selectedReportId, view, r
     );
     setLockedProjectIds(otherIds);
 
-    // ── Modus-Konflikt: selbes Projekt, anderer Modus ─────────────────
+    // ── Session-Konflikt: selbes Projekt geöffnet ─────────────────────
     const inProject = myView === 'details' || myView === 'new-report';
     if (!inProject || !myProjectId) {
       setIsSessionActive(true);
       return;
     }
 
-    const mySessionData = (data || []).find(s => s.session_token === myToken);
     const conflicting = (data || []).filter(
       s => s.session_token !== myToken &&
-           s.open_project_id === myProjectId &&
-           s.mode !== myMode
+           s.open_project_id === myProjectId
     );
 
     if (conflicting.length === 0) {
@@ -161,14 +158,10 @@ export function useSessionLock(supabase, sessionToken, selectedReportId, view, r
     // Einfachste Implementierung: My token alphabetisch vs. conflicting tokens vergleichen
     //   → deterministisch, aber nicht zeitbasiert
     // Besser: session_started_at mitschicken (last_seen enthält nicht die Startzeit)
-    const myStarted = sessionStartedAt;
     const earliest = conflicting.reduce((min, s) => {
       return (new Date(s.last_seen) < new Date(min.last_seen)) ? s : min;
     }, conflicting[0]);
 
-    // Vergleich: Wer ist länger aktiv?
-    // Falls meine Session älter als der früheste Konflikt → ich bin Owner
-    const mySessionStart = mySessionData?.last_seen ?? new Date().toISOString();
     // Wir verwenden sessionStartedAt (ms seit Epoch) das wir mitgespeichert haben
     // Da wir es noch nicht speichern, nutzen wir Token-Vergleich als deterministischen Tiebreaker
     const isNewSession = Date.now() - sessionStartedAt < 15000;

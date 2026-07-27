@@ -368,3 +368,53 @@ test('10. takeOverLock bleibt geschützt', async () => {
   const deletes = supabase.requests.filter(r => r.method.startsWith('delete'));
   assert.equal(deletes.length, 0);
 });
+
+test('11. Konflikt blockiert gleichem Modus (Desktop vs Desktop)', async () => {
+  const supabase = createMockSupabase();
+
+  // Custom mock select implementation to return conflicting sessions with SAME mode (desktop)
+  supabase.from = (table) => ({
+    upsert: (data, opts) => {
+      supabase.requests.push({ method: 'upsert', table, data, opts });
+      return Promise.resolve({ error: null });
+    },
+    select: (columns) => {
+      supabase.requests.push({ method: 'select', table, columns });
+      return {
+        gte: (col, val) => {
+          supabase.requests.push({ method: 'select.gte', table, col, val });
+          return Promise.resolve({
+            data: [
+              {
+                session_token: 'otherToken', // lexicographically smaller than token123
+                open_project_id: 'report456',
+                mode: 'desktop',
+                last_seen: new Date(Date.now() - 5000).toISOString()
+              },
+              {
+                session_token: 'token123',
+                open_project_id: 'report456',
+                mode: 'desktop',
+                last_seen: new Date().toISOString()
+              }
+            ],
+            error: null
+          });
+        }
+      };
+    }
+  });
+
+  const sessionStartedAt = Date.now() - 30000; // session is old (> 15s)
+  const harness = new HookHarness(supabase, 'token123', 'report456', 'details', 'desktop', sessionStartedAt, true);
+  harness.run();
+
+  const pollTimer = harness.intervals.find(t => t.delay === 5000);
+  assert.ok(pollTimer);
+
+  // Run poll callback which computes conflicts
+  await pollTimer.callback();
+
+  // The session active state should be set to false due to same-mode conflict
+  assert.equal(harness.states[1].value, false);
+});
