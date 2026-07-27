@@ -27,7 +27,9 @@ export default defineConfig({
         ]
       },
       workbox: {
-        cacheId: 'qtool-ipad-test-v1',
+        cacheId: 'qtool-ipad-test-v2',
+        skipWaiting: true,
+        clientsClaim: true,
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2,ttf}'],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         runtimeCaching: [
