@@ -642,6 +642,28 @@ function App() {
     const saved = localStorage.getItem('qtool_current_user');
     return saved ? JSON.parse(saved) : null;
   });
+  const [supabaseSession, setSupabaseSession] = useState(null);
+
+  useEffect(() => {
+    if (!supabase) return;
+
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSupabaseSession(session);
+    }).catch(err => {
+      console.error('[Supabase Auth] Fehler beim Abrufen der initialen Session:', err);
+    });
+
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSupabaseSession(session);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
   const sessionTokenRef = useRef(null);
   const isSessionActiveRef = useRef(true);
   const selectedReportRef = useRef(null);
@@ -766,7 +788,7 @@ function App() {
     view,
     resolvedProjectMode,
     sessionStartedAtRef.current,
-    Boolean(currentUser)
+    Boolean(currentUser) && Boolean(supabaseSession?.user)
   );
 
   // isSessionActive-Ref synchron halten (für handleSaveReport)
