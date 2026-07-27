@@ -256,7 +256,10 @@ const TodoModal = ({
                                         key={proj.id}
                                         onClick={() => {
                                             setSelectedProject(proj);
-                                            setProjectSearch((proj.projectTitle && proj.projectTitle !== proj.id && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(proj.projectTitle)) ? proj.projectTitle : (proj.address || proj.id));
+                                            const label = proj.projectNumber 
+                                                ? `${proj.projectNumber} | ${proj.address || proj.projectTitle || proj.id}` 
+                                                : (proj.address || proj.projectTitle || proj.id);
+                                            setProjectSearch(label);
                                             setShowProjectDropdown(false);
                                             setError('');
                                         }}
@@ -269,10 +272,10 @@ const TodoModal = ({
                                         onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                                     >
                                         <div style={{ fontWeight: 600 }}>
-                                            {(proj.projectTitle && proj.projectTitle !== proj.id && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(proj.projectTitle)) ? proj.projectTitle : (proj.address || 'Unbenanntes Projekt')}
+                                            {proj.projectNumber ? `${proj.projectNumber} · ${proj.address || proj.projectTitle}` : (proj.address || proj.projectTitle || 'Unbenanntes Projekt')}
                                         </div>
                                         <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                                            {proj.projectNumber || proj.id} | {proj.address}
+                                            {proj.client ? `${proj.client} · ` : ''}{proj.address || proj.id}
                                         </div>
                                     </div>
                                 ))}

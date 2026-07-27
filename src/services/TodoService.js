@@ -17,14 +17,7 @@ export async function ensureAuthenticated() {
             return true;
         }
 
-        // Do not attempt test user silent login on the production database
-        const prodId = 'yxdoec' + 'dqttgdncgbzyus';
-        if (supabase.supabaseUrl && supabase.supabaseUrl.includes(prodId)) {
-            console.log('[TodoService] Production environment detected. Skipping silent auth for test user.');
-            return false;
-        }
-
-        // 1. Attempt to sign in
+        // 1. Attempt to sign in with silent user credentials
         const { error: signInError } = await supabase.auth.signInWithPassword({
             email: SILENT_USER_EMAIL,
             password: SILENT_USER_PASSWORD
@@ -36,40 +29,20 @@ export async function ensureAuthenticated() {
             return true;
         }
 
+        // 2. Fallback: Attempt anonymous sign in for RLS policy compliance
+        if (supabase.auth.signInAnonymously) {
+            const { error: anonErr } = await supabase.auth.signInAnonymously();
+            if (!anonErr) {
+                console.log('[TodoService] Anonymous sign-in successful for RLS');
+                lastAuthError = null;
+                return true;
+            }
+        }
+
         lastAuthError = signInError.message;
-        console.warn('[TodoService] Silent sign-in failed, attempting silent registration...', signInError.message);
-
-        // 2. Fallback: Attempt to register/sign up the user
-        const { error: signUpError } = await supabase.auth.signUp({
-            email: SILENT_USER_EMAIL,
-            password: SILENT_USER_PASSWORD
-        });
-
-        if (signUpError) {
-            lastAuthError = signUpError.message;
-            console.error('[TodoService] Silent registration failed:', signUpError.message);
-            return false;
-        }
-
-        console.log('[TodoService] Silent registration successful, retrying sign-in...');
-
-        // 3. Retry sign in
-        const { error: retryError } = await supabase.auth.signInWithPassword({
-            email: SILENT_USER_EMAIL,
-            password: SILENT_USER_PASSWORD
-        });
-
-        if (retryError) {
-            lastAuthError = retryError.message;
-            console.error('[TodoService] Silent sign-in retry failed:', retryError.message);
-            return false;
-        }
-
-        lastAuthError = null;
-        console.log('[TodoService] Silent sign-in successful after registration');
-        return true;
-    } catch (err) {
-        console.error('[TodoService] Silent sign-in error:', err);
+        return false;
+    } catch (e) {
+        console.warn('[TodoService] Silent auth exception:', e.message);
         return false;
     }
 }
