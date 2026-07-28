@@ -49,7 +49,22 @@ export async function ensureAuthenticated() {
 
 function getLocalTodos() {
     try {
-        return JSON.parse(localStorage.getItem('qservice_local_todos') || '[]');
+        const pTodos = JSON.parse(localStorage.getItem('qservice_local_todos') || '[]');
+        const inboxTodosRaw = JSON.parse(localStorage.getItem('qtool_inbox_todos') || '[]');
+        const inboxTodosConverted = inboxTodosRaw.map(i => ({
+            id: i.id || `inbox_${Date.now()}_${Math.random()}`,
+            project_id: null,
+            task: i.text || i.task || 'Aufgabe aus Eingang',
+            due_date: i.date || new Date().toISOString().split('T')[0],
+            assigned_user_id: 'office',
+            assigned_user_name: i.sender || 'Innendienst',
+            note: i.sender ? `Absender: ${i.sender}` : null,
+            closes_project: false,
+            status: i.done ? 'done' : 'open',
+            created_at: new Date().toISOString(),
+            created_by: i.sender || 'Eingang'
+        }));
+        return [...pTodos, ...inboxTodosConverted];
     } catch (e) {
         return [];
     }

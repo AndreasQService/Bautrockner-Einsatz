@@ -99,9 +99,11 @@ const TodoMonitor = ({
         // 1. Basic filtering by status 'open'
         let list = todos.filter(t => t.status === 'open');
 
-        // Only include todos for active (non-archived) projects
-        const activeProjIds = new Set(activeProjects.map(p => p.id));
-        list = list.filter(t => activeProjIds.has(t.project_id));
+        // Allow standalone todos (no project_id) or active project todos
+        if (activeProjects.length > 0) {
+            const activeProjIds = new Set(activeProjects.map(p => p.id));
+            list = list.filter(t => !t.project_id || activeProjIds.has(t.project_id));
+        }
 
         // 2. Filter by Search term
         if (searchTerm.trim()) {
