@@ -1046,24 +1046,37 @@ function App() {
           // Sortierung auf dem Client um DB Statement Timeouts zu vermeiden
           .sort((a, b) => new Date(b.date || b.updated_at).getTime() - new Date(a.date || a.updated_at).getTime())
           .map(row => {
+            // Support database columns or nested report_data fallback if present
+            const rData = row.report_data || {};
+            const pNum = row.projectNumber || rData.projectNumber || '';
+            const pTitle = row.project_title || rData.projectTitle || '';
+            const pClient = row.client || rData.client || '';
+            const pAddress = row.address || rData.address || '';
+            const pStatus = row.status || rData.status || 'Schadenaufnahme';
+            const pAssignedTo = row.assigned_to || rData.assignedTo || '';
+            const pDate = row.date || rData.date || new Date().toISOString();
+            const pDryingStarted = row.drying_started || rData.dryingStarted || null;
+
             return {
               id: row.id,
               _supabase_updated_at: row.updated_at,
               created_at: row.created_at,
-              projectTitle: row.project_title || '',
-              projectNumber: row.projectNumber || '',
-              client: row.client || '',
-              address: row.address || '',
-              status: row.status || 'Schadenaufnahme',
-              assignedTo: row.assigned_to || '',
-              date: row.date || new Date().toISOString(),
-              dryingStarted: row.drying_started || null,
-              deletedAt: row.deleted_at || null,
-              rooms: [],
-              images: [],
-              equipment: [],
-              contacts: [],
-              isLightweight: true
+              projectTitle: pTitle,
+              projectNumber: pNum,
+              client: pClient,
+              address: pAddress,
+              status: pStatus,
+              assignedTo: pAssignedTo,
+              date: pDate,
+              dryingStarted: pDryingStarted,
+              deletedAt: row.deleted_at || rData.deletedAt || null,
+              rooms: rData.rooms || [],
+              images: rData.images || [],
+              equipment: rData.equipment || [],
+              contacts: rData.contacts || [],
+              measurementRooms: rData.measurementRooms || [],
+              officeTasks: rData.officeTasks || [],
+              isLightweight: !row.report_data
             };
           })
           // Robuster Filter: Session-Einträge der DB (__session__) sowie gelöschte Projekte herausfiltern
