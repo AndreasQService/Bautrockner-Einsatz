@@ -8,43 +8,58 @@ export let lastAuthError = null;
 /**
  * Performs a silent background sign-in to Supabase Auth so that RLS 'authenticated' policies are satisfied.
  */
+let authPromise = null;
+
 export async function ensureAuthenticated() {
     if (!supabase) return false;
-    try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
-            lastAuthError = null;
-            return true;
-        }
+    if (authPromise) return authPromise;
 
-        // 1. Attempt to sign in with silent user credentials
-        const { error: signInError } = await supabase.auth.signInWithPassword({
-            email: SILENT_USER_EMAIL,
-            password: SILENT_USER_PASSWORD
-        });
+    authPromise = (async () => {
+        try {
+            // Wait up to 500ms for Supabase client to asynchronously restore the session from localStorage
+            for (let i = 0; i < 5; i++) {
+                const { data: { session } } = await supabase.auth.getSession();
+                if (session) {
+                    lastAuthError = null;
+                    return true;
+                }
+                await new Promise(r => setTimeout(r, 100));
+            }
 
-        if (!signInError) {
-            console.log('[TodoService] Silent sign-in successful');
-            lastAuthError = null;
-            return true;
-        }
+            // 1. Attempt to sign in with silent user credentials
+            const { error: signInError } = await supabase.auth.signInWithPassword({
+                email: SILENT_USER_EMAIL,
+                password: SILENT_USER_PASSWORD
+            });
 
-        // 2. Fallback: Attempt anonymous sign in for RLS policy compliance
-        if (supabase.auth.signInAnonymously) {
-            const { error: anonErr } = await supabase.auth.signInAnonymously();
-            if (!anonErr) {
-                console.log('[TodoService] Anonymous sign-in successful for RLS');
+            if (!signInError) {
+                console.log('[TodoService] Silent sign-in successful');
                 lastAuthError = null;
                 return true;
             }
-        }
 
-        lastAuthError = signInError.message;
-        return false;
-    } catch (e) {
-        console.warn('[TodoService] Silent auth exception:', e.message);
-        return false;
-    }
+            // 2. Fallback: Attempt anonymous sign in for RLS policy compliance
+            if (supabase.auth.signInAnonymously) {
+                const { error: anonErr } = await supabase.auth.signInAnonymously();
+                if (!anonErr) {
+                    console.log('[TodoService] Anonymous sign-in successful for RLS');
+                    lastAuthError = null;
+                    return true;
+                }
+            }
+
+            lastAuthError = signInError.message;
+            return false;
+        } catch (e) {
+            console.warn('[TodoService] Silent auth exception:', e.message);
+            lastAuthError = e.message;
+            return false;
+        } finally {
+            authPromise = null;
+        }
+    })();
+
+    return authPromise;
 }
 
 function getLocalTodos() {
@@ -78,7 +93,8 @@ export async function fetchAllTodos(reports = []) {
     await ensureAuthenticated().catch(() => {});
     
     // ── BACKGROUND SYNCHRONIZATION ──
-    if (supabase) {
+    const isTestEnv = typeof window !== 'undefined' && (window.navigator.webdriver || window.IS_TEST_ENV);
+    if (supabase && !isTestEnv) {
         try {
             const local = JSON.parse(localStorage.getItem('qservice_local_todos') || '[]');
             const inboxTodosRaw = JSON.parse(localStorage.getItem('qtool_inbox_todos') || '[]');
@@ -157,11 +173,89 @@ export async function fetchAllTodos(reports = []) {
         }
     });
 
+    // Helper to get latest measurement date across a project (only if measurements actually exist)
+    const getLatestMeasurementDate = (project) => {
+        const allRooms = [
+            ...(project.measurementRooms || []),
+            ...(project.rooms || []),
+            ...(project.report_data?.measurementRooms || []),
+            ...(project.report_data?.rooms || [])
+        ];
+        let latestDate = null;
+        allRooms.forEach(room => {
+            if (!room) return;
+            // Check if active room has actual measurements
+            const hasActiveMeas = (Array.isArray(room.measurements) && room.measurements.length > 0) ||
+                                  (room.measurementData && Array.isArray(room.measurementData.measurements) && room.measurementData.measurements.length > 0);
+            if (hasActiveMeas) {
+                const mDate = room.measurementData?.globalSettings?.date || room.globalSettings?.date || room.date;
+                if (mDate) {
+                    const d = new Date(mDate);
+                    if (!isNaN(d.getTime())) {
+                        if (!latestDate || d > latestDate) latestDate = d;
+                    }
+                }
+            }
+
+            // Check if historical entries have actual measurements
+            if (room.measurementHistory && Array.isArray(room.measurementHistory)) {
+                room.measurementHistory.forEach(hist => {
+                    const hasHistMeas = Array.isArray(hist.measurements) && hist.measurements.length > 0;
+                    if (hasHistMeas) {
+                        const hDate = hist.date || hist.datum || hist.timestamp || hist.createdAt || hist.globalSettings?.date;
+                        if (hDate) {
+                            const d = new Date(hDate);
+                            if (!isNaN(d.getTime())) {
+                                if (!latestDate || d > latestDate) latestDate = d;
+                            }
+                        }
+                    }
+                });
+            }
+        });
+        return latestDate;
+    };
+
     // Also collect legacy/embedded officeTasks from loaded reports
     if (Array.isArray(reports)) {
         reports.forEach(r => {
-            const tasks = r?.officeTasks || r?.report_data?.officeTasks;
-            if (Array.isArray(tasks)) {
+            const tasks = [...(r?.officeTasks || r?.report_data?.officeTasks || [])];
+
+            // ─── 300% SELF-HEALING FALLBACK FOR AUTOMATIC TODOS ───
+            // Only generate the next measurement follow-up if:
+            // 1. The project is in 'Trocknung' status.
+            // 2. A measurement protocol actually exists (i.e. latestMDate is not null).
+            const status = r.status || r.report_data?.status;
+            if (status === 'Trocknung') {
+                const latestMDate = getLatestMeasurementDate(r);
+                if (latestMDate) {
+                    const baseDate = latestMDate;
+                    const nextDue = new Date(baseDate);
+                    nextDue.setDate(nextDue.getDate() + 7);
+                    const nextDueStr = nextDue.toISOString();
+                    const nextDueLabelStr = nextDue.toLocaleDateString('de-CH');
+
+                    const alreadyHasFollowUp = tasks.some(t => {
+                        const isFUp = t.id === 'measurement_followup' || (t.id && String(t.id).startsWith('measurement_followup'));
+                        return isFUp && !t.done;
+                    });
+
+                    if (!alreadyHasFollowUp) {
+                        tasks.push({
+                            id: `measurement_followup_healed_${r.id}`,
+                            projectId: r.id,
+                            title: `Nächste Feuchtekontrolle durchführen (fällig ${nextDueLabelStr})`,
+                            done: false,
+                            dueDate: nextDueStr,
+                            category: 'auto',
+                            urgent: false,
+                            createdAt: baseDate.toISOString()
+                        });
+                    }
+                }
+            }
+
+            if (tasks.length > 0) {
                 tasks.forEach(t => {
                     const taskKey = t.id || `${r.id}_${t.title}_${t.dueDate}`;
                     if (!combined.some(c => c.id === taskKey || (c.project_id === (r.id || t.projectId) && c.task === (t.title || t.text)))) {
@@ -220,8 +314,43 @@ export async function fetchTodosForProject(projectIdOrProject) {
     });
 
     if (projectObj) {
-        const tasks = projectObj?.officeTasks || projectObj?.report_data?.officeTasks;
-        if (Array.isArray(tasks)) {
+        const tasks = [...(projectObj?.officeTasks || projectObj?.report_data?.officeTasks || [])];
+
+        // ─── 300% SELF-HEALING FALLBACK FOR AUTOMATIC TODOS ───
+        // Only generate the next measurement follow-up if:
+        // 1. The project is in 'Trocknung' status.
+        // 2. A measurement protocol actually exists (i.e. latestMDate is not null).
+        const status = projectObj.status || projectObj.report_data?.status;
+        if (status === 'Trocknung') {
+            const latestMDate = getLatestMeasurementDate(projectObj);
+            if (latestMDate) {
+                const baseDate = latestMDate;
+                const nextDue = new Date(baseDate);
+                nextDue.setDate(nextDue.getDate() + 7);
+                const nextDueStr = nextDue.toISOString();
+                const nextDueLabelStr = nextDue.toLocaleDateString('de-CH');
+
+                const alreadyHasFollowUp = tasks.some(t => {
+                    const isFUp = t.id === 'measurement_followup' || (t.id && String(t.id).startsWith('measurement_followup'));
+                    return isFUp && !t.done;
+                });
+
+                if (!alreadyHasFollowUp) {
+                    tasks.push({
+                        id: `measurement_followup_healed_${projectId}`,
+                        projectId: projectId,
+                        title: `Nächste Feuchtekontrolle durchführen (fällig ${nextDueLabelStr})`,
+                        done: false,
+                        dueDate: nextDueStr,
+                        category: 'auto',
+                        urgent: false,
+                        createdAt: baseDate.toISOString()
+                    });
+                }
+            }
+        }
+
+        if (tasks.length > 0) {
             tasks.forEach(t => {
                 const taskKey = t.id || `${projectId}_${t.title}_${t.dueDate}`;
                 if (!combined.some(c => c.id === taskKey || c.task === (t.title || t.text))) {
@@ -253,10 +382,11 @@ export async function createTodo(todoData) {
     await ensureAuthenticated().catch(() => {});
     if (!supabase) throw new Error('Supabase client not initialized');
 
+    const isUuidVal = (id) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
     const payload = {
         project_id: todoData.projectId,
-        parent_todo_id: todoData.parentTodoId || null,
-        root_todo_id: todoData.rootTodoId || null,
+        parent_todo_id: (todoData.parentTodoId && isUuidVal(todoData.parentTodoId)) ? todoData.parentTodoId : null,
+        root_todo_id: (todoData.rootTodoId && isUuidVal(todoData.rootTodoId)) ? todoData.rootTodoId : null,
         task: todoData.task.trim(),
         due_date: todoData.dueDate,
         assigned_user_id: String(todoData.assignedUserId),

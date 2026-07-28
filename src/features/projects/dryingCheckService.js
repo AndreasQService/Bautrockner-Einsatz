@@ -32,17 +32,34 @@
 export const applyDryingCheck = (project, measurementInfo) => {
   const { measuredAt, documentationComplete, measurementType } = measurementInfo;
 
+  console.log('[dryingCheckService] applyDryingCheck input:', {
+    projectId: project.id,
+    projectStatus: project.status,
+    documentationComplete,
+    measuredAt,
+    measurementType
+  });
+
   // ── Defensive checks ────────────────────────────────────────────────────────
 
   // Nur für Trocknung-Projekte
-  if (project.status !== 'Trocknung') return null;
+  if (project.status !== 'Trocknung') {
+    console.log('[dryingCheckService] rejected: status is not Trocknung');
+    return null;
+  }
 
   // Nur wenn Dokumentation vollständig
-  if (!documentationComplete) return null;
+  if (!documentationComplete) {
+    console.log('[dryingCheckService] rejected: documentationComplete is false');
+    return null;
+  }
 
   // Nur wenn kein expliziter Typ gesetzt ist, oder der Typ passt
   // (Im bestehenden System gibt es keinen measurementType-Enum — wir akzeptieren fehlendes Feld)
-  if (measurementType && measurementType !== 'drying_control') return null;
+  if (measurementType && measurementType !== 'drying_control') {
+    console.log('[dryingCheckService] rejected: mismatching measurementType');
+    return null;
+  }
 
   if (!measuredAt) return null;
 
@@ -66,15 +83,18 @@ export const applyDryingCheck = (project, measurementInfo) => {
 
   // Markiere passende offene Aufgaben als erledigt
   const updatedTasks = existingTasks.map(task => {
-    if (!task.done && MEASUREMENT_TASK_IDS.includes(task.id)) {
+    const isDryingTask = MEASUREMENT_TASK_IDS.includes(task.id) ||
+                         task.id === 'measurement_followup' ||
+                         (task.id && String(task.id).startsWith('measurement_followup'));
+    if (!task.done && isDryingTask) {
       return { ...task, done: true, completedAt: measuredAt };
     }
     return task;
   });
 
-  // Neue Folgeaufgabe hinzufügen (nur wenn noch keine mit gleichem Due-Datum existiert)
+  // Neue Folgeaufgabe hinzufügen (nur wenn noch keine offene mit gleichem Due-Datum existiert)
   const alreadyHasFollowUp = updatedTasks.some(
-    t => !t.done && t.id === 'measurement_followup' && t.dueDate === nextDueAt
+    t => !t.done && (t.id === 'measurement_followup' || (t.id && String(t.id).startsWith('measurement_followup'))) && t.dueDate === nextDueAt
   );
 
   if (!alreadyHasFollowUp) {

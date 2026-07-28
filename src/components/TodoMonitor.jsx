@@ -108,6 +108,8 @@ const TodoMonitor = ({
                 if (p.projectTitle) activeProjIds.add(String(p.projectTitle));
                 if (p.project_title) activeProjIds.add(String(p.project_title));
             });
+            console.log('[TodoMonitor TRACE] all reports:', reports.map(r => `${r.projectTitle || r.client || 'no-title'}|${r.id}`).join('; '));
+            console.log('[TodoMonitor TRACE] match checks:', list.map(t => `${t.task}|${t.project_id}|${activeProjIds.has(String(t.project_id))}`).join('; '));
             list = list.filter(t => !t.project_id || activeProjIds.has(String(t.project_id)));
         }
 
@@ -458,15 +460,19 @@ const TodoMonitor = ({
                                             </td>
                                             <td style={{ padding: '0.65rem 0.8rem' }}>
                                                 {(() => {
-                                                    const displayTitle = getCleanProjectTitle(proj);
+                                                    const displayTitle = proj ? getCleanProjectTitle(proj) : 'Ohne Projektzuordnung';
                                                     return (
                                                         <>
-                                                            <button
-                                                                onClick={() => proj && onSelectReport(proj)}
-                                                                style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--q-primary, #1e6db7)', textDecoration: 'underline', fontWeight: 600, fontSize: 'inherit', textAlign: 'left' }}
-                                                            >
-                                                                {displayTitle}
-                                                            </button>
+                                                            {proj ? (
+                                                                <button
+                                                                    onClick={() => onSelectReport(proj)}
+                                                                    style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--q-primary, #1e6db7)', textDecoration: 'underline', fontWeight: 600, fontSize: 'inherit', textAlign: 'left' }}
+                                                                >
+                                                                    {displayTitle}
+                                                                </button>
+                                                            ) : (
+                                                                <span style={{ fontWeight: 500, color: 'var(--text-muted)' }}>{displayTitle}</span>
+                                                            )}
                                                             {proj?.address && displayTitle !== proj.address && (
                                                                 <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{proj.address}</div>
                                                             )}
@@ -612,15 +618,19 @@ const TodoMonitor = ({
                                             {/* 2. Projekt / Adresse */}
                                             <td style={{ padding: '0.65rem 0.8rem' }}>
                                                 {(() => {
-                                                    const displayTitle = getCleanProjectTitle(proj);
+                                                    const displayTitle = proj ? getCleanProjectTitle(proj) : 'Ohne Projektzuordnung';
                                                     return (
                                                         <>
-                                                            <button
-                                                                onClick={() => proj && onSelectReport(proj)}
-                                                                style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--q-primary, #1e6db7)', textDecoration: 'underline', fontWeight: 600, fontSize: 'inherit', textAlign: 'left' }}
-                                                            >
-                                                                {displayTitle}
-                                                            </button>
+                                                            {proj ? (
+                                                                <button
+                                                                    onClick={() => onSelectReport(proj)}
+                                                                    style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--q-primary, #1e6db7)', textDecoration: 'underline', fontWeight: 600, fontSize: 'inherit', textAlign: 'left' }}
+                                                                >
+                                                                    {displayTitle}
+                                                                </button>
+                                                            ) : (
+                                                                <span style={{ fontWeight: 500, color: 'var(--text-muted)' }}>{displayTitle}</span>
+                                                            )}
                                                             {proj?.address && displayTitle !== proj.address && (
                                                                 <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{proj.address}</div>
                                                             )}

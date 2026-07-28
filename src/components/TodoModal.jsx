@@ -162,8 +162,8 @@ const TodoModal = ({
 
         setError('');
 
-        if (!selectedProject) {
-            setError('Bitte ein Projekt auswählen.');
+        if (projectSearch.trim() && !selectedProject) {
+            setError('Bitte wählen Sie ein gültiges Projekt aus der Liste oder leeren Sie das Feld für ein schnelles To-do.');
             return;
         }
         if (!task.trim()) {
@@ -189,7 +189,7 @@ const TodoModal = ({
 
         try {
             const dataToSave = {
-                projectId: selectedProject.id,
+                projectId: selectedProject ? (selectedProject.id && !selectedProject.id.startsWith('TMP-') ? selectedProject.id : (selectedProject.projectNumber || selectedProject.projectTitle || selectedProject.id)) : null,
                 task: task.trim(),
                 dueDate,
                 assignedUserId,
@@ -259,7 +259,7 @@ const TodoModal = ({
                 <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
                     {/* Project Autocomplete Search */}
                     <div style={{ position: 'relative' }}>
-                        <label style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.88rem', fontWeight: 600 }}>Projekt / Adresse *</label>
+                        <label style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.88rem', fontWeight: 600 }}>Projekt / Adresse (optional für schnelles To-do)</label>
                         <input
                             type="text"
                             value={projectSearch}
@@ -275,7 +275,7 @@ const TodoModal = ({
                             className="form-input"
                             style={{ width: '100%' }}
                             disabled={!!todo || saving} // Lock project if editing or creating follow-up
-                            required
+
                         />
                         {showProjectDropdown && filteredProjects.length > 0 && !todo && (
                             <div style={{
