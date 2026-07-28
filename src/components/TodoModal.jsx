@@ -35,10 +35,12 @@ const TodoModal = ({
             const proj = reports.find(r => r.id === todo.project_id || (r.projectNumber && String(r.projectNumber) === String(todo.project_id)));
             if (proj) {
                 setSelectedProject(proj);
-                const title = proj.projectTitle || proj.project_title || proj.id || '';
+                const title = proj.projectTitle || proj.project_title || '';
+                const isDummy = !title || /^\d{1,3}$/.test(title) || /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(title);
+                const prefix = isDummy ? '' : `${title} `;
                 const num = proj.projectNumber || '';
                 const addr = proj.address || '';
-                setProjectSearch(`${title}${num ? ' (' + num + ')' : ''}${addr ? ' - ' + addr : ''}`);
+                setProjectSearch(`${prefix}${num ? '(' + num + ')' : ''}${addr ? (num ? ' - ' : '') + addr : ''}`);
             }
 
             if (!isFollowUpMode) {
@@ -54,16 +56,20 @@ const TodoModal = ({
             }
         } else if (initialProject) {
             setSelectedProject(initialProject);
-            const title = initialProject.projectTitle || initialProject.project_title || initialProject.id || '';
+            const title = initialProject.projectTitle || initialProject.project_title || '';
+            const isDummy = !title || /^\d{1,3}$/.test(title) || /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(title);
+            const prefix = isDummy ? '' : `${title} `;
             const num = initialProject.projectNumber || '';
             const addr = initialProject.address || '';
-            setProjectSearch(`${title}${num ? ' (' + num + ')' : ''}${addr ? ' - ' + addr : ''}`);
+            setProjectSearch(`${prefix}${num ? '(' + num + ')' : ''}${addr ? (num ? ' - ' : '') + addr : ''}`);
         } else if (reports.length === 1) {
             setSelectedProject(reports[0]);
-            const title = reports[0].projectTitle || reports[0].project_title || reports[0].id || '';
+            const title = reports[0].projectTitle || reports[0].project_title || '';
+            const isDummy = !title || /^\d{1,3}$/.test(title) || /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(title);
+            const prefix = isDummy ? '' : `${title} `;
             const num = reports[0].projectNumber || '';
             const addr = reports[0].address || '';
-            setProjectSearch(`${title}${num ? ' (' + num + ')' : ''}${addr ? ' - ' + addr : ''}`);
+            setProjectSearch(`${prefix}${num ? '(' + num + ')' : ''}${addr ? (num ? ' - ' : '') + addr : ''}`);
         }
     }, [todo, isFollowUpMode, reports, initialProject]);
 
