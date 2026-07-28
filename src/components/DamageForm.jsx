@@ -1920,6 +1920,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         }
         
         setActiveNumpadField({ ...activeNumpadField, value: newVal });
+        setNewDevice(prev => ({ ...prev, [activeNumpadField.field]: newVal }));
     };
 
     const handleAddDevice = async () => {
@@ -9141,7 +9142,7 @@ END:VCARD`;
                                                     value={newDevice.counterStart || ''}
                                                     onChange={(e) => setNewDevice(prev => ({ ...prev, counterStart: e.target.value }))}
                                                     onClick={() => setActiveNumpadField({ field: 'counterStart', value: newDevice.counterStart || '' })}
-                                                    style={{ width: '100%', boxSizing: 'border-box', minWidth: 0, fontSize: '1.1rem', padding: '1rem', borderColor: (!newDevice.counterStart && newDevice.deviceNumber) ? '#F87171' : '', cursor: 'pointer' }}
+                                                    style={{ width: '100%', boxSizing: 'border-box', minWidth: 0, fontSize: '1.1rem', padding: '1rem', borderColor: (String(newDevice.counterStart ?? '').trim() === '' && newDevice.deviceNumber) ? '#F87171' : '' }}
                                                 />
                                                 <input
                                                     type="text"
@@ -9150,7 +9151,7 @@ END:VCARD`;
                                                     value={newDevice.hours || ''}
                                                     onChange={(e) => setNewDevice(prev => ({ ...prev, hours: e.target.value }))}
                                                     onClick={() => setActiveNumpadField({ field: 'hours', value: newDevice.hours || '' })}
-                                                    style={{ width: '100%', boxSizing: 'border-box', minWidth: 0, fontSize: '1.1rem', padding: '1rem', cursor: 'pointer' }}
+                                                    style={{ width: '100%', boxSizing: 'border-box', minWidth: 0, fontSize: '1.1rem', padding: '1rem' }}
                                                 />
                                             </div>
 
@@ -9168,7 +9169,7 @@ END:VCARD`;
                                                 type="button"
                                                 className="btn btn-primary"
                                                 style={{ width: '100%', padding: '1rem', fontSize: '1rem' }}
-                                                disabled={!newDevice.deviceNumber || !newDevice.counterStart || (!selectedDevice && !newDevice.type)}
+                                                disabled={!newDevice.deviceNumber || String(newDevice.counterStart ?? '').trim() === '' || (!selectedDevice && !newDevice.type)}
                                                 onClick={async (e) => {
                                                     e.preventDefault();
                                                     if (!newDevice.apartment && techSelectedEquipmentRoom?.apartment) {
