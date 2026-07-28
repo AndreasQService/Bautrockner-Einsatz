@@ -295,9 +295,9 @@ if (isWebDriver) {
       }
     }
   };
-} else if (rawUrl || rawKey || expectedProjectId) {
-  if (expectedProjectId === LIVE_PROJECT_ID) {
-    // In Production direkt ohne Test-Isolations-Guard initialisieren
+} else if (rawUrl && rawKey) {
+  if (expectedProjectId === LIVE_PROJECT_ID || !expectedProjectId) {
+    // Standard Supabase Client für Dev/Prod
     supabaseInstance = createClient(rawUrl, rawKey);
   } else {
     validatedUrl = validateSupabaseConfig(rawUrl, rawKey, expectedProjectId);
