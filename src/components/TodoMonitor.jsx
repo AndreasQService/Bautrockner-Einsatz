@@ -44,6 +44,7 @@ const TodoMonitor = ({
         setError('');
         try {
             const list = await fetchAllTodos(reports);
+            console.log('[DEBUG TODOS] fetchAllTodos returned:', list, 'for reports:', reports);
             setTodos(list);
         } catch (err) {
             setError('Fehler beim Laden der Aufgaben: ' + err.message);

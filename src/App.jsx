@@ -1139,22 +1139,23 @@ function App() {
                   const idBatch = activeIds.slice(i, i + batchSize);
                   const { data: details, error: detailError } = await supabase
                     .from('damage_reports')
-                    .select('id, report_data, updated_at')
+                    .select('id, officeTasks:report_data->officeTasks, rooms:report_data->rooms, measurementRooms:report_data->measurementRooms, equipment:report_data->equipment, dryingCompleted:report_data->dryingCompleted, updated_at')
                     .in('id', idBatch);
 
                   if (!detailError && details && details.length > 0) {
                     setReports(prev => {
                       let updated = [...prev];
                       details.forEach(detail => {
-                        if (detail && detail.report_data) {
-                          const parsedData = typeof detail.report_data === 'string'
-                            ? JSON.parse(detail.report_data)
-                            : detail.report_data;
+                        if (detail) {
                           const idx = updated.findIndex(r => r.id === detail.id);
                           if (idx >= 0) {
                             updated[idx] = {
                               ...updated[idx],
-                              ...parsedData,
+                              officeTasks: detail.officeTasks || [],
+                              rooms: detail.rooms || [],
+                              measurementRooms: detail.measurementRooms || [],
+                              equipment: detail.equipment || [],
+                              dryingCompleted: !!detail.dryingCompleted,
                               isLightweight: false,
                               _supabase_updated_at: detail.updated_at
                             };
@@ -1167,13 +1168,14 @@ function App() {
                     setSelectedReport(prev => {
                       if (prev && prev.id) {
                         const detail = details.find(d => d.id === prev.id);
-                        if (detail && detail.report_data) {
-                          const parsedData = typeof detail.report_data === 'string'
-                            ? JSON.parse(detail.report_data)
-                            : detail.report_data;
+                        if (detail) {
                           return {
                             ...prev,
-                            ...parsedData,
+                            officeTasks: detail.officeTasks || [],
+                            rooms: detail.rooms || [],
+                            measurementRooms: detail.measurementRooms || [],
+                            equipment: detail.equipment || [],
+                            dryingCompleted: !!detail.dryingCompleted,
                             isLightweight: false,
                             _supabase_updated_at: detail.updated_at
                           };
