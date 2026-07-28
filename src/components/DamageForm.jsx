@@ -9855,24 +9855,24 @@ END:VCARD`;
                                                         <div 
                                                             style={{
                                                                 position: 'absolute',
-                                                                top: '8px',
-                                                                left: '8px',
+                                                                top: '6px',
+                                                                left: '6px',
                                                                 backgroundColor: isCloudSaved ? 'rgba(16, 185, 129, 0.92)' : 'rgba(217, 119, 6, 0.92)',
                                                                 color: '#FFFFFF',
-                                                                borderRadius: '6px',
-                                                                padding: '3px 7px',
-                                                                fontSize: '0.72rem',
+                                                                borderRadius: '4px',
+                                                                padding: '2px 5px',
+                                                                fontSize: '0.62rem',
                                                                 fontWeight: 700,
                                                                 display: 'flex',
                                                                 alignItems: 'center',
-                                                                gap: '4px',
-                                                                boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+                                                                gap: '3px',
+                                                                boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
                                                                 zIndex: 2,
                                                                 backdropFilter: 'blur(4px)'
                                                             }}
                                                             title={isCloudSaved ? 'In Supabase/Cloud gespeichert' : 'Lokal gesichert'}
                                                         >
-                                                            <Database size={13} style={{ strokeWidth: 2.5 }} />
+                                                            <Database size={10} style={{ strokeWidth: 2.5 }} />
                                                             <span>{isCloudSaved ? 'In Supabase' : 'Lokal gesichert'}</span>
                                                         </div>
                                                     );
