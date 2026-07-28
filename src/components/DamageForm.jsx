@@ -1898,7 +1898,8 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         startDate: new Date().toISOString().split('T')[0],
         hours: '',
         counterStart: '',
-        energyConsumption: ''
+        energyConsumption: '',
+        isRental: false
     });
 
     const [activeNumpadField, setActiveNumpadField] = useState(null);
@@ -1923,14 +1924,10 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
     };
 
     const handleAddDevice = async () => {
-        // Validation removed per user request: "es braucht nur die wohung oder den raum als option , kein muss"
-
-        let deviceDbId = selectedDevice ? selectedDevice.id : null;
-
-        // If manual entry (no selected device) and we have a device number, add to global inventory
+        // Validation        // If manual entry (no selected device) and we have a device number, add to global inventory
         if (!selectedDevice && newDevice.deviceNumber && supabase) {
             console.log("Inserting new device into global inventory...");
-            const isRental = newDevice.deviceNumber.trim().toUpperCase().startsWith('M');
+            const isRental = !!(newDevice.isRental || newDevice.deviceNumber.trim().toUpperCase().startsWith('M'));
             const { data, error } = await supabase
                 .from('devices')
                 .insert([{
@@ -1953,26 +1950,11 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                 // Usually we don't need to push it locally if we only show available devices.
             }
         } else if (selectedDevice && supabase) {
-            // If a real device was selected from DB, update its status
-            console.log("Updating device status in DB...", selectedDevice.id);
-            const { error } = await supabase
-                .from('devices')
-                .update({
-                    // status logic removed to keep 'Aktiv'/'Inaktiv' only
-                    current_report_id: formData.id,
-                    current_project: formData.projectTitle || formData.client
-                })
-                .eq('id', selectedDevice.id);
-
-            if (error) {
-                console.error("Failed to update device status:", error);
-                alert("Fehler beim Aktualisieren des Gerätestatus: " + error.message);
-                return false; // Stop adding if DB update fails
-            }
-
-            // Remove from available list locally
-            setAvailableDevices(prev => prev.filter(d => d.id !== selectedDevice.id));
+            // device is from existing inventory
+            deviceDbId = selectedDevice.id;
         }
+
+        const isRentalDevice = !!(newDevice.isRental || (selectedDevice && selectedDevice.is_rental) || newDevice.deviceNumber.trim().toUpperCase().startsWith('M'));
 
         // manual entry fallback if no device selected?
         let deviceToAdd = {
@@ -1988,6 +1970,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
             counterStart: newDevice.counterStart,
             counterEnd: '',
             energyConsumption: newDevice.energyConsumption,
+            isRental: isRentalDevice,
             // Link to Supabase ID if available
             dbId: deviceDbId
         };
@@ -9149,6 +9132,16 @@ END:VCARD`;
                                                     style={{ width: '100%', boxSizing: 'border-box', minWidth: 0, fontSize: '1.1rem', padding: '1rem', cursor: 'pointer' }}
                                                 />
                                             </div>
+
+                                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '0.95rem', cursor: 'pointer', userSelect: 'none', padding: '0.2rem 0' }}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={!!newDevice.isRental}
+                                                    onChange={(e) => setNewDevice(prev => ({ ...prev, isRental: e.target.checked }))}
+                                                    style={{ width: '20px', height: '20px', accentColor: 'var(--primary)', cursor: 'pointer' }}
+                                                />
+                                                <span style={{ fontWeight: 600 }}>Mietgerät (Externes Gerät)</span>
+                                            </label>
 
                                             <button
                                                 type="button"
