@@ -1020,9 +1020,9 @@ function App() {
 
     setSupabaseStatus({ ok: null, count: null, error: null }); // Laden...
     try {
-      // 25-Sekunden-Timeout für die initiale Supabase-Abfrage (große JSON-Datenmengen über Mobilfunk)
+      // 6-Sekunden-Timeout für die Supabase-Abfrage
       const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Timeout nach 25 Sekunden')), 25000)
+        setTimeout(() => reject(new Error('Timeout nach 6 Sekunden')), 6000)
       );
 
       const fetchPromise = supabase
@@ -1031,8 +1031,8 @@ function App() {
         .limit(100);
 
       let result = await Promise.race([fetchPromise, timeoutPromise]);
-      let data = result.data;
-      let error = result.error;
+      let data = result?.data;
+      let error = result?.error;
 
       // HINWEIS: Client-seitige Sortierung um Statement Timeout bei großen JSONs zu verhindern
 
