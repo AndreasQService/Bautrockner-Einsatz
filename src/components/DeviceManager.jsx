@@ -159,19 +159,17 @@ export default function DeviceManager({ onBack, onNavigateToReport, reports = []
         setIsLoading(true);
         setError(null);
         try {
-            // Check if inventory number already exists (only for new devices)
-            if (!currentDevice.id) {
-                const { data: existing, error: checkError } = await supabase
-                    .from('devices')
-                    .select('id')
-                    .eq('number', trimmedNumber)
-                    .maybeSingle();
-                if (checkError) throw checkError;
-                if (existing) {
-                    setError(`Die Inventarnummer "${trimmedNumber}" existiert bereits.`);
-                    setIsLoading(false);
-                    return;
-                }
+            // Check if inventory number already exists for another device
+            const { data: existing, error: checkError } = await supabase
+                .from('devices')
+                .select('id, number')
+                .eq('number', trimmedNumber);
+
+            if (checkError) throw checkError;
+            if (existing && existing.some(d => d.id !== currentDevice.id)) {
+                setError(`Ein Gerät mit der Inventarnummer "${trimmedNumber}" existiert bereits im Inventar! Es kann kein doppeltes Inventar angelegt werden.`);
+                setIsLoading(false);
+                return;
             }
 
             const row = {

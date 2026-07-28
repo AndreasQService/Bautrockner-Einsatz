@@ -1920,34 +1920,54 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         }
         
         setActiveNumpadField({ ...activeNumpadField, value: newVal });
-        setNewDevice(prev => ({ ...prev, [activeNumpadField.field]: newVal }));
     };
 
     const handleAddDevice = async () => {
-        // Validation        // If manual entry (no selected device) and we have a device number, add to global inventory
+        let deviceDbId = selectedDevice ? selectedDevice.id : null;
+
+        // If manual entry (no selected device) and we have a device number, add or link to global inventory
         if (!selectedDevice && newDevice.deviceNumber && supabase) {
-            console.log("Inserting new device into global inventory...");
-            const isRental = !!(newDevice.isRental || newDevice.deviceNumber.trim().toUpperCase().startsWith('M'));
-            const { data, error } = await supabase
+            const trimmedNumber = newDevice.deviceNumber.trim();
+            
+            // Check if device number already exists in database
+            const { data: existingDev, error: checkError } = await supabase
                 .from('devices')
-                .insert([{
-                    number: newDevice.deviceNumber,
-                    type: newDevice.type || 'Unbekannt',
-                    model: '',
-                    status: 'Aktiv',
-                    current_project: formData.projectTitle || formData.client || 'Unbekannt',
-                    current_report_id: formData.id,
-                    is_rental: isRental,
-                    rental_start: isRental ? new Date().toISOString().split('T')[0] : null
-                }])
-                .select();
-                
-            if (error) {
-                console.error("Failed to insert new device:", error);
-            } else if (data && data.length > 0) {
-                deviceDbId = data[0].id;
-                // Add to available devices so it can be seen if needed, though it's now 'in use'
-                // Usually we don't need to push it locally if we only show available devices.
+                .select('id, number, type, model, is_rental')
+                .eq('number', trimmedNumber)
+                .maybeSingle();
+
+            if (checkError) {
+                console.error("Error checking existing device:", checkError);
+            }
+
+            if (existingDev) {
+                // Device already exists! Reuse existing inventory ID instead of creating a duplicate
+                console.log("Device number already exists in inventory, linking to existing device ID:", existingDev.id);
+                deviceDbId = existingDev.id;
+            } else {
+                console.log("Inserting new unique device into global inventory...");
+                const isRental = !!(newDevice.isRental || trimmedNumber.toUpperCase().startsWith('M'));
+                const { data, error } = await supabase
+                    .from('devices')
+                    .insert([{
+                        number: trimmedNumber,
+                        type: newDevice.type || 'Unbekannt',
+                        model: '',
+                        status: 'Aktiv',
+                        current_project: formData.projectTitle || formData.client || 'Unbekannt',
+                        current_report_id: formData.id,
+                        is_rental: isRental,
+                        rental_start: isRental ? new Date().toISOString().split('T')[0] : null
+                    }])
+                    .select();
+                    
+                if (error) {
+                    console.error("Failed to insert new device:", error);
+                    alert(`Fehler: Das Gerät "${trimmedNumber}" konnte nicht angelegt werden (${error.message}).`);
+                    return false;
+                } else if (data && data.length > 0) {
+                    deviceDbId = data[0].id;
+                }
             }
         } else if (selectedDevice && supabase) {
             // device is from existing inventory
@@ -8991,7 +9011,8 @@ END:VCARD`;
                                                 value={newDevice.deviceNumber}
                                                 onChange={(e) => {
                                                     const val = e.target.value;
-                                                    const foundDev = availableDevices.find(d => String(d.number) === val);
+                                                    const trimmedVal = val.trim().toLowerCase();
+                                                    const foundDev = availableDevices.find(d => String(d.number).trim().toLowerCase() === trimmedVal);
                                                     if (foundDev) {
                                                         setSelectedDevice(foundDev);
                                                     } else {
@@ -9009,7 +9030,7 @@ END:VCARD`;
                                                 ))}
                                             </datalist>
 
-                                            {!selectedDevice && newDevice.deviceNumber && (
+                                            {!selectedDevice && newDevice.deviceNumber && !availableDevices.some(d => String(d.number).trim().toLowerCase() === newDevice.deviceNumber.trim().toLowerCase()) && (
                                                 <>
                                                     <div style={{ display: 'flex', width: '100%' }}>
                                                         <button
