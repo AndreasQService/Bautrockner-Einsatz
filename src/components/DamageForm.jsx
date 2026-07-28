@@ -9186,7 +9186,7 @@ END:VCARD`;
                                                 cursor: (selectedDevice && !selectedDevice.is_rental) ? 'not-allowed' : 'pointer',
                                                 userSelect: 'none',
                                                 padding: '0.2rem 0',
-                                                opacity: (selectedDevice && !selectedDevice.is_rental) ? 0.6 : 1
+                                                opacity: (selectedDevice && !selectedDevice.is_rental) ? 0.4 : 1
                                             }}>
                                                 <input
                                                     type="checkbox"
@@ -9195,12 +9195,7 @@ END:VCARD`;
                                                     onChange={(e) => setNewDevice(prev => ({ ...prev, isRental: e.target.checked }))}
                                                     style={{ width: '20px', height: '20px', accentColor: 'var(--primary)', cursor: (selectedDevice && !selectedDevice.is_rental) ? 'not-allowed' : 'pointer' }}
                                                 />
-                                                <span style={{ fontWeight: 600 }}>
-                                                    Mietgerät (Externes Gerät)
-                                                    {selectedDevice && !selectedDevice.is_rental && (
-                                                        <span style={{ fontSize: '0.8rem', fontWeight: 500, marginLeft: '0.5rem', color: '#94A3B8' }}>(Eigenes Inventargerät)</span>
-                                                    )}
-                                                </span>
+                                                <span style={{ fontWeight: 600 }}>Mietgerät (Externes Gerät)</span>
                                             </label>
 
                                             <button
