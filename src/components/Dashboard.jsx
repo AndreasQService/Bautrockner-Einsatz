@@ -266,7 +266,10 @@ const DeviceInventoryList = ({ reports, onSelectReport }) => {
         reports.forEach(report => {
             if (report.equipment && Array.isArray(report.equipment)) {
                 report.equipment.forEach(item => {
-                    list.push({ report, item });
+                    const { isAktiv } = getEquipmentStatus(item);
+                    if (isAktiv) {
+                        list.push({ report, item });
+                    }
                 });
             }
         });
