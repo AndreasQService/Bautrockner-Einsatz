@@ -32,12 +32,15 @@ const TodoModal = ({
     useEffect(() => {
         if (todo) {
             // Find project
-            const proj = reports.find(r => 
+            let proj = reports.find(r => 
                 r.id === todo.project_id || 
                 (r.projectNumber && String(r.projectNumber) === String(todo.project_id)) ||
                 (r.projectTitle && String(r.projectTitle) === String(todo.project_id)) ||
                 (r.project_title && String(r.project_title) === String(todo.project_id))
             );
+            if (!proj && reports.length === 1) {
+                proj = reports[0];
+            }
             if (proj) {
                 setSelectedProject(proj);
                 const title = proj.projectTitle || proj.project_title || '';
@@ -63,7 +66,11 @@ const TodoModal = ({
                 setClosesProject(!!todo.closes_project);
             } else {
                 // Follow-up mode: prefill some values if desired, but keep task/due_date clean
+                setTask('');
+                setDueDate('');
                 setAssignedUserId(todo.assigned_user_id || '');
+                setNote('');
+                setClosesProject(false);
             }
         } else if (initialProject) {
             setSelectedProject(initialProject);
