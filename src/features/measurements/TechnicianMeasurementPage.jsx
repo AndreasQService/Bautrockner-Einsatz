@@ -5,7 +5,9 @@ export default function TechnicianMeasurementPage({
     onBackToTiles,
     onContinueMeasurement,
     onNewRoom,
-    onDeleteRoom
+    onDeleteRoom,
+    dryingCompleted = false,
+    onToggleDryingCompleted
 }) {
     return (
         <div style={{ marginBottom: '2rem' }}>
@@ -15,9 +17,35 @@ export default function TechnicianMeasurementPage({
                         <ArrowLeft size={18} /> Zurück
                     </button>
                 </div>
-                <div style={{ flex: 2, textAlign: 'center' }}>
+                <div style={{ flex: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.4rem' }}>
                     <h2 style={{ fontSize: '1.8rem', fontWeight: 800, margin: 0, color: 'var(--text-main)' }}>Messen</h2>
                     <p style={{ fontSize: '1rem', color: 'var(--text-muted)', margin: 0 }}>Messräume & Messprotokolle</p>
+
+                    <div
+                        onClick={() => onToggleDryingCompleted && onToggleDryingCompleted(!dryingCompleted)}
+                        style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.5rem',
+                            background: dryingCompleted ? 'rgba(16, 185, 129, 0.1)' : 'rgba(255, 255, 255, 0.03)',
+                            border: dryingCompleted ? '1px solid #10B981' : '1px solid var(--border)',
+                            padding: '0.4rem 0.8rem',
+                            borderRadius: '8px',
+                            cursor: 'pointer',
+                            transition: 'all 0.3s ease',
+                            marginTop: '0.2rem'
+                        }}
+                    >
+                        <input
+                            type="checkbox"
+                            checked={!!dryingCompleted}
+                            readOnly
+                            style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: '#10B981' }}
+                        />
+                        <span style={{ fontSize: '0.85rem', fontWeight: 700, color: dryingCompleted ? '#10B981' : 'var(--text-main)', cursor: 'pointer' }}>
+                            Trocknung abgeschlossen (Gesamtes Projekt)
+                        </span>
+                    </div>
                 </div>
                 <div style={{ flex: 1 }}></div>
             </div>
@@ -47,7 +75,7 @@ export default function TechnicianMeasurementPage({
                             }
 
                             return (
-                                <div key={room.id} 
+                                <div key={room.id}
                                     onClick={() => onContinueMeasurement(room)}
                                     style={{
                                         background: 'var(--surface)',

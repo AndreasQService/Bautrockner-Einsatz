@@ -91,7 +91,7 @@ function getLocalTodos() {
  */
 export async function fetchAllTodos(reports = []) {
     await ensureAuthenticated().catch(() => {});
-    
+
     // ── BACKGROUND SYNCHRONIZATION ──
     const isTestEnv = typeof window !== 'undefined' && (window.navigator.webdriver || window.IS_TEST_ENV);
     if (supabase && !isTestEnv) {
@@ -226,7 +226,11 @@ export async function fetchAllTodos(reports = []) {
             // 1. The project is in 'Trocknung' status.
             // 2. A measurement protocol actually exists (i.e. latestMDate is not null).
             const status = r.status || r.report_data?.status;
-            if (status === 'Trocknung') {
+            const rRooms = r.measurementRooms || r.report_data?.measurementRooms || [];
+            const rAllRoomsCompleted = Array.isArray(rRooms) && rRooms.length > 0 && rRooms.every(rm => rm.dryingCompleted || rm.globalSettings?.dryingCompleted);
+            const isDryingCompleted = !!(r.dryingCompleted || r.report_data?.dryingCompleted || rAllRoomsCompleted);
+
+            if (status === 'Trocknung' && !isDryingCompleted) {
                 const latestMDate = getLatestMeasurementDate(r);
                 if (latestMDate) {
                     const baseDate = latestMDate;
@@ -258,6 +262,11 @@ export async function fetchAllTodos(reports = []) {
             if (tasks.length > 0) {
                 tasks.forEach(t => {
                     const taskKey = t.id || `${r.id}_${t.title}_${t.dueDate}`;
+                    const isDryingTask = t.id === 'measurement_followup' ||
+                                         (t.id && String(t.id).startsWith('measurement_followup')) ||
+                                         ['first_measurement', 'measurement_due', 'measurement_overdue', 'measurement_missing'].includes(t.id);
+                    const isDone = t.done || (isDryingCompleted && isDryingTask);
+
                     if (!combined.some(c => c.id === taskKey || (c.project_id === (r.id || t.projectId) && c.task === (t.title || t.text)))) {
                         combined.push({
                             id: taskKey,
@@ -268,7 +277,7 @@ export async function fetchAllTodos(reports = []) {
                             assigned_user_name: t.assignedTo || 'Innendienst',
                             note: t.note || (t.category ? `Kategorie: ${t.category}` : null),
                             closes_project: !!t.closesProject,
-                            status: t.done ? 'done' : 'open',
+                            status: isDone ? 'done' : 'open',
                             created_at: t.createdAt || new Date().toISOString(),
                             created_by: 'System'
                         });
@@ -321,7 +330,11 @@ export async function fetchTodosForProject(projectIdOrProject) {
         // 1. The project is in 'Trocknung' status.
         // 2. A measurement protocol actually exists (i.e. latestMDate is not null).
         const status = projectObj.status || projectObj.report_data?.status;
-        if (status === 'Trocknung') {
+        const rRooms = projectObj.measurementRooms || projectObj.report_data?.measurementRooms || [];
+        const rAllRoomsCompleted = Array.isArray(rRooms) && rRooms.length > 0 && rRooms.every(rm => rm.dryingCompleted || rm.globalSettings?.dryingCompleted);
+        const isDryingCompleted = !!(projectObj.dryingCompleted || projectObj.report_data?.dryingCompleted || rAllRoomsCompleted);
+
+        if (status === 'Trocknung' && !isDryingCompleted) {
             const latestMDate = getLatestMeasurementDate(projectObj);
             if (latestMDate) {
                 const baseDate = latestMDate;
@@ -353,6 +366,11 @@ export async function fetchTodosForProject(projectIdOrProject) {
         if (tasks.length > 0) {
             tasks.forEach(t => {
                 const taskKey = t.id || `${projectId}_${t.title}_${t.dueDate}`;
+                const isDryingTask = t.id === 'measurement_followup' ||
+                                     (t.id && String(t.id).startsWith('measurement_followup')) ||
+                                     ['first_measurement', 'measurement_due', 'measurement_overdue', 'measurement_missing'].includes(t.id);
+                const isDone = t.done || (isDryingCompleted && isDryingTask);
+
                 if (!combined.some(c => c.id === taskKey || c.task === (t.title || t.text))) {
                     combined.push({
                         id: taskKey,
@@ -363,7 +381,7 @@ export async function fetchTodosForProject(projectIdOrProject) {
                         assigned_user_name: t.assignedTo || 'Innendienst',
                         note: t.note || (t.category ? `Kategorie: ${t.category}` : null),
                         closes_project: !!t.closesProject,
-                        status: t.done ? 'done' : 'open',
+                        status: isDone ? 'done' : 'open',
                         created_at: t.createdAt || new Date().toISOString(),
                         created_by: 'System'
                     });
@@ -418,7 +436,7 @@ export async function createTodo(todoData) {
         if (error) throw error;
     } catch (err) {
         console.warn('[TodoService] Supabase insert failed (RLS/Auth), falling back to local storage:', err.message);
-        
+
         // Resilient local fallback object
         const localTodo = {
             id: `todo_local_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
@@ -475,7 +493,7 @@ export async function updateTodo(todoId, updateData, expectedUpdatedAt) {
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(todoId);
     if (!isUuid) {
         console.log('[TodoService] Non-UUID todo update triggered. Modifying locally/in report JSON directly.');
-        
+
         // 1. Update in local storage
         try {
             const local = JSON.parse(localStorage.getItem('qservice_local_todos') || '[]');
@@ -536,7 +554,7 @@ export async function updateTodo(todoId, updateData, expectedUpdatedAt) {
                 }
             } catch (e) {}
         }
-        
+
         throw new Error('Dieses To-do konnte nicht aktualisiert werden (kein übereinstimmender Eintrag gefunden).');
     }
 

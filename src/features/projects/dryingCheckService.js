@@ -63,6 +63,40 @@ export const applyDryingCheck = (project, measurementInfo) => {
 
   if (!measuredAt) return null;
 
+  const allRoomsCompleted = Array.isArray(project.measurementRooms) &&
+                            project.measurementRooms.length > 0 &&
+                            project.measurementRooms.every(r => r.dryingCompleted);
+  const isDryingCompleted = !!(project.dryingCompleted || allRoomsCompleted);
+
+  // If drying is completed, mark all open tasks as done and don't create new ones
+  if (isDryingCompleted) {
+    const MEASUREMENT_TASK_IDS = [
+      'first_measurement',
+      'measurement_due',
+      'measurement_overdue',
+      'measurement_missing',
+    ];
+    const existingTasks = project.officeTasks || [];
+    const updatedTasks = existingTasks.map(task => {
+      const isDryingTask = MEASUREMENT_TASK_IDS.includes(task.id) ||
+                           task.id === 'measurement_followup' ||
+                           (task.id && String(task.id).startsWith('measurement_followup'));
+      if (!task.done && isDryingTask) {
+        return { ...task, done: true, completedAt: measuredAt };
+      }
+      return task;
+    });
+
+    return {
+      ...project,
+      dryingCompleted: true,
+      lastDryingCheckAt:    measuredAt,
+      nextDryingCheckDueAt: null,
+      lastActivityAt:       measuredAt,
+      officeTasks:          updatedTasks
+    };
+  }
+
   const measuredDate = new Date(measuredAt);
   if (isNaN(measuredDate.getTime())) return null;
 

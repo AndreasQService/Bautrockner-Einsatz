@@ -263,7 +263,7 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
 
     const handleNumpadPress = (key) => {
         if (!activeNumpadField) return;
-        
+
         let newVal = activeNumpadField.value || '';
         if (key === 'DEL') {
             newVal = newVal.slice(0, -1);
@@ -272,7 +272,7 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
         } else {
             newVal += key;
         }
-        
+
         setActiveNumpadField({ ...activeNumpadField, value: newVal });
 
         if (activeNumpadField.idx !== undefined) {
@@ -539,7 +539,7 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
         const activeRoomForMeasurement = rooms && rooms.length > 0 ? rooms[0] : null;
         if (isNewMeasurementFlag && activeRoomForMeasurement?.measurementData && Array.isArray(activeRoomForMeasurement.measurementData.measurements) && activeRoomForMeasurement.measurementData.measurements.length > 0) {
             const prevDate = activeRoomForMeasurement.measurementData.globalSettings?.date || activeRoomForMeasurement.measurementData.date || new Date().toISOString().split('T')[0];
-            
+
             // Deduplicate to avoid repeating if it's already in history
             const isDuplicateInHistory = virtualHistory.some(e => e.date === prevDate && e.measurements?.length === activeRoomForMeasurement.measurementData.measurements.length);
             if (!isDuplicateInHistory) {
@@ -557,7 +557,7 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
                         measurements: prevMs,
                         globalSettings: activeRoomForMeasurement.measurementData.globalSettings
                     });
-                    
+
                     // Add its point names to the unique list
                     prevMs.forEach((m, idx) => {
                         if (m) {
@@ -706,7 +706,7 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
         if (isSuccess) return;
 
         const currentRoomId = rooms && rooms.length > 0 ? rooms[0].id : null;
-        
+
         if (!currentRoomId) return;
 
         if (isInitializedRef.current === currentRoomId) return;
@@ -724,7 +724,7 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
 
             if (isNewMeasurementFlag) {
                 const oldMs = roomData ? roomData.measurements : [];
-                const initial = oldMs.length > 0 
+                const initial = oldMs.length > 0
                     ? oldMs.map((m, idx) => ({ id: `p${Date.now()}_${idx}`, pointName: m.pointName, w_value: '', b_value: '', notes: '' }))
                     : [
                         { id: `p${Date.now()}`, pointName: 'MP 1', w_value: '', b_value: '', notes: '' },
@@ -739,7 +739,8 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
                     humidity: '',
                     device: 'Trotec T 3000',
                     apartment: rooms && rooms.length > 0 ? (rooms[0].apartment || '') : '',
-                    room: rooms && rooms.length > 0 ? (rooms[0].name || '') : ''
+                    room: rooms && rooms.length > 0 ? (rooms[0].name || '') : '',
+                    dryingCompleted: roomData?.globalSettings?.dryingCompleted || roomData?.dryingCompleted || false
                 };
                 setGlobalSettings(gs);
                 const rm = gs.room || '';
@@ -788,7 +789,8 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
                     humidity: baseGs.humidity || '',
                     device: baseGs.device || 'Trotec T 3000',
                     apartment: baseGs.apartment || (rooms && rooms.length > 0 ? (rooms[0].apartment || '') : ''),
-                    room: baseGs.room || (rooms && rooms.length > 0 ? (rooms[0].name || '') : '')
+                    room: baseGs.room || (rooms && rooms.length > 0 ? (rooms[0].name || '') : ''),
+                    dryingCompleted: baseGs.dryingCompleted || roomData?.dryingCompleted || false
                 };
                 setGlobalSettings(gs);
                 const rm = gs.room || '';
@@ -827,7 +829,8 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
                     humidity: '',
                     device: 'Trotec T 3000',
                     apartment: rooms && rooms.length > 0 ? (rooms[0].apartment || '') : '',
-                    room: rooms && rooms.length > 0 ? (rooms[0].name || '') : ''
+                    room: rooms && rooms.length > 0 ? (rooms[0].name || '') : '',
+                    dryingCompleted: false
                 };
                 setGlobalSettings(gs);
                 const rm = gs.room || '';
@@ -874,7 +877,7 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
                         const comp = document.createElement('canvas');
                         comp.width = fc.width; comp.height = fc.height;
                         const cCtx = comp.getContext('2d');
-                        
+
                         // Background White + Grid
                         cCtx.fillStyle = '#ffffff';
                         cCtx.fillRect(0, 0, comp.width, comp.height);
@@ -882,7 +885,7 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
                         cCtx.lineWidth = 1;
                         for (let x = 0; x <= comp.width; x += 40) { cCtx.beginPath(); cCtx.moveTo(x, 0); cCtx.lineTo(x, comp.height); cCtx.stroke(); }
                         for (let y = 0; y <= comp.height; y += 40) { cCtx.beginPath(); cCtx.moveTo(0, y); cCtx.lineTo(comp.width, y); cCtx.stroke(); }
-                        
+
                         // Photos
                         galleryPhotos.forEach(photo => {
                             const img = document.querySelector(`img[data-id="${photo.id}"]`);
@@ -895,7 +898,7 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
                                 cCtx.drawImage(img, px, py, pw, ph);
                             }
                         });
-                        
+
                         // Drawing Layer
                         cCtx.drawImage(fc, 0, 0);
                         return comp.toDataURL();
@@ -1179,11 +1182,11 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
         // pointerType-Regel: Finger/touch -> immer Foto-Overlay, nie zeichnen
         if (e.pointerType === 'touch') return;
         if (stylusOnlyMode && e.pointerType !== 'pen') return;
-        
+
         setSelectedPhotoId(null); // Reset photo selection!
-        
+
         e.preventDefault(); // Stop mobile browser rubber-banding/scrolling
-        
+
         try { (e.currentTarget || e.target).setPointerCapture(e.pointerId); } catch (_) { }
         const coords = getCoordinates(e);
         const ctx = getCtx();
@@ -1198,9 +1201,9 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
     const draw = (e) => {
         if (!isDrawingRef.current) return;
         if (stylusOnlyMode && e.pointerType !== 'pen') return;
-        
+
         e.preventDefault(); // Stop mobile browser native scroll
-        
+
         const coords = getCoordinates(e);
         const ctx = getCtx();
         if (!ctx) return;
@@ -1312,7 +1315,8 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
             humidity: h.globalSettings?.humidity || h.humidity || '',
             device: h.globalSettings?.device || h.device || '',
             apartment: h.globalSettings?.apartment || rooms[0]?.apartment || '',
-            room: h.globalSettings?.room || rooms[0]?.name || ''
+            room: h.globalSettings?.room || rooms[0]?.name || '',
+            dryingCompleted: h.globalSettings?.dryingCompleted || h.dryingCompleted || false
         });
 
         setGalleryPhotos(h.galleryPhotos || []);
@@ -1404,7 +1408,7 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
                             if (!isBlueHighlight) {
                                 el.style.setProperty('color', '#0f172a', 'important');
                             }
-                            
+
                             // Replace any dark theme backgrounds with light grey
                             if (el.style.background && (el.style.background.includes('var(') || el.style.background.includes('rgba('))) {
                                 el.style.setProperty('background', '#f8fafc', 'important');
@@ -1422,7 +1426,7 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
 
             // Capture canvas state as DataURL for restoration
             const toggleCanvas = hiddenCanvasRef.current;
-            
+
             const canvasDataUrl = await (async () => {
                 // If we are currently in the sketch editor, we should capture the latest state
                 if (isSketchFullscreen && canvasRef.current) {
@@ -1430,7 +1434,7 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
                     const comp = document.createElement('canvas');
                     comp.width = fc.width; comp.height = fc.height;
                     const cCtx = comp.getContext('2d');
-                    
+
                     // 1. Background White + Grid
                     cCtx.fillStyle = '#ffffff';
                     cCtx.fillRect(0, 0, comp.width, comp.height);
@@ -1438,7 +1442,7 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
                     cCtx.lineWidth = 1;
                     for (let x = 0; x <= comp.width; x += 40) { cCtx.beginPath(); cCtx.moveTo(x, 0); cCtx.lineTo(x, comp.height); cCtx.stroke(); }
                     for (let y = 0; y <= comp.height; y += 40) { cCtx.beginPath(); cCtx.moveTo(0, y); cCtx.lineTo(comp.width, y); cCtx.stroke(); }
-                    
+
                     // 2. Photos
                     galleryPhotos.forEach(photo => {
                         const img = document.querySelector(`img[data-id="${photo.id}"]`);
@@ -1451,7 +1455,7 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
                             cCtx.drawImage(img, px, py, pw, ph);
                         }
                     });
-                    
+
                     // 3. Drawing Layer
                     cCtx.drawImage(fc, 0, 0);
                     return comp.toDataURL();
@@ -1693,10 +1697,10 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
                                         {title && <span style={{ color: 'var(--border)', fontWeight: 600 }}>{title}</span>}
                                         {address && <span style={{ color: '#94A3B8', fontWeight: 500 }}>{title ? '·' : ''} {address}</span>}
                                         {autosaveStatus && (
-                                            <span style={{ 
-                                                marginLeft: '0.75rem', 
-                                                fontSize: '0.75rem', 
-                                                color: autosaveStatus === 'saving' ? '#F59E0B' : '#10B981', 
+                                            <span style={{
+                                                marginLeft: '0.75rem',
+                                                fontSize: '0.75rem',
+                                                color: autosaveStatus === 'saving' ? '#F59E0B' : '#10B981',
                                                 background: autosaveStatus === 'saving' ? 'rgba(245,158,11,0.1)' : 'rgba(16,185,129,0.1)',
                                                 padding: '0.2rem 0.5rem',
                                                 borderRadius: '6px',
@@ -1730,18 +1734,18 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
                             {isSaving ? <Loader size={16} className="animate-spin" /> : <Check size={16} />}
                             {isSaving ? 'Speichert…' : isSuccess ? 'Gespeichert!' : (readOnly ? 'Schliessen' : 'Fertig')}
                         </button>
-                        <button 
-                            onClick={() => setShowHistoryTable(!showHistoryTable)} 
-                            style={{ 
-                                padding: '0.55rem 1rem', 
-                                borderRadius: '8px', 
-                                background: showHistoryTable ? 'rgba(96,165,250,0.2)' : 'rgba(255,255,255,0.07)', 
-                                border: showHistoryTable ? '1px solid #60A5FA' : '1px solid var(--border)', 
-                                color: showHistoryTable ? '#60A5FA' : '#94A3B8', 
-                                cursor: 'pointer', 
-                                minHeight: '42px', 
-                                display: 'flex', 
-                                alignItems: 'center', 
+                        <button
+                            onClick={() => setShowHistoryTable(!showHistoryTable)}
+                            style={{
+                                padding: '0.55rem 1rem',
+                                borderRadius: '8px',
+                                background: showHistoryTable ? 'rgba(96,165,250,0.2)' : 'rgba(255,255,255,0.07)',
+                                border: showHistoryTable ? '1px solid #60A5FA' : '1px solid var(--border)',
+                                color: showHistoryTable ? '#60A5FA' : '#94A3B8',
+                                cursor: 'pointer',
+                                minHeight: '42px',
+                                display: 'flex',
+                                alignItems: 'center',
                                 gap: '0.4rem',
                                 fontWeight: 700
                             }}
@@ -1821,9 +1825,9 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
                         <canvas ref={hiddenCanvasRef} width={960} height={600} style={{ display: 'none' }} />
 
                         {(() => {
-                            const historyOnly = historyEntries.filter(entry => 
-                                entry.source === 'history' || 
-                                (entry.source === 'current' && entry.measurements && entry.measurements.some(m => 
+                            const historyOnly = historyEntries.filter(entry =>
+                                entry.source === 'history' ||
+                                (entry.source === 'current' && entry.measurements && entry.measurements.some(m =>
                                     String(m.w_value || '').trim() !== '' || String(m.b_value || '').trim() !== ''
                                 ))
                             );
@@ -1860,16 +1864,16 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
                                                     {row.source === 'current' ? (
                                                         <span style={{ fontSize: '0.65rem', color: '#60A5FA', fontWeight: 700 }}>(Aktuell)</span>
                                                     ) : (
-                                                        <button 
-                                                            type="button" 
+                                                        <button
+                                                            type="button"
                                                             onClick={() => handleStartEditHistorical(row.id)}
-                                                            style={{ 
-                                                                fontSize: '0.65rem', 
-                                                                color: '#e2e8f0', 
-                                                                background: 'rgba(255,255,255,0.08)', 
-                                                                border: '1px solid rgba(255,255,255,0.1)', 
-                                                                borderRadius: '4px', 
-                                                                padding: '1px 5px', 
+                                                            style={{
+                                                                fontSize: '0.65rem',
+                                                                color: '#e2e8f0',
+                                                                background: 'rgba(255,255,255,0.08)',
+                                                                border: '1px solid rgba(255,255,255,0.1)',
+                                                                borderRadius: '4px',
+                                                                padding: '1px 5px',
                                                                 cursor: 'pointer',
                                                                 marginTop: '3px',
                                                                 fontWeight: 700
@@ -2008,8 +2012,8 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
                                 <div>
                                     <label style={S.label}>Wohnung / Bereich</label>
                                     <div style={{ position: 'relative', marginBottom: isCustomApartment ? '0.5rem' : '0' }}>
-                                        <select 
-                                            value={isCustomApartment ? 'Sonstiges' : (globalSettings.apartment || '')} 
+                                        <select
+                                            value={isCustomApartment ? 'Sonstiges' : (globalSettings.apartment || '')}
                                             onChange={e => {
                                                 const val = e.target.value;
                                                 if (val === 'Sonstiges') {
@@ -2019,7 +2023,7 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
                                                     setIsCustomApartment(false);
                                                     setGlobalSettings({ ...globalSettings, apartment: val });
                                                 }
-                                            }} 
+                                            }}
                                             style={{ ...S.input, paddingRight: '2rem', appearance: 'none', backgroundColor: 'transparent' }}
                                         >
                                             <option value="" style={{ background: 'var(--surface)', color: 'var(--text-main)' }}>Bitte wählen...</option>
@@ -2107,7 +2111,7 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
                                         <div key={f.key}>
                                             <label style={{ ...S.label, fontSize: '0.65rem', whiteSpace: 'nowrap' }}>{f.lbl}</label>
                                             {f.isNumeric ? (
-                                                <div 
+                                                <div
                                                     onClick={() => setActiveNumpadField({ field: f.key, value: globalSettings[f.key] || '' })}
                                                     style={{ ...S.input, padding: '0.4rem 0.2rem', fontSize: '1rem', minHeight: 40, textAlign: 'center', background: activeNumpadField?.field === f.key ? '#3B82F6' : 'var(--background)', color: activeNumpadField?.field === f.key ? '#FFFFFF' : 'var(--text-main)', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}
                                                 >
@@ -2125,6 +2129,20 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
                                             )}
                                         </div>
                                     ))}
+                                </div>
+
+                                {/* Room-level dryingCompleted checkbox */}
+                                <div style={{ marginTop: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.4rem 0.6rem', background: globalSettings.dryingCompleted ? 'rgba(16, 185, 129, 0.08)' : 'transparent', border: globalSettings.dryingCompleted ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid transparent', borderRadius: '8px' }}>
+                                    <input
+                                        type="checkbox"
+                                        id="room-drying-completed"
+                                        checked={!!globalSettings.dryingCompleted}
+                                        onChange={e => setGlobalSettings({ ...globalSettings, dryingCompleted: e.target.checked })}
+                                        style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: '#10B981' }}
+                                    />
+                                    <label htmlFor="room-drying-completed" style={{ fontSize: '0.85rem', fontWeight: 700, color: globalSettings.dryingCompleted ? '#10B981' : 'var(--text-main)', cursor: 'pointer', margin: 0 }}>
+                                        Trocknung in diesem Raum abgeschlossen
+                                    </label>
                                 </div>
 
                                 <div style={{ borderTop: '1px solid var(--border)' }} />
@@ -2153,7 +2171,7 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
                                                     style={{ width: '100%', padding: '0.4rem 0.5rem', background: 'var(--background)', border: '1px solid var(--border)', color: 'var(--text-main)', fontSize: '1rem', fontWeight: 700, textAlign: 'center', height: 40, boxSizing: 'border-box', borderRadius: 6 }}
                                                 />
                                             ) : (
-                                                <div 
+                                                <div
                                                     onClick={() => setActiveNumpadField({ idx, field: 'w_value', value: row.w_value || '' })}
                                                     style={{ width: '100%', padding: '0.4rem 0.5rem', background: (activeNumpadField?.idx === idx && activeNumpadField?.field === 'w_value') ? '#3B82F6' : 'var(--background)', border: '1px solid var(--border)', color: (activeNumpadField?.idx === idx && activeNumpadField?.field === 'w_value') ? '#FFFFFF' : 'var(--text-main)', fontSize: '1rem', fontWeight: 700, textAlign: 'center', height: 40, boxSizing: 'border-box', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
                                                 >
@@ -2171,7 +2189,7 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
                                                     style={{ width: '100%', padding: '0.4rem 0.5rem', background: 'var(--background)', border: '1px solid var(--border)', color: 'var(--text-main)', fontSize: '1rem', fontWeight: 700, textAlign: 'center', height: 40, boxSizing: 'border-box', borderRadius: 6 }}
                                                 />
                                             ) : (
-                                                <div 
+                                                <div
                                                     onClick={() => setActiveNumpadField({ idx, field: 'b_value', value: row.b_value || '' })}
                                                     style={{ width: '100%', padding: '0.4rem 0.5rem', background: (activeNumpadField?.idx === idx && activeNumpadField?.field === 'b_value') ? '#3B82F6' : 'var(--background)', border: '1px solid var(--border)', color: (activeNumpadField?.idx === idx && activeNumpadField?.field === 'b_value') ? '#FFFFFF' : 'var(--text-main)', fontSize: '1rem', fontWeight: 700, textAlign: 'center', height: 40, boxSizing: 'border-box', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
                                                 >
@@ -2229,7 +2247,7 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
 
             {/* ── FULLSCREEN SKETCH OVERLAY (unverändert) ── */}
             {isSketchFullscreen && createPortal(
-                <div 
+                <div
                     ref={portalRef}
                     className="qtool-sketch-lock"
                     onContextMenu={(e) => e.preventDefault()}
@@ -2259,7 +2277,7 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
                         <button onClick={() => { activateTool('pen'); setColor('#22c55e'); setLineWidth(3); }} style={{ padding: '0.5rem', borderRadius: '6px', background: (activeTool === 'pen' && color === '#22c55e') ? 'rgba(34,197,94,0.2)' : 'rgba(255,255,255,0.05)', border: (activeTool === 'pen' && color === '#22c55e') ? '1px solid #22c55e' : '1px solid rgba(255,255,255,0.15)', color: '#22c55e' }} title="Grün"><Pen size={16} /></button>
                         <button onClick={() => { activateTool('pen'); setColor('#eab308'); setLineWidth(3); }} style={{ padding: '0.5rem', borderRadius: '6px', background: (activeTool === 'pen' && color === '#eab308') ? 'rgba(234,179,8,0.2)' : 'rgba(255,255,255,0.05)', border: (activeTool === 'pen' && color === '#eab308') ? '1px solid #eab308' : '1px solid rgba(255,255,255,0.15)', color: '#eab308' }} title="Gelb"><Pen size={16} /></button>
                         <button onClick={() => activateTool('eraser')} style={{ padding: '0.5rem 0.75rem', borderRadius: '6px', background: (activeTool === 'eraser') ? 'var(--color-panel-bg)' : 'rgba(255,255,255,0.05)', border: (activeTool === 'eraser') ? '1px solid var(--border)' : '1px solid rgba(255,255,255,0.15)', color: '#94A3B8', display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Eraser size={16} /><span style={{ fontSize: '0.8rem', fontWeight: 600 }}>Radierer</span></button>
-                        
+
                         <div style={{ width: '1px', height: '24px', background: 'var(--border)', margin: '0 0.5rem' }} />
 
                         <button onClick={() => setViewport({ scale: 1, x: 0, y: 0 })} style={{ padding: '0.5rem 0.75rem', borderRadius: '6px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.15)', color: '#94A3B8', display: 'flex', alignItems: 'center', gap: '0.4rem' }} title="Zoom & Pan zurücksetzen">
