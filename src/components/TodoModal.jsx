@@ -282,16 +282,16 @@ const TodoModal = ({
                             </div>
                         )}
 
-                        {/* Existing active todos warning */}
+                        {/* Existing active todos info badge */}
                         {existingTodosCount > 0 && (
                             <div style={{
                                 display: 'flex', alignItems: 'center', gap: '0.5rem',
                                 marginTop: '0.5rem', padding: '0.5rem 0.75rem',
-                                backgroundColor: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.2)',
-                                borderRadius: '6px', color: '#d97706', fontSize: '0.82rem'
+                                backgroundColor: 'rgba(30, 109, 183, 0.1)', border: '1px solid rgba(30, 109, 183, 0.25)',
+                                borderRadius: '6px', color: 'var(--q-primary, #1e6db7)', fontSize: '0.82rem'
                             }}>
-                                <AlertTriangle size={16} />
-                                <span>Für dieses Projekt bestehen bereits {existingTodosCount} offene To-dos.</span>
+                                <ClipboardList size={16} />
+                                <span>Dieses Projekt hat bereits {existingTodosCount} offene Aufgaben. Du fügst hier ein <strong>weiteres To-do</strong> hinzu.</span>
                             </div>
                         )}
                     </div>
