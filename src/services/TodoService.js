@@ -129,20 +129,25 @@ export async function fetchAllTodos(reports = []) {
 export async function fetchTodosForProject(projectIdOrProject) {
     await ensureAuthenticated().catch(() => {});
     const projectId = typeof projectIdOrProject === 'object' ? projectIdOrProject?.id : projectIdOrProject;
+    const projectNum = typeof projectIdOrProject === 'object' ? projectIdOrProject?.projectNumber : null;
     const projectObj = typeof projectIdOrProject === 'object' ? projectIdOrProject : null;
 
     let remoteData = [];
-    if (supabase && projectId) {
+    if (supabase && (projectId || projectNum)) {
         try {
-            const { data, error } = await supabase
-                .from('project_todos')
-                .select('*')
-                .eq('project_id', projectId)
-                .order('due_date', { ascending: true });
+            let query = supabase.from('project_todos').select('*');
+            if (projectId && projectNum) {
+                query = query.or(`project_id.eq.${projectId},project_id.eq.${projectNum}`);
+            } else if (projectId) {
+                query = query.eq('project_id', projectId);
+            } else {
+                query = query.eq('project_id', projectNum);
+            }
+            const { data, error } = await query.order('due_date', { ascending: true });
             if (!error && data) remoteData = data;
         } catch (e) {}
     }
-    const local = getLocalTodos().filter(t => t.project_id === projectId);
+    const local = getLocalTodos().filter(t => t.project_id === projectId || (projectNum && t.project_id === projectNum));
     const combined = [...remoteData];
     local.forEach(loc => {
         if (!combined.some(r => r.id === loc.id)) {
