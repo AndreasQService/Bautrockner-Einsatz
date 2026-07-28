@@ -1037,7 +1037,9 @@ function App() {
 
       if (error) {
         console.error('[Supabase] Fehler beim Laden:', error);
-        setSupabaseStatus({ ok: false, count: 0, error: `${error.code}: ${error.message}` });
+        setSupabaseStatus({ ok: false, count: 0, error: `${error.code || 'ERR'}: ${error.message}` });
+        // Auto-retry fetchReports after 5 seconds on transient error
+        setTimeout(() => fetchReports(), 5000);
       } else if (data) {
         const loadedReports = data
           // Sortierung auf dem Client um DB Statement Timeouts zu vermeiden
