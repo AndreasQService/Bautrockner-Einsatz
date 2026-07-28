@@ -1125,9 +1125,8 @@ function App() {
 
           // Asynchrones Nachladen der detaillierten report_data für aktive Projekte im Hintergrund (optimiert in Batch-Abfrage)
           const activeIds = loadedReports
-            .filter(r => r.status !== 'Abgeschlossen')
-            .map(r => r.id)
-            .filter(id => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id));
+            .filter(r => r.status !== 'Abgeschlossen' && r.id !== 'SYSTEM_SETTINGS')
+            .map(r => r.id);
 
           if (activeIds.length > 0) {
             console.log('[Supabase] Starting background fetch for active projects in batch:', activeIds.length);
