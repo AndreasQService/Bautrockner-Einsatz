@@ -9186,14 +9186,15 @@ END:VCARD`;
                                                 cursor: (selectedDevice && !selectedDevice.is_rental) ? 'not-allowed' : 'pointer',
                                                 userSelect: 'none',
                                                 padding: '0.2rem 0',
-                                                opacity: (selectedDevice && !selectedDevice.is_rental) ? 0.4 : 1
+                                                color: (selectedDevice ? !!selectedDevice.is_rental : !!newDevice.isRental) ? 'var(--text-main)' : 'var(--text-muted)',
+                                                opacity: (selectedDevice && !selectedDevice.is_rental) ? 0.4 : 0.85
                                             }}>
                                                 <input
                                                     type="checkbox"
                                                     checked={selectedDevice ? !!selectedDevice.is_rental : !!newDevice.isRental}
                                                     disabled={!!(selectedDevice && !selectedDevice.is_rental)}
                                                     onChange={(e) => setNewDevice(prev => ({ ...prev, isRental: e.target.checked }))}
-                                                    style={{ width: '20px', height: '20px', accentColor: 'var(--primary)', cursor: (selectedDevice && !selectedDevice.is_rental) ? 'not-allowed' : 'pointer' }}
+                                                    style={{ width: '18px', height: '18px', accentColor: 'var(--primary)', cursor: (selectedDevice && !selectedDevice.is_rental) ? 'not-allowed' : 'pointer' }}
                                                 />
                                                 <span style={{ fontWeight: 600 }}>Mietgerät (Externes Gerät)</span>
                                             </label>
