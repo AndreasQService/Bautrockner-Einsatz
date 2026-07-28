@@ -1020,9 +1020,9 @@ function App() {
 
     setSupabaseStatus({ ok: null, count: null, error: null }); // Laden...
     try {
-      // 6-Sekunden-Timeout für die Supabase-Abfrage
+      // 12-Sekunden-Timeout für die Supabase-Abfrage
       const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Timeout nach 6 Sekunden')), 6000)
+        setTimeout(() => reject(new Error('Timeout nach 12 Sekunden')), 12000)
       );
 
       const fetchPromise = supabase
