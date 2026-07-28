@@ -9838,7 +9838,17 @@ END:VCARD`;
                                                 />
                                                 {/* DB Sync Status Badge */}
                                                 {(() => {
-                                                    const isCloudSaved = !!(img.supabasePath || img.oneDriveItemId || img.synced || img.supabaseUrl || (typeof img.url === 'string' && img.url.startsWith('http')));
+                                                    const isCloudSaved = !!(
+                                                        img.supabasePath || 
+                                                        img.oneDriveItemId || 
+                                                        img.synced || 
+                                                        img.supabaseUrl || 
+                                                        img.syncStatus === 'remote_verified' || 
+                                                        img.syncStatus === 'uploaded_to_backend' || 
+                                                        img.syncStatus === 'synced' || 
+                                                        img.syncStatus === 'queued_for_remote' || 
+                                                        (typeof img.url === 'string' && img.url.startsWith('http'))
+                                                    );
                                                     return (
                                                         <div 
                                                             style={{
