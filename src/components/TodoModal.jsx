@@ -32,10 +32,13 @@ const TodoModal = ({
     useEffect(() => {
         if (todo) {
             // Find project
-            const proj = reports.find(r => r.id === todo.project_id);
+            const proj = reports.find(r => r.id === todo.project_id || (r.projectNumber && String(r.projectNumber) === String(todo.project_id)));
             if (proj) {
                 setSelectedProject(proj);
-                setProjectSearch(proj.projectTitle || proj.project_title || proj.address || proj.id);
+                const title = proj.projectTitle || proj.project_title || '';
+                const num = proj.projectNumber || '';
+                const addr = proj.address || '';
+                setProjectSearch(`${title}${num ? ' (' + num + ')' : ''}${addr ? ' - ' + addr : ''}`);
             }
 
             if (!isFollowUpMode) {
@@ -51,10 +54,16 @@ const TodoModal = ({
             }
         } else if (initialProject) {
             setSelectedProject(initialProject);
-            setProjectSearch(initialProject.projectTitle || initialProject.project_title || initialProject.address || initialProject.id);
+            const title = initialProject.projectTitle || initialProject.project_title || '';
+            const num = initialProject.projectNumber || '';
+            const addr = initialProject.address || '';
+            setProjectSearch(`${title}${num ? ' (' + num + ')' : ''}${addr ? ' - ' + addr : ''}`);
         } else if (reports.length === 1) {
             setSelectedProject(reports[0]);
-            setProjectSearch(reports[0].projectTitle || reports[0].project_title || reports[0].address || reports[0].id);
+            const title = reports[0].projectTitle || reports[0].project_title || '';
+            const num = reports[0].projectNumber || '';
+            const addr = reports[0].address || '';
+            setProjectSearch(`${title}${num ? ' (' + num + ')' : ''}${addr ? ' - ' + addr : ''}`);
         }
     }, [todo, isFollowUpMode, reports, initialProject]);
 
