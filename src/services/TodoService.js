@@ -341,6 +341,75 @@ export async function deleteTodo(todoId) {
  * Updates a To-do with optimistic locking (checks updated_at and status = 'open').
  */
 export async function updateTodo(todoId, updateData, expectedUpdatedAt) {
+    // ── FALLBACK FOR NON-UUID (EMBEDDED OR LOCAL) TODOS ──
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(todoId);
+    if (!isUuid) {
+        console.log('[TodoService] Non-UUID todo update triggered. Modifying locally/in report JSON directly.');
+        
+        // 1. Update in local storage
+        try {
+            const local = JSON.parse(localStorage.getItem('qservice_local_todos') || '[]');
+            const idx = local.findIndex(t => t.id === todoId);
+            if (idx >= 0) {
+                local[idx] = {
+                    ...local[idx],
+                    task: updateData.task.trim(),
+                    due_date: updateData.dueDate,
+                    assigned_user_id: String(updateData.assignedUserId),
+                    assigned_user_name: updateData.assignedUserName,
+                    note: updateData.note ? updateData.note.trim() : null,
+                    closes_project: !!updateData.closesProject,
+                    updated_at: new Date().toISOString()
+                };
+                localStorage.setItem('qservice_local_todos', JSON.stringify(local));
+                return local[idx];
+            }
+        } catch (e) {}
+
+        // 2. Update in Supabase damage_reports JSON if it belongs to a report
+        if (supabase && updateData.projectId) {
+            try {
+                const { data: report, error: fetchErr } = await supabase
+                    .from('damage_reports')
+                    .select('report_data')
+                    .eq('id', updateData.projectId)
+                    .single();
+                if (!fetchErr && report && report.report_data) {
+                    const rd = report.report_data;
+                    const tasks = rd.officeTasks || [];
+                    const taskIdx = tasks.findIndex(t => t.id === todoId);
+                    if (taskIdx >= 0) {
+                        tasks[taskIdx] = {
+                            ...tasks[taskIdx],
+                            title: updateData.task.trim(),
+                            dueDate: updateData.dueDate,
+                            assignedTo: updateData.assignedUserName,
+                            category: 'manual',
+                            note: updateData.note ? updateData.note.trim() : null
+                        };
+                        rd.officeTasks = tasks;
+                        const { error: updateErr } = await supabase
+                            .from('damage_reports')
+                            .update({ report_data: rd })
+                            .eq('id', updateData.projectId);
+                        if (!updateErr) {
+                            return {
+                                id: todoId,
+                                project_id: updateData.projectId,
+                                task: updateData.task.trim(),
+                                due_date: updateData.dueDate,
+                                assigned_user_name: updateData.assignedUserName,
+                                status: 'open'
+                            };
+                        }
+                    }
+                }
+            } catch (e) {}
+        }
+        
+        throw new Error('Dieses To-do konnte nicht aktualisiert werden (kein übereinstimmender Eintrag gefunden).');
+    }
+
     await ensureAuthenticated();
     if (!supabase) throw new Error('Supabase client not initialized');
 
