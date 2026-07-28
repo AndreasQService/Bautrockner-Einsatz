@@ -35,7 +35,7 @@ const TodoModal = ({
             const proj = reports.find(r => r.id === todo.project_id || (r.projectNumber && String(r.projectNumber) === String(todo.project_id)));
             if (proj) {
                 setSelectedProject(proj);
-                const title = proj.projectTitle || proj.project_title || '';
+                const title = proj.projectTitle || proj.project_title || proj.id || '';
                 const num = proj.projectNumber || '';
                 const addr = proj.address || '';
                 setProjectSearch(`${title}${num ? ' (' + num + ')' : ''}${addr ? ' - ' + addr : ''}`);
@@ -54,13 +54,13 @@ const TodoModal = ({
             }
         } else if (initialProject) {
             setSelectedProject(initialProject);
-            const title = initialProject.projectTitle || initialProject.project_title || '';
+            const title = initialProject.projectTitle || initialProject.project_title || initialProject.id || '';
             const num = initialProject.projectNumber || '';
             const addr = initialProject.address || '';
             setProjectSearch(`${title}${num ? ' (' + num + ')' : ''}${addr ? ' - ' + addr : ''}`);
         } else if (reports.length === 1) {
             setSelectedProject(reports[0]);
-            const title = reports[0].projectTitle || reports[0].project_title || '';
+            const title = reports[0].projectTitle || reports[0].project_title || reports[0].id || '';
             const num = reports[0].projectNumber || '';
             const addr = reports[0].address || '';
             setProjectSearch(`${title}${num ? ' (' + num + ')' : ''}${addr ? ' - ' + addr : ''}`);
