@@ -41,7 +41,7 @@ const TodoProjectSection = ({
 
     useEffect(() => {
         loadProjectTodos();
-    }, [project]);
+    }, [project, project?.officeTasks, project?.report_data?.officeTasks]);
 
     // Split open vs done
     const openTodos = useMemo(() => {
