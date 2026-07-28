@@ -86,7 +86,7 @@ const getUrgencyStyle = (days, thresholds = [7, 10]) => {
     }
 };
 
-const DryingMonitor = ({ reports, onSelectReport, workflowStore = {} }) => {
+const DryingMonitor = ({ reports, onSelectReport, onDeleteReport, workflowStore = {} }) => {
     // Filter by status 'Trocknung' OR if there are active devices
     const dryingReports = reports.filter(r => {
         const isStatusDrying = r.status === 'Trocknung' || (r.equipment && r.equipment.length > 0);
@@ -131,8 +131,31 @@ const DryingMonitor = ({ reports, onSelectReport, workflowStore = {} }) => {
                                 onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--surface)'}
                             >
                                 <div style={{ marginBottom: '0.6rem' }}>
-                                    <div style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-main)', marginBottom: '0.15rem', letterSpacing: '0.01em' }}>
-                                        {report.projectNumber || report.projectTitle || '---'}
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                        <div style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-main)', marginBottom: '0.15rem', letterSpacing: '0.01em', wordBreak: 'break-all', paddingRight: '0.5rem' }}>
+                                            {report.projectNumber || report.projectTitle || '---'}
+                                        </div>
+                                        {onDeleteReport && (
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    if (window.confirm(`Projekt "${report.projectTitle || report.id}" wirklich löschen?`)) {
+                                                        onDeleteReport(report.id);
+                                                    }
+                                                }}
+                                                style={{
+                                                    background: 'none', border: 'none', cursor: 'pointer',
+                                                    color: '#EF4444', padding: '0.2rem', borderRadius: '4px',
+                                                    display: 'flex', alignItems: 'center', transition: 'background-color 0.2s',
+                                                    marginTop: '-2px', marginRight: '-2px'
+                                                }}
+                                                onMouseEnter={(ev) => ev.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.1)'}
+                                                onMouseLeave={(ev) => ev.currentTarget.style.backgroundColor = 'transparent'}
+                                                title="Projekt löschen"
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                        )}
                                     </div>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
                                         <span style={{ fontWeight: 600, fontSize: '0.8rem', color: 'var(--text-main)' }}>{report.locationDetails || report.client}</span>
@@ -637,7 +660,7 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
                         <WorkflowStatusOverview reports={reports} onSelectReport={onSelectReport} currentUser={currentUser} users={users || []} searchTerm={searchTerm} store={workflowStore} onStoreChange={setWorkflowStore} />
                     )}
                     {showDrying && (
-                        <DryingMonitor reports={filteredReports} onSelectReport={onSelectReport} workflowStore={workflowStore} />
+                        <DryingMonitor reports={filteredReports} onSelectReport={onSelectReport} onDeleteReport={onDeleteReport} workflowStore={workflowStore} />
                     )}
                     {showDevices && (
                         <DeviceInventoryList reports={filteredReports} onSelectReport={onSelectReport} />
