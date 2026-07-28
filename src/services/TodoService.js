@@ -56,9 +56,9 @@ function getLocalTodos() {
 }
 
 /**
- * Fetches all todos from Supabase & local storage.
+ * Fetches all todos from Supabase project_todos, local storage, and officeTasks inside damage_reports.
  */
-export async function fetchAllTodos() {
+export async function fetchAllTodos(reports = []) {
     await ensureAuthenticated().catch(() => {});
     let remoteData = [];
     if (supabase) {
@@ -77,6 +77,34 @@ export async function fetchAllTodos() {
             combined.push(loc);
         }
     });
+
+    // Also collect legacy/embedded officeTasks from loaded reports
+    if (Array.isArray(reports)) {
+        reports.forEach(r => {
+            const tasks = r?.officeTasks || r?.report_data?.officeTasks;
+            if (Array.isArray(tasks)) {
+                tasks.forEach(t => {
+                    const taskKey = t.id || `${r.id}_${t.title}_${t.dueDate}`;
+                    if (!combined.some(c => c.id === taskKey || (c.project_id === (r.id || t.projectId) && c.task === (t.title || t.text)))) {
+                        combined.push({
+                            id: taskKey,
+                            project_id: r.id || t.projectId,
+                            task: t.title || t.text || 'Aufgabe',
+                            due_date: t.dueDate ? t.dueDate.split('T')[0] : new Date().toISOString().split('T')[0],
+                            assigned_user_id: 'office',
+                            assigned_user_name: 'Innendienst',
+                            note: t.category ? `Kategorie: ${t.category}` : null,
+                            closes_project: false,
+                            status: t.done ? 'done' : 'open',
+                            created_at: t.createdAt || new Date().toISOString(),
+                            created_by: 'System'
+                        });
+                    }
+                });
+            }
+        });
+    }
+
     return combined;
 }
 

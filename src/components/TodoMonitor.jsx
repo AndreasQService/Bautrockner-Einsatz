@@ -43,7 +43,7 @@ const TodoMonitor = ({
         setLoading(true);
         setError('');
         try {
-            const list = await fetchAllTodos();
+            const list = await fetchAllTodos(reports);
             setTodos(list);
         } catch (err) {
             setError('Fehler beim Laden der Aufgaben: ' + err.message);
