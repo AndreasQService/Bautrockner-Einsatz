@@ -1,18 +1,54 @@
 import React, { useState } from 'react';
 import { User, Lock, LogIn, ShieldAlert } from 'lucide-react';
 
-const LoginScreen = ({ users, onLogin }) => {
+const LoginScreen = ({ users, onLogin, supabase }) => {
     const [name, setName] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
 
-    const handleLogin = (e) => {
+    const handleLogin = async (e) => {
         e.preventDefault();
         const trimmedName = name.trim();
         const trimmedPassword = password.trim();
 
         if (!trimmedName || !trimmedPassword) {
             setError('Bitte Name und Passwort eingeben.');
+            return;
+        }
+
+        // Intercept login for Andreas Strehler to authenticate via Supabase
+        if (trimmedName.toLowerCase() === 'andreas strehler') {
+            if (!supabase) {
+                setError('Supabase-Client nicht initialisiert.');
+                return;
+            }
+            try {
+                const { data, error: authError } = await supabase.auth.signInWithPassword({
+                    email: 'a.strehler@q-service.ch',
+                    password: trimmedPassword
+                });
+
+                if (authError) {
+                    setError(`Anmeldung fehlgeschlagen: ${authError.message}`);
+                    return;
+                }
+
+                if (data && data.user) {
+                    const userObj = users.find(u => u.name.toLowerCase() === 'andreas strehler') || {
+                        id: 4,
+                        name: 'Andreas Strehler',
+                        role: 'admin'
+                    };
+                    onLogin({
+                        ...userObj,
+                        role: 'admin'
+                    });
+                } else {
+                    setError('Keine gültige Sitzung erhalten.');
+                }
+            } catch (err) {
+                setError(`Verbindungsfehler: ${err.message}`);
+            }
             return;
         }
 

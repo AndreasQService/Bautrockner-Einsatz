@@ -641,23 +641,70 @@ function App() {
 
   const [currentUser, setCurrentUser] = useState(() => {
     const saved = localStorage.getItem('qtool_current_user');
-    return saved ? JSON.parse(saved) : null;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.name && parsed.name.toLowerCase() === 'andreas strehler') {
+          return null;
+        }
+        return parsed;
+      } catch (e) {
+        return null;
+      }
+    }
+    return null;
   });
   const [supabaseSession, setSupabaseSession] = useState(null);
 
   useEffect(() => {
     if (!supabase) return;
 
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSupabaseSession(session);
-    }).catch(err => {
-      console.error('[Supabase Auth] Fehler beim Abrufen der initialen Session:', err);
-    });
+    const syncSession = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        setSupabaseSession(session);
+        if (session && session.user && session.user.email === 'a.strehler@q-service.ch') {
+          const saved = localStorage.getItem('qtool_current_user');
+          let existingUserObj = null;
+          if (saved) {
+            try {
+              existingUserObj = JSON.parse(saved);
+            } catch {}
+          }
+          if (!existingUserObj || existingUserObj.name.toLowerCase() !== 'andreas strehler') {
+            existingUserObj = { id: 4, name: 'Andreas Strehler', role: 'admin' };
+          }
+          setCurrentUser(existingUserObj);
+          setUserRole('admin');
+          setIsTechnicianMode(false);
+          setProjectMode('desktop');
+        } else {
+          setCurrentUser(prev => {
+            if (prev && prev.name && prev.name.toLowerCase() === 'andreas strehler') {
+              localStorage.removeItem('qtool_current_user');
+              return null;
+            }
+            return prev;
+          });
+        }
+      } catch (err) {
+        console.error('[Supabase Auth] Fehler beim Abrufen der initialen Session:', err);
+      }
+    };
 
-    // Listen for auth state changes
+    syncSession();
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSupabaseSession(session);
+      if (!session) {
+        setCurrentUser(prev => {
+          if (prev && prev.name && prev.name.toLowerCase() === 'andreas strehler') {
+            localStorage.removeItem('qtool_current_user');
+            return null;
+          }
+          return prev;
+        });
+      }
     });
 
     return () => {
@@ -692,14 +739,26 @@ function App() {
   const [userRole, setUserRole] = useState(() => {
     const saved = localStorage.getItem('qtool_current_user');
     if (saved) {
-      try { return JSON.parse(saved).role; } catch (e) {}
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.name && parsed.name.toLowerCase() === 'andreas strehler') {
+          return 'admin';
+        }
+        return parsed.role;
+      } catch (e) {}
     }
     return 'admin';
   });
   const [isTechnicianMode, setIsTechnicianMode] = useState(() => {
     const saved = localStorage.getItem('qtool_current_user');
     if (saved) {
-      try { return JSON.parse(saved).role === 'technician'; } catch (e) {}
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.name && parsed.name.toLowerCase() === 'andreas strehler') {
+          return false;
+        }
+        return parsed.role === 'technician';
+      } catch (e) {}
     }
     return false;
   });
@@ -948,7 +1007,14 @@ function App() {
     showToast(`Angemeldet als ${user.name}`, 'success');
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    if (supabase) {
+      try {
+        await supabase.auth.signOut();
+      } catch (err) {
+        console.error('[Supabase Auth] Fehler beim Abmelden:', err);
+      }
+    }
     setCurrentUser(null);
     setUserRole('admin');
     setIsTechnicianMode(false);

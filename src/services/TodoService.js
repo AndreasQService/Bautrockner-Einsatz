@@ -1,65 +1,21 @@
 import { supabase } from '../supabaseClient';
 
-export const SILENT_USER_EMAIL = 'test-env-user@qtool.local';
-export const SILENT_USER_PASSWORD = 'TestEnvPassword123!';
-
 export let lastAuthError = null;
-
-/**
- * Performs a silent background sign-in to Supabase Auth so that RLS 'authenticated' policies are satisfied.
- */
-let authPromise = null;
 
 export async function ensureAuthenticated() {
     if (!supabase) return false;
-    if (authPromise) return authPromise;
-
-    authPromise = (async () => {
-        try {
-            // Wait up to 500ms for Supabase client to asynchronously restore the session from localStorage
-            for (let i = 0; i < 5; i++) {
-                const { data: { session } } = await supabase.auth.getSession();
-                if (session) {
-                    lastAuthError = null;
-                    return true;
-                }
-                await new Promise(r => setTimeout(r, 100));
-            }
-
-            // 1. Attempt to sign in with silent user credentials
-            const { error: signInError } = await supabase.auth.signInWithPassword({
-                email: SILENT_USER_EMAIL,
-                password: SILENT_USER_PASSWORD
-            });
-
-            if (!signInError) {
-                console.log('[TodoService] Silent sign-in successful');
-                lastAuthError = null;
-                return true;
-            }
-
-            // 2. Fallback: Attempt anonymous sign in for RLS policy compliance
-            if (supabase.auth.signInAnonymously) {
-                const { error: anonErr } = await supabase.auth.signInAnonymously();
-                if (!anonErr) {
-                    console.log('[TodoService] Anonymous sign-in successful for RLS');
-                    lastAuthError = null;
-                    return true;
-                }
-            }
-
-            lastAuthError = signInError.message;
-            return false;
-        } catch (e) {
-            console.warn('[TodoService] Silent auth exception:', e.message);
-            lastAuthError = e.message;
-            return false;
-        } finally {
-            authPromise = null;
+    try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+            lastAuthError = null;
+            return true;
         }
-    })();
-
-    return authPromise;
+        lastAuthError = 'Anmeldung erforderlich';
+        return false;
+    } catch (e) {
+        lastAuthError = e.message;
+        return false;
+    }
 }
 
 function getLocalTodos() {
