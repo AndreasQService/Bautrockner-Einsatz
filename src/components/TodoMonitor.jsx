@@ -52,15 +52,15 @@ const TodoMonitor = ({
         }
     };
 
-    // Load on mount and only when the number of reports or their IDs change (avoids loops during background detail fetches)
+    // Load on mount and also when projects are background-loaded (lightweight state changes)
     const reportsLength = reports.length;
-    const reportsIdsKey = useMemo(() => {
-        return reports.map(r => r.id).join(',');
+    const reportsStateKey = useMemo(() => {
+        return reports.map(r => `${r.id}_${!!r.isLightweight}`).join(',');
     }, [reports]);
 
     useEffect(() => {
         loadTodos();
-    }, [reportsLength, reportsIdsKey]);
+    }, [reportsLength, reportsStateKey]);
 
     // Grouping / filtering of active reports
     const activeProjects = useMemo(() => {
