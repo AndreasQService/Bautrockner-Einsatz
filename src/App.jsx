@@ -618,9 +618,8 @@ function App() {
           if (cached) {
             const parsed = JSON.parse(cached);
             Object.keys(parsed).forEach(id => {
-              if (!parsed[id]._sync_conflict) {
-                syncUnsavedReport(id);
-              }
+              // Automatically sync local changes to cloud without blocking popup modal
+              syncUnsavedReport(id, true);
             });
           }
         } catch (e) {
