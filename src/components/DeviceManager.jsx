@@ -321,19 +321,13 @@ export default function DeviceManager({ onBack, onNavigateToReport, reports = []
     };
 
     const handleReturnRentalDevice = async (device) => {
-        const confirmMsg = `Mietgerät "${device.number}" (${device.type || 'Mietgerät'}) wirklich beim Vermieter abmelden und als zurückgegeben markieren?`;
+        const confirmMsg = `Mietgerät "${device.number}" (${device.type || 'Mietgerät'}) wirklich abmelden und aus dem Inventar löschen? Die Projektdaten bleiben im Schadensbericht vollständig erhalten.`;
         if (window.confirm(confirmMsg)) {
             setIsLoading(true);
             try {
-                const today = new Date().toISOString().split('T')[0];
                 const { error } = await supabase
                     .from('devices')
-                    .update({ 
-                        status: 'Abgemeldet',
-                        current_project: null, 
-                        current_report_id: null,
-                        rental_end_actual: today 
-                    })
+                    .delete()
                     .eq('id', device.id);
 
                 if (error) throw error;
@@ -890,25 +884,14 @@ export default function DeviceManager({ onBack, onNavigateToReport, reports = []
                                                 </td>
                                                 <td style={{ textAlign: 'right' }}>
                                                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', alignItems: 'center' }}>
-                                                        {device.status === 'Abgemeldet' ? (
-                                                            <button
-                                                                className="btn btn-ghost"
-                                                                style={{ color: '#10B981', padding: '0.4rem 0.75rem', fontSize: '0.8rem', borderRadius: '8px', border: '1px solid rgba(16,185,129,0.3)', fontWeight: 600 }}
-                                                                onClick={(e) => { e.stopPropagation(); handleReactivateRentalDevice(device); }}
-                                                                title="Mietgerät reaktivieren"
-                                                            >
-                                                                Reaktivieren
-                                                            </button>
-                                                        ) : (
-                                                            <button
-                                                                className="btn btn-outline"
-                                                                style={{ borderColor: 'rgba(239, 68, 68, 0.5)', color: '#EF4444', padding: '0.35rem 0.75rem', borderRadius: '8px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 600 }}
-                                                                onClick={(e) => { e.stopPropagation(); handleReturnRentalDevice(device); }}
-                                                                title="Mietgerät beim Vermieter abmelden"
-                                                            >
-                                                                <LogOut size={14} /> Abmelden
-                                                            </button>
-                                                        )}
+                                                        <button
+                                                            className="btn btn-outline"
+                                                            style={{ borderColor: 'rgba(239, 68, 68, 0.5)', color: '#EF4444', padding: '0.35rem 0.75rem', borderRadius: '8px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 600 }}
+                                                            onClick={(e) => { e.stopPropagation(); handleReturnRentalDevice(device); }}
+                                                            title="Mietgerät beim Vermieter abmelden & aus Inventar löschen"
+                                                        >
+                                                            <LogOut size={14} /> Abmelden
+                                                        </button>
                                                         {device.current_project && (
                                                             <button
                                                                 className="btn btn-ghost"
