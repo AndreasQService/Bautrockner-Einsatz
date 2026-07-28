@@ -32,7 +32,12 @@ const TodoModal = ({
     useEffect(() => {
         if (todo) {
             // Find project
-            const proj = reports.find(r => r.id === todo.project_id || (r.projectNumber && String(r.projectNumber) === String(todo.project_id)));
+            const proj = reports.find(r => 
+                r.id === todo.project_id || 
+                (r.projectNumber && String(r.projectNumber) === String(todo.project_id)) ||
+                (r.projectTitle && String(r.projectTitle) === String(todo.project_id)) ||
+                (r.project_title && String(r.project_title) === String(todo.project_id))
+            );
             if (proj) {
                 setSelectedProject(proj);
                 const title = proj.projectTitle || proj.project_title || '';
@@ -41,6 +46,12 @@ const TodoModal = ({
                 const num = proj.projectNumber || '';
                 const addr = proj.address || '';
                 setProjectSearch(`${prefix}${num ? '(' + num + ')' : ''}${addr ? (num ? ' - ' : '') + addr : ''}`);
+            } else {
+                // Fallback if not found: clean if it's just '2'
+                const isDummy = !todo.project_id || /^\d{1,3}$/.test(todo.project_id);
+                if (isDummy) {
+                    setProjectSearch('');
+                }
             }
 
             if (!isFollowUpMode) {
