@@ -30,7 +30,7 @@ const TodoProjectSection = ({
         setLoading(true);
         setError('');
         try {
-            const list = await fetchTodosForProject(project.id);
+            const list = await fetchTodosForProject(project);
             setTodos(list);
         } catch (err) {
             setError('Fehler beim Laden der Aufgaben: ' + err.message);

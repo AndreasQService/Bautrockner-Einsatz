@@ -109,12 +109,15 @@ export async function fetchAllTodos(reports = []) {
 }
 
 /**
- * Fetches todos specifically for a given project.
+ * Fetches todos specifically for a given project (including legacy/embedded officeTasks).
  */
-export async function fetchTodosForProject(projectId) {
+export async function fetchTodosForProject(projectIdOrProject) {
     await ensureAuthenticated().catch(() => {});
+    const projectId = typeof projectIdOrProject === 'object' ? projectIdOrProject?.id : projectIdOrProject;
+    const projectObj = typeof projectIdOrProject === 'object' ? projectIdOrProject : null;
+
     let remoteData = [];
-    if (supabase) {
+    if (supabase && projectId) {
         try {
             const { data, error } = await supabase
                 .from('project_todos')
@@ -131,6 +134,31 @@ export async function fetchTodosForProject(projectId) {
             combined.push(loc);
         }
     });
+
+    if (projectObj) {
+        const tasks = projectObj?.officeTasks || projectObj?.report_data?.officeTasks;
+        if (Array.isArray(tasks)) {
+            tasks.forEach(t => {
+                const taskKey = t.id || `${projectId}_${t.title}_${t.dueDate}`;
+                if (!combined.some(c => c.id === taskKey || c.task === (t.title || t.text))) {
+                    combined.push({
+                        id: taskKey,
+                        project_id: projectId,
+                        task: t.title || t.text || 'Aufgabe',
+                        due_date: t.dueDate ? t.dueDate.split('T')[0] : new Date().toISOString().split('T')[0],
+                        assigned_user_id: 'office',
+                        assigned_user_name: 'Innendienst',
+                        note: t.category ? `Kategorie: ${t.category}` : null,
+                        closes_project: false,
+                        status: t.done ? 'done' : 'open',
+                        created_at: t.createdAt || new Date().toISOString(),
+                        created_by: 'System'
+                    });
+                }
+            });
+        }
+    }
+
     return combined;
 }
 
