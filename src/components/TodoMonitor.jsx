@@ -124,7 +124,13 @@ const TodoMonitor = ({
 
         // 3. Filter by Active Tab Filter
         if (activeFilter === 'mine' && currentUser) {
-            list = list.filter(t => String(t.assigned_user_id) === String(currentUser.id));
+            const myName = (currentUser.name || '').toLowerCase();
+            const myId = String(currentUser.id || '');
+            list = list.filter(t => 
+                String(t.assigned_user_id) === myId ||
+                (t.assigned_user_name && t.assigned_user_name.toLowerCase().includes(myName)) ||
+                (myName && t.assigned_user_name && myName.includes(t.assigned_user_name.toLowerCase()))
+            );
         } else if (activeFilter === 'overdue') {
             list = list.filter(t => t.due_date < todayStr);
         } else if (activeFilter === 'today') {
