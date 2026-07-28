@@ -709,7 +709,7 @@ function App() {
   // ── Dark / Light Mode ────────────────────────────────────────────────────
   const [isDarkMode, setIsDarkMode] = useState(() => {
     const saved = localStorage.getItem('qtool_dark_mode');
-    return saved !== null ? saved === 'true' : false; // Default: Light
+    return saved !== null ? saved === 'true' : true; // Default: Dark
   });
 
   useEffect(() => {
