@@ -39,7 +39,8 @@ const LoginScreen = ({ users, onLogin }) => {
             fontFamily: 'system-ui, -apple-system, sans-serif'
         }}>
             <style>{`
-                .login-input {
+                input.login-input[type="text"],
+                input.login-input[type="password"] {
                     width: 100% !important;
                     height: 48px !important;
                     padding: 0.75rem 1rem 0.75rem 2.5rem !important;
@@ -52,19 +53,27 @@ const LoginScreen = ({ users, onLogin }) => {
                     outline: none !important;
                     box-sizing: border-box !important;
                 }
-                .login-input:focus {
+                input.login-input[type="text"]:focus,
+                input.login-input[type="password"]:focus {
                     border-color: #2b96d9 !important;
                     box-shadow: 0 0 0 2px rgba(43, 150, 217, 0.2) !important;
+                    background-color: #131929 !important;
+                    background: #131929 !important;
                 }
-                .login-input::placeholder {
+                input.login-input[type="text"]::placeholder,
+                input.login-input[type="password"]::placeholder {
                     color: #64748b !important;
                     opacity: 1 !important;
                 }
                 /* Webkit Autofill Override to prevent browser from forcing white/yellow backgrounds */
-                .login-input:-webkit-autofill,
-                .login-input:-webkit-autofill:hover, 
-                .login-input:-webkit-autofill:focus, 
-                .login-input:-webkit-autofill:active {
+                input.login-input[type="text"]:-webkit-autofill,
+                input.login-input[type="password"]:-webkit-autofill,
+                input.login-input[type="text"]:-webkit-autofill:hover,
+                input.login-input[type="password"]:-webkit-autofill:hover,
+                input.login-input[type="text"]:-webkit-autofill:focus,
+                input.login-input[type="password"]:-webkit-autofill:focus,
+                input.login-input[type="text"]:-webkit-autofill:active,
+                input.login-input[type="password"]:-webkit-autofill:active {
                     -webkit-box-shadow: 0 0 0 1000px #131929 inset !important;
                     -webkit-text-fill-color: #f8fafc !important;
                     transition: background-color 5000s ease-in-out 0s !important;
