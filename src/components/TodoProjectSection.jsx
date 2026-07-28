@@ -102,6 +102,21 @@ const TodoProjectSection = ({
         }
     };
 
+    const handleDeleteTodo = async (todoId) => {
+        if (!window.confirm('Möchten Sie dieses To-do wirklich löschen?')) return;
+        setLoading(true);
+        setError('');
+        try {
+            await deleteTodo(todoId);
+            loadProjectTodos();
+            onReportsChanged?.();
+        } catch (err) {
+            setError('Fehler beim Löschen des To-dos: ' + err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const formatDateGerman = (dateStr) => {
         if (!dateStr) return '';
         const parts = dateStr.split('-');
@@ -261,14 +276,15 @@ const TodoProjectSection = ({
                 )}
             </div>
 
-            {/* TodoModal Portal */}
+             {/* TodoModal Portal */}
             {modalOpen && (
                 <TodoModal
                     todo={editingTodo}
+                    initialProject={project}
                     onClose={() => { setModalOpen(false); setEditingTodo(null); }}
                     onSaveSuccess={() => { loadProjectTodos(); onReportsChanged?.(); }}
                     users={users}
-                    reports={[project]} // limit to this project
+                    reports={[project]}
                     currentUser={currentUser}
                 />
             )}
@@ -277,6 +293,7 @@ const TodoProjectSection = ({
             {followUpTodo && (
                 <TodoModal
                     todo={followUpTodo}
+                    initialProject={project}
                     isFollowUpMode={true}
                     onClose={() => { setFollowUpTodo(null); setPendingActionTodoId(null); }}
                     onSaveSuccess={() => { loadProjectTodos(); onReportsChanged?.(); }}
