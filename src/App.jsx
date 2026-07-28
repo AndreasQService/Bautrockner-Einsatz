@@ -2311,15 +2311,6 @@ function App() {
                     setProjectModeExclusive(newMode);
                   }}
                 />
-                {selectedReport && selectedReport.id !== 'new' && (
-                  <TodoProjectSection
-                    project={selectedReport}
-                    users={users}
-                    currentUser={currentUser}
-                    onReportsChanged={fetchReports}
-                    onCloseProject={handleCancelEntry}
-                  />
-                )}
               </div>
             )}
           </div>
