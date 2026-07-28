@@ -19,6 +19,7 @@ import EmailImportModalV2 from './components/EmailImportModalV2'
 import DisponentMockup from './components/mockups/DisponentMockup'
 import i18n from './i18n'
 import { buildProjectFolderName, uploadProjectJson } from "./services/OneDriveService";
+import { syncPendingToSupabase } from './lib/sync/supabaseSyncWorker.js';
 const IS_TEST_ENV = !!(typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_EXPECTED_SUPABASE_PROJECT_ID === 'aoxduqspiezzyqeqyzzl');
 
 
@@ -748,7 +749,12 @@ function App() {
         const all = tx.objectStore('photos').getAll();
         all.onsuccess = () => resolve(
           (all.result || []).filter(p =>
-            p.syncStatus !== 'synced' && !p.oneDriveItemId
+            p.syncStatus !== 'synced' && 
+            p.syncStatus !== 'remote_verified' && 
+            p.syncStatus !== 'uploaded_to_backend' && 
+            p.syncStatus !== 'queued_for_remote' &&
+            !p.supabasePath && 
+            !p.oneDriveItemId
           ).length
         );
         all.onerror = () => resolve(0);
@@ -757,8 +763,10 @@ function App() {
       req.onupgradeneeded = () => resolve(0);
     });
 
+    syncPendingToSupabase().catch(() => {});
     countPending().then(setSyncPending).catch(() => {});
     const interval = setInterval(() => {
+      syncPendingToSupabase().catch(() => {});
       countPending().then(setSyncPending).catch(() => {});
     }, 10_000);
     return () => clearInterval(interval);

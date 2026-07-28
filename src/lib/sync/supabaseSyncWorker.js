@@ -249,5 +249,8 @@ async function syncOnePhoto(photo) {
             }
             checkAttempts++;
         }
+        await updatePhotoSyncStatus(photo.id, {
+            syncStatus: 'remote_verified'
+        }).catch(() => {});
     }
 }
