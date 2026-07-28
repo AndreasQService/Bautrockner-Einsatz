@@ -2171,31 +2171,31 @@ function App() {
 
               const fetchPromise = supabase
                 .from('damage_reports')
-                .select('report_data, updated_at')
-                .order('created_at', { ascending: false });
+                .select('id, report_data, updated_at')
+                .limit(100);
 
               const result = await Promise.race([fetchPromise, timeoutPromise]);
               const data = result.data;
               const error = result.error;
 
               if (data && !error) {
-                setReports(
-                  data
-                    .filter(r => r.report_data && typeof r.report_data === 'object')
-                    .map(r => {
-                      const report = r.report_data;
+                setReports(prev => {
+                  return prev.map(existing => {
+                    const fresh = data.find(r => r.id === existing.id);
+                    if (fresh && fresh.report_data) {
+                      const parsed = typeof fresh.report_data === 'string'
+                        ? JSON.parse(fresh.report_data)
+                        : fresh.report_data;
                       return {
-                        ...report,
-                        id: report.id || r.id,
-                        _supabase_updated_at: r.updated_at,
-                        images: (Array.isArray(report.images) ? report.images : []).map(img => ({
-                          ...img,
-                          includeInReport: img.includeInReport !== false
-                        }))
+                        ...existing,
+                        ...parsed,
+                        _supabase_updated_at: fresh.updated_at,
+                        isLightweight: false
                       };
-                    })
-                    .filter(r => r && !r._isSession && !r.deleted_at)
-                );
+                    }
+                    return existing;
+                  });
+                });
               }
             } catch (e) {
               console.warn('[Supabase] Fehler beim onReportsChanged Reload:', e);
