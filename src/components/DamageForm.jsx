@@ -1975,7 +1975,9 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
             deviceDbId = selectedDevice.id;
         }
 
-        const isRentalDevice = !!(newDevice.isRental || (selectedDevice && selectedDevice.is_rental) || newDevice.deviceNumber.trim().toUpperCase().startsWith('M'));
+        const isRentalDevice = selectedDevice
+            ? !!selectedDevice.is_rental
+            : !!(newDevice.isRental || newDevice.deviceNumber.trim().toUpperCase().startsWith('M'));
 
         // manual entry fallback if no device selected?
         let deviceToAdd = {
@@ -9176,14 +9178,29 @@ END:VCARD`;
                                                 />
                                             </div>
 
-                                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '0.95rem', cursor: 'pointer', userSelect: 'none', padding: '0.2rem 0' }}>
+                                            <label style={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '0.6rem',
+                                                fontSize: '0.95rem',
+                                                cursor: (selectedDevice && !selectedDevice.is_rental) ? 'not-allowed' : 'pointer',
+                                                userSelect: 'none',
+                                                padding: '0.2rem 0',
+                                                opacity: (selectedDevice && !selectedDevice.is_rental) ? 0.6 : 1
+                                            }}>
                                                 <input
                                                     type="checkbox"
-                                                    checked={!!newDevice.isRental}
+                                                    checked={selectedDevice ? !!selectedDevice.is_rental : !!newDevice.isRental}
+                                                    disabled={!!(selectedDevice && !selectedDevice.is_rental)}
                                                     onChange={(e) => setNewDevice(prev => ({ ...prev, isRental: e.target.checked }))}
-                                                    style={{ width: '20px', height: '20px', accentColor: 'var(--primary)', cursor: 'pointer' }}
+                                                    style={{ width: '20px', height: '20px', accentColor: 'var(--primary)', cursor: (selectedDevice && !selectedDevice.is_rental) ? 'not-allowed' : 'pointer' }}
                                                 />
-                                                <span style={{ fontWeight: 600 }}>Mietgerät (Externes Gerät)</span>
+                                                <span style={{ fontWeight: 600 }}>
+                                                    Mietgerät (Externes Gerät)
+                                                    {selectedDevice && !selectedDevice.is_rental && (
+                                                        <span style={{ fontSize: '0.8rem', fontWeight: 500, marginLeft: '0.5rem', color: '#94A3B8' }}>(Eigenes Inventargerät)</span>
+                                                    )}
+                                                </span>
                                             </label>
 
                                             <button
