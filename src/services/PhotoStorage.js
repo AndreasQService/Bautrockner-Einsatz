@@ -289,6 +289,38 @@ export async function deleteOldSyncedPhotos(olderThanDays = 30) {
 }
 
 /**
+ * Auto-migrates photos in IndexedDB that are already uploaded to Supabase or OneDrive,
+ * setting their syncStatus to 'remote_verified'.
+ */
+export async function markUploadedPhotosAsVerified() {
+    const db = await openDB();
+    if (!db.objectStoreNames.contains(STORE_PHOTOS)) return 0;
+    return new Promise((resolve) => {
+        try {
+            const tx = db.transaction(STORE_PHOTOS, 'readwrite');
+            const store = tx.objectStore(STORE_PHOTOS);
+            const req = store.getAll();
+            req.onsuccess = () => {
+                const all = req.result || [];
+                let count = 0;
+                all.forEach(p => {
+                    const isUploaded = !!(p.supabasePath || p.oneDriveItemId || p.syncStatus === 'uploaded_to_backend' || p.syncStatus === 'queued_for_remote' || (typeof p.url === 'string' && p.url.startsWith('http')));
+                    if (isUploaded && p.syncStatus !== 'remote_verified' && p.syncStatus !== 'synced') {
+                        p.syncStatus = 'remote_verified';
+                        store.put(p);
+                        count++;
+                    }
+                });
+                resolve(count);
+            };
+            req.onerror = () => resolve(0);
+        } catch (e) {
+            resolve(0);
+        }
+    });
+}
+
+/**
  * Anzahl pending (nicht vollständig hochgeladener) Fotos
  */
 export async function getPendingCount() {
@@ -304,7 +336,12 @@ export async function getPendingCount() {
             const req = store.getAll();
             req.onsuccess = () => {
                 const pending = (req.result || []).filter(p => 
-                    p.syncStatus !== 'remote_verified' && p.syncStatus !== 'synced'
+                    p.syncStatus !== 'remote_verified' && 
+                    p.syncStatus !== 'synced' && 
+                    p.syncStatus !== 'uploaded_to_backend' && 
+                    p.syncStatus !== 'queued_for_remote' && 
+                    !p.supabasePath && 
+                    !p.oneDriveItemId
                 );
                 resolve(pending.length);
             };

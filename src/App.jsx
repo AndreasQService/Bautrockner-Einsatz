@@ -20,6 +20,7 @@ import DisponentMockup from './components/mockups/DisponentMockup'
 import i18n from './i18n'
 import { buildProjectFolderName, uploadProjectJson } from "./services/OneDriveService";
 import { syncPendingToSupabase } from './lib/sync/supabaseSyncWorker.js';
+import { markUploadedPhotosAsVerified } from './services/PhotoStorage';
 const IS_TEST_ENV = !!(typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_EXPECTED_SUPABASE_PROJECT_ID === 'aoxduqspiezzyqeqyzzl');
 
 
@@ -762,11 +763,11 @@ function App() {
       req.onupgradeneeded = () => resolve(0);
     });
 
+    markUploadedPhotosAsVerified().then(() => countPending().then(setSyncPending)).catch(() => {});
     syncPendingToSupabase().catch(() => {});
-    countPending().then(setSyncPending).catch(() => {});
     const interval = setInterval(() => {
       syncPendingToSupabase().catch(() => {});
-      countPending().then(setSyncPending).catch(() => {});
+      markUploadedPhotosAsVerified().then(() => countPending().then(setSyncPending)).catch(() => {});
     }, 10_000);
     return () => clearInterval(interval);
   }, []);

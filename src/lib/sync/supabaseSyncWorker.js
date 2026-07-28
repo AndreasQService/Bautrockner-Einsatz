@@ -59,8 +59,15 @@ async function getPendingPhotosFromDb() {
         const req = tx.objectStore('photos').getAll();
         req.onsuccess = () => {
             const all = req.result || [];
-            // Get everything not fully remote_verified
-            resolve(all.filter(p => p.syncStatus !== 'remote_verified' && p.syncStatus !== 'synced'));
+            // Get everything not fully uploaded/remote_verified
+            resolve(all.filter(p => 
+                p.syncStatus !== 'remote_verified' && 
+                p.syncStatus !== 'synced' && 
+                p.syncStatus !== 'uploaded_to_backend' && 
+                p.syncStatus !== 'queued_for_remote' && 
+                !p.supabasePath && 
+                !p.oneDriveItemId
+            ));
         };
         req.onerror = () => reject(req.error);
     });
