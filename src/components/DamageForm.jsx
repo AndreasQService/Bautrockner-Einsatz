@@ -9031,6 +9031,27 @@ END:VCARD`;
                                                 ))}
                                             </datalist>
 
+                                            {selectedDevice && (
+                                                <div style={{
+                                                    padding: '0.65rem 0.85rem',
+                                                    borderRadius: '8px',
+                                                    backgroundColor: 'rgba(59, 130, 246, 0.15)',
+                                                    border: '1px solid rgba(59, 130, 246, 0.35)',
+                                                    color: '#60A5FA',
+                                                    fontSize: '0.9rem',
+                                                    fontWeight: 600,
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '0.5rem',
+                                                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                                                }}>
+                                                    <span>✓ Erkannt:</span>
+                                                    <strong style={{ color: '#F8FAFC' }}>
+                                                        {selectedDevice.type} {selectedDevice.model ? `(${selectedDevice.model})` : ''}
+                                                    </strong>
+                                                </div>
+                                            )}
+
                                             {!selectedDevice && newDevice.deviceNumber && !availableDevices.some(d => String(d.number).trim().toLowerCase() === newDevice.deviceNumber.trim().toLowerCase()) && (
                                                 <>
                                                     <div style={{ display: 'flex', width: '100%' }}>
