@@ -105,6 +105,8 @@ const TodoMonitor = ({
             activeProjects.forEach(p => {
                 if (p.id) activeProjIds.add(String(p.id));
                 if (p.projectNumber) activeProjIds.add(String(p.projectNumber));
+                if (p.projectTitle) activeProjIds.add(String(p.projectTitle));
+                if (p.project_title) activeProjIds.add(String(p.project_title));
             });
             list = list.filter(t => !t.project_id || activeProjIds.has(String(t.project_id)));
         }
