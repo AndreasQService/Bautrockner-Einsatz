@@ -155,8 +155,8 @@ const TodoMonitor = ({
                 return a.due_date < b.due_date ? -1 : 1;
             }
             // Secondary sorting by project title
-            const projA = reports.find(r => r.id === a.project_id)?.projectTitle || '';
-            const projB = reports.find(r => r.id === b.project_id)?.projectTitle || '';
+            const projA = reports.find(r => r.id === a.project_id || (r.projectNumber && String(r.projectNumber) === String(a.project_id)))?.projectTitle || '';
+            const projB = reports.find(r => r.id === b.project_id || (r.projectNumber && String(r.projectNumber) === String(b.project_id)))?.projectTitle || '';
             return projA.localeCompare(projB);
         });
     }, [todos, reports, activeProjects, activeFilter, searchTerm, currentUser]);
@@ -441,7 +441,11 @@ const TodoMonitor = ({
                                 </tr>
                             ) : (
                                 processedHistoryTodos.map(todoItem => {
-                                    const proj = reports.find(r => r.id === todoItem.project_id);
+                                    const proj = reports.find(r => 
+                                        r.id === todoItem.project_id || 
+                                        (r.projectNumber && String(r.projectNumber) === String(todoItem.project_id)) ||
+                                        (r.projectTitle && String(r.projectTitle) === String(todoItem.project_id))
+                                    );
                                     return (
                                         <tr key={todoItem.id} style={{ borderBottom: '1px solid var(--border)', opacity: 0.8, backgroundColor: 'var(--surface)' }}>
                                             <td style={{ padding: '0.65rem 0.8rem', color: 'var(--text-muted)' }}>
@@ -561,7 +565,11 @@ const TodoMonitor = ({
                                 </tr>
                             ) : (
                                 processedOpenTodos.map(todoItem => {
-                                    const proj = reports.find(r => r.id === todoItem.project_id);
+                                    const proj = reports.find(r => 
+                                        r.id === todoItem.project_id || 
+                                        (r.projectNumber && String(r.projectNumber) === String(todoItem.project_id)) ||
+                                        (r.projectTitle && String(r.projectTitle) === String(todoItem.project_id))
+                                    );
                                     const dueStatus = getDueDateStatus(todoItem.due_date);
 
                                     // Inline styling based on due status
