@@ -9118,6 +9118,17 @@ END:VCARD`;
                                                 </optgroup>
                                             </select>
 
+                                            <div>
+                                                <label style={{ display: 'block', fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '0.25rem', fontWeight: 600 }}>Startdatum (Installation)</label>
+                                                <input
+                                                    type="date"
+                                                    className="form-input"
+                                                    value={newDevice.startDate || new Date().toISOString().split('T')[0]}
+                                                    onChange={(e) => setNewDevice(prev => ({ ...prev, startDate: e.target.value }))}
+                                                    style={{ width: '100%', fontSize: '1.05rem', padding: '0.75rem', backgroundColor: 'var(--surface)', color: 'var(--text-main)', borderRadius: '8px', border: '1px solid var(--border)' }}
+                                                />
+                                            </div>
+
                                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', width: '100%' }}>
                                                 <input
                                                     type="text"
