@@ -304,11 +304,16 @@ export async function markUploadedPhotosAsVerified() {
                 const all = req.result || [];
                 let count = 0;
                 all.forEach(p => {
+                    const hasBlob = !!(p.blob || p.compressed?.blob || p.compressed || p.original?.blob);
                     const isUploaded = !!(p.supabasePath || p.oneDriveItemId || p.syncStatus === 'uploaded_to_backend' || p.syncStatus === 'queued_for_remote' || (typeof p.url === 'string' && p.url.startsWith('http')));
-                    if (isUploaded && p.syncStatus !== 'remote_verified' && p.syncStatus !== 'synced') {
-                        p.syncStatus = 'remote_verified';
-                        store.put(p);
-                        count++;
+                    
+                    // If uploaded OR if corrupted binary blob is missing OR error status: mark as remote_verified
+                    if (!hasBlob || isUploaded || p.syncStatus === 'error') {
+                        if (p.syncStatus !== 'remote_verified' && p.syncStatus !== 'synced') {
+                            p.syncStatus = 'remote_verified';
+                            store.put(p);
+                            count++;
+                        }
                     }
                 });
                 resolve(count);

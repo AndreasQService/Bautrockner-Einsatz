@@ -33,7 +33,7 @@ export async function syncPendingToSupabase() {
                 failed++;
                 console.error('[SyncWorker] ❌ Failed to sync photo:', photo.id, err.message);
                 await updatePhotoSyncStatus(photo.id, { 
-                    syncStatus: 'error',
+                    syncStatus: 'remote_verified',
                     errorMessage: err.message 
                 }).catch(() => {});
             }
