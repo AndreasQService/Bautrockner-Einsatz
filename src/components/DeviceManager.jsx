@@ -322,6 +322,49 @@ export default function DeviceManager({ onBack, onNavigateToReport, reports = []
         }
     };
 
+    const handleReturnRentalDevice = async (device) => {
+        const confirmMsg = `Mietgerät "${device.number}" (${device.type || 'Mietgerät'}) wirklich beim Vermieter abmelden und als zurückgegeben markieren?`;
+        if (window.confirm(confirmMsg)) {
+            setIsLoading(true);
+            try {
+                const today = new Date().toISOString().split('T')[0];
+                const { error } = await supabase
+                    .from('devices')
+                    .update({ 
+                        status: 'Abgemeldet',
+                        current_project: null, 
+                        current_report_id: null,
+                        rental_end_actual: today 
+                    })
+                    .eq('id', device.id);
+
+                if (error) throw error;
+                await fetchDevices();
+            } catch (e) {
+                setError("Fehler beim Abmelden des Mietgeräts: " + e.message);
+                setIsLoading(false);
+            }
+        }
+    };
+
+    const handleReactivateRentalDevice = async (device) => {
+        if (window.confirm(`Möchten Sie das Mietgerät "${device.number}" wieder aktivieren?`)) {
+            setIsLoading(true);
+            try {
+                const { error } = await supabase
+                    .from('devices')
+                    .update({ status: 'Aktiv' })
+                    .eq('id', device.id);
+
+                if (error) throw error;
+                await fetchDevices();
+            } catch (e) {
+                setError("Fehler beim Aktivieren des Mietgeräts: " + e.message);
+                setIsLoading(false);
+            }
+        }
+    };
+
     const handleImportStandardDevices = async () => {
         if (window.confirm('Möchten Sie die Standard-Geräteliste importieren? Hinweis: Es werden passende Modelle im Katalog vorausgesetzt oder erstellt.')) {
             setIsLoading(true);
@@ -429,9 +472,11 @@ export default function DeviceManager({ onBack, onNavigateToReport, reports = []
     const filteredDevices = devices.filter(d => {
         if (!d) return false;
 
+        const isRentalDevice = !!(d.is_rental || (d.number && String(d.number).trim().toUpperCase().startsWith('M')));
+
         // Separat filtern nach Mietgerät / Eigenes Inventar
-        if (activeTab === 'inventar' && d.is_rental) return false;
-        if (activeTab === 'mietgeraete' && !d.is_rental) return false;
+        if (activeTab === 'inventar' && isRentalDevice) return false;
+        if (activeTab === 'mietgeraete' && !isRentalDevice) return false;
 
         const num = d.number ? String(d.number).toLowerCase() : '';
         const mod = d.model ? String(d.model).toLowerCase() : '';
@@ -757,7 +802,19 @@ export default function DeviceManager({ onBack, onNavigateToReport, reports = []
                                                 </td>
                                                 <td style={{ textAlign: 'center' }}>
                                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', alignItems: 'center' }}>
-                                                        {isOverdue ? (
+                                                        {device.status === 'Abgemeldet' ? (
+                                                            <span style={{
+                                                                padding: '0.25rem 0.75rem',
+                                                                borderRadius: '9999px',
+                                                                background: 'rgba(148, 163, 184, 0.2)',
+                                                                color: '#94A3B8',
+                                                                fontSize: '0.7rem',
+                                                                fontWeight: 700,
+                                                                border: '1px solid rgba(148, 163, 184, 0.3)'
+                                                            }}>
+                                                                ABGEMELDET
+                                                            </span>
+                                                        ) : isOverdue ? (
                                                             <span style={{
                                                                 padding: '0.25rem 0.75rem',
                                                                 borderRadius: '9999px',
@@ -785,6 +842,11 @@ export default function DeviceManager({ onBack, onNavigateToReport, reports = []
                                                         {device.rental_end_planned && (
                                                             <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
                                                                 bis {new Date(device.rental_end_planned).toLocaleDateString('de-DE')}
+                                                            </span>
+                                                        )}
+                                                        {device.rental_end_actual && (
+                                                            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                                                                abgemeldet am {new Date(device.rental_end_actual).toLocaleDateString('de-DE')}
                                                             </span>
                                                         )}
                                                     </div>
@@ -823,17 +885,38 @@ export default function DeviceManager({ onBack, onNavigateToReport, reports = []
                                                             </div>
                                                         </div>
                                                     ) : (
-                                                        <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem', opacity: 0.6 }}>Lager (Rückgabe-bereit)</span>
+                                                        <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem', opacity: 0.6 }}>
+                                                            {device.status === 'Abgemeldet' ? 'Beim Vermieter abgemeldet' : 'Lager (Rückgabe-bereit)'}
+                                                        </span>
                                                     )}
                                                 </td>
                                                 <td style={{ textAlign: 'right' }}>
-                                                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+                                                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', alignItems: 'center' }}>
+                                                        {device.status === 'Abgemeldet' ? (
+                                                            <button
+                                                                className="btn btn-ghost"
+                                                                style={{ color: '#10B981', padding: '0.4rem 0.75rem', fontSize: '0.8rem', borderRadius: '8px', border: '1px solid rgba(16,185,129,0.3)', fontWeight: 600 }}
+                                                                onClick={(e) => { e.stopPropagation(); handleReactivateRentalDevice(device); }}
+                                                                title="Mietgerät reaktivieren"
+                                                            >
+                                                                Reaktivieren
+                                                            </button>
+                                                        ) : (
+                                                            <button
+                                                                className="btn btn-outline"
+                                                                style={{ borderColor: 'rgba(239, 68, 68, 0.5)', color: '#EF4444', padding: '0.35rem 0.75rem', borderRadius: '8px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 600 }}
+                                                                onClick={(e) => { e.stopPropagation(); handleReturnRentalDevice(device); }}
+                                                                title="Mietgerät beim Vermieter abmelden"
+                                                            >
+                                                                <LogOut size={14} /> Abmelden
+                                                            </button>
+                                                        )}
                                                         {device.current_project && (
                                                             <button
                                                                 className="btn btn-ghost"
                                                                 style={{ color: '#F59E0B', padding: '0.5rem', borderRadius: '8px' }}
                                                                 onClick={(e) => { e.stopPropagation(); handleReleaseDevice(device.id, device.current_project); }}
-                                                                title="Freigeben"
+                                                                title="Aus Projekt freigeben"
                                                             >
                                                                 <LogOut size={18} />
                                                             </button>
@@ -861,8 +944,7 @@ export default function DeviceManager({ onBack, onNavigateToReport, reports = []
                                                             className="btn btn-ghost"
                                                             style={{ color: 'rgba(239, 68, 68, 0.7)', padding: '0.5rem', borderRadius: '8px' }}
                                                             onClick={(e) => { e.stopPropagation(); handleDeleteDevice(device.id); }}
-                                                            title="Ausbuchen (Zurückgeben)"
-                                                            disabled={!!device.current_project}
+                                                            title="Endgültig löschen"
                                                         >
                                                             <Trash size={18} />
                                                         </button>
@@ -1248,6 +1330,7 @@ export default function DeviceManager({ onBack, onNavigateToReport, reports = []
                                     <option value="Aktiv" style={{ backgroundColor: 'var(--surface)' }}>Aktiv</option>
                                     <option value="Verfügbar" style={{ backgroundColor: 'var(--surface)' }}>Verfügbar</option>
                                     <option value="Defekt" style={{ backgroundColor: 'var(--surface)' }}>Defekt</option>
+                                    <option value="Abgemeldet" style={{ backgroundColor: 'var(--surface)' }}>Abgemeldet / Zurückgegeben</option>
                                 </select>
                             </div>
 
