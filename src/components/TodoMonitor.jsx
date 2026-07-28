@@ -55,7 +55,7 @@ const TodoMonitor = ({
     // Load on mount and also when projects are background-loaded (lightweight state changes)
     const reportsLength = reports.length;
     const reportsStateKey = useMemo(() => {
-        return reports.map(r => `${r.id}_${!!r.isLightweight}`).join(',');
+        return reports.map(r => `${r.id}_${!!r.isLightweight}_${(r.officeTasks || r.report_data?.officeTasks || []).length}`).join(',');
     }, [reports]);
 
     useEffect(() => {
