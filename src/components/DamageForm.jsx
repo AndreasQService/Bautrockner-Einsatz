@@ -9136,19 +9136,19 @@ END:VCARD`;
                                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', width: '100%' }}>
                                                 <input
                                                     type="text"
-                                                    readOnly
                                                     placeholder="Zählerstand *"
                                                     className="form-input"
-                                                    value={newDevice.counterStart}
+                                                    value={newDevice.counterStart || ''}
+                                                    onChange={(e) => setNewDevice(prev => ({ ...prev, counterStart: e.target.value }))}
                                                     onClick={() => setActiveNumpadField({ field: 'counterStart', value: newDevice.counterStart || '' })}
                                                     style={{ width: '100%', boxSizing: 'border-box', minWidth: 0, fontSize: '1.1rem', padding: '1rem', borderColor: (!newDevice.counterStart && newDevice.deviceNumber) ? '#F87171' : '', cursor: 'pointer' }}
                                                 />
                                                 <input
                                                     type="text"
-                                                    readOnly
                                                     placeholder="Laufzeit (Std)"
                                                     className="form-input"
-                                                    value={newDevice.hours}
+                                                    value={newDevice.hours || ''}
+                                                    onChange={(e) => setNewDevice(prev => ({ ...prev, hours: e.target.value }))}
                                                     onClick={() => setActiveNumpadField({ field: 'hours', value: newDevice.hours || '' })}
                                                     style={{ width: '100%', boxSizing: 'border-box', minWidth: 0, fontSize: '1.1rem', padding: '1rem', cursor: 'pointer' }}
                                                 />
