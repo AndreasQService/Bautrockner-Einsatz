@@ -101,8 +101,12 @@ const TodoMonitor = ({
 
         // Allow standalone todos (no project_id) or active project todos
         if (activeProjects.length > 0) {
-            const activeProjIds = new Set(activeProjects.map(p => p.id));
-            list = list.filter(t => !t.project_id || activeProjIds.has(t.project_id));
+            const activeProjIds = new Set();
+            activeProjects.forEach(p => {
+                if (p.id) activeProjIds.add(String(p.id));
+                if (p.projectNumber) activeProjIds.add(String(p.projectNumber));
+            });
+            list = list.filter(t => !t.project_id || activeProjIds.has(String(t.project_id)));
         }
 
         // 2. Filter by Search term
