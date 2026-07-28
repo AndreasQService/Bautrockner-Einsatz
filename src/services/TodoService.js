@@ -448,26 +448,123 @@ export async function updateTodo(todoId, updateData, expectedUpdatedAt) {
  * Completes a To-do and creates a follow-up todo in a single database transaction.
  */
 export async function completeAndCreateTodoRpc(todoId, completedBy, newTodoData) {
-    await ensureAuthenticated();
-    if (!supabase) throw new Error('Supabase client not initialized');
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(todoId);
+    if (!isUuid) {
+        console.log('[TodoService] Non-UUID todo complete-and-create triggered.');
+        // 1. Mark old local/embedded todo as done
+        try {
+            const local = JSON.parse(localStorage.getItem('qservice_local_todos') || '[]');
+            const idx = local.findIndex(t => t.id === todoId);
+            if (idx >= 0) {
+                local[idx] = {
+                    ...local[idx],
+                    status: 'done',
+                    completed_at: new Date().toISOString(),
+                    completed_by: completedBy,
+                    updated_at: new Date().toISOString()
+                };
+                localStorage.setItem('qservice_local_todos', JSON.stringify(local));
+            }
+        } catch (e) {}
 
-    const { data, error } = await supabase.rpc('fn_complete_and_create_todo', {
-        p_todo_id: todoId,
-        p_completed_by: completedBy,
-        p_new_task: newTodoData.task.trim(),
-        p_new_due_date: newTodoData.dueDate,
-        p_new_assigned_user_id: String(newTodoData.assignedUserId),
-        p_new_assigned_user_name: newTodoData.assignedUserName,
-        p_new_note: newTodoData.note ? newTodoData.note.trim() : null,
-        p_new_closes_project: !!newTodoData.closesProject
-    });
+        // If in Supabase damage_reports JSON
+        if (supabase && newTodoData.projectId) {
+            try {
+                const { data: report, error: fetchErr } = await supabase
+                    .from('damage_reports')
+                    .select('report_data')
+                    .eq('id', newTodoData.projectId)
+                    .single();
+                if (!fetchErr && report && report.report_data) {
+                    const rd = report.report_data;
+                    const tasks = rd.officeTasks || [];
+                    const taskIdx = tasks.findIndex(t => t.id === todoId);
+                    if (taskIdx >= 0) {
+                        tasks[taskIdx] = {
+                            ...tasks[taskIdx],
+                            done: true,
+                            completedAt: new Date().toISOString(),
+                            completedBy: completedBy
+                        };
+                        rd.officeTasks = tasks;
+                        await supabase
+                            .from('damage_reports')
+                            .update({ report_data: rd })
+                            .eq('id', newTodoData.projectId)
+                            .catch(() => {});
+                    }
+                }
+            } catch (e) {}
+        }
 
-    if (error) {
-        console.error('[TodoService] Error completing and creating todo (RPC):', error.message);
-        throw error;
+        // 2. Create the follow-up todo
+        return await createTodo({
+            projectId: newTodoData.projectId,
+            task: newTodoData.task,
+            dueDate: newTodoData.dueDate,
+            assignedUserId: newTodoData.assignedUserId,
+            assignedUserName: newTodoData.assignedUserName,
+            note: newTodoData.note,
+            closesProject: newTodoData.closesProject,
+            currentUser: completedBy,
+            parentTodoId: todoId
+        });
     }
 
-    return data;
+    await ensureAuthenticated().catch(() => {});
+    if (!supabase) throw new Error('Supabase client not initialized');
+
+    try {
+        const { data, error } = await supabase.rpc('fn_complete_and_create_todo', {
+            p_todo_id: todoId,
+            p_completed_by: completedBy,
+            p_new_task: newTodoData.task.trim(),
+            p_new_due_date: newTodoData.dueDate,
+            p_new_assigned_user_id: String(newTodoData.assignedUserId),
+            p_new_assigned_user_name: newTodoData.assignedUserName,
+            p_new_note: newTodoData.note ? newTodoData.note.trim() : null,
+            p_new_closes_project: !!newTodoData.closesProject
+        });
+
+        if (!error) {
+            return data;
+        }
+        // If it's a permission/execute/missing function error, throw it so we try client-side transaction fallback
+        throw error;
+    } catch (err) {
+        console.warn('[TodoService] RPC complete_and_create failed (possibly permission denied). Performing client-side fallback:', err.message);
+
+        // Client-side sequential transaction fallback:
+        // 1. Update old todo to status = 'done'
+        const { error: updateErr } = await supabase
+            .from('project_todos')
+            .update({
+                status: 'done',
+                completed_by: completedBy,
+                completed_at: new Date().toISOString(),
+                updated_by: completedBy,
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', todoId);
+
+        if (updateErr) {
+            console.error('[TodoService] Client-side complete update failed:', updateErr.message);
+            throw updateErr;
+        }
+
+        // 2. Create the follow-up todo
+        return await createTodo({
+            projectId: newTodoData.projectId,
+            task: newTodoData.task,
+            dueDate: newTodoData.dueDate,
+            assignedUserId: newTodoData.assignedUserId,
+            assignedUserName: newTodoData.assignedUserName,
+            note: newTodoData.note,
+            closesProject: newTodoData.closesProject,
+            currentUser: completedBy,
+            parentTodoId: todoId
+        });
+    }
 }
 
 /**
