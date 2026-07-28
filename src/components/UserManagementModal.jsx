@@ -1,11 +1,20 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { X, UserPlus, Trash, Shield, User, Wrench } from 'lucide-react';
+import { X, UserPlus, Trash, Shield, User, Wrench, Key, Eye, EyeOff, Edit2, Check } from 'lucide-react';
 
 const UserManagementModal = ({ onClose, users, setUsers }) => {
     const [newName, setNewName] = useState('');
     const [newPassword, setNewPassword] = useState('');
     const [newRole, setNewRole] = useState('technician');
+
+    // Password visibility state per user ID
+    const [visiblePasswords, setVisiblePasswords] = useState({});
+    const [editingPasswordId, setEditingPasswordId] = useState(null);
+    const [editedPasswordVal, setEditedPasswordVal] = useState('');
+
+    const togglePasswordVisibility = (id) => {
+        setVisiblePasswords(prev => ({ ...prev, [id]: !prev[id] }));
+    };
 
     const handleAddUser = (e) => {
         e.preventDefault();
@@ -24,6 +33,13 @@ const UserManagementModal = ({ onClose, users, setUsers }) => {
         setNewRole('technician');
     };
 
+    const handleSavePassword = (userId) => {
+        if (!editedPasswordVal.trim()) return;
+        const updated = users.map(u => u.id === userId ? { ...u, password: editedPasswordVal.trim() } : u);
+        setUsers(updated);
+        setEditingPasswordId(null);
+    };
+
     const handleDeleteUser = (id) => {
         if (confirm('Benutzer wirklich löschen?')) {
             setUsers(users.filter(u => u.id !== id));
@@ -40,7 +56,7 @@ const UserManagementModal = ({ onClose, users, setUsers }) => {
         }}>
             <div style={{
                 backgroundColor: 'var(--surface)', padding: '2rem', borderRadius: '8px',
-                width: '600px', maxWidth: '90%', maxHeight: '90vh', display: 'flex', flexDirection: 'column',
+                width: '650px', maxWidth: '95%', maxHeight: '90vh', display: 'flex', flexDirection: 'column',
                 boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5)',
                 border: '1px solid var(--border)',
                 color: 'var(--text-main)'
@@ -48,7 +64,7 @@ const UserManagementModal = ({ onClose, users, setUsers }) => {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                     <h3 style={{ margin: 0, fontSize: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         <UserPlus size={24} />
-                        Benutzerverwaltung
+                        Benutzer- & Passwortverwaltung (Supabase Cloud DB)
                     </h3>
                     <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
                         <X size={24} />
@@ -56,8 +72,8 @@ const UserManagementModal = ({ onClose, users, setUsers }) => {
                 </div>
 
                 {/* Add User Form */}
-                <form onSubmit={handleAddUser} style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', alignItems: 'flex-end' }}>
-                    <div style={{ flex: 2 }}>
+                <form onSubmit={handleAddUser} style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                    <div style={{ flex: 2, minWidth: '130px' }}>
                         <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem', fontWeight: 600 }}>Name</label>
                         <input
                             type="text"
@@ -68,7 +84,7 @@ const UserManagementModal = ({ onClose, users, setUsers }) => {
                             style={{ width: '100%' }}
                         />
                     </div>
-                    <div style={{ flex: 2 }}>
+                    <div style={{ flex: 2, minWidth: '130px' }}>
                         <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem', fontWeight: 600 }}>Passwort</label>
                         <input
                             type="text"
@@ -79,7 +95,7 @@ const UserManagementModal = ({ onClose, users, setUsers }) => {
                             style={{ width: '100%' }}
                         />
                     </div>
-                    <div style={{ flex: 1 }}>
+                    <div style={{ flex: 1, minWidth: '110px' }}>
                         <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem', fontWeight: 600 }}>Rolle / Rechte</label>
                         <select
                             value={newRole}
@@ -99,17 +115,17 @@ const UserManagementModal = ({ onClose, users, setUsers }) => {
 
                 {/* User List */}
                 <div style={{ flex: 1, overflowY: 'auto', borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>
-                    <h4 style={{ margin: '0 0 1rem 0', opacity: 0.7, fontSize: '0.9rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Vorhandene Benutzer</h4>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    <h4 style={{ margin: '0 0 1rem 0', opacity: 0.7, fontSize: '0.9rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Vorhandene Benutzer & Passwörter</h4>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
                         {users.map(user => (
                             <div key={user.id} style={{
                                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                                padding: '1rem', backgroundColor: 'var(--background)',
-                                borderRadius: '6px', border: '1px solid var(--border)'
+                                padding: '0.85rem 1rem', backgroundColor: 'var(--background)',
+                                borderRadius: '6px', border: '1px solid var(--border)', gap: '0.5rem'
                             }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1 }}>
                                     <div style={{
-                                        width: '40px', height: '40px', borderRadius: '50%',
+                                        width: '38px', height: '38px', borderRadius: '50%', flexShrink: 0,
                                         backgroundColor: user.role === 'admin' ? 'rgba(239, 68, 68, 0.1)' : (user.role === 'technician' ? 'rgba(56, 189, 248, 0.1)' : 'rgba(16, 185, 129, 0.1)'),
                                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                                         color: user.role === 'admin' ? '#EF4444' : (user.role === 'technician' ? '#38BDF8' : '#10B981')
@@ -117,22 +133,68 @@ const UserManagementModal = ({ onClose, users, setUsers }) => {
                                         {user.role === 'admin' ? <Shield size={20} /> : (user.role === 'technician' ? <Wrench size={20} /> : <User size={20} />)}
                                     </div>
                                     <div>
-                                        <div style={{ fontWeight: 600 }}>{user.name}</div>
-                                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'capitalize' }}>
-                                            {user.role === 'technician' ? 'Techniker (Eingeschränkt)' : (user.role === 'admin' ? 'Administrator (Vollzugriff)' : 'Benutzer')}
+                                        <div style={{ fontWeight: 600, fontSize: '0.92rem' }}>{user.name}</div>
+                                        <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', textTransform: 'capitalize' }}>
+                                            {user.role === 'technician' ? 'Techniker' : (user.role === 'admin' ? 'Administrator' : 'Benutzer')}
                                         </div>
                                     </div>
                                 </div>
-                                <div style={{ display: 'flex', alignItems: 'center' }}>
-                                    <button
-                                        onClick={() => handleDeleteUser(user.id)}
-                                        className="btn btn-ghost"
-                                        style={{ color: '#EF4444', padding: '0.25rem 0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                                        title="Löschen"
-                                    >
-                                        <Trash size={18} />
-                                    </button>
+
+                                {/* Password field / inline edit */}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', backgroundColor: 'var(--surface)', padding: '0.25rem 0.5rem', borderRadius: '6px', border: '1px solid var(--border)' }}>
+                                    <Key size={14} style={{ color: 'var(--text-muted)' }} />
+                                    {editingPasswordId === user.id ? (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                            <input
+                                                type="text"
+                                                className="form-input"
+                                                value={editedPasswordVal}
+                                                onChange={(e) => setEditedPasswordVal(e.target.value)}
+                                                style={{ fontSize: '0.82rem', padding: '0.2rem 0.4rem', width: '110px' }}
+                                                autoFocus
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => handleSavePassword(user.id)}
+                                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#10B981', padding: '0.1rem' }}
+                                                title="Speichern"
+                                            >
+                                                <Check size={16} />
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                            <span style={{ fontFamily: 'monospace', fontSize: '0.88rem', fontWeight: 600 }}>
+                                                {visiblePasswords[user.id] ? user.password : '••••••••'}
+                                            </span>
+                                            <button
+                                                type="button"
+                                                onClick={() => togglePasswordVisibility(user.id)}
+                                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '0.1rem' }}
+                                                title={visiblePasswords[user.id] ? "Passwort verbergen" : "Passwort anzeigen"}
+                                            >
+                                                {visiblePasswords[user.id] ? <EyeOff size={14} /> : <Eye size={14} />}
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => { setEditingPasswordId(user.id); setEditedPasswordVal(user.password || ''); }}
+                                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '0.1rem' }}
+                                                title="Passwort ändern"
+                                            >
+                                                <Edit2 size={14} />
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
+
+                                <button
+                                    onClick={() => handleDeleteUser(user.id)}
+                                    className="btn btn-ghost"
+                                    style={{ color: '#EF4444', padding: '0.25rem 0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                    title="Löschen"
+                                >
+                                    <Trash size={18} />
+                                </button>
                             </div>
                         ))}
                         {users.length === 0 && (
@@ -142,7 +204,6 @@ const UserManagementModal = ({ onClose, users, setUsers }) => {
                         )}
                     </div>
                 </div>
-
             </div>
         </div>,
         document.body

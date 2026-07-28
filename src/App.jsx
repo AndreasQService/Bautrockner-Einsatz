@@ -887,9 +887,10 @@ function App() {
     ];
   });
 
-  // Persist users changes
+  // Persist users and passwords changes to localStorage and Supabase Cloud DB
   useEffect(() => {
     localStorage.setItem('qtool_users_v2', JSON.stringify(users));
+    saveUsersToSupabase(users);
   }, [users]);
 
   // Load users from Supabase on mount
