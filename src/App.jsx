@@ -1027,7 +1027,8 @@ function App() {
 
       const fetchPromise = supabase
         .from('damage_reports')
-        .select('id, updated_at, created_at, project_title, client, address, status, assigned_to, date, drying_started');
+        .select('id, updated_at, created_at, project_title, client, address, status, assigned_to, date, drying_started')
+        .limit(100);
 
       let result = await Promise.race([fetchPromise, timeoutPromise]);
       let data = result.data;
