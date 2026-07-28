@@ -87,10 +87,10 @@ const getUrgencyStyle = (days, thresholds = [7, 10]) => {
 };
 
 const DryingMonitor = ({ reports, onSelectReport, onDeleteReport, workflowStore = {} }) => {
-    // Filter by status 'Trocknung' OR if there are active devices
+    // Only active dryings with active equipment/devices are relevant
     const dryingReports = reports.filter(r => {
-        const isStatusDrying = r.status === 'Trocknung' || (r.equipment && r.equipment.length > 0);
-        if (!isStatusDrying) return false;
+        const hasActiveDevices = r.equipment && r.equipment.length > 0;
+        if (!hasActiveDevices) return false;
 
         // Filter out if the workflow milestone 'trocknung' is set to done or skip
         const sd = workflowStore[`${r.id}__trocknung`] || {};
