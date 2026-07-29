@@ -2,6 +2,15 @@ import { supabase } from '../supabaseClient';
 
 export let lastAuthError = null;
 
+let dbTodosCache = null;
+let dbTodosPromise = null;
+let cachedUserId = null;
+
+export function invalidateTodoCache() {
+    dbTodosCache = null;
+    dbTodosPromise = null;
+}
+
 export async function ensureAuthenticated() {
     if (!supabase) return false;
     try {
@@ -70,12 +79,74 @@ function isAutoDbMatch(c, projectId, runtimeTask) {
  * Fetches all todos from Supabase project_todos, local storage, and officeTasks inside damage_reports.
  * Automatically synchronizes outstanding local or inbox todos if connection is healthy.
  */
+// Helper to get latest measurement date across a project (only if measurements actually exist)
+const getLatestMeasurementDate = (project) => {
+    const allRooms = [
+        ...(project.measurementRooms || []),
+        ...(project.rooms || []),
+        ...(project.report_data?.measurementRooms || []),
+        ...(project.report_data?.rooms || [])
+    ];
+    let latestDate = null;
+    allRooms.forEach(room => {
+        if (!room) return;
+        // Check if active room has actual measurements
+        const hasActiveMeas = (Array.isArray(room.measurements) && room.measurements.length > 0) ||
+                              (room.measurementData && Array.isArray(room.measurementData.measurements) && room.measurementData.measurements.length > 0);
+        if (hasActiveMeas) {
+            const mDate = room.measurementData?.globalSettings?.date || room.globalSettings?.date || room.date;
+            if (mDate) {
+                const d = new Date(mDate);
+                if (!isNaN(d.getTime())) {
+                    if (!latestDate || d > latestDate) latestDate = d;
+                }
+            }
+        }
+
+        // Check if historical entries have actual measurements
+        if (room.measurementHistory && Array.isArray(room.measurementHistory)) {
+            room.measurementHistory.forEach(hist => {
+                const hasHistMeas = Array.isArray(hist.measurements) && hist.measurements.length > 0;
+                if (hasHistMeas) {
+                    const hDate = hist.date || hist.datum || hist.timestamp || hist.createdAt || hist.globalSettings?.date;
+                    if (hDate) {
+                        const d = new Date(hDate);
+                        if (!isNaN(d.getTime())) {
+                            if (!latestDate || d > latestDate) latestDate = d;
+                        }
+                    }
+                }
+            });
+        }
+    });
+    return latestDate;
+};
+
+/**
+ * Fetches all todos from Supabase project_todos, local storage, and officeTasks inside damage_reports.
+ * Automatically synchronizes outstanding local or inbox todos if connection is healthy.
+ */
 export async function fetchAllTodos(reports = []) {
     await ensureAuthenticated().catch(() => {});
 
+    // Check session user to invalidate cache on login/logout/switch
+    if (supabase) {
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            const currentUserId = session?.user?.id || null;
+            if (currentUserId !== cachedUserId) {
+                dbTodosCache = null;
+                dbTodosPromise = null;
+                cachedUserId = currentUserId;
+            }
+        } catch (e) {
+            console.warn('[TodoService] Session check failed:', e);
+        }
+    }
+
     // ── BACKGROUND SYNCHRONIZATION ──
     const isTestEnv = typeof window !== 'undefined' && (window.navigator.webdriver || window.IS_TEST_ENV);
-    if (supabase && !isTestEnv) {
+    if (supabase && !isTestEnv && !dbTodosCache && !dbTodosPromise) {
         try {
             const local = JSON.parse(localStorage.getItem('qservice_local_todos') || '[]');
             const inboxTodosRaw = JSON.parse(localStorage.getItem('qtool_inbox_todos') || '[]');
@@ -136,66 +207,43 @@ export async function fetchAllTodos(reports = []) {
         }
     }
 
-    let remoteData = [];
-    if (supabase) {
-        try {
-            const { data, error } = await supabase
-                .from('project_todos')
-                .select('*')
-                .order('due_date', { ascending: true });
-            if (!error && data) remoteData = data;
-        } catch (e) {}
-    }
-    const local = getLocalTodos();
-    const combined = [...remoteData];
-    local.forEach(loc => {
-        if (!combined.some(r => r.id === loc.id)) {
-            combined.push(loc);
-        }
-    });
-
-    // Helper to get latest measurement date across a project (only if measurements actually exist)
-    const getLatestMeasurementDate = (project) => {
-        const allRooms = [
-            ...(project.measurementRooms || []),
-            ...(project.rooms || []),
-            ...(project.report_data?.measurementRooms || []),
-            ...(project.report_data?.rooms || [])
-        ];
-        let latestDate = null;
-        allRooms.forEach(room => {
-            if (!room) return;
-            // Check if active room has actual measurements
-            const hasActiveMeas = (Array.isArray(room.measurements) && room.measurements.length > 0) ||
-                                  (room.measurementData && Array.isArray(room.measurementData.measurements) && room.measurementData.measurements.length > 0);
-            if (hasActiveMeas) {
-                const mDate = room.measurementData?.globalSettings?.date || room.globalSettings?.date || room.date;
-                if (mDate) {
-                    const d = new Date(mDate);
-                    if (!isNaN(d.getTime())) {
-                        if (!latestDate || d > latestDate) latestDate = d;
+    let dbTodos = [];
+    if (dbTodosCache) {
+        dbTodos = dbTodosCache;
+    } else {
+        if (!dbTodosPromise) {
+            dbTodosPromise = (async () => {
+                let remoteData = [];
+                if (supabase) {
+                    try {
+                        const { data, error } = await supabase
+                            .from('project_todos')
+                            .select('*')
+                            .order('due_date', { ascending: true });
+                        if (!error && data) remoteData = data;
+                    } catch (e) {
+                        console.error('[TodoService] fetch remote project_todos failed:', e);
                     }
                 }
-            }
-
-            // Check if historical entries have actual measurements
-            if (room.measurementHistory && Array.isArray(room.measurementHistory)) {
-                room.measurementHistory.forEach(hist => {
-                    const hasHistMeas = Array.isArray(hist.measurements) && hist.measurements.length > 0;
-                    if (hasHistMeas) {
-                        const hDate = hist.date || hist.datum || hist.timestamp || hist.createdAt || hist.globalSettings?.date;
-                        if (hDate) {
-                            const d = new Date(hDate);
-                            if (!isNaN(d.getTime())) {
-                                if (!latestDate || d > latestDate) latestDate = d;
-                            }
-                        }
+                const local = getLocalTodos();
+                const combined = [...remoteData];
+                local.forEach(loc => {
+                    if (!combined.some(r => r.id === loc.id)) {
+                        combined.push(loc);
                     }
                 });
-            }
-        });
-        return latestDate;
-    };
+                return combined;
+            })();
+        }
+        try {
+            dbTodos = await dbTodosPromise;
+            dbTodosCache = dbTodos;
+        } finally {
+            dbTodosPromise = null;
+        }
+    }
+
+    const combined = [...dbTodos];
 
     // Also collect legacy/embedded officeTasks from loaded reports
     if (Array.isArray(reports)) {
@@ -282,36 +330,14 @@ export async function fetchTodosForProject(projectIdOrProject) {
     const projectNum = typeof projectIdOrProject === 'object' ? projectIdOrProject?.projectNumber : null;
     const projectObj = typeof projectIdOrProject === 'object' ? projectIdOrProject : null;
 
-    let remoteData = [];
-    if (supabase && (projectId || projectNum)) {
-        try {
-            let query = supabase.from('project_todos').select('*');
-            if (projectId && projectNum) {
-                query = query.or(`project_id.eq.${projectId},project_id.eq.${projectNum}`);
-            } else if (projectId) {
-                query = query.eq('project_id', projectId);
-            } else {
-                query = query.eq('project_id', projectNum);
-            }
-            const { data, error } = await query.order('due_date', { ascending: true });
-            if (!error && data) remoteData = data;
-        } catch (e) {}
-    }
-    const local = getLocalTodos().filter(t => t.project_id === projectId || (projectNum && t.project_id === projectNum));
-    const combined = [...remoteData];
-    local.forEach(loc => {
-        if (!combined.some(r => r.id === loc.id)) {
-            combined.push(loc);
-        }
-    });
+    // Use cached/once-loaded fetchAllTodos to get all base todos
+    const allTodos = await fetchAllTodos([]);
+    const filtered = allTodos.filter(t => t.project_id === projectId || (projectNum && t.project_id === projectNum));
 
     if (projectObj) {
         const tasks = [...(projectObj?.officeTasks || projectObj?.report_data?.officeTasks || [])];
 
         // ─── 300% SELF-HEALING FALLBACK FOR AUTOMATIC TODOS ───
-        // Only generate the next measurement follow-up if:
-        // 1. The project is in 'Trocknung' status.
-        // 2. A measurement protocol actually exists (i.e. latestMDate is not null).
         const status = projectObj.status || projectObj.report_data?.status;
         const rRooms = projectObj.measurementRooms || projectObj.report_data?.measurementRooms || [];
         const rAllRoomsCompleted = Array.isArray(rRooms) && rRooms.length > 0 && rRooms.every(rm => rm.dryingCompleted || rm.globalSettings?.dryingCompleted);
@@ -354,10 +380,10 @@ export async function fetchTodosForProject(projectIdOrProject) {
                                      ['first_measurement', 'measurement_due', 'measurement_overdue', 'measurement_missing'].includes(t.id);
                 const isDone = t.done || (isDryingCompleted && isDryingTask);
 
-                const hasAutoDbMatch = combined.some(c => isAutoDbMatch(c, projectId, t));
+                const hasAutoDbMatch = filtered.some(c => isAutoDbMatch(c, projectId, t));
 
-                if (!hasAutoDbMatch && !combined.some(c => c.id === taskKey || c.task === (t.title || t.text))) {
-                    combined.push({
+                if (!hasAutoDbMatch && !filtered.some(c => c.id === taskKey || c.task === (t.title || t.text))) {
+                    filtered.push({
                         id: taskKey,
                         project_id: projectId,
                         task: t.title || t.text || 'Aufgabe',
@@ -375,13 +401,14 @@ export async function fetchTodosForProject(projectIdOrProject) {
         }
     }
 
-    return combined;
+    return filtered;
 }
 
 /**
  * Creates a new independent To-do with resilient local fallback.
  */
 export async function createTodo(todoData) {
+    invalidateTodoCache();
     await ensureAuthenticated().catch(() => {});
     if (!supabase) throw new Error('Supabase client not initialized');
 
@@ -445,6 +472,7 @@ export async function createTodo(todoData) {
  * Deletes a To-do by ID from Supabase and local storage.
  */
 export async function deleteTodo(todoId) {
+    invalidateTodoCache();
     if (!todoId) return false;
 
     // 1. Remove from local storage
@@ -474,6 +502,7 @@ export async function deleteTodo(todoId) {
  * Updates a To-do with optimistic locking (checks updated_at and status = 'open').
  */
 export async function updateTodo(todoId, updateData, expectedUpdatedAt) {
+    invalidateTodoCache();
     // ── FALLBACK FOR NON-UUID (EMBEDDED OR LOCAL) TODOS ──
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(todoId);
     if (!isUuid) {
@@ -581,6 +610,7 @@ export async function updateTodo(todoId, updateData, expectedUpdatedAt) {
  * Completes a To-do and creates a follow-up todo in a single database transaction.
  */
 export async function completeAndCreateTodoRpc(todoId, completedBy, newTodoData) {
+    invalidateTodoCache();
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(todoId);
     if (!isUuid) {
         console.log('[TodoService] Non-UUID todo complete-and-create triggered.');
@@ -704,6 +734,7 @@ export async function completeAndCreateTodoRpc(todoId, completedBy, newTodoData)
  * Completes a To-do and archives the project in a single database transaction.
  */
 export async function completeTodoAndArchiveProjectRpc(todoId, completedBy) {
+    invalidateTodoCache();
     await ensureAuthenticated();
     if (!supabase) throw new Error('Supabase client not initialized');
 
