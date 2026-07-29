@@ -655,9 +655,13 @@ function App() {
     return null;
   });
   const [supabaseSession, setSupabaseSession] = useState(null);
+  const [authReady, setAuthReady] = useState(false);
 
   useEffect(() => {
-    if (!supabase) return;
+    if (!supabase) {
+      setAuthReady(true);
+      return;
+    }
 
     const syncSession = async () => {
       try {
@@ -678,7 +682,9 @@ function App() {
           setUserRole('admin');
           setIsTechnicianMode(false);
           setProjectMode('desktop');
+          localStorage.setItem('qtool_current_user', JSON.stringify(existingUserObj));
         } else {
+          // If no session exists, only clear a stale Andreas Strehler state
           setCurrentUser(prev => {
             if (prev && prev.name && prev.name.toLowerCase() === 'andreas strehler') {
               localStorage.removeItem('qtool_current_user');
@@ -686,17 +692,44 @@ function App() {
             }
             return prev;
           });
+          const saved = localStorage.getItem('qtool_current_user');
+          if (saved) {
+            try {
+              const parsed = JSON.parse(saved);
+              if (parsed && parsed.name && parsed.name.toLowerCase() === 'andreas strehler') {
+                localStorage.removeItem('qtool_current_user');
+              }
+            } catch {}
+          }
         }
       } catch (err) {
         console.error('[Supabase Auth] Fehler beim Abrufen der initialen Session:', err);
+      } finally {
+        setAuthReady(true);
       }
     };
 
     syncSession();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setSupabaseSession(session);
-      if (!session) {
+      if (session && session.user && session.user.email === 'a.strehler@q-service.ch') {
+        const saved = localStorage.getItem('qtool_current_user');
+        let existingUserObj = null;
+        if (saved) {
+          try {
+            existingUserObj = JSON.parse(saved);
+          } catch {}
+        }
+        if (!existingUserObj || existingUserObj.name.toLowerCase() !== 'andreas strehler') {
+          existingUserObj = { id: 4, name: 'Andreas Strehler', role: 'admin' };
+        }
+        setCurrentUser(existingUserObj);
+        setUserRole('admin');
+        setIsTechnicianMode(false);
+        setProjectMode('desktop');
+        localStorage.setItem('qtool_current_user', JSON.stringify(existingUserObj));
+      } else if (event === 'SIGNED_OUT') {
         setCurrentUser(prev => {
           if (prev && prev.name && prev.name.toLowerCase() === 'andreas strehler') {
             localStorage.removeItem('qtool_current_user');
@@ -1937,6 +1970,32 @@ function App() {
       {toast.message}
     </div>
   );
+
+  // --- AUTH INITIALIZATION CHECK ---
+  let isAndreasStored = false;
+  try {
+    const saved = localStorage.getItem('qtool_current_user');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      isAndreasStored = !!(parsed && parsed.name && parsed.name.toLowerCase() === 'andreas strehler');
+    }
+  } catch {}
+
+  if (isAndreasStored && !authReady) {
+    return (
+      <div style={{
+        height: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#0f172a',
+        color: '#f8fafc',
+        fontFamily: 'system-ui, -apple-system, sans-serif'
+      }}>
+        Lade Sitzung...
+      </div>
+    );
+  }
 
   // --- LOGIN SCREEN CHECK ---
   if (!currentUser) {
