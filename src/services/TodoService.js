@@ -41,6 +41,31 @@ function getLocalTodos() {
     }
 }
 
+function normalizeTodoDate(value) {
+    if (!value) return '';
+    const str = String(value).trim();
+    if (str.length >= 10) {
+        const yyyymmdd = str.substring(0, 10);
+        if (/^\d{4}-\d{2}-\d{2}$/.test(yyyymmdd)) {
+            return yyyymmdd;
+        }
+    }
+    return '';
+}
+
+function isAutoDbMatch(c, projectId, runtimeTask) {
+    const cProj = c.project_id ? String(c.project_id).trim() : '';
+    const rProj = projectId ? String(projectId).trim() : '';
+    if (cProj !== rProj || !cProj) return false;
+
+    if (c.created_by !== 'system:measurement_followup') return false;
+
+    const cDate = normalizeTodoDate(c.due_date);
+    const rDate = normalizeTodoDate(runtimeTask.dueDate);
+
+    return cDate !== '' && rDate !== '' && cDate === rDate;
+}
+
 /**
  * Fetches all todos from Supabase project_todos, local storage, and officeTasks inside damage_reports.
  * Automatically synchronizes outstanding local or inbox todos if connection is healthy.
@@ -223,7 +248,9 @@ export async function fetchAllTodos(reports = []) {
                                          ['first_measurement', 'measurement_due', 'measurement_overdue', 'measurement_missing'].includes(t.id);
                     const isDone = t.done || (isDryingCompleted && isDryingTask);
 
-                    if (!combined.some(c => c.id === taskKey || (c.project_id === (r.id || t.projectId) && c.task === (t.title || t.text)))) {
+                    const hasAutoDbMatch = combined.some(c => isAutoDbMatch(c, r.id || t.projectId, t));
+
+                    if (!hasAutoDbMatch && !combined.some(c => c.id === taskKey || (c.project_id === (r.id || t.projectId) && c.task === (t.title || t.text)))) {
                         combined.push({
                             id: taskKey,
                             project_id: r.id || t.projectId,
@@ -327,7 +354,9 @@ export async function fetchTodosForProject(projectIdOrProject) {
                                      ['first_measurement', 'measurement_due', 'measurement_overdue', 'measurement_missing'].includes(t.id);
                 const isDone = t.done || (isDryingCompleted && isDryingTask);
 
-                if (!combined.some(c => c.id === taskKey || c.task === (t.title || t.text))) {
+                const hasAutoDbMatch = combined.some(c => isAutoDbMatch(c, projectId, t));
+
+                if (!hasAutoDbMatch && !combined.some(c => c.id === taskKey || c.task === (t.title || t.text))) {
                     combined.push({
                         id: taskKey,
                         project_id: projectId,
