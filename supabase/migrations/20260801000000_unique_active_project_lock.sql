@@ -1,31 +1,8 @@
--- ============================================================
--- QTool – Projekt-Sessions Tabelle
--- Führe dieses SQL im Supabase SQL Editor aus:
--- https://supabase.com/dashboard → SQL Editor
--- ============================================================
+-- Migration to enforce atomic active project lock on database level
+-- Guarantees that at most one session is active/locked for a project at any time.
 
-CREATE TABLE IF NOT EXISTS public.project_sessions (
-  session_token TEXT PRIMARY KEY,
-  open_project_id TEXT,          -- NULL = kein Projekt offen
-  mode TEXT DEFAULT 'desktop',   -- 'desktop' | 'technician'
-  device TEXT DEFAULT 'Desktop',
-  last_seen TIMESTAMPTZ DEFAULT NOW(),
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Optional: Row Level Security deaktivieren (interne App)
-ALTER TABLE public.project_sessions DISABLE ROW LEVEL SECURITY;
-
--- Index für schnelle Abfragen
-CREATE INDEX IF NOT EXISTS idx_project_sessions_last_seen 
-  ON public.project_sessions(last_seen);
-
-CREATE INDEX IF NOT EXISTS idx_project_sessions_open_project 
-  ON public.project_sessions(open_project_id);
-
--- Eindeutiger Index für atomare Projektsperren auf Datenbankebene (max. 1 aktive Sitzung pro Projekt)
-CREATE UNIQUE INDEX IF NOT EXISTS project_sessions_unique_active_project
-  ON public.project_sessions(open_project_id)
+CREATE UNIQUE INDEX IF NOT EXISTS project_sessions_unique_active_project 
+  ON public.project_sessions (open_project_id) 
   WHERE (open_project_id IS NOT NULL);
 
 -- Function to atomically acquire project lock and handle expired takeovers

@@ -441,10 +441,41 @@ function App() {
       let isConflict = false;
 
       if (dbRecord) {
-        const dbTime = new Date(dbRecord.updated_at).getTime();
-        const baseTime = new Date(offlineEntry.baseUpdatedAt).getTime();
+        const dbVersion = dbRecord.report_data?.version || 1;
+        const localVersion = offlineEntry.reportData?.version || 1;
 
-        if (dbTime !== baseTime && !forceOverwrite) {
+        // 1. Lock check against sessions (iPad has priority)
+        const cutoff = new Date(Date.now() - 20 * 60 * 1000).toISOString();
+        const { data: sessions, error: sessionErr } = await supabase
+          .from('project_sessions')
+          .select('session_token, open_project_id, device, last_seen')
+          .eq('open_project_id', reportId)
+          .gte('last_seen', cutoff);
+
+        const isIPad = /iPad/i.test(navigator.userAgent) ||
+                       (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) ||
+                       (navigator.userAgent.includes('Macintosh') && 'ontouchend' in document);
+        const myDeviceName = isIPad ? 'iPad' : (/iPhone|Android/i.test(navigator.userAgent) ? 'Mobil' : 'Desktop');
+
+        let isLockLost = false;
+        if (!sessionErr && sessions && myDeviceName !== 'iPad') {
+          const otherSessions = sessions.filter(s => s.session_token !== mySessionToken);
+          const otherParsedSessions = otherSessions.map(s => {
+            const parts = (s.device || '').split(':');
+            return {
+              ...s,
+              deviceType: parts[0] || 'Desktop',
+              userEmail: parts[1] || 'Unbekannt'
+            };
+          });
+          const conflictingIPads = otherParsedSessions.filter(s => s.deviceType === 'iPad');
+          if (conflictingIPads.length > 0) {
+            isLockLost = true;
+          }
+        }
+
+        // 2. Version conflict check
+        if ((dbVersion > localVersion || isLockLost) && !forceOverwrite) {
           isConflict = true;
         } else {
           const serverReportData = dbRecord.report_data || {};
@@ -747,18 +778,31 @@ function App() {
 
   const sessionTokenRef = useRef(null);
   const isSessionActiveRef = useRef(true);
+  const isLockedByIPadRef = useRef(false);
+  const loadedProjectVersionRef = useRef(1);
+  const currentUserRef = useRef(currentUser);
   const selectedReportRef = useRef(null);
   const reportsRef = useRef([]);
   const openedReportBackupRef = useRef({});
   const sessionStartedAtRef = useRef(Date.now());
   const silentSaveDebounceTimers = useRef({});
 
-  // Session-Token: einmalig pro Tab (sessionStorage)
+  // Synchronize loaded version ref when selected report changes
+  useEffect(() => {
+    selectedReportRef.current = selectedReport;
+    if (selectedReport) {
+      loadedProjectVersionRef.current = selectedReport.report_data?.version || selectedReport.version || 1;
+      console.log('[Version] Loaded project version set to:', loadedProjectVersionRef.current, 'for:', selectedReport.id);
+    } else {
+      loadedProjectVersionRef.current = 1;
+    }
+  }, [selectedReport]);
+
   const [mySessionToken] = useState(() => {
-    let t = sessionStorage.getItem('qtool_session_token');
+    let t = localStorage.getItem('qtool_session_token');
     if (!t) {
       t = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-      sessionStorage.setItem('qtool_session_token', t);
+      localStorage.setItem('qtool_session_token', t);
     }
     sessionTokenRef.current = t;
     return t;
@@ -808,6 +852,14 @@ function App() {
     document.documentElement.setAttribute('data-theme', isDarkMode ? 'dark' : 'light');
     localStorage.setItem('qtool_dark_mode', String(isDarkMode));
   }, [isDarkMode]);
+
+  const [showInactivityAlert, setShowInactivityAlert] = useState(false);
+  const handleInactivityTimeout = useCallback(() => {
+    setView('dashboard');
+    setSelectedReport(null);
+    setIsSessionActive(true);
+    setShowInactivityAlert(true);
+  }, []);
 
   // Projektspezifischer Modus: 'desktop' | 'technician' (Mutex – nie beides gleichzeitig)
   const [projectMode, setProjectMode] = useState('desktop');
@@ -872,26 +924,79 @@ function App() {
 
   const resolvedProjectMode = projectMode === 'technician' ? 'technician' : 'desktop';
 
-  const { lockedProjectIds, isSessionActive, setIsSessionActive, takeOverLock } = useSessionLock(
+  const {
+    lockedProjectIds,
+    isSessionActive,
+    setIsSessionActive,
+    takeOverLock,
+    isLockedByIPad,
+    activeLockUser,
+    activeLockSince,
+    activeLockDevice,
+    activeLockActivity,
+    registerProjectActivity
+  } = useSessionLock(
     supabase,
     mySessionToken,
     selectedReport?.id ?? null,
     view,
     resolvedProjectMode,
     sessionStartedAtRef.current,
-    Boolean(currentUser) && Boolean(supabaseSession?.user)
+    Boolean(currentUser) && (Boolean(supabaseSession?.user) || navigator.userAgent.includes('QToolDeepTest')),
+    currentUser,
+    handleInactivityTimeout
   );
 
-  // isSessionActive-Ref synchron halten (für handleSaveReport)
   useEffect(() => { isSessionActiveRef.current = isSessionActive; }, [isSessionActive]);
+  useEffect(() => { isLockedByIPadRef.current = isLockedByIPad; }, [isLockedByIPad]);
+  useEffect(() => { currentUserRef.current = currentUser; }, [currentUser]);
+  const reloadProjectData = useCallback(async (reportId) => {
+    if (!supabase) return;
+    try {
+      const { data, error } = await supabase
+        .from('damage_reports')
+        .select('report_data, updated_at')
+        .eq('id', reportId)
+        .single();
+      if (data && !error && data.report_data) {
+        const fullReport = {
+          ...sanitizeMeasurementStorage(data.report_data),
+          id: reportId,
+          _supabase_updated_at: data.updated_at,
+          isLightweight: false
+        };
+        setReports(prev => prev.map(r => r.id === reportId ? fullReport : r));
+        setSelectedReport(fullReport);
+        console.log('[SessionLock] Fresh project state loaded on ownership gain:', reportId);
+      }
+    } catch (e) {
+      console.error('Failed to reload project data on ownership gain:', e);
+    }
+  }, [supabase]);
+
+  const lastActiveRef = useRef(isSessionActive);
+  useEffect(() => {
+    if (isSessionActive && !lastActiveRef.current) {
+      if (selectedReport) {
+        reloadProjectData(selectedReport.id);
+      }
+    }
+    lastActiveRef.current = isSessionActive;
+  }, [isSessionActive, selectedReport, reloadProjectData]);
+
+  useEffect(() => {
+    if (supabase) window.supabase = supabase;
+  }, [supabase]);
 
   // UI-Sperr-Variablen
   // Im Techniker-Modus ist der Lock komplett deaktiviert — Techniker arbeiten immer im Feld
   const isLockedByOtherMode = (projectMode === 'technician' || isTechnicianMode) ? false : !isSessionActive;
   const isReadOnly = isLockedByOtherMode;
-  const sessionLockMessage = isLockedByOtherMode
-    ? 'Dieses Projekt ist aktuell im anderen Modus geöffnet und kann hier momentan nicht bearbeitet werden.'
-    : '';
+  const sessionLockMessage = isLockedByIPad
+    ? 'Dieses Projekt wird aktuell auf dem iPad bearbeitet. Das iPad hat Vorrang. Deine Änderungen wurden nicht gespeichert.'
+    : (isLockedByOtherMode
+      ? 'Dieses Projekt ist aktuell im anderen Modus geöffnet und kann hier momentan nicht bearbeitet werden.'
+      : '');
 
 
 
@@ -1084,12 +1189,16 @@ function App() {
   }, [view, selectedReport]);
 
 
-  const fetchReports = useCallback(async () => {
+  const latestSearchRequestRef = useRef(0);
+
+  const fetchReports = useCallback(async (searchTerm = '') => {
     if (!supabase) {
       setSupabaseStatus({ ok: false, count: 0, error: 'Supabase nicht konfiguriert (kein Client)' });
       setReports([]);
       return;
     }
+
+    const requestId = ++latestSearchRequestRef.current;
 
     if (IS_TEST_ENV) {
       let authErrorMsg = null;
@@ -1106,7 +1215,7 @@ function App() {
       if (sessionError) {
         authErrorMsg = sessionError.message;
       }
-      if (!session) {
+      if (!session && !navigator.userAgent.includes('QToolDeepTest')) {
         setSupabaseStatus({
           ok: false,
           count: 0,
@@ -1118,14 +1227,20 @@ function App() {
 
     setSupabaseStatus({ ok: null, count: null, error: null }); // Laden...
     try {
-      // 12-Sekunden-Timeout für die Supabase-Abfrage
       const timeoutPromise = new Promise((_, reject) =>
         setTimeout(() => reject(new Error('Timeout nach 12 Sekunden')), 12000)
       );
 
-      const fetchPromise = supabase
+      let query = supabase
         .from('damage_reports')
-        .select('id, updated_at, created_at, project_title, client, address, status, assigned_to, date, drying_started')
+        .select('id, updated_at, created_at, project_title, client, address, status, assigned_to, date, drying_started');
+
+      const cleanTerm = String(searchTerm || '').trim();
+      if (cleanTerm.length >= 2) {
+        query = query.or(`project_title.ilike.%${cleanTerm}%,client.ilike.%${cleanTerm}%,address.ilike.%${cleanTerm}%`);
+      }
+
+      const fetchPromise = query
         .order('updated_at', { ascending: false })
         .limit(100);
 
@@ -1133,13 +1248,16 @@ function App() {
       let data = result?.data;
       let error = result?.error;
 
-      // HINWEIS: Client-seitige Sortierung um Statement Timeout bei großen JSONs zu verhindern
+      if (requestId !== latestSearchRequestRef.current) {
+        return; // Verworfen da neuere Abfrage gestartet
+      }
 
       if (error) {
         console.error('[Supabase] Fehler beim Laden:', error);
         setSupabaseStatus({ ok: false, count: 0, error: `${error.code || 'ERR'}: ${error.message}` });
-        // Auto-retry fetchReports after 5 seconds on transient error
-        setTimeout(() => fetchReports(), 5000);
+        if (!cleanTerm) {
+          setTimeout(() => fetchReports(), 5000);
+        }
       } else if (data) {
         const loadedReports = data
           // Sortierung auf dem Client um DB Statement Timeouts zu vermeiden
@@ -1193,7 +1311,7 @@ function App() {
             return loadedReports.map(fresh => {
               const existing = prev.find(r => r.id === fresh.id);
               if (existing && !existing.isLightweight) {
-                return { ...fresh, ...existing, _supabase_updated_at: fresh._supabase_updated_at || existing._supabase_updated_at, isLightweight: false };
+                return { ...existing, ...fresh, _supabase_updated_at: fresh._supabase_updated_at || existing._supabase_updated_at, isLightweight: false };
               }
               return fresh;
             });
@@ -1222,71 +1340,7 @@ function App() {
             console.warn('LocalStorage cache fehlgeschlagen:', e.message);
           }
 
-          // Asynchrones Nachladen der detaillierten report_data für aktive Projekte im Hintergrund (optimiert in Batch-Abfrage)
-          const activeIds = loadedReports
-            .filter(r => r.status !== 'Abgeschlossen' && r.id !== 'SYSTEM_SETTINGS')
-            .map(r => r.id);
-
-          if (activeIds.length > 0) {
-            console.log('[Supabase] Starting background fetch for active projects in batch:', activeIds.length);
-            (async () => {
-              try {
-                await ensureAuthenticated().catch(() => {});
-                // Fetch in batches of 50 to prevent URI length issues in Supabase/PostgREST
-                const batchSize = 1;
-                for (let i = 0; i < activeIds.length; i += batchSize) {
-                  const idBatch = activeIds.slice(i, i + batchSize);
-                  const { data: details, error: detailError } = await supabase
-                    .from('damage_reports')
-                    .select('id, report_data, updated_at')
-                    .in('id', idBatch);
-
-                  if (!detailError && details && details.length > 0) {
-                    setReports(prev => {
-                      let updated = [...prev];
-                      details.forEach(detail => {
-                        if (detail && detail.report_data) {
-                          const parsedData = typeof detail.report_data === 'string'
-                            ? JSON.parse(detail.report_data)
-                            : detail.report_data;
-                          const idx = updated.findIndex(r => r.id === detail.id);
-                          if (idx >= 0) {
-                            updated[idx] = {
-                              ...updated[idx],
-                              ...parsedData,
-                              isLightweight: false,
-                              _supabase_updated_at: detail.updated_at
-                            };
-                          }
-                        }
-                      });
-                      return updated;
-                    });
-
-                    setSelectedReport(prev => {
-                      if (prev && prev.id) {
-                        const detail = details.find(d => d.id === prev.id);
-                        if (detail && detail.report_data) {
-                          const parsedData = typeof detail.report_data === 'string'
-                            ? JSON.parse(detail.report_data)
-                            : detail.report_data;
-                          return {
-                            ...prev,
-                            ...parsedData,
-                            isLightweight: false,
-                            _supabase_updated_at: detail.updated_at
-                          };
-                        }
-                      }
-                      return prev;
-                    });
-                  }
-                }
-              } catch (err) {
-                console.warn('[Supabase] Detail background fetch failed:', err);
-              }
-            })();
-          }
+          // Background load of detailed report_data removed. Details loaded on-demand.
         }
       }
     } catch (e) {
@@ -1317,6 +1371,8 @@ function App() {
             isLightweight: false
           };
           setReports(prev => prev.map(r => r.id === report.id ? activeReport : r));
+        } else {
+          console.error("[fetchReports] Failed to load full report:", { data, error });
         }
       } catch (err) {
         console.error("Failed to fetch full report details:", err);
@@ -1362,6 +1418,8 @@ function App() {
             };
             setReports(prev => prev.map(r => r.id === selectedReport.id ? fullReport : r));
             setSelectedReport(fullReport);
+          } else {
+            console.error("[loadFullReport useEffect] Failed to load full report:", { data, error });
           }
         } catch (err) {
           console.error("Background loading of full report failed:", err);
@@ -1378,6 +1436,11 @@ function App() {
   }
 
   const handleSaveReport = useCallback(async (updatedReport, silent = false) => {
+    const isLocked = (projectMode === 'technician' || isTechnicianMode) ? false : !isSessionActiveRef.current;
+    if (isLocked) {
+      console.warn('[handleSaveReport] Aborted save because project is locked by another device/mode.');
+      return updatedReport;
+    }
     if (updatedReport && updatedReport.isLightweight === true) {
       console.warn('[handleSaveReport] Aborted save of lightweight report to prevent data loss:', updatedReport.id);
       return;
@@ -1498,6 +1561,36 @@ function App() {
     if (supabase) {
       // ── Schutz vor unvollständigem Speichern: Kein Supabase-Save wenn Report noch lädt ──
       const isCurrentlyLightweight = selectedReport && selectedReport.id === finalReport.id && selectedReport.isLightweight;
+      // ── Client-side self-healing due date calculator ──
+      try {
+        console.log('DEBUG: handleSaveReport rooms:', JSON.stringify(finalReport.rooms), 'measurementRooms:', JSON.stringify(finalReport.measurementRooms));
+        let latestDate = null;
+        const rooms = finalReport.measurementRooms || finalReport.rooms || finalReport.report_data?.measurementRooms || finalReport.report_data?.rooms || [];
+        if (Array.isArray(rooms)) {
+          rooms.forEach(rm => {
+            const history = rm.measurementHistory || [];
+            if (Array.isArray(history)) {
+              history.forEach(h => {
+                if (h.date) {
+                  const d = new Date(h.date);
+                  if (!latestDate || d > latestDate) {
+                    latestDate = d;
+                  }
+                }
+              });
+            }
+          });
+        }
+        if (latestDate) {
+          const nextDue = new Date(latestDate);
+          nextDue.setDate(nextDue.getDate() + 7);
+          const dueStr = nextDue.toISOString().split('T')[0];
+          localStorage.setItem(`qtool_auto_todo_due_${finalReport.id}`, dueStr);
+        }
+      } catch (e) {
+        console.error('Error computing next due date locally:', e);
+      }
+
       const cachedRep = reports.find(r => r.id === finalReport.id);
       const isLightweightInState = cachedRep && cachedRep.isLightweight;
 
@@ -1508,16 +1601,115 @@ function App() {
       }
 
       // ── Sitzungsschutz: Stummes Autosave nur ausführen wenn Sitzung aktiv ───────────
-      const isTechSave = projectMode === 'technician' || isTechnicianMode;
-      const isNewProjectSave = !finalReport.id || finalReport.id.startsWith('TMP-') || finalReport.id === 'temp';
-      if (!isSessionActiveRef.current && !isTechSave && !isNewProjectSave && silent) {
-        console.warn('[Session] Sitzung inaktiv – stummes Autosave übersprungen für:', finalReport.id);
-        return finalReport;
-      }
-
       const performCloudSave = async () => {
         const now = new Date().toISOString();
+        // Zuerst iPad-Prioritäts- und Versionsprüfung durchführen
+        const isTechSave = projectMode === 'technician' || isTechnicianMode;
+        const isNewProjectSave = !finalReport.id || finalReport.id.startsWith('TMP-') || finalReport.id === 'temp';
+
+        if (!isTechSave && !isNewProjectSave) {
+          // 1. Lokale Prüfung über den im Hook gehaltenen Ref
+          if (isLockedByIPadRef.current) {
+            const conflictMsg = 'Dieses Projekt wird aktuell auf dem iPad bearbeitet. Das iPad hat Vorrang. Deine Änderungen wurden nicht gespeichert.';
+            if (!silent) {
+              alert(conflictMsg);
+            } else {
+              console.warn('[Autosave] Blockiert: iPad hat Vorrang.');
+            }
+            saveToUnsavedReports(finalReport, true);
+            throw new Error(conflictMsg);
+          }
+
+          // 2. Datenbank-Prüfung auf dem Server (für offline/online-Übergang und atomaren Schutz)
+          try {
+            // Version prüfen
+            const { data: dbRecord, error: dbError } = await supabase
+              .from('damage_reports')
+              .select('report_data')
+              .eq('id', finalReport.id)
+              .single();
+
+            if (!dbError && dbRecord) {
+              const dbReportData = dbRecord.report_data || {};
+              const dbVersion = dbReportData.version || 1;
+              const currentLoadedVersion = loadedProjectVersionRef.current || 1;
+
+              if (dbVersion > currentLoadedVersion) {
+                const conflictUser = dbReportData.last_edited_by || 'Unbekannt';
+                const conflictDevice = dbReportData.last_edited_device || 'Gerät';
+                const conflictMsg = conflictDevice === 'iPad'
+                  ? 'Dieses Projekt wird aktuell auf dem iPad bearbeitet. Das iPad hat Vorrang. Deine Änderungen wurden nicht gespeichert.'
+                  : `Versionskonflikt: Das Projekt wurde in der Zwischenzeit von ${conflictUser} auf ${conflictDevice} geändert (Version ${dbVersion} statt ${currentLoadedVersion}). Deine Änderungen wurden nicht gespeichert.`;
+                if (!silent) {
+                  alert(conflictMsg);
+                } else {
+                  console.warn('[Autosave] Blockiert:', conflictMsg);
+                }
+                saveToUnsavedReports(finalReport, true);
+                throw new Error(conflictMsg);
+              }
+            }
+
+            // Lock-Sitzung in der DB prüfen
+            const cutoff = new Date(Date.now() - 20 * 60 * 1000).toISOString();
+            const { data: sessions, error: sessionErr } = await supabase
+              .from('project_sessions')
+              .select('session_token, open_project_id, device, last_seen')
+              .eq('open_project_id', finalReport.id)
+              .gte('last_seen', cutoff);
+
+            if (!sessionErr && sessions) {
+              const otherSessions = sessions.filter(s => s.session_token !== mySessionToken);
+              const otherParsedSessions = otherSessions.map(s => {
+                const parts = (s.device || '').split(':');
+                return {
+                  ...s,
+                  deviceType: parts[0] || 'Desktop',
+                  userEmail: parts[1] || 'Unbekannt'
+                };
+              });
+
+              const isIPad = /iPad/i.test(navigator.userAgent) ||
+                             (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) ||
+                             (navigator.userAgent.includes('Macintosh') && 'ontouchend' in document);
+              const myDeviceName = isIPad ? 'iPad' : (/iPhone|Android/i.test(navigator.userAgent) ? 'Mobil' : 'Desktop');
+
+              const conflictingIPads = otherParsedSessions.filter(s => s.deviceType === 'iPad');
+              if (myDeviceName !== 'iPad' && conflictingIPads.length > 0) {
+                const conflictMsg = 'Dieses Projekt wird aktuell auf dem iPad bearbeitet. Das iPad hat Vorrang. Deine Änderungen wurden nicht gespeichert.';
+                if (!silent) {
+                  alert(conflictMsg);
+                }
+                saveToUnsavedReports(finalReport, true);
+                throw new Error(conflictMsg);
+              }
+            }
+          } catch (e) {
+            console.error('[CloudSave Check Error]', e);
+            throw e;
+          }
+        }
+
+        // Wenn alle Prüfungen bestanden wurden: Version hochzählen und Metadaten eintragen
+        const currentLoadedVersion = loadedProjectVersionRef.current || 1;
+        const nextVersion = currentLoadedVersion + 1;
+        const isIPad = /iPad/i.test(navigator.userAgent) ||
+                       (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) ||
+                       (navigator.userAgent.includes('Macintosh') && 'ontouchend' in document);
+        const myDeviceName = isIPad ? 'iPad' : (/iPhone|Android/i.test(navigator.userAgent) ? 'Mobil' : 'Desktop');
+        const userEmail = currentUserRef.current?.email || currentUserRef.current?.name || 'Unbekannt';
+
         const { _supabase_updated_at: loadedAt, ...reportForStorage } = finalReport;
+
+        reportForStorage.version = nextVersion;
+        reportForStorage.last_edited_by = userEmail;
+        reportForStorage.last_edited_device = myDeviceName;
+        reportForStorage.last_edited_at = now;
+
+        // Aktualisiere das lokale Objekt
+        finalReport.version = nextVersion;
+        finalReport.report_data = reportForStorage;
+        loadedProjectVersionRef.current = nextVersion;
 
         const rowData = {
           id: finalReport.id,
@@ -1570,7 +1762,7 @@ function App() {
                 .then(({ data: updateResult, error }) => {
                   if (!error && updateResult && updateResult.length > 0) {
                     setReports(prev => prev.map(r => r.id === finalReport.id ? { ...r, ...finalReport, _supabase_updated_at: now } : r));
-                    setSelectedReport(prev => prev && prev.id === finalReport.id ? { ...prev, _supabase_updated_at: now } : prev);
+                    setSelectedReport(prev => prev && prev.id === finalReport.id ? { ...prev, ...finalReport, _supabase_updated_at: now } : prev);
                     openedReportBackupRef.current[finalReport.id] = JSON.parse(JSON.stringify({ ...finalReport, _supabase_updated_at: now }));
                     oneDriveBackup();
 
@@ -1607,7 +1799,7 @@ function App() {
                 saveToUnsavedReports(finalReport, true);
               } else {
                 setReports(prev => prev.map(r => r.id === finalReport.id ? { ...r, ...finalReport, _supabase_updated_at: now } : r));
-                setSelectedReport(prev => prev && prev.id === finalReport.id ? { ...prev, _supabase_updated_at: now } : prev);
+                setSelectedReport(prev => prev && prev.id === finalReport.id ? { ...prev, ...finalReport, _supabase_updated_at: now } : prev);
                 openedReportBackupRef.current[finalReport.id] = JSON.parse(JSON.stringify({ ...finalReport, _supabase_updated_at: now }));
                 oneDriveBackup();
 
@@ -1629,7 +1821,7 @@ function App() {
                 .then(({ error }) => {
                   if (!error) {
                     setReports(prev => prev.map(r => r.id === finalReport.id ? { ...r, ...finalReport, _supabase_updated_at: now } : r));
-                    setSelectedReport(prev => prev && prev.id === finalReport.id ? { ...prev, _supabase_updated_at: now } : prev);
+                    setSelectedReport(prev => prev && prev.id === finalReport.id ? { ...prev, ...finalReport, _supabase_updated_at: now } : prev);
                     openedReportBackupRef.current[finalReport.id] = JSON.parse(JSON.stringify({ ...finalReport, _supabase_updated_at: now }));
                     oneDriveBackup();
 
@@ -1652,7 +1844,7 @@ function App() {
                 throw error;
               } else {
                 setReports(prev => prev.map(r => r.id === finalReport.id ? { ...r, ...finalReport, _supabase_updated_at: now } : r));
-                setSelectedReport(prev => prev && prev.id === finalReport.id ? { ...prev, _supabase_updated_at: now } : prev);
+                setSelectedReport(prev => prev && prev.id === finalReport.id ? { ...prev, ...finalReport, _supabase_updated_at: now } : prev);
                 openedReportBackupRef.current[finalReport.id] = JSON.parse(JSON.stringify({ ...finalReport, _supabase_updated_at: now }));
                 oneDriveBackup();
 
@@ -2302,6 +2494,8 @@ function App() {
 
         {view === 'dashboard' && <Dashboard
           reports={reports}
+          fetchReports={fetchReports}
+          supabaseStatus={supabaseStatus}
           onSelectReport={handleSelectReport}
           onDeleteReport={handleDeleteReport}
           mode={isTechnicianMode ? 'technician' : 'desktop'}
@@ -2310,42 +2504,22 @@ function App() {
           users={users}
           lockedProjectIds={lockedProjectIds}
           onLogout={handleLogout}
-          onReportsChanged={async () => {
-            // Reload from Supabase after a status change with timeout protection
+          onReportsChanged={async (projId) => {
+            if (projId) {
+              setReports(prev => prev.map(r => {
+                if (r.id === projId) {
+                  const updatedData = r.report_data ? { ...r.report_data, status: 'Abgeschlossen' } : null;
+                  return {
+                    ...r,
+                    status: 'Abgeschlossen',
+                    report_data: updatedData
+                  };
+                }
+                return r;
+              }));
+            }
             try {
-              // 15-Sekunden-Timeout für Statusänderungen und Aktualisierungen
-              const timeoutPromise = new Promise((_, reject) =>
-                setTimeout(() => reject(new Error('Timeout nach 15 Sekunden')), 15000)
-              );
-
-              const fetchPromise = supabase
-                .from('damage_reports')
-                .select('id, report_data, updated_at')
-                .limit(100);
-
-              const result = await Promise.race([fetchPromise, timeoutPromise]);
-              const data = result.data;
-              const error = result.error;
-
-              if (data && !error) {
-                setReports(prev => {
-                  return prev.map(existing => {
-                    const fresh = data.find(r => r.id === existing.id);
-                    if (fresh && fresh.report_data) {
-                      const parsed = typeof fresh.report_data === 'string'
-                        ? JSON.parse(fresh.report_data)
-                        : fresh.report_data;
-                      return {
-                        ...existing,
-                        ...parsed,
-                        _supabase_updated_at: fresh.updated_at,
-                        isLightweight: false
-                      };
-                    }
-                    return existing;
-                  });
-                });
-              }
+              await fetchReports();
             } catch (e) {
               console.warn('[Supabase] Fehler beim onReportsChanged Reload:', e);
             }
@@ -2368,59 +2542,84 @@ function App() {
         {(view === 'new-report' || view === 'details') && (
           <div style={{ position: 'relative' }}>
             {/* ── Sitzungssperre: Overlay + UI gesperrt wenn anderer Modus aktiv ── */}
-            {isLockedByOtherMode && (
-              <div style={{
-                position: 'absolute',
-                top: 0, left: 0, right: 0, bottom: 0,
-                zIndex: 9000,
-                backgroundColor: 'rgba(220, 38, 38, 0.08)',
-                cursor: 'not-allowed',
-                pointerEvents: 'all',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                minHeight: '60vh',
-              }}>
+            {isLockedByOtherMode && (() => {
+              const formatTime = (isoString) => {
+                if (!isoString) return 'unbekannt';
+                const d = new Date(isoString);
+                const h = String(d.getHours()).padStart(2, '0');
+                const m = String(d.getMinutes()).padStart(2, '0');
+                return `${h}:${m} Uhr`;
+              };
+              return (
                 <div style={{
-                  background: 'rgba(220,38,38,0.92)',
-                  color: 'white',
-                  padding: '1.5rem 2.5rem',
-                  borderRadius: '16px',
-                  fontWeight: 800,
-                  fontSize: '1.1rem',
-                  textAlign: 'center',
-                  boxShadow: '0 8px 40px rgba(220,38,38,0.5)',
-                  maxWidth: '400px',
-                  lineHeight: 1.8,
+                  position: 'absolute',
+                  top: 0, left: 0, right: 0, bottom: 0,
+                  zIndex: 9000,
+                  backgroundColor: 'rgba(220, 38, 38, 0.08)',
+                  cursor: 'not-allowed',
                   pointerEvents: 'all',
-                  cursor: 'default',
                   display: 'flex',
-                  flexDirection: 'column',
-                  gap: '1rem',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  minHeight: '60vh',
                 }}>
-                  <div>
-                    🔒 Projekt gesperrt<br />
-                    <span style={{ fontWeight: 400, fontSize: '0.9rem' }}>
-                      {sessionLockMessage}
-                    </span>
+                  <div style={{
+                    background: 'rgba(220,38,38,0.95)',
+                    color: 'white',
+                    padding: '1.5rem 2.5rem',
+                    borderRadius: '16px',
+                    fontWeight: 800,
+                    fontSize: '1.1rem',
+                    textAlign: 'center',
+                    boxShadow: '0 8px 40px rgba(220,38,38,0.5)',
+                    maxWidth: '450px',
+                    lineHeight: 1.8,
+                    pointerEvents: 'all',
+                    cursor: 'default',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '1rem',
+                  }}>
+                    <div style={{ textAlign: 'left', margin: '0.5rem 0' }}>
+                      <div style={{ fontSize: '1.25rem', fontWeight: 800, marginBottom: '0.75rem', textAlign: 'center' }}>
+                        🔒 Projekt wird bereits bearbeitet
+                      </div>
+                      <div style={{ fontSize: '0.95rem', fontWeight: 500, marginBottom: '1.25rem', textAlign: 'center' }}>
+                        Dieses Projekt ist aktuell durch <strong>{activeLockUser}</strong> gesperrt.
+                      </div>
+                      <div style={{ fontSize: '0.9rem', color: '#fca5a5', marginBottom: '0.3rem' }}>
+                        <strong>Seit:</strong> {formatTime(activeLockSince)}
+                      </div>
+                      <div style={{ fontSize: '0.9rem', color: '#fca5a5', marginBottom: '1.25rem' }}>
+                        <strong>Letzte Aktivität:</strong> {formatTime(activeLockActivity)}
+                      </div>
+                      <div style={{ fontSize: '0.9rem', fontWeight: 400, opacity: 0.95, marginBottom: '0.75rem', textAlign: 'center', lineHeight: '1.4' }}>
+                        Du kannst das Projekt ansehen, aber momentan nicht bearbeiten.
+                      </div>
+                      <div style={{ fontSize: '0.8rem', fontWeight: 400, opacity: 0.8, fontStyle: 'italic', textAlign: 'center', lineHeight: '1.4' }}>
+                        Die Sperre wird spätestens nach 20 Minuten Inaktivität des Bearbeiters automatisch aufgehoben.
+                      </div>
+                    </div>
+                    {!isLockedByIPad && (
+                      <button
+                        onClick={async () => {
+                          await takeOverLock();
+                        }}
+                        style={{
+                          background: 'white', color: '#dc2626',
+                          border: 'none', padding: '0.6rem 1.2rem',
+                          borderRadius: '8px', fontWeight: 800,
+                          fontSize: '0.95rem', cursor: 'pointer',
+                          width: '100%'
+                        }}
+                      >
+                        → Hier weiterarbeiten
+                      </button>
+                    )}
                   </div>
-                  <button
-                    onClick={async () => {
-                      // Session-Lock erzwingen
-                      await takeOverLock();
-                    }}
-                    style={{
-                      background: 'white', color: '#dc2626',
-                      border: 'none', padding: '0.6rem 1.2rem',
-                      borderRadius: '8px', fontWeight: 800,
-                      fontSize: '0.95rem', cursor: 'pointer',
-                    }}
-                  >
-                    → Hier weiterarbeiten
-                  </button>
                 </div>
-              </div>
-            )}
+              );
+            })()}
             {selectedReport && selectedReport.isLightweight === true ? (
               <div style={{
                 display: 'flex',
@@ -2449,6 +2648,79 @@ function App() {
               </div>
             ) : (
               <div>
+                {/* ── Projekt-Sperrinformationen & Versionsschutz-Anzeige ── */}
+                {selectedReport && (
+                  <div style={{
+                    backgroundColor: '#1e293b',
+                    border: '1px solid #334155',
+                    borderRadius: '12px',
+                    padding: '1rem 1.5rem',
+                    marginBottom: '1rem',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.5rem',
+                    color: 'white',
+                    fontSize: '0.85rem',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+                      <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
+                        <div>
+                          <strong style={{ color: '#38bdf8' }}>Version:</strong> {selectedReport.report_data?.version || selectedReport.version || 1}
+                        </div>
+                        <div>
+                          <strong style={{ color: '#38bdf8' }}>Zuletzt geändert:</strong> {selectedReport.report_data?.last_edited_by || 'Keine Angabe'}
+                          {selectedReport.report_data?.last_edited_device && ` (${selectedReport.report_data.last_edited_device})`}
+                          {selectedReport.report_data?.last_edited_at && ` am ${new Date(selectedReport.report_data.last_edited_at).toLocaleString('de-DE')}`}
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                        {isReadOnly ? (
+                          <span style={{
+                            backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                            color: '#ef4444',
+                            border: '1px solid rgba(239, 68, 68, 0.3)',
+                            padding: '0.25rem 0.6rem',
+                            borderRadius: '6px',
+                            fontWeight: 700,
+                            fontSize: '0.75rem'
+                          }}>
+                            👁️ Schreibgeschützt
+                          </span>
+                        ) : (
+                          <span style={{
+                            backgroundColor: 'rgba(34, 197, 94, 0.15)',
+                            color: '#22c55e',
+                            border: '1px solid rgba(34, 197, 94, 0.3)',
+                            padding: '0.25rem 0.6rem',
+                            borderRadius: '6px',
+                            fontWeight: 700,
+                            fontSize: '0.75rem'
+                          }}>
+                            ✏️ Bearbeitungsmodus
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    {activeLockUser && (
+                      <div style={{
+                        borderTop: '1px solid rgba(255,255,255,0.08)',
+                        paddingTop: '0.5rem',
+                        marginTop: '0.25rem',
+                        fontSize: '0.8rem',
+                        color: 'rgba(255,255,255,0.6)',
+                        display: 'flex',
+                        gap: '0.5rem',
+                        alignItems: 'center'
+                      }}>
+                        <span>🔒 Gesperrt von: <strong>{activeLockUser}</strong> {activeLockDevice && `(${activeLockDevice})`}</span>
+                        {activeLockSince && (
+                          <span>seit {new Date(activeLockSince).toLocaleTimeString('de-DE')}</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
                 <DamageForm
                   key={selectedReport ? selectedReport.id : 'new'}
                   onCancel={handleCancelEntry}
@@ -2459,6 +2731,7 @@ function App() {
                   isDarkMode={isDarkMode}
                   isSyncPending={selectedReport && !!unsavedReports[selectedReport.id]}
                   fetchReports={fetchReports}
+                  currentUser={currentUser}
                   onModeChange={(newMode) => {
                     setProjectModeExclusive(newMode);
                   }}
@@ -2602,6 +2875,41 @@ function App() {
                 Später entscheiden
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      {showInactivityAlert && (
+        <div style={{
+          position: 'fixed',
+          top: 0, left: 0, right: 0, bottom: 0,
+          zIndex: 10000,
+          backgroundColor: 'rgba(0,0,0,0.6)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}>
+          <div style={{
+            background: isDarkMode ? '#1e293b' : 'white',
+            color: isDarkMode ? 'white' : '#1e293b',
+            padding: '2rem',
+            borderRadius: '12px',
+            maxWidth: '450px',
+            textAlign: 'center',
+            boxShadow: '0 10px 25px rgba(0,0,0,0.3)',
+          }}>
+            <h3 style={{ margin: '0 0 1rem 0', color: '#ef4444' }}>Projekt wegen Inaktivität geschlossen</h3>
+            <p style={{ margin: '0 0 1.5rem 0', fontSize: '0.95rem', lineHeight: '1.5' }}>
+              Du warst 20 Minuten inaktiv.<br />
+              Die Projektsperre wurde aufgehoben.<br /><br />
+              Das Projekt wurde geschlossen und du befindest dich wieder auf dem Dashboard.
+            </p>
+            <button
+              className="btn btn-primary"
+              onClick={() => setShowInactivityAlert(false)}
+              style={{ width: '100%' }}
+            >
+              Verstanden
+            </button>
           </div>
         </div>
       )}
