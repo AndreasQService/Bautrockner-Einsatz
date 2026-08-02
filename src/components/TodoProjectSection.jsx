@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { ClipboardList, Plus, Clock, Edit2, ShieldAlert, Check, HelpCircle, Trash2 } from 'lucide-react';
+import { ClipboardList, Plus, Clock, Edit2, ShieldAlert, Check, HelpCircle, Trash2, History } from 'lucide-react';
 import { fetchTodosForProject, completeTodoAndArchiveProjectRpc, deleteTodo } from '../services/TodoService';
 import TodoModal from './TodoModal';
+import TodoHistoryModal from './TodoHistoryModal';
 
 const TodoProjectSection = ({
     project = null,
@@ -24,6 +25,7 @@ const TodoProjectSection = ({
     const [blockDialog, setBlockDialog] = useState(null);
     const [confirmArchiveDialog, setConfirmArchiveDialog] = useState(null);
     const [pendingActionTodoId, setPendingActionTodoId] = useState(null);
+    const [historyViewTodo, setHistoryViewTodo] = useState(null);
 
     const loadProjectTodos = async () => {
         if (!project) return;
@@ -171,13 +173,19 @@ const TodoProjectSection = ({
                                 backgroundColor: 'var(--surface-hover, rgba(0,0,0,0.015))'
                             }}
                         >
-                            <input
-                                type="checkbox"
-                                checked={pendingActionTodoId === t.id}
-                                disabled={pendingActionTodoId !== null && pendingActionTodoId !== t.id}
-                                onChange={(e) => handleToggleDone(t, e.target.checked)}
-                                style={{ width: '20px', height: '20px', marginTop: '2px', cursor: 'pointer' }}
-                            />
+                             {(() => {
+                                 const isAuto = t.category === 'auto' || String(t.id).startsWith('measurement_followup') || String(t.id).startsWith('a0d0a0d0-');
+                                 return (
+                                     <input
+                                         type="checkbox"
+                                         checked={pendingActionTodoId === t.id}
+                                         disabled={pendingActionTodoId !== null && pendingActionTodoId !== t.id}
+                                         onChange={(e) => handleToggleDone(t, e.target.checked)}
+                                         style={{ width: '20px', height: '20px', marginTop: '2px', cursor: 'pointer' }}
+                                         title={isAuto ? "Automatische Aufgabe erledigen & Nachfolger erstellen" : "To-do erledigen"}
+                                     />
+                                 );
+                             })()}
                             <div style={{ flex: 1, fontSize: '0.88rem' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                                     <span style={{ fontWeight: 600 }}>{t.task}</span>
@@ -203,6 +211,15 @@ const TodoProjectSection = ({
                                 )}
                             </div>
                             <div style={{ display: 'flex', gap: '0.25rem', alignItems: 'center' }}>
+                                <button
+                                    type="button"
+                                    title="Aufgabenverlauf anzeigen"
+                                    onClick={() => setHistoryViewTodo(t)}
+                                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--q-primary, #1e6db7)', padding: '0.25rem' }}
+                                    disabled={pendingActionTodoId !== null}
+                                >
+                                    <History size={14} />
+                                </button>
                                 <button
                                     type="button"
                                     title="To-do bearbeiten"
@@ -256,18 +273,29 @@ const TodoProjectSection = ({
                                         style={{
                                             padding: '0.5rem 0.75rem', border: '1px solid var(--border)', borderRadius: '4px',
                                             backgroundColor: 'var(--surface-hover, rgba(0,0,0,0.01))', fontSize: '0.8rem',
-                                            opacity: 0.85
+                                            opacity: 0.85,
+                                            display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem'
                                         }}
                                     >
-                                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                            <span style={{ fontWeight: 600 }}>{ht.task}</span>
-                                            <span style={{ color: 'var(--text-muted)' }}>Erledigt: {formatDateGerman(ht.completed_at?.split('T')[0])}</span>
+                                        <div style={{ flex: 1 }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                <span style={{ fontWeight: 600 }}>{ht.task}</span>
+                                                <span style={{ color: 'var(--text-muted)' }}>Erledigt: {formatDateGerman(ht.completed_at?.split('T')[0])}</span>
+                                            </div>
+                                            <div style={{ color: 'var(--text-muted)', marginTop: '0.15rem' }}>
+                                                Mitarbeiter: {ht.assigned_user_name} | Erledigt durch: {ht.completed_by}
+                                            </div>
+                                            {ht.note && <div style={{ fontStyle: 'italic', marginTop: '0.25rem', color: 'var(--text-muted)' }}>Note: {ht.note}</div>}
+                                            {ht.closes_project && <div style={{ color: '#10B981', fontWeight: 600, fontSize: '0.75rem', marginTop: '0.2rem' }}>Projektabschluss: Ja</div>}
                                         </div>
-                                        <div style={{ color: 'var(--text-muted)', marginTop: '0.15rem' }}>
-                                            Mitarbeiter: {ht.assigned_user_name} | Erledigt durch: {ht.completed_by}
-                                        </div>
-                                        {ht.note && <div style={{ fontStyle: 'italic', marginTop: '0.25rem', color: 'var(--text-muted)' }}>Note: {ht.note}</div>}
-                                        {ht.closes_project && <div style={{ color: '#10B981', fontWeight: 600, fontSize: '0.75rem', marginTop: '0.2rem' }}>Projektabschluss: Ja</div>}
+                                        <button
+                                            type="button"
+                                            title="Aufgabenverlauf anzeigen"
+                                            onClick={() => setHistoryViewTodo(ht)}
+                                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--q-primary, #1e6db7)', padding: '0.25rem', flexShrink: 0 }}
+                                        >
+                                            <History size={14} />
+                                        </button>
                                     </div>
                                 ))}
                             </div>
@@ -300,6 +328,14 @@ const TodoProjectSection = ({
                     users={users}
                     reports={[project]}
                     currentUser={currentUser}
+                />
+            )}
+            {/* TodoHistoryModal Portal */}
+            {historyViewTodo && (
+                <TodoHistoryModal
+                    todo={historyViewTodo}
+                    onClose={() => setHistoryViewTodo(null)}
+                    projectTitle={project.projectTitle || project.address || project.projectNumber || 'Unbekanntes Projekt'}
                 />
             )}
 

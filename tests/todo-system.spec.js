@@ -14,6 +14,19 @@ test.describe('Todo System End-to-End Workflows', () => {
     test.beforeEach(async ({ page }) => {
         page.on('console', msg => console.log('BROWSER LOG:', msg.text()));
         page.on('pageerror', err => console.log('BROWSER ERROR:', err.message));
+        page.on('requestfailed', req => {
+            console.log(`BROWSER REQUEST FAILED: ${req.method()} ${req.url()} - ${req.failure()?.errorText || 'Unknown error'}`);
+        });
+        page.on('response', async res => {
+            if (res.status() >= 400) {
+                try {
+                    const text = await res.text();
+                    console.log(`BROWSER RESPONSE ERROR: ${res.status()} ${res.url()} - Body: ${text}`);
+                } catch (e) {
+                    console.log(`BROWSER RESPONSE ERROR: ${res.status()} ${res.url()} - (Failed to read body)`);
+                }
+            }
+        });
         await login(page);
     });
 
@@ -136,9 +149,10 @@ test.describe('Todo System End-to-End Workflows', () => {
         await followUpTaskField.fill('Rolling Follow Up Task C');
 
         await page.locator('form button', { hasText: 'Morgen' }).first().click();
-        await saveBtn.click();
+        await page.locator('button', { hasText: 'Folge-To-do speichern' }).first().click();
 
-        // Wait for loading to finish
+        // Wait for modal to close and loading to finish
+        await expect(followUpTitle).toBeHidden({ timeout: 10000 });
         await waitForLoadingFinished(page);
 
         // Verify Fast Standalone Task B is completed (gone from active list)
@@ -265,7 +279,7 @@ test.describe('Todo System End-to-End Workflows', () => {
         futureDate.setDate(futureDate.getDate() + 7);
         const expectedDueLabel = `fällig ${futureDate.toLocaleDateString('de-CH')}`;
         await expect(page.getByText('Nächste Feuchtekontrolle durchführen').first()).toBeVisible({ timeout: 10000 });
-        await expect(page.getByText(expectedDueLabel)).toBeVisible({ timeout: 5000 });
+        await expect(page.getByText(expectedDueLabel).first()).toBeVisible({ timeout: 5000 });
 
         // --- STEP 8: DOUBLE MEASUREMENT TEST ---
         // Toggle back to Techniker mode
@@ -327,7 +341,7 @@ test.describe('Todo System End-to-End Workflows', () => {
         const nextFutureDate = new Date();
         nextFutureDate.setDate(nextFutureDate.getDate() + 8);
         const nextExpectedDueLabel = `fällig ${nextFutureDate.toLocaleDateString('de-CH')}`;
-        await expect(page.getByText(nextExpectedDueLabel)).toBeVisible({ timeout: 10000 });
+        await expect(page.getByText(nextExpectedDueLabel).first()).toBeVisible({ timeout: 10000 });
 
         // --- STEP 9: PROJECT ARCHIVE / CLOSURE ---
         // Complete "Test Project Task A" but set "Abschluss" true first.
@@ -358,6 +372,6 @@ test.describe('Todo System End-to-End Workflows', () => {
         // Verify project is archived (no longer shows up in active lists)
         await expect(page.getByText(uniqueClientName)).toHaveCount(0);
         // Verify all open todos for this project are gone from active dashboard tasks
-        await expect(page.getByText('Nächste Feuchtekontrolle durchführen')).toHaveCount(0);
+        await expect(page.locator('tr', { hasText: uniqueClientName }).filter({ hasText: 'Nächste Feuchtekontrolle durchführen' })).toHaveCount(0);
     });
 });

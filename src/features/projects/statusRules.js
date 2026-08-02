@@ -181,7 +181,13 @@ function buildReason(canonical, days, severity) {
  * @returns {number|null}
  */
 export function getDaysSinceLastMeasurement(project) {
-  if (!project.rooms) return null;
+  const rooms = [
+    ...(project.rooms || []),
+    ...(project.measurementRooms || []),
+    ...(project.report_data?.rooms || []),
+    ...(project.report_data?.measurementRooms || [])
+  ];
+  if (rooms.length === 0) return null;
   let latest = null;
 
   // Büro-Feld hat Vorrang wenn gesetzt (gespeichert via dryingCheckService)
@@ -191,13 +197,19 @@ export function getDaysSinceLastMeasurement(project) {
   }
 
   // Zusätzlich aus Raum-Messdaten
-  project.rooms.forEach(room => {
-    if (room.measurementData?.globalSettings?.date) {
-      const d = new Date(room.measurementData.globalSettings.date);
+  rooms.forEach(room => {
+    if (!room) return;
+    const mDate = room.measurementData?.globalSettings?.date || room.globalSettings?.date || room.date;
+    if (mDate) {
+      const d = new Date(mDate);
       if (!isNaN(d) && (!latest || d > latest)) latest = d;
     }
     (room.measurementHistory || []).forEach(h => {
-      if (h.date) { const d = new Date(h.date); if (!isNaN(d) && (!latest || d > latest)) latest = d; }
+      const hDate = h.date || h.datum || h.timestamp;
+      if (hDate) {
+        const d = new Date(hDate);
+        if (!isNaN(d) && (!latest || d > latest)) latest = d;
+      }
     });
   });
 

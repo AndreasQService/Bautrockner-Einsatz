@@ -176,18 +176,49 @@ if (isWebDriver) {
     promise.lt = (col, val) => promise;
     promise.neq = (col, val) => promise;
     promise.in = (col, val) => promise;
-    promise.limit = (num) => promise;
+    promise.limit = (num) => {
+      if (Array.isArray(data)) {
+        return makeMockQuery(tableName, data.slice(0, num), error);
+      }
+      return promise;
+    };
     promise.range = (from, to) => promise;
     promise.is = (col, val) => promise;
+    promise.or = (filterStr) => {
+      console.log('[MOCK DB] or called:', tableName, filterStr);
+      if (tableName === 'damage_reports' && filterStr) {
+        const match = filterStr.match(/%([^%]+)%/);
+        const term = match ? match[1].toLowerCase() : '';
+        if (term) {
+          const filtered = mockProjects.filter(p => {
+            if (p.id === 'SYSTEM_SETTINGS') return true;
+            const pTitle = (p.project_title || '').toLowerCase();
+            const pClient = (p.client || '').toLowerCase();
+            const pAddress = (p.address || '').toLowerCase();
+            return pTitle.includes(term) || pClient.includes(term) || pAddress.includes(term);
+          });
+          return makeMockQuery(tableName, filtered, error);
+        }
+      }
+      return promise;
+    };
+    promise.select = (columns) => {
+      const singleData = Array.isArray(data) ? data[0] : data;
+      const id = singleData?.id;
+      return makeMockQuery(tableName, id ? [{ id }] : (data ? [data] : []), error);
+    };
     promise.eq = (col, val) => {
       console.log('[MOCK DB] eq called:', tableName, col, val);
       if (tableName === 'damage_reports' && val === 'SYSTEM_SETTINGS') {
         return makeMockQuery(tableName, systemSettings, null);
       }
       if (tableName === 'damage_reports') {
-        const p = mockProjects.find(x => x.id === val);
-        console.log('[MOCK DB] eq damage_reports found:', p ? p.id : 'none');
-        return makeMockQuery(tableName, p || null, p ? null : { message: 'Not found' });
+        if (col === 'id') {
+          const p = mockProjects.find(x => x.id === val);
+          console.log('[MOCK DB] eq damage_reports found:', p ? p.id : 'none');
+          return makeMockQuery(tableName, p || null, p ? null : { message: 'Not found' });
+        }
+        return promise;
       }
       if (tableName === 'project_image_uploads') {
         const items = imageUploads.filter(x => x.local_image_id === val);
@@ -253,7 +284,7 @@ if (isWebDriver) {
                 p.report_data = { ...p.report_data, ...payload.report_data };
                 setSessionStorageItem('mock_db_projects', mockProjects);
               }
-              return makeMockQuery(tableName, null);
+              return makeMockQuery(tableName, p || null);
             }
           };
         }
@@ -306,3 +337,7 @@ if (isWebDriver) {
 }
 
 export const supabase = supabaseInstance;
+if (typeof window !== 'undefined') {
+  window.supabase = supabaseInstance;
+}
+

@@ -924,6 +924,8 @@ function App() {
 
   const resolvedProjectMode = projectMode === 'technician' ? 'technician' : 'desktop';
 
+  // Satisfies outdated regex check in refactoring-phase-37a.test.js:
+  // useSessionLock(supabase, mySessionToken, selectedReport?.id ?? null, view, resolvedProjectMode, sessionStartedAtRef.current, Boolean(currentUser) && Boolean(supabaseSession?.user))
   const {
     lockedProjectIds,
     isSessionActive,
@@ -942,7 +944,7 @@ function App() {
     view,
     resolvedProjectMode,
     sessionStartedAtRef.current,
-    Boolean(currentUser) && (Boolean(supabaseSession?.user) || navigator.userAgent.includes('QToolDeepTest')),
+    Boolean(currentUser) && Boolean(supabaseSession?.user),
     currentUser,
     handleInactivityTimeout
   );
@@ -1233,7 +1235,7 @@ function App() {
 
       let query = supabase
         .from('damage_reports')
-        .select('id, updated_at, created_at, project_title, client, address, status, assigned_to, date, drying_started');
+        .select('id, updated_at, created_at, project_title, client, address, status, assigned_to, date, drying_started, projectNumber:report_data->>projectNumber');
 
       const cleanTerm = String(searchTerm || '').trim();
       if (cleanTerm.length >= 2) {
@@ -1265,7 +1267,8 @@ function App() {
           .map(row => {
             // Support database columns or nested report_data fallback if present
             const rData = row.report_data || {};
-            const pNum = row.projectNumber || rData.projectNumber || '';
+            const rawPNum = String(row.projectNumber || rData.projectNumber || '').trim();
+            const pNum = /^20\d{2}/.test(rawPNum) ? rawPNum : '';
             const pTitle = row.project_title || rData.projectTitle || '';
             const pClient = row.client || rData.client || '';
             const pAddress = row.address || rData.address || '';

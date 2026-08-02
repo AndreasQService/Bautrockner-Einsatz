@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Calendar, ClipboardList, CheckSquare, AlertTriangle, ShieldAlert } from 'lucide-react';
 import { createTodo, updateTodo, completeAndCreateTodoRpc } from '../services/TodoService';
@@ -28,8 +28,12 @@ const TodoModal = ({
     const [error, setError] = useState('');
     const [dateWarning, setDateWarning] = useState('');
 
+    const isInitializedRef = useRef(false);
+
     // Load initial values if editing or in follow-up mode
     useEffect(() => {
+        if (isInitializedRef.current) return;
+
         if (todo) {
             // Find project
             let proj = reports.find(r => 
@@ -72,6 +76,7 @@ const TodoModal = ({
                 setNote('');
                 setClosesProject(false);
             }
+            isInitializedRef.current = true;
         } else if (initialProject) {
             setSelectedProject(initialProject);
             const title = initialProject.projectTitle || initialProject.project_title || '';
@@ -80,14 +85,18 @@ const TodoModal = ({
             const num = initialProject.projectNumber || '';
             const addr = initialProject.address || '';
             setProjectSearch(`${prefix}${num ? '(' + num + ')' : ''}${addr ? (num ? ' - ' : '') + addr : ''}`);
-        } else if (reports.length === 1) {
-            setSelectedProject(reports[0]);
-            const title = reports[0].projectTitle || reports[0].project_title || '';
-            const isDummy = !title || /^\d{1,3}$/.test(title) || /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(title);
-            const prefix = isDummy ? '' : `${title} `;
-            const num = reports[0].projectNumber || '';
-            const addr = reports[0].address || '';
-            setProjectSearch(`${prefix}${num ? '(' + num + ')' : ''}${addr ? (num ? ' - ' : '') + addr : ''}`);
+            isInitializedRef.current = true;
+        } else if (reports.length > 0) {
+            if (reports.length === 1) {
+                setSelectedProject(reports[0]);
+                const title = reports[0].projectTitle || reports[0].project_title || '';
+                const isDummy = !title || /^\d{1,3}$/.test(title) || /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(title);
+                const prefix = isDummy ? '' : `${title} `;
+                const num = reports[0].projectNumber || '';
+                const addr = reports[0].address || '';
+                setProjectSearch(`${prefix}${num ? '(' + num + ')' : ''}${addr ? (num ? ' - ' : '') + addr : ''}`);
+            }
+            isInitializedRef.current = true;
         }
     }, [todo, isFollowUpMode, reports, initialProject]);
 
@@ -157,30 +166,44 @@ const TodoModal = ({
     }, [dueDate]);
 
     const handleSave = async (e) => {
-        e.preventDefault();
-        if (saving) return;
+        if (e) e.preventDefault();
+        console.log('[TodoModal] handleSave function entered.');
+        if (saving) {
+            console.log('[TodoModal] handleSave blocked because saving is true');
+            return;
+        }
 
         setError('');
 
         if (projectSearch.trim() && !selectedProject) {
-            setError('Bitte wählen Sie ein gültiges Projekt aus der Liste oder leeren Sie das Feld für ein schnelles To-do.');
+            const validationErr = 'Bitte wählen Sie ein gültiges Projekt aus der Liste oder leeren Sie das Feld für ein schnelles To-do.';
+            console.warn('[TodoModal] Validation failed:', validationErr);
+            setError(validationErr);
             return;
         }
         if (!task.trim()) {
-            setError('Bitte eine Aufgabe eingeben.');
+            const validationErr = 'Bitte eine Aufgabe eingeben.';
+            console.warn('[TodoModal] Validation failed:', validationErr);
+            setError(validationErr);
             return;
         }
         if (!dueDate) {
-            setError('Bitte ein Fälligkeitsdatum auswählen.');
+            const validationErr = 'Bitte ein Fälligkeitsdatum auswählen.';
+            console.warn('[TodoModal] Validation failed:', validationErr);
+            setError(validationErr);
             return;
         }
         if (!assignedUserId) {
-            setError('Bitte einen zuständigen Mitarbeiter auswählen.');
+            const validationErr = 'Bitte einen zuständigen Mitarbeiter auswählen.';
+            console.warn('[TodoModal] Validation failed:', validationErr);
+            setError(validationErr);
             return;
         }
 
         const assignedUser = users.find(u => String(u.id) === String(assignedUserId));
         if (!assignedUser) {
+            const validationErr = `Zuständiger Mitarbeiter ist ungültig. (assignedUserId: "${assignedUserId}", users: ${JSON.stringify(users.map(u => u.id))})`;
+            console.warn('[TodoModal] Validation failed:', validationErr);
             setError('Zuständiger Mitarbeiter ist ungültig.');
             return;
         }
@@ -199,6 +222,8 @@ const TodoModal = ({
                 currentUser: currentUser?.name || 'System'
             };
 
+            console.log('[TodoModal] handleSave saving todo. isFollowUpMode:', isFollowUpMode, 'todo:', todo, 'dataToSave:', dataToSave);
+
             if (isFollowUpMode && todo) {
                 // Save follow-up: completes old todo and creates new todo atomically
                 await completeAndCreateTodoRpc(todo.id, currentUser?.name || 'System', dataToSave);
@@ -210,11 +235,18 @@ const TodoModal = ({
                 await createTodo(dataToSave);
             }
 
-            onSaveSuccess();
+            console.log('[TodoModal] Save operation completed successfully.');
+            if (typeof onSaveSuccess === 'function') {
+                console.log('[TodoModal] Calling onSaveSuccess');
+                onSaveSuccess();
+            }
+            console.log('[TodoModal] Calling onClose');
             onClose();
         } catch (err) {
+            console.error('[TodoModal] Save operation threw error:', err);
             setError(err.message || 'Fehler beim Speichern des To-dos.');
         } finally {
+            console.log('[TodoModal] handleSave finally block.');
             setSaving(false);
         }
     };
@@ -447,6 +479,7 @@ const TodoModal = ({
                             type="submit"
                             className="btn btn-primary"
                             disabled={saving}
+                            onClick={() => console.log('[TodoModal] Submit button clicked! state values:', { task, assignedUserId, dueDate })}
                             style={{
                                 display: 'flex', alignItems: 'center', gap: '0.5rem',
                                 minWidth: '120px', justifyContent: 'center'

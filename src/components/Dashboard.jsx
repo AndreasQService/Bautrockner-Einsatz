@@ -446,6 +446,22 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
             return true;
         }
     });
+    const [showAllCases, setShowAllCases] = useState(() => {
+        try {
+            const saved = localStorage.getItem('qtool_show_all_cases');
+            return saved !== null ? JSON.parse(saved) : true;
+        } catch {
+            return true;
+        }
+    });
+
+    useEffect(() => {
+        try {
+            localStorage.setItem('qtool_show_all_cases', JSON.stringify(showAllCases));
+        } catch (e) {
+            console.error(e);
+        }
+    }, [showAllCases]);
 
     useEffect(() => {
         try {
@@ -607,6 +623,15 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
                             <label style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.78rem', cursor: 'pointer', userSelect: 'none', color: 'var(--text-muted)' }}>
                                 <input
                                     type="checkbox"
+                                    checked={showAllCases}
+                                    onChange={(e) => setShowAllCases(e.target.checked)}
+                                    style={{ cursor: 'pointer', width: '14px', height: '14px', margin: 0 }}
+                                />
+                                <span>Alle Fälle</span>
+                            </label>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.78rem', cursor: 'pointer', userSelect: 'none', color: 'var(--text-muted)' }}>
+                                <input
+                                    type="checkbox"
                                     checked={showDrying}
                                     onChange={(e) => setShowDrying(e.target.checked)}
                                     style={{ cursor: 'pointer', width: '14px', height: '14px', margin: 0 }}
@@ -730,7 +755,8 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
                     )}
                 </div>
             ) : (
-                <div className="card" style={{ padding: '0' }}>
+                showAllCases && (
+                    <div className="card" style={{ padding: '0' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.625rem 0.875rem', borderBottom: '1px solid var(--border)' }}>
                         <h3 style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-main)' }}>Alle Fälle ({filteredReports.length})</h3>
                         <button className="btn btn-sm btn-outline" style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.75rem', padding: '0.2rem 0.5rem' }}>
@@ -952,7 +978,8 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
                         )}
                     </div>
                 </div>
-            )}
-        </div>
+            )
+        )}
+    </div>
     )
 }

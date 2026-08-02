@@ -13,8 +13,14 @@
 export async function login(page, { name = 'Admin User', password = 'admin' } = {}) {
     await page.goto('/');
 
-    // Falls wir schon eingeloggt sind (kein Login-Screen sichtbar), nichts tun
-    const isLoginVisible = await page.locator('form').isVisible().catch(() => false);
+    // Warten, bis entweder das Anmeldeformular oder die Dashboard-Kopfzeile geladen ist
+    await Promise.race([
+        page.waitForSelector('input[type="password"]', { timeout: 10000 }).catch(() => null),
+        page.waitForSelector('header.app-header', { timeout: 10000 }).catch(() => null)
+    ]);
+
+    // Falls wir schon eingeloggt sind, nichts tun
+    const isLoginVisible = await page.locator('input[type="password"]').isVisible().catch(() => false);
     if (!isLoginVisible) return;
 
     // Name eingeben

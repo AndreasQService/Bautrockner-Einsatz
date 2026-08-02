@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { ClipboardList, Plus, Search, Calendar, User, Check, Edit2, AlertTriangle, HelpCircle, Archive, AlertCircle, Clock, Trash2 } from 'lucide-react';
+import { ClipboardList, Plus, Search, Calendar, User, Check, Edit2, AlertTriangle, HelpCircle, Archive, AlertCircle, Clock, Trash2, ShieldAlert, History } from 'lucide-react';
 import { fetchAllTodos, completeTodoAndArchiveProjectRpc, deleteTodo } from '../services/TodoService';
 import TodoModal from './TodoModal';
+import TodoHistoryModal from './TodoHistoryModal';
 
 function getCleanProjectTitle(proj) {
     if (!proj) return 'Unbekanntes Projekt';
@@ -33,6 +34,7 @@ const TodoMonitor = ({
     const [editingTodo, setEditingTodo] = useState(null);
     const [followUpTodo, setFollowUpTodo] = useState(null);
     const [selectedWarningProject, setSelectedWarningProject] = useState(null);
+    const [historyViewTodo, setHistoryViewTodo] = useState(null);
 
     // Block & Confirmation Dialog states
     const [blockDialog, setBlockDialog] = useState(null); // { todo, otherTodos }
@@ -219,7 +221,13 @@ const TodoMonitor = ({
 
         if (todoItem.closes_project) {
             // Find if other open todos exist for this project
-            const otherOpen = todos.filter(t => t.project_id === todoItem.project_id && t.status === 'open' && t.id !== todoItem.id);
+            const otherOpen = todos.filter(t => 
+                t.project_id === todoItem.project_id && 
+                t.status === 'open' && 
+                t.id !== todoItem.id &&
+                t.category !== 'auto' &&
+                !String(t.id).startsWith('measurement_followup')
+            );
 
             if (otherOpen.length > 0) {
                 // Block completion
@@ -244,6 +252,19 @@ const TodoMonitor = ({
         setLoading(true);
         try {
             await completeTodoAndArchiveProjectRpc(todoItem.id, currentUser?.name || 'System');
+
+            // Local status update to prevent autosave races
+            const projId = todoItem.project_id;
+            if (projId && Array.isArray(reports)) {
+                const rep = reports.find(r => r.id === projId);
+                if (rep) {
+                    rep.status = 'Abgeschlossen';
+                    if (rep.report_data) {
+                        rep.report_data.status = 'Abgeschlossen';
+                    }
+                }
+            }
+
             setConfirmArchiveDialog(null);
             setPendingActionTodoId(null);
             loadTodos();
@@ -370,6 +391,19 @@ const TodoMonitor = ({
                             <span>Fehler ({counters.noTodos})</span>
                         </button>
                     )}
+                    <button
+                        onClick={() => setShowHistory(!showHistory)}
+                        style={{
+                            padding: '0.3rem 0.6rem', borderRadius: '6px', border: '1px solid var(--border)',
+                            background: showHistory ? 'var(--q-primary, #1e6db7)' : 'rgba(30,109,183,0.08)',
+                            color: showHistory ? '#fff' : 'var(--q-primary, #1e6db7)',
+                            fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer',
+                            display: 'flex', alignItems: 'center', gap: '0.25rem'
+                        }}
+                    >
+                        <Clock size={12} />
+                        <span>{showHistory ? 'Aktive anzeigen' : 'Erledigte anzeigen'}</span>
+                    </button>
                 </div>
 
                 {/* Search Bar */}
@@ -415,8 +449,8 @@ const TodoMonitor = ({
             )}
 
             {/* List Table Area */}
-            <div style={{ overflowX: 'auto', marginTop: '0.5rem', border: '1px solid var(--border)', borderRadius: '6px' }}>
-                {loading ? (
+            <div style={{ overflowX: 'auto', marginTop: '0.5rem', border: '1px solid var(--border)', borderRadius: '6px', maxWidth: '1400px' }}>
+                {loading && todos.length === 0 ? (
                     <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>Aufgaben werden geladen...</div>
                 ) : showHistory ? (
                     /* History View */
@@ -431,12 +465,7 @@ const TodoMonitor = ({
                                 <th style={{ padding: '0.65rem 0.8rem', textAlign: 'left', width: '120px', fontWeight: 600 }}>Erledigt durch</th>
                                 <th style={{ padding: '0.65rem 0.8rem', textAlign: 'center', width: '100px', fontWeight: 600 }}>Fälligkeit</th>
                                 <th style={{ padding: '0.65rem 0.8rem', textAlign: 'center', width: '80px', fontWeight: 600 }}>Abschluss</th>
-                                <th 
-                                    onClick={() => setShowHistory(false)}
-                                    style={{ padding: '0.65rem 0.8rem', textAlign: 'center', width: '130px', fontWeight: 600, cursor: 'pointer', color: 'var(--q-primary, #1e6db7)', textDecoration: 'underline', userSelect: 'none' }}
-                                >
-                                    History ausblenden
-                                </th>
+                                <th style={{ padding: '0.65rem 0.8rem', textAlign: 'center', width: '90px', fontWeight: 600 }}>Verlauf</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -493,7 +522,16 @@ const TodoMonitor = ({
                                             <td style={{ padding: '0.65rem 0.8rem', textAlign: 'center', color: todoItem.closes_project ? '#10B981' : 'var(--text-muted)' }}>
                                                 {todoItem.closes_project ? 'Ja' : 'Nein'}
                                             </td>
-                                            <td style={{ padding: '0.65rem 0.8rem', textAlign: 'center', color: 'var(--text-muted)' }}>-</td>
+                                            <td style={{ padding: '0.65rem 0.8rem', textAlign: 'center' }}>
+                                                <button
+                                                    onClick={() => setHistoryViewTodo(todoItem)}
+                                                    className="btn btn-ghost"
+                                                    style={{ padding: '0.35rem', color: 'var(--q-primary, #1e6db7)' }}
+                                                    title="Aufgabenverlauf anzeigen"
+                                                >
+                                                    <History size={16} />
+                                                </button>
+                                            </td>
                                         </tr>
                                     );
                                 })
@@ -558,19 +596,13 @@ const TodoMonitor = ({
                                 <th style={{ padding: '0.65rem 0.8rem', textAlign: 'left', fontWeight: 600 }}>Notiz</th>
                                 <th style={{ padding: '0.65rem 0.8rem', textAlign: 'center', width: '80px', fontWeight: 600 }}>Erledigt</th>
                                 <th style={{ padding: '0.65rem 0.8rem', textAlign: 'center', width: '80px', fontWeight: 600 }}>Abschluss</th>
-                                <th style={{ padding: '0.65rem 0.8rem', textAlign: 'center', width: '85px', fontWeight: 600 }}>Bearbeiten</th>
-                                <th 
-                                    onClick={() => setShowHistory(true)}
-                                    style={{ padding: '0.65rem 0.8rem', textAlign: 'center', width: '130px', fontWeight: 600, cursor: 'pointer', color: 'var(--q-primary, #1e6db7)', textDecoration: 'underline', userSelect: 'none' }}
-                                >
-                                    History anzeigen
-                                </th>
+                                <th style={{ padding: '0.65rem 0.8rem', textAlign: 'center', width: '115px', fontWeight: 600 }}>Bearbeiten</th>
                             </tr>
                         </thead>
                         <tbody>
                             {processedOpenTodos.length === 0 ? (
                                 <tr>
-                                    <td colSpan={10} style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>Keine offenen Aufgaben vorhanden.</td>
+                                    <td colSpan={9} style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>Keine offenen Aufgaben vorhanden.</td>
                                 </tr>
                             ) : (
                                 processedOpenTodos.map(todoItem => {
@@ -652,13 +684,19 @@ const TodoMonitor = ({
                                             {/* 6. Checkbox erledigt */}
                                             <td style={{ padding: '0.65rem 0.8rem', textAlign: 'center', verticalAlign: 'middle' }}>
                                                 <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '22px' }}>
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={pendingActionTodoId === todoItem.id}
-                                                        disabled={pendingActionTodoId !== null && pendingActionTodoId !== todoItem.id}
-                                                        onChange={(e) => handleToggleDone(todoItem, e.target.checked)}
-                                                        style={{ width: '16px', height: '16px', cursor: 'pointer', margin: 0, padding: 0 }}
-                                                    />
+                                                    {(() => {
+                                                        const isAuto = todoItem.category === 'auto' || String(todoItem.id).startsWith('measurement_followup') || String(todoItem.id).startsWith('a0d0a0d0-');
+                                                        return (
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={pendingActionTodoId === todoItem.id}
+                                                                disabled={pendingActionTodoId !== null && pendingActionTodoId !== todoItem.id}
+                                                                onChange={(e) => handleToggleDone(todoItem, e.target.checked)}
+                                                                style={{ width: '16px', height: '16px', cursor: 'pointer', margin: 0, padding: 0 }}
+                                                                title={isAuto ? "Automatische Aufgabe erledigen & Nachfolger erstellen" : "To-do erledigen"}
+                                                            />
+                                                        );
+                                                    })()}
                                                 </div>
                                             </td>
                                             {/* 7. Abschluss */}
@@ -675,6 +713,14 @@ const TodoMonitor = ({
                                             {/* 7. Aktionen */}
                                             <td style={{ padding: '0.65rem 0.8rem', textAlign: 'center' }}>
                                                 <div style={{ display: 'flex', justifyContent: 'center', gap: '0.25rem', alignItems: 'center' }}>
+                                                    <button
+                                                        onClick={() => setHistoryViewTodo(todoItem)}
+                                                        className="btn btn-ghost"
+                                                        style={{ padding: '0.35rem', color: 'var(--q-primary, #1e6db7)' }}
+                                                        title="Aufgabenverlauf anzeigen"
+                                                    >
+                                                        <History size={16} />
+                                                    </button>
                                                     <button
                                                         onClick={() => { setEditingTodo(todoItem); setModalOpen(true); }}
                                                         className="btn btn-ghost"
@@ -700,10 +746,6 @@ const TodoMonitor = ({
                                                         <Trash2 size={16} />
                                                     </button>
                                                 </div>
-                                            </td>
-                                            {/* 8. History placeholder cell */}
-                                            <td style={{ padding: '0.65rem 0.8rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-                                                -
                                             </td>
                                         </tr>
                                     );
@@ -732,11 +774,35 @@ const TodoMonitor = ({
                 <TodoModal
                     todo={followUpTodo}
                     isFollowUpMode={true}
-                    onClose={() => { setFollowUpTodo(null); setPendingActionTodoId(null); }}
-                    onSaveSuccess={() => { loadTodos(); onReportsChanged?.(); }}
+                    onClose={() => {
+                        console.log('[TodoMonitor] followUpTodo onClose called. Setting followUpTodo to null.');
+                        setFollowUpTodo(null);
+                        setPendingActionTodoId(null);
+                    }}
+                    onSaveSuccess={() => {
+                        console.log('[TodoMonitor] followUpTodo onSaveSuccess called.');
+                        loadTodos();
+                        onReportsChanged?.();
+                    }}
                     users={users}
                     reports={reports}
                     currentUser={currentUser}
+                />
+            )}
+
+            {/* TodoHistoryModal Portal */}
+            {historyViewTodo && (
+                <TodoHistoryModal
+                    todo={historyViewTodo}
+                    onClose={() => setHistoryViewTodo(null)}
+                    projectTitle={(() => {
+                        const proj = reports.find(r => 
+                            r.id === historyViewTodo.project_id || 
+                            (r.projectNumber && String(r.projectNumber) === String(historyViewTodo.project_id)) ||
+                            (r.projectTitle && String(r.projectTitle) === String(historyViewTodo.project_id))
+                        );
+                        return proj ? (proj.projectTitle || proj.address || proj.projectNumber) : 'Unbekanntes Projekt';
+                    })()}
                 />
             )}
 
@@ -836,7 +902,7 @@ const TodoMonitor = ({
                                 style={{ minWidth: '180px', backgroundColor: '#10B981', borderColor: '#10B981' }}
                                 disabled={loading}
                             >
-                                {loading ? 'Schliesst ab...' : 'Projekt abschliessen und archivieren'}
+                                {loading ? 'Schliesst ab...' : 'Ja, Projekt abschliessen'}
                             </button>
                         </div>
                     </div>

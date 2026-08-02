@@ -56,7 +56,7 @@ CREATE POLICY "Todos insert access for authenticated" ON public.project_todos
 
 DROP POLICY IF EXISTS "Todos update access for authenticated" ON public.project_todos;
 CREATE POLICY "Todos update access for authenticated" ON public.project_todos
-    FOR UPDATE TO authenticated USING (status = 'open') WITH CHECK (status = 'open');
+    FOR UPDATE TO authenticated USING (status = 'open') WITH CHECK (true);
 
 -- NOTE: No DELETE policy is created, physical deletion is forbidden.
 
