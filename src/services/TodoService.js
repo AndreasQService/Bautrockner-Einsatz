@@ -9,12 +9,16 @@ let cachedUserId = null;
 let cacheVersion = 0;
 let fetchAllTodosCache = null;
 let lastFetchTime = 0;
+let activeDryingCache = null;
+let lastActiveDryingFetchTime = 0;
 
 export function invalidateTodoCache() {
     dbTodosCache = null;
     dbTodosPromise = null;
     fetchAllTodosCache = null;
     lastFetchTime = 0;
+    activeDryingCache = null;
+    lastActiveDryingFetchTime = 0;
     cacheVersion++;
 }
 
@@ -286,10 +290,18 @@ export async function fetchAllTodos(reports = [], forceRefresh = false) {
     let mergedReports = [...reports];
     if (supabase && reports.length > 0) {
         try {
-            const { data: activeDrying } = await supabase
-                .from('damage_reports')
-                .select('id, status, report_data')
-                .in('status', ['Trocknung', 'trocknung', 'TROCKNUNG']);
+            let activeDrying = activeDryingCache;
+            if (!activeDrying || (Date.now() - lastActiveDryingFetchTime > 120000)) {
+                const { data } = await supabase
+                    .from('damage_reports')
+                    .select('id, status, report_data')
+                    .in('status', ['Trocknung', 'trocknung', 'TROCKNUNG']);
+                if (data) {
+                    activeDryingCache = data;
+                    lastActiveDryingFetchTime = Date.now();
+                    activeDrying = data;
+                }
+            }
             
             if (Array.isArray(activeDrying)) {
                 mergedReports = reports.map(r => {
