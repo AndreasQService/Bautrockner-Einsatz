@@ -6,7 +6,7 @@ console.log('[BUILD GUARD] 🛡️ Starting pre-build security checks...');
 // Helper to parse .env files
 function loadEnv() {
     const env = {};
-    const paths = ['.env', '.env.local', '.env.production', '.env.development'];
+    const paths = ['.env', '.env.local', '.env.production', '.env.development', '.env.vercel-preview'];
     for (const p of paths) {
         const fullPath = path.join(__dirname, '..', p);
         if (fs.existsSync(fullPath)) {
