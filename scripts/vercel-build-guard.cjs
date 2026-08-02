@@ -6,7 +6,11 @@ console.log('[BUILD GUARD] 🛡️ Starting pre-build security checks...');
 // Helper to parse .env files
 function loadEnv() {
     const env = {};
-    const paths = ['.env', '.env.local', '.env.production', '.env.development', '.env.vercel-preview'];
+    const paths = ['.env', '.env.local', '.env.production', '.env.development'];
+    const isVercel = !!process.env.VERCEL || !!process.env.VERCEL_ENV;
+    if (isVercel) {
+        paths.push('.env.vercel-preview');
+    }
     for (const p of paths) {
         const fullPath = path.join(__dirname, '..', p);
         if (fs.existsSync(fullPath)) {

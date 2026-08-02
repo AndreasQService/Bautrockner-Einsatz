@@ -7,10 +7,14 @@ let dbTodosCache = null;
 let dbTodosPromise = null;
 let cachedUserId = null;
 let cacheVersion = 0;
+let fetchAllTodosCache = null;
+let lastFetchTime = 0;
 
 export function invalidateTodoCache() {
     dbTodosCache = null;
     dbTodosPromise = null;
+    fetchAllTodosCache = null;
+    lastFetchTime = 0;
     cacheVersion++;
 }
 
@@ -148,7 +152,11 @@ const getLatestMeasurementDate = (project) => {
  * Fetches all todos from Supabase project_todos, local storage, and officeTasks inside damage_reports.
  * Automatically synchronizes outstanding local or inbox todos if connection is healthy.
  */
-export async function fetchAllTodos(reports = []) {
+export async function fetchAllTodos(reports = [], forceRefresh = false) {
+    if (!forceRefresh && fetchAllTodosCache && (Date.now() - lastFetchTime < 15000)) {
+        return fetchAllTodosCache;
+    }
+
     await ensureAuthenticated().catch(() => {});
 
     // Check session user to invalidate cache on login/logout/switch
@@ -407,6 +415,8 @@ export async function fetchAllTodos(reports = []) {
         console.log('[DEBUG FETCH] final combined todos returning from fetchAllTodos:', JSON.stringify(combined.map(t => ({ id: t.id, task: t.task, project_id: t.project_id, status: t.status, category: t.category, assigned_user_id: t.assigned_user_id, assignedUserId: t.assignedUserId }))));
     }
 
+    fetchAllTodosCache = combined;
+    lastFetchTime = Date.now();
     return combined;
 }
 
