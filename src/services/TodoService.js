@@ -3,6 +3,8 @@ import { getAutoTasksForStatus } from '../features/projects/tasks';
 
 export let lastAuthError = null;
 
+const isUuidVal = (id) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+
 let dbTodosCache = null;
 let dbTodosPromise = null;
 let cachedUserId = null;
@@ -157,7 +159,7 @@ const getLatestMeasurementDate = (project) => {
  * Automatically synchronizes outstanding local or inbox todos if connection is healthy.
  */
 export async function fetchAllTodos(reports = [], forceRefresh = false) {
-    if (!forceRefresh && fetchAllTodosCache && (Date.now() - lastFetchTime < 15000)) {
+    if (!forceRefresh && fetchAllTodosCache && (Date.now() - lastFetchTime < 60000)) {
         return fetchAllTodosCache;
     }
 
@@ -192,8 +194,8 @@ export async function fetchAllTodos(reports = [], forceRefresh = false) {
                 for (const todo of local) {
                     const payload = {
                         project_id: todo.project_id,
-                        parent_todo_id: todo.parent_todo_id || null,
-                        root_todo_id: todo.root_todo_id || null,
+                        parent_todo_id: (todo.parent_todo_id && isUuidVal(todo.parent_todo_id)) ? todo.parent_todo_id : null,
+                        root_todo_id: (todo.root_todo_id && isUuidVal(todo.root_todo_id)) ? todo.root_todo_id : null,
                         task: todo.task,
                         due_date: todo.due_date,
                         assigned_user_id: String(todo.assigned_user_id),

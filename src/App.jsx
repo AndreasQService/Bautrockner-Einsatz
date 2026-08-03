@@ -1761,12 +1761,13 @@ function App() {
                 .update(rowData)
                 .eq('id', finalReport.id)
                 .lte('updated_at', loadedAt)
-                .select('id')
+                .select('id, updated_at')
                 .then(({ data: updateResult, error }) => {
                   if (!error && updateResult && updateResult.length > 0) {
-                    setReports(prev => prev.map(r => r.id === finalReport.id ? { ...r, ...finalReport, _supabase_updated_at: now } : r));
-                    setSelectedReport(prev => prev && prev.id === finalReport.id ? { ...prev, ...finalReport, _supabase_updated_at: now } : prev);
-                    openedReportBackupRef.current[finalReport.id] = JSON.parse(JSON.stringify({ ...finalReport, _supabase_updated_at: now }));
+                    const serverUpdatedAt = updateResult[0].updated_at || now;
+                    setReports(prev => prev.map(r => r.id === finalReport.id ? { ...r, ...finalReport, _supabase_updated_at: serverUpdatedAt } : r));
+                    setSelectedReport(prev => prev && prev.id === finalReport.id ? { ...prev, ...finalReport, _supabase_updated_at: serverUpdatedAt } : prev);
+                    openedReportBackupRef.current[finalReport.id] = JSON.parse(JSON.stringify({ ...finalReport, _supabase_updated_at: serverUpdatedAt }));
                     oneDriveBackup();
 
                     setUnsavedReports(prev => {
@@ -1792,7 +1793,7 @@ function App() {
                 .update(rowData)
                 .eq('id', finalReport.id)
                 .lte('updated_at', loadedAt)
-                .select('id');
+                .select('id, updated_at');
 
               if (error) {
                 throw error;
@@ -1801,9 +1802,10 @@ function App() {
                 showToast('⚠️ Neuere Version auf anderem Gerät! Seite neu laden.', 'warning');
                 saveToUnsavedReports(finalReport, true);
               } else {
-                setReports(prev => prev.map(r => r.id === finalReport.id ? { ...r, ...finalReport, _supabase_updated_at: now } : r));
-                setSelectedReport(prev => prev && prev.id === finalReport.id ? { ...prev, ...finalReport, _supabase_updated_at: now } : prev);
-                openedReportBackupRef.current[finalReport.id] = JSON.parse(JSON.stringify({ ...finalReport, _supabase_updated_at: now }));
+                const serverUpdatedAt = updateResult[0].updated_at || now;
+                setReports(prev => prev.map(r => r.id === finalReport.id ? { ...r, ...finalReport, _supabase_updated_at: serverUpdatedAt } : r));
+                setSelectedReport(prev => prev && prev.id === finalReport.id ? { ...prev, ...finalReport, _supabase_updated_at: serverUpdatedAt } : prev);
+                openedReportBackupRef.current[finalReport.id] = JSON.parse(JSON.stringify({ ...finalReport, _supabase_updated_at: serverUpdatedAt }));
                 oneDriveBackup();
 
                 setUnsavedReports(prev => {
@@ -1821,11 +1823,13 @@ function App() {
               supabase
                 .from('damage_reports')
                 .upsert(rowData)
-                .then(({ error }) => {
+                .select('id, updated_at')
+                .then(({ data: upsertResult, error }) => {
                   if (!error) {
-                    setReports(prev => prev.map(r => r.id === finalReport.id ? { ...r, ...finalReport, _supabase_updated_at: now } : r));
-                    setSelectedReport(prev => prev && prev.id === finalReport.id ? { ...prev, ...finalReport, _supabase_updated_at: now } : prev);
-                    openedReportBackupRef.current[finalReport.id] = JSON.parse(JSON.stringify({ ...finalReport, _supabase_updated_at: now }));
+                    const serverUpdatedAt = (upsertResult && upsertResult[0]?.updated_at) || now;
+                    setReports(prev => prev.map(r => r.id === finalReport.id ? { ...r, ...finalReport, _supabase_updated_at: serverUpdatedAt } : r));
+                    setSelectedReport(prev => prev && prev.id === finalReport.id ? { ...prev, ...finalReport, _supabase_updated_at: serverUpdatedAt } : prev);
+                    openedReportBackupRef.current[finalReport.id] = JSON.parse(JSON.stringify({ ...finalReport, _supabase_updated_at: serverUpdatedAt }));
                     oneDriveBackup();
 
                     setUnsavedReports(prev => {
@@ -1842,13 +1846,17 @@ function App() {
                   handleSaveError(err);
                 });
             } else {
-              const { error } = await supabase.from('damage_reports').upsert(rowData);
+              const { data: upsertResult, error } = await supabase
+                .from('damage_reports')
+                .upsert(rowData)
+                .select('id, updated_at');
               if (error) {
                 throw error;
               } else {
-                setReports(prev => prev.map(r => r.id === finalReport.id ? { ...r, ...finalReport, _supabase_updated_at: now } : r));
-                setSelectedReport(prev => prev && prev.id === finalReport.id ? { ...prev, ...finalReport, _supabase_updated_at: now } : prev);
-                openedReportBackupRef.current[finalReport.id] = JSON.parse(JSON.stringify({ ...finalReport, _supabase_updated_at: now }));
+                const serverUpdatedAt = (upsertResult && upsertResult[0]?.updated_at) || now;
+                setReports(prev => prev.map(r => r.id === finalReport.id ? { ...r, ...finalReport, _supabase_updated_at: serverUpdatedAt } : r));
+                setSelectedReport(prev => prev && prev.id === finalReport.id ? { ...prev, ...finalReport, _supabase_updated_at: serverUpdatedAt } : prev);
+                openedReportBackupRef.current[finalReport.id] = JSON.parse(JSON.stringify({ ...finalReport, _supabase_updated_at: serverUpdatedAt }));
                 oneDriveBackup();
 
                 setUnsavedReports(prev => {

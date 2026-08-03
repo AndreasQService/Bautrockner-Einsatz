@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Filter, MapPin, Calendar, ArrowRight, Search, Trash2, FileText, RotateCcw, LogOut } from 'lucide-react'
+import { Filter, MapPin, Calendar, ArrowRight, Search, Trash2, FileText, RotateCcw, LogOut, Archive, Folder } from 'lucide-react'
 import InboxTodo from './InboxTodo'
 import WorkflowStatusOverview from './WorkflowStatusOverview'
 import TodoMonitor from './TodoMonitor'
@@ -281,6 +281,93 @@ const DryingMonitor = ({ reports, onSelectReport, onDeleteReport, workflowStore 
     )
 }
 
+
+
+const CompactDeviceInventoryList = ({ reports, onSelectReport }) => {
+    const devicesList = useMemo(() => {
+        const list = [];
+        reports.forEach(report => {
+            if (report.equipment && Array.isArray(report.equipment)) {
+                report.equipment.forEach(item => {
+                    const { isAktiv } = getEquipmentStatus(item);
+                    if (isAktiv) {
+                        list.push({ report, item });
+                    }
+                });
+            }
+        });
+        
+        return list.sort((a, b) => {
+            const dateA = a.item.startDate ? new Date(a.item.startDate) : new Date(0);
+            const dateB = b.item.startDate ? new Date(b.item.startDate) : new Date(0);
+            return dateB - dateA;
+        });
+    }, [reports]);
+
+    return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
+                <h2 style={{ margin: 0, fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 700 }}>
+                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#3B82F6' }}></div>
+                    Aktive Geräte ({devicesList.length})
+                </h2>
+            </div>
+            
+            <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem', textAlign: 'left' }}>
+                    <thead>
+                        <tr style={{ borderBottom: '1px solid var(--border)', color: 'var(--text-muted)' }}>
+                            <th style={{ padding: '0.5rem 0.4rem', fontWeight: 600 }}>Gerät / Adresse</th>
+                            <th style={{ padding: '0.5rem 0.4rem', fontWeight: 600, width: '90px' }}>Inv.-Nr.</th>
+                            <th style={{ padding: '0.5rem 0.4rem', fontWeight: 600, width: '60px', textAlign: 'right' }}>Laufzeit</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {devicesList.length === 0 ? (
+                            <tr>
+                                <td colSpan={3} style={{ padding: '1rem 0.4rem', textAlign: 'center', color: 'var(--text-muted)' }}>Keine aktiven Geräte.</td>
+                            </tr>
+                        ) : (
+                            devicesList.map(({ report, item }, idx) => {
+                                const typeModel = formatEquipmentTypeModel(item);
+                                const projectAddress = report.street || formatEquipmentProjectAddress(report);
+                                const days = item.startDate ? Math.floor((new Date() - new Date(item.startDate)) / (1000 * 60 * 60 * 24)) : 0;
+
+                                return (
+                                    <tr
+                                        key={`${report.id}-${idx}`}
+                                        onClick={() => onSelectReport(report)}
+                                        style={{
+                                            borderBottom: '1px solid var(--border)',
+                                            cursor: 'pointer',
+                                            transition: 'background-color 0.15s ease'
+                                        }}
+                                        className="hover-row"
+                                    >
+                                        <td style={{ padding: '0.5rem 0.4rem' }}>
+                                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                                <span style={{ fontWeight: 700 }}>{typeModel || 'Unbekannt'}</span>
+                                                <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '200px' }}>
+                                                    {projectAddress}
+                                                </span>
+                                            </div>
+                                        </td>
+                                        <td style={{ padding: '0.5rem 0.4rem', color: 'var(--text-muted)' }}>
+                                            {item.deviceNumber || '—'}
+                                        </td>
+                                        <td style={{ padding: '0.5rem 0.4rem', textAlign: 'right', fontWeight: 600 }}>
+                                            {days} {days === 1 ? 'Tag' : 'Tage'}
+                                        </td>
+                                    </tr>
+                                );
+                            })
+                        )}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    );
+};
 
 
 const DeviceInventoryList = ({ reports, onSelectReport }) => {
@@ -679,16 +766,165 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
 
             {/* Pass Filtered Reports to Monitors (only when not in Archive OR Technician Mode) */}
             {!showArchive && mode !== 'technician' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                    <TodoMonitor reports={reports} users={users || []} currentUser={currentUser} onSelectReport={onSelectReport} onReportsChanged={onReportsChanged} />
-                    {showWorkflow && (
-                        <WorkflowStatusOverview reports={reports} onSelectReport={onSelectReport} currentUser={currentUser} users={users || []} searchTerm={searchTerm} store={workflowStore} onStoreChange={setWorkflowStore} />
-                    )}
-                    {showDrying && (
-                        <DryingMonitor reports={filteredReports} onSelectReport={onSelectReport} onDeleteReport={onDeleteReport} workflowStore={workflowStore} />
-                    )}
-                    {showDevices && (
-                        <DeviceInventoryList reports={filteredReports} onSelectReport={onSelectReport} />
+                <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'stretch', flexWrap: 'wrap', width: '100%' }}>
+                    {/* Left Column: Monitors */}
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1.5rem', minWidth: 0 }}>
+                        <TodoMonitor reports={reports} users={users || []} currentUser={currentUser} onSelectReport={onSelectReport} onReportsChanged={onReportsChanged} />
+                        {showWorkflow && (
+                            <WorkflowStatusOverview reports={reports} onSelectReport={onSelectReport} currentUser={currentUser} users={users || []} searchTerm={searchTerm} store={workflowStore} onStoreChange={setWorkflowStore} />
+                        )}
+                        {showDrying && (
+                            <DryingMonitor reports={filteredReports} onSelectReport={onSelectReport} onDeleteReport={onDeleteReport} workflowStore={workflowStore} />
+                        )}
+                    </div>
+
+                    {/* Right Column: All Projects & Compact Devices List */}
+                    {(showAllCases || showDevices) && (
+                        <div style={{
+                            width: '400px',
+                            flexShrink: 0,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '1rem',
+                            position: 'sticky',
+                            top: '1rem',
+                            maxHeight: 'calc(100vh - 120px)',
+                            overflowY: 'auto'
+                        }}>
+                            {/* All Projects List */}
+                            {showAllCases && (
+                                <div style={{
+                                    background: 'var(--surface)',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: '8px',
+                                    padding: '1.5rem',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '1rem'
+                                }}>
+                                    {/* Header */}
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                                        <h2 style={{ margin: 0, fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 700 }}>
+                                            <Folder size={18} style={{ color: 'var(--q-primary, #1e6db7)' }} />
+                                            Alle Projekte ({filteredReports.length})
+                                        </h2>
+                                    </div>
+
+                                    {/* Table Area */}
+                                    <div style={{ overflowX: 'auto', marginTop: '0.5rem' }}>
+                                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem', textAlign: 'left' }}>
+                                            <thead>
+                                                <tr style={{ borderBottom: '1px solid var(--border)', color: 'var(--text-muted)' }}>
+                                                    <th style={{ padding: '0.5rem 0.4rem', fontWeight: 600 }}>Projekt-Nr. / Adresse</th>
+                                                    <th style={{ padding: '0.5rem 0.4rem', width: '30px' }}></th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {filteredReports.map(report => {
+                                                    const isLocked = lockedIds.has(report.id);
+                                                    return (
+                                                        <tr
+                                                            key={report.id}
+                                                            onClick={() => { if (!isLocked) onSelectReport(report); }}
+                                                            style={{
+                                                                borderBottom: '1px solid var(--border)',
+                                                                cursor: isLocked ? 'not-allowed' : 'pointer',
+                                                                opacity: isLocked ? 0.75 : 1,
+                                                                transition: 'background-color 0.15s ease'
+                                                            }}
+                                                            className="hover-row"
+                                                        >
+                                                            {/* Project Number / Adresse */}
+                                                            <td style={{ padding: '0.5rem 0.4rem' }}>
+                                                                <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                                                                    <span style={{ fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                                        {isLocked && <span style={{ marginRight: '0.2rem' }}>🔒</span>}
+                                                                        {report.projectNumber || report.projectTitle || report.id}
+                                                                    </span>
+                                                                    <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '400px' }} title={(() => {
+                                                                        const streetPart = report.street || (report.address ? report.address.split(',')[0] : 'Keine Strasse');
+                                                                        const cityPart = report.city || (() => {
+                                                                            const parts = (report.address || '').split(',');
+                                                                            return parts.length > 1 ? parts[1].trim().replace(/^\d+\s*/, '') : '';
+                                                                        })();
+                                                                        return cityPart ? `${streetPart}, ${cityPart}` : streetPart;
+                                                                    })()}>
+                                                                        {(() => {
+                                                                            const streetPart = report.street || (report.address ? report.address.split(',')[0] : 'Keine Strasse');
+                                                                            const cityPart = report.city || (() => {
+                                                                                const parts = (report.address || '').split(',');
+                                                                                return parts.length > 1 ? parts[1].trim().replace(/^\d+\s*/, '') : '';
+                                                                            })();
+                                                                            return cityPart ? `${streetPart}, ${cityPart}` : streetPart;
+                                                                        })()}
+                                                                    </span>
+                                                                </div>
+                                                            </td>
+
+                                                            {/* Archive Button */}
+                                                            <td style={{ padding: '0.5rem 0.4rem', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
+                                                                <button
+                                                                    onClick={async (e) => {
+                                                                        e.stopPropagation();
+                                                                        if (window.confirm(`Projekt "${report.projectNumber || report.projectTitle || report.id}" wirklich archivieren (auf Abgeschlossen setzen)?`)) {
+                                                                            try {
+                                                                                const { error } = await supabase
+                                                                                    .from('damage_reports')
+                                                                                    .update({ status: 'Abgeschlossen' })
+                                                                                    .eq('id', report.id);
+                                                                                if (!error) {
+                                                                                    if (onReportsChanged) onReportsChanged(report.id);
+                                                                                } else {
+                                                                                    alert('Fehler beim Archivieren: ' + error.message);
+                                                                                }
+                                                                            } catch (err) {
+                                                                                console.error(err);
+                                                                            }
+                                                                        }
+                                                                    }}
+                                                                    title="Projekt archivieren (auf Abgeschlossen setzen)"
+                                                                    style={{
+                                                                        background: 'none',
+                                                                        border: 'none',
+                                                                        cursor: 'pointer',
+                                                                        color: 'var(--text-muted, #64748B)',
+                                                                        padding: '0.2rem',
+                                                                        borderRadius: '4px',
+                                                                        display: 'flex',
+                                                                        alignItems: 'center',
+                                                                        opacity: 0.5,
+                                                                        transition: 'all 0.15s'
+                                                                    }}
+                                                                    onMouseEnter={e => e.currentTarget.style.opacity = 1}
+                                                                    onMouseLeave={e => e.currentTarget.style.opacity = 0.5}
+                                                                >
+                                                                    <Archive size={14} />
+                                                                </button>
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Compact Device List */}
+                            {showDevices && (
+                                <div style={{
+                                    background: 'var(--surface)',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: '8px',
+                                    padding: '1.5rem',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '1rem'
+                                }}>
+                                    <CompactDeviceInventoryList reports={filteredReports} onSelectReport={onSelectReport} />
+                                </div>
+                            )}
+                        </div>
                     )}
                 </div>
             )}
@@ -755,7 +991,7 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
                     )}
                 </div>
             ) : (
-                showAllCases && (
+                (showArchive && showAllCases) && (
                     <div className="card" style={{ padding: '0' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.625rem 0.875rem', borderBottom: '1px solid var(--border)' }}>
                         <h3 style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-main)' }}>Alle Fälle ({filteredReports.length})</h3>

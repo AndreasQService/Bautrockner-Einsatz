@@ -20,7 +20,13 @@ const TodoMonitor = ({
     onReportsChanged,
     isDarkMode = false
 }) => {
-    const [todos, setTodos] = useState([]);
+    const [todos, setTodos] = useState(() => {
+        try {
+            return JSON.parse(localStorage.getItem('qtool_cached_todos') || '[]');
+        } catch (e) {
+            return [];
+        }
+    });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
@@ -48,6 +54,11 @@ const TodoMonitor = ({
             const list = await fetchAllTodos(reports);
             console.log('[DEBUG TODOS] fetchAllTodos returned:', list, 'for reports:', reports);
             setTodos(list);
+            try {
+                localStorage.setItem('qtool_cached_todos', JSON.stringify(list));
+            } catch (e) {
+                console.error(e);
+            }
         } catch (err) {
             setError('Fehler beim Laden der Aufgaben: ' + err.message);
         } finally {
@@ -58,7 +69,7 @@ const TodoMonitor = ({
     // Load on mount and also when projects are background-loaded (lightweight state changes)
     const reportsLength = reports.length;
     const reportsStateKey = useMemo(() => {
-        return reports.map(r => `${r.id}_${!!r.isLightweight}_${(r.officeTasks || r.report_data?.officeTasks || []).length}`).join(',');
+        return reports.map(r => `${r.id}_${(r.officeTasks || r.report_data?.officeTasks || []).length}`).join(',');
     }, [reports]);
 
     useEffect(() => {
@@ -306,6 +317,13 @@ const TodoMonitor = ({
                     --todo-overdue-text: #F87171;
                     --todo-today-text: #FBBF24;
                 }
+                .sticky-th {
+                    position: sticky !important;
+                    top: 0 !important;
+                    background-color: var(--surface) !important;
+                    z-index: 5 !important;
+                    box-shadow: inset 0 -1px 0 var(--border) !important;
+                }
             `}</style>
 
             {/* Header / Filter / Search Container - Compact Row Layout */}
@@ -449,7 +467,7 @@ const TodoMonitor = ({
             )}
 
             {/* List Table Area */}
-            <div style={{ overflowX: 'auto', marginTop: '0.5rem', border: '1px solid var(--border)', borderRadius: '6px', maxWidth: '1400px' }}>
+            <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: 'calc(100vh - 280px)', marginTop: '0.5rem', border: '1px solid var(--border)', borderRadius: '6px' }}>
                 {loading && todos.length === 0 ? (
                     <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>Aufgaben werden geladen...</div>
                 ) : showHistory ? (
@@ -457,15 +475,15 @@ const TodoMonitor = ({
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' }}>
                         <thead>
                             <tr style={{ borderBottom: '1px solid var(--border)', background: 'var(--surface-hover, rgba(0,0,0,0.015))', color: 'var(--text-muted)' }}>
-                                <th style={{ padding: '0.65rem 0.8rem', textAlign: 'left', width: '140px', fontWeight: 600 }}>Erledigt am</th>
-                                <th style={{ padding: '0.65rem 0.8rem', textAlign: 'left', width: '110px', fontWeight: 600 }}>Projektnummer</th>
-                                <th style={{ padding: '0.65rem 0.8rem', textAlign: 'left', width: '25%', fontWeight: 600 }}>Projekt / Adresse</th>
-                                <th style={{ padding: '0.65rem 0.8rem', textAlign: 'left', width: '100px', fontWeight: 600 }}>Wer</th>
-                                <th style={{ padding: '0.65rem 0.8rem', textAlign: 'left', fontWeight: 600 }}>Was</th>
-                                <th style={{ padding: '0.65rem 0.8rem', textAlign: 'left', width: '120px', fontWeight: 600 }}>Erledigt durch</th>
-                                <th style={{ padding: '0.65rem 0.8rem', textAlign: 'center', width: '100px', fontWeight: 600 }}>Fälligkeit</th>
-                                <th style={{ padding: '0.65rem 0.8rem', textAlign: 'center', width: '80px', fontWeight: 600 }}>Abschluss</th>
-                                <th style={{ padding: '0.65rem 0.8rem', textAlign: 'center', width: '90px', fontWeight: 600 }}>Verlauf</th>
+                                <th className="sticky-th" style={{ padding: '0.65rem 0.8rem', textAlign: 'left', width: '140px', fontWeight: 600 }}>Erledigt am</th>
+                                <th className="sticky-th" style={{ padding: '0.65rem 0.8rem', textAlign: 'left', width: '110px', fontWeight: 600 }}>Projektnummer</th>
+                                <th className="sticky-th" style={{ padding: '0.65rem 0.8rem', textAlign: 'left', width: '25%', fontWeight: 600 }}>Projekt / Adresse</th>
+                                <th className="sticky-th" style={{ padding: '0.65rem 0.8rem', textAlign: 'left', width: '100px', fontWeight: 600 }}>Wer</th>
+                                <th className="sticky-th" style={{ padding: '0.65rem 0.8rem', textAlign: 'left', fontWeight: 600 }}>Was</th>
+                                <th className="sticky-th" style={{ padding: '0.65rem 0.8rem', textAlign: 'left', width: '120px', fontWeight: 600 }}>Erledigt durch</th>
+                                <th className="sticky-th" style={{ padding: '0.65rem 0.8rem', textAlign: 'center', width: '100px', fontWeight: 600 }}>Fälligkeit</th>
+                                <th className="sticky-th" style={{ padding: '0.65rem 0.8rem', textAlign: 'center', width: '80px', fontWeight: 600 }}>Abschluss</th>
+                                <th className="sticky-th" style={{ padding: '0.65rem 0.8rem', textAlign: 'center', width: '90px', fontWeight: 600 }}>Verlauf</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -543,11 +561,11 @@ const TodoMonitor = ({
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' }}>
                         <thead>
                             <tr style={{ borderBottom: '1px solid var(--border)', background: 'var(--surface-hover, rgba(0,0,0,0.015))', color: 'var(--text-muted)' }}>
-                                <th style={{ padding: '0.65rem 0.8rem', textAlign: 'left', fontWeight: 600 }}>Projekt / ID</th>
-                                <th style={{ padding: '0.65rem 0.8rem', textAlign: 'left', fontWeight: 600 }}>Adresse</th>
-                                <th style={{ padding: '0.65rem 0.8rem', textAlign: 'left', fontWeight: 600 }}>Kunde</th>
-                                <th style={{ padding: '0.65rem 0.8rem', textAlign: 'left', fontWeight: 600 }}>Status</th>
-                                <th style={{ padding: '0.65rem 0.8rem', textAlign: 'center', fontWeight: 600 }}>Aktionen</th>
+                                <th className="sticky-th" style={{ padding: '0.65rem 0.8rem', textAlign: 'left', fontWeight: 600 }}>Projekt / ID</th>
+                                <th className="sticky-th" style={{ padding: '0.65rem 0.8rem', textAlign: 'left', fontWeight: 600 }}>Adresse</th>
+                                <th className="sticky-th" style={{ padding: '0.65rem 0.8rem', textAlign: 'left', fontWeight: 600 }}>Kunde</th>
+                                <th className="sticky-th" style={{ padding: '0.65rem 0.8rem', textAlign: 'left', fontWeight: 600 }}>Status</th>
+                                <th className="sticky-th" style={{ padding: '0.65rem 0.8rem', textAlign: 'center', fontWeight: 600 }}>Aktionen</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -588,15 +606,15 @@ const TodoMonitor = ({
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' }}>
                         <thead>
                             <tr style={{ borderBottom: '1px solid var(--border)', background: 'var(--surface-hover, rgba(0,0,0,0.015))', color: 'var(--text-muted)' }}>
-                                <th style={{ padding: '0.65rem 0.8rem', textAlign: 'left', width: '90px', fontWeight: 600 }}>Fällig</th>
-                                <th style={{ padding: '0.65rem 0.8rem', textAlign: 'left', width: '110px', fontWeight: 600 }}>Projektnummer</th>
-                                <th style={{ padding: '0.65rem 0.8rem', textAlign: 'left', width: '25%', fontWeight: 600 }}>Projekt / Adresse</th>
-                                <th style={{ padding: '0.65rem 0.8rem', textAlign: 'left', width: '100px', fontWeight: 600 }}>Wer</th>
-                                <th style={{ padding: '0.65rem 0.8rem', textAlign: 'left', fontWeight: 600 }}>Was</th>
-                                <th style={{ padding: '0.65rem 0.8rem', textAlign: 'left', fontWeight: 600 }}>Notiz</th>
-                                <th style={{ padding: '0.65rem 0.8rem', textAlign: 'center', width: '80px', fontWeight: 600 }}>Erledigt</th>
-                                <th style={{ padding: '0.65rem 0.8rem', textAlign: 'center', width: '80px', fontWeight: 600 }}>Abschluss</th>
-                                <th style={{ padding: '0.65rem 0.8rem', textAlign: 'center', width: '115px', fontWeight: 600 }}>Bearbeiten</th>
+                                <th className="sticky-th" style={{ padding: '0.65rem 0.8rem', textAlign: 'left', width: '90px', fontWeight: 600 }}>Fällig</th>
+                                <th className="sticky-th" style={{ padding: '0.65rem 0.8rem', textAlign: 'left', width: '110px', fontWeight: 600 }}>Projektnummer</th>
+                                <th className="sticky-th" style={{ padding: '0.65rem 0.8rem', textAlign: 'left', width: '25%', fontWeight: 600 }}>Projekt / Adresse</th>
+                                <th className="sticky-th" style={{ padding: '0.65rem 0.8rem', textAlign: 'left', width: '100px', fontWeight: 600 }}>Wer</th>
+                                <th className="sticky-th" style={{ padding: '0.65rem 0.8rem', textAlign: 'left', fontWeight: 600 }}>Was</th>
+                                <th className="sticky-th" style={{ padding: '0.65rem 0.8rem', textAlign: 'left', fontWeight: 600 }}>Notiz</th>
+                                <th className="sticky-th" style={{ padding: '0.65rem 0.8rem', textAlign: 'center', width: '80px', fontWeight: 600 }}>Erledigt</th>
+                                <th className="sticky-th" style={{ padding: '0.65rem 0.8rem', textAlign: 'center', width: '80px', fontWeight: 600 }}>Abschluss</th>
+                                <th className="sticky-th" style={{ padding: '0.65rem 0.8rem', textAlign: 'center', width: '115px', fontWeight: 600 }}>Bearbeiten</th>
                             </tr>
                         </thead>
                         <tbody>
