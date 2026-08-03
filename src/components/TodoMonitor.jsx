@@ -32,6 +32,7 @@ const TodoMonitor = ({
 
     // Filter and search states
     const [activeFilter, setActiveFilter] = useState('all'); // all, mine, overdue, today, week, closes, no_todos
+    const [assigneeFilter, setAssigneeFilter] = useState('all'); // all, office, or specific user ID
     const [showHistory, setShowHistory] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
 
@@ -167,6 +168,16 @@ const TodoMonitor = ({
             list = list.filter(t => t.closes_project);
         }
 
+        // 3.5. Filter by Assignee Filter Dropdown
+        if (assigneeFilter !== 'all') {
+            list = list.filter(t => {
+                if (assigneeFilter === 'office') {
+                    return !t.assigned_user_id || t.assigned_user_id === 'office' || t.assigned_user_name === 'Innendienst';
+                }
+                return String(t.assigned_user_id) === String(assigneeFilter);
+            });
+        }
+
         // 4. Sort: Overdue (oldest first) -> Today -> Future (chronological, closest first)
         return [...list].sort((a, b) => {
             if (a.due_date !== b.due_date) {
@@ -177,7 +188,7 @@ const TodoMonitor = ({
             const projB = reports.find(r => r.id === b.project_id || (r.projectNumber && String(r.projectNumber) === String(b.project_id)))?.projectTitle || '';
             return projA.localeCompare(projB);
         });
-    }, [todos, reports, activeProjects, activeFilter, searchTerm, currentUser]);
+    }, [todos, reports, activeProjects, activeFilter, searchTerm, currentUser, assigneeFilter]);
     // Historical completed todos
     const processedHistoryTodos = useMemo(() => {
         let list = todos.filter(t => t.status === 'done');
@@ -199,13 +210,23 @@ const TodoMonitor = ({
             });
         }
 
+        // Apply assignee filter
+        if (assigneeFilter !== 'all') {
+            list = list.filter(t => {
+                if (assigneeFilter === 'office') {
+                    return !t.assigned_user_id || t.assigned_user_id === 'office' || t.assigned_user_name === 'Innendienst';
+                }
+                return String(t.assigned_user_id) === String(assigneeFilter);
+            });
+        }
+
         // Sort: Newest completed_at first
         return [...list].sort((a, b) => {
             const timeA = new Date(a.completed_at || 0).getTime();
             const timeB = new Date(b.completed_at || 0).getTime();
             return timeB - timeA;
         });
-    }, [todos, reports, searchTerm]);
+    }, [todos, reports, searchTerm, assigneeFilter]);
 
     // Counters
     const counters = useMemo(() => {
@@ -435,6 +456,33 @@ const TodoMonitor = ({
                         className="form-input"
                         style={{ width: '100%', paddingLeft: '28px', height: '30px', fontSize: '0.8rem' }}
                     />
+                </div>
+
+                {/* Assignee Filter Dropdown */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', shrink: 0 }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Wer:</span>
+                    <select
+                        value={assigneeFilter}
+                        onChange={(e) => setAssigneeFilter(e.target.value)}
+                        className="select select-sm"
+                        style={{
+                            padding: '0.1rem 0.5rem',
+                            fontSize: '0.8rem',
+                            height: '30px',
+                            backgroundColor: 'var(--surface-hover, rgba(255,255,255,0.015))',
+                            border: '1px solid var(--border)',
+                            borderRadius: '6px',
+                            color: 'var(--text-main)',
+                            cursor: 'pointer',
+                            minWidth: '120px'
+                        }}
+                    >
+                        <option value="all">Alle Mitarbeiter</option>
+                        <option value="office">Innendienst</option>
+                        {users.map(u => (
+                            <option key={u.id} value={u.id}>{u.name}</option>
+                        ))}
+                    </select>
                     {searchTerm && (
                         <button
                             onClick={() => setSearchTerm('')}
