@@ -4063,7 +4063,7 @@ END:VCARD`;
                                                 setFormData(prev => ({ ...prev, city: matchParsed[1].trim(), zip: matchParsed[2].trim() }));
                                             } else {
                                                 const match = swissPLZ.find(entry => entry.city.toLowerCase() === val.trim().toLowerCase());
-                                                if (match && !formData.zip) {
+                                                if (match) {
                                                     setFormData(prev => ({ ...prev, city: val, zip: match.plz }));
                                                 } else {
                                                     setFormData(prev => ({ ...prev, city: val }));
@@ -4479,7 +4479,7 @@ END:VCARD`;
                                             setFormData(prev => ({ ...prev, clientCity: matchParsed[1].trim(), clientZip: matchParsed[2].trim() }));
                                         } else {
                                             const match = swissPLZ.find(entry => entry.city.toLowerCase() === val.trim().toLowerCase());
-                                            if (match && !formData.clientZip) {
+                                            if (match) {
                                                 setFormData(prev => ({ ...prev, clientCity: val, clientZip: match.plz }));
                                             } else {
                                                 setFormData(prev => ({ ...prev, clientCity: val }));
@@ -4694,7 +4694,7 @@ END:VCARD`;
                                                     setFormData(prev => ({ ...prev, ownerCity: matchParsed[1].trim(), ownerZip: matchParsed[2].trim() }));
                                                 } else {
                                                     const match = swissPLZ.find(entry => entry.city.toLowerCase() === val.trim().toLowerCase());
-                                                    if (match && !formData.ownerZip) {
+                                                    if (match) {
                                                         setFormData(prev => ({ ...prev, ownerCity: val, ownerZip: match.plz }));
                                                     } else {
                                                         setFormData(prev => ({ ...prev, ownerCity: val }));
@@ -4830,7 +4830,7 @@ END:VCARD`;
                                             setFormData(prev => ({ ...prev, city: matchParsed[1].trim(), zip: matchParsed[2].trim() }));
                                         } else {
                                             const match = swissPLZ.find(entry => entry.city.toLowerCase() === val.trim().toLowerCase());
-                                            if (match && !formData.zip) {
+                                            if (match) {
                                                 setFormData(prev => ({ ...prev, city: val, zip: match.plz }));
                                             } else {
                                                 setFormData(prev => ({ ...prev, city: val }));
