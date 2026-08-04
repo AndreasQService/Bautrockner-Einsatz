@@ -9919,10 +9919,8 @@ END:VCARD`;
                                                         img.syncStatus === 'remote_verified' ||
                                                         img.syncStatus === 'uploaded_to_backend' ||
                                                         img.syncStatus === 'synced' ||
-                                                        img.syncStatus === 'queued_for_remote' ||
                                                         (typeof img.url === 'string' && img.url.startsWith('http')) ||
-                                                        (typeof img.preview === 'string' && img.preview.startsWith('http')) ||
-                                                        (navigator.onLine && formData?.id && formData.id !== 'temp')
+                                                        (typeof img.preview === 'string' && img.preview.startsWith('http'))
                                                     );
                                                     return (
                                                         <div
