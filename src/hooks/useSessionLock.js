@@ -123,7 +123,20 @@ export function useSessionLock(
 
     if (error) {
       console.warn('[SessionLock] Lock acquire RPC failed:', error.message);
-      setIsSessionActive(false);
+      const isNetworkError = !error.status || 
+                             error.status === 522 || 
+                             error.status === 502 || 
+                             error.status === 503 ||
+                             error.status === 504 ||
+                             String(error.message).toLowerCase().includes('fetch') ||
+                             String(error.message).toLowerCase().includes('network') ||
+                             String(error.message).toLowerCase().includes('timeout') ||
+                             String(error.message).toLowerCase().includes('connection');
+      if (isNetworkError) {
+        setIsSessionActive(true);
+      } else {
+        setIsSessionActive(false);
+      }
     } else {
       const result = data && data[0];
       if (result && result.acquired) {
