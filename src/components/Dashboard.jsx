@@ -498,8 +498,20 @@ const DeviceInventoryList = ({ reports, onSelectReport }) => {
 
 export default function Dashboard({ reports, onSelectReport, onDeleteReport, mode, supabase, currentUser, users, onReportsChanged, lockedProjectIds, onLogout }) {
     const [searchTerm, setSearchTerm] = useState('')
+    const [casesSearchTerm, setCasesSearchTerm] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const [selectedSidebarReport, setSelectedSidebarReport] = useState(null);
+
+    const sidebarFilteredReports = useMemo(() => {
+        if (!casesSearchTerm) return filteredReports;
+        const lower = casesSearchTerm.toLowerCase();
+        return filteredReports.filter(r => 
+            String(r.projectNumber || '').toLowerCase().includes(lower) ||
+            String(r.projectTitle || '').toLowerCase().includes(lower) ||
+            String(r.client || '').toLowerCase().includes(lower) ||
+            String(r.address || '').toLowerCase().includes(lower)
+        );
+    }, [filteredReports, casesSearchTerm]);
     const [workflowStore, setWorkflowStore] = useState(() => {
         try {
             return JSON.parse(localStorage.getItem('qtool_wf_v4') || '{}');
@@ -815,11 +827,60 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
                                     gap: '1rem'
                                 }}>
                                     {/* Header */}
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
                                         <h2 style={{ margin: 0, fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 700 }}>
                                             <Folder size={18} style={{ color: 'var(--q-primary, #1e6db7)' }} />
-                                            Alle Projekte ({filteredReports.length})
+                                            Alle Projekte ({sidebarFilteredReports.length === filteredReports.length ? filteredReports.length : `${sidebarFilteredReports.length}/${filteredReports.length}`})
                                         </h2>
+                                    </div>
+
+                                    {/* Sidebar Search Field */}
+                                    <div style={{ position: 'relative', width: '100%', marginBottom: '0.25rem' }}>
+                                        <input
+                                            type="text"
+                                            placeholder="Projekte durchsuchen..."
+                                            value={casesSearchTerm}
+                                            onChange={e => setCasesSearchTerm(e.target.value)}
+                                            style={{
+                                                width: '100%',
+                                                padding: '0.35rem 0.65rem 0.35rem 1.8rem',
+                                                fontSize: '0.78rem',
+                                                border: '1px solid var(--border)',
+                                                borderRadius: '6px',
+                                                backgroundColor: 'var(--surface-hover, rgba(0,0,0,0.02))',
+                                                color: 'var(--text-main)',
+                                                outline: 'none',
+                                            }}
+                                        />
+                                        <Search
+                                            size={12}
+                                            style={{
+                                                position: 'absolute',
+                                                left: '8px',
+                                                top: '50%',
+                                                transform: 'translateY(-50%)',
+                                                color: 'var(--text-muted)'
+                                            }}
+                                        />
+                                        {casesSearchTerm && (
+                                            <button
+                                                onClick={() => setCasesSearchTerm('')}
+                                                style={{
+                                                    position: 'absolute',
+                                                    right: '8px',
+                                                    top: '50%',
+                                                    transform: 'translateY(-50%)',
+                                                    background: 'none',
+                                                    border: 'none',
+                                                    color: 'var(--text-muted)',
+                                                    cursor: 'pointer',
+                                                    fontSize: '0.8rem',
+                                                    padding: '0.1rem 0.3rem'
+                                                }}
+                                            >
+                                                ×
+                                            </button>
+                                        )}
                                     </div>
 
                                     {/* Table Area */}
@@ -832,7 +893,7 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                {filteredReports.map(report => {
+                                                {sidebarFilteredReports.map(report => {
                                                     const isLocked = lockedIds.has(report.id);
                                                     return (
                                                         <tr
