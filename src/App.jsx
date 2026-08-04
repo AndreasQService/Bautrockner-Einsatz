@@ -1747,7 +1747,9 @@ function App() {
 
         const handleSaveError = (err) => {
           console.error('[Supabase Save Error/Exception]', err);
-          showToast(`⚠️ Offline: Speicherfehler (${err.message || 'Verbindungsfehler'}). Daten wurden lokal gesichert!`, 'warning', 5000);
+          if (!silent) {
+            showToast(`⚠️ Offline: Speicherfehler (${err.message || 'Verbindungsfehler'}). Daten wurden lokal gesichert!`, 'warning', 5000);
+          }
           saveToUnsavedReports(finalReport, false);
         };
 
