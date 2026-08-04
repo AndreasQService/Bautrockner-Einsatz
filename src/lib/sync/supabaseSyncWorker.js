@@ -116,8 +116,8 @@ async function syncOnePhoto(photo) {
         
         const { error: uploadErr } = await supabase.storage
             .from('case-files')
-            .upload(storagePath, compressedBlob, {
-                contentType: photo.compressed.mimeType || 'image/jpeg',
+             .upload(storagePath, compressedBlob, {
+                contentType: photo.compressed?.mimeType || photo.type || 'image/jpeg',
                 upsert: true
             });
 
@@ -138,8 +138,8 @@ async function syncOnePhoto(photo) {
                 local_image_id: photo.id,
                 project_id: projectId,
                 filename: photo.name,
-                mime_type: photo.compressed.mimeType,
-                size_bytes: photo.compressed.size,
+                mime_type: photo.compressed?.mimeType || photo.type || 'image/jpeg',
+                size_bytes: photo.compressed?.size || compressedBlob.size || photo.size || 0,
                 sha256: sha256,
                 storage_bucket: 'case-files',
                 storage_path: storagePath,
@@ -195,8 +195,8 @@ async function syncOnePhoto(photo) {
                 uploading: false,
                 error: false,
                 type: 'image',
+                size: photo.compressed?.size || compressedBlob.size || photo.size || 0,
                 fileType: ext,
-                size: photo.compressed.size,
                 sha256: sha256,
                 assignedTo: photo.meta?.assignedTo || 'Sonstiges',
                 includeInReport: photo.meta?.includeInReport !== undefined ? photo.meta.includeInReport : true
