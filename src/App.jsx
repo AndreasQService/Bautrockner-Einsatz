@@ -1329,18 +1329,49 @@ function App() {
         if (loadedReports.length > 0) {
           setReports(prev => {
             return loadedReports.map(fresh => {
+              // Lokale ungespeicherte Änderungen einmischen falls vorhanden
+              let merged = fresh;
+              const cached = localStorage.getItem('qservice_unsaved_reports');
+              if (cached) {
+                try {
+                  const unsaved = JSON.parse(cached);
+                  if (unsaved[fresh.id]?.reportData) {
+                    merged = {
+                      ...fresh,
+                      ...unsaved[fresh.id].reportData,
+                      isLightweight: false
+                    };
+                  }
+                } catch (e) {}
+              }
+
               const existing = prev.find(r => r.id === fresh.id);
               if (existing && !existing.isLightweight) {
-                return { ...existing, ...fresh, _supabase_updated_at: fresh._supabase_updated_at || existing._supabase_updated_at, isLightweight: false };
+                return { ...existing, ...merged, _supabase_updated_at: merged._supabase_updated_at || existing._supabase_updated_at, isLightweight: false };
               }
-              return fresh;
+              return merged;
             });
           });
           setSelectedReport(prev => {
             if (prev && prev.id) {
               const fresh = loadedReports.find(r => r.id === prev.id);
               if (fresh) {
-                return prev.isLightweight ? fresh : prev;
+                // Lokale ungespeicherte Änderungen einmischen falls vorhanden
+                let merged = fresh;
+                const cached = localStorage.getItem('qservice_unsaved_reports');
+                if (cached) {
+                  try {
+                    const unsaved = JSON.parse(cached);
+                    if (unsaved[fresh.id]?.reportData) {
+                      merged = {
+                        ...fresh,
+                        ...unsaved[fresh.id].reportData,
+                        isLightweight: false
+                      };
+                    }
+                  } catch (e) {}
+                }
+                return prev.isLightweight ? merged : prev;
               }
             }
             return prev;
@@ -1374,9 +1405,26 @@ function App() {
   }, [fetchReports]);
 
   const handleSelectReport = async (report) => {
-    // 1. Sofort in die Detailansicht wechseln und Ladezustand anzeigen
-    openedReportBackupRef.current[report.id] = JSON.parse(JSON.stringify(report));
-    setSelectedReport(report);
+    // 1. Lokale ungespeicherte Änderungen einmischen falls vorhanden
+    let activeReport = report;
+    const cached = localStorage.getItem('qservice_unsaved_reports');
+    if (cached) {
+      try {
+        const unsaved = JSON.parse(cached);
+        if (unsaved[report.id]?.reportData) {
+          activeReport = {
+            ...report,
+            ...unsaved[report.id].reportData,
+            isLightweight: false
+          };
+          console.log('[Offline] Loaded unsaved report data for:', report.id);
+        }
+      } catch (e) {}
+    }
+
+    // Sofort in die Detailansicht wechseln und Ladezustand anzeigen
+    openedReportBackupRef.current[activeReport.id] = JSON.parse(JSON.stringify(activeReport));
+    setSelectedReport(activeReport);
     setView('details');
     setIsSessionActive(true);
 
@@ -1390,7 +1438,7 @@ function App() {
     }
 
     // 2. Falls leichtgewichtig, Details asynchron im Hintergrund laden
-    if (supabase && report.isLightweight) {
+    if (supabase && activeReport.isLightweight) {
       try {
         const { data, error } = await supabase
           .from('damage_reports')
