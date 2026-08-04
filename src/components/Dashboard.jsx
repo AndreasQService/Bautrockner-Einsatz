@@ -766,7 +766,7 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
 
             {/* Pass Filtered Reports to Monitors (only when not in Archive OR Technician Mode) */}
             {!showArchive && mode !== 'technician' && (
-                <div className="dashboard-layout-wrap" style={{ display: 'flex', gap: '1.5rem', alignItems: 'stretch', flexWrap: 'wrap', width: '100%' }}>
+                <div className="dashboard-layout-wrap" style={{ display: 'flex', gap: '1.5rem', alignItems: 'stretch', flexWrap: 'nowrap', width: '100%' }}>
                     <style>{`
                         @media (max-width: 1024px) {
                             .dashboard-layout-wrap {
