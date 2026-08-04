@@ -502,16 +502,7 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
     const [currentPage, setCurrentPage] = useState(1);
     const [selectedSidebarReport, setSelectedSidebarReport] = useState(null);
 
-    const sidebarFilteredReports = useMemo(() => {
-        if (!casesSearchTerm) return filteredReports;
-        const lower = casesSearchTerm.toLowerCase();
-        return filteredReports.filter(r => 
-            String(r.projectNumber || '').toLowerCase().includes(lower) ||
-            String(r.projectTitle || '').toLowerCase().includes(lower) ||
-            String(r.client || '').toLowerCase().includes(lower) ||
-            String(r.address || '').toLowerCase().includes(lower)
-        );
-    }, [filteredReports, casesSearchTerm]);
+
     const [workflowStore, setWorkflowStore] = useState(() => {
         try {
             return JSON.parse(localStorage.getItem('qtool_wf_v4') || '{}');
@@ -622,8 +613,18 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
         // Additional info (optional fields if they exist)
         if (r.clientSource?.toLowerCase().includes(lowerSearch)) return true;
 
-        return false;
     }), [reports, showArchive, searchTerm]);
+
+    const sidebarFilteredReports = useMemo(() => {
+        if (!casesSearchTerm) return filteredReports;
+        const lower = casesSearchTerm.toLowerCase();
+        return filteredReports.filter(r => 
+            String(r.projectNumber || '').toLowerCase().includes(lower) ||
+            String(r.projectTitle || '').toLowerCase().includes(lower) ||
+            String(r.client || '').toLowerCase().includes(lower) ||
+            String(r.address || '').toLowerCase().includes(lower)
+        );
+    }, [filteredReports, casesSearchTerm]);
 
     // Sort by last opened timestamp, falling back to report date
     const sortedReports = useMemo(() => {
