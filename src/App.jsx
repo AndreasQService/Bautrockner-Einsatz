@@ -271,6 +271,19 @@ function App() {
     return null;
   });
 
+  const sessionTokenRef = useRef(null);
+  const isSessionActiveRef = useRef(true);
+  const isLockedByIPadRef = useRef(false);
+  const loadedProjectVersionRef = useRef(1);
+  const currentUserRef = useRef(null);
+  const selectedReportRef = useRef(null);
+  const reportsRef = useRef([]);
+  const openedReportBackupRef = useRef({});
+  const sessionStartedAtRef = useRef(Date.now());
+  const silentSaveDebounceTimers = useRef({});
+  const viewRef = useRef('dashboard');
+  useEffect(() => { viewRef.current = view; }, [view]);
+
   // Authentication / User Management State
   const [showUserModal, setShowUserModal] = useState(false);
   const [showMeasurementManager, setShowMeasurementManager] = useState(false);
@@ -791,18 +804,7 @@ function App() {
     };
   }, []);
 
-  const sessionTokenRef = useRef(null);
-  const isSessionActiveRef = useRef(true);
-  const isLockedByIPadRef = useRef(false);
-  const loadedProjectVersionRef = useRef(1);
-  const currentUserRef = useRef(currentUser);
-  const selectedReportRef = useRef(null);
-  const reportsRef = useRef([]);
-  const openedReportBackupRef = useRef({});
-  const sessionStartedAtRef = useRef(Date.now());
-  const silentSaveDebounceTimers = useRef({});
-  const viewRef = useRef(view);
-  useEffect(() => { viewRef.current = view; }, [view]);
+
 
   // Synchronize loaded version ref when selected report changes
   useEffect(() => {
