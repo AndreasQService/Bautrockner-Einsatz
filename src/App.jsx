@@ -1447,8 +1447,22 @@ function App() {
           .single();
         
         if (data && !error && data.report_data) {
+          let mergedData = data.report_data;
+          const cached = localStorage.getItem('qservice_unsaved_reports');
+          if (cached) {
+            try {
+              const unsaved = JSON.parse(cached);
+              if (unsaved[report.id]?.reportData) {
+                mergedData = {
+                  ...mergedData,
+                  ...unsaved[report.id].reportData
+                };
+              }
+            } catch (e) {}
+          }
+
           const activeReport = {
-            ...sanitizeMeasurementStorage(data.report_data),
+            ...sanitizeMeasurementStorage(mergedData),
             id: report.id,
             _supabase_updated_at: data.updated_at,
             isLightweight: false
