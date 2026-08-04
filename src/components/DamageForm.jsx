@@ -9922,29 +9922,48 @@ END:VCARD`;
                                                         (typeof img.url === 'string' && img.url.startsWith('http')) ||
                                                         (typeof img.preview === 'string' && img.preview.startsWith('http'))
                                                     );
+                                                    const hasOneDrive = !!img.oneDriveItemId;
                                                     return (
-                                                        <div
-                                                            style={{
-                                                                position: 'absolute',
-                                                                top: '6px',
-                                                                left: '6px',
-                                                                backgroundColor: isCloudSaved ? 'rgba(16, 185, 129, 0.92)' : 'rgba(217, 119, 6, 0.92)',
-                                                                color: '#FFFFFF',
-                                                                borderRadius: '4px',
-                                                                padding: '2px 5px',
-                                                                fontSize: '0.62rem',
-                                                                fontWeight: 700,
-                                                                display: 'flex',
-                                                                alignItems: 'center',
-                                                                gap: '3px',
-                                                                boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
-                                                                zIndex: 2,
-                                                                backdropFilter: 'blur(4px)'
-                                                            }}
-                                                            title={isCloudSaved ? 'In Supabase/Cloud gespeichert' : 'Lokal gesichert'}
-                                                        >
-                                                            <Database size={10} style={{ strokeWidth: 2.5 }} />
-                                                            <span>{isCloudSaved ? 'In Supabase' : 'Lokal gesichert'}</span>
+                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', position: 'absolute', top: '6px', left: '6px', zIndex: 2 }}>
+                                                            <div
+                                                                style={{
+                                                                    backgroundColor: isCloudSaved ? 'rgba(16, 185, 129, 0.92)' : 'rgba(217, 119, 6, 0.92)',
+                                                                    color: '#FFFFFF',
+                                                                    borderRadius: '4px',
+                                                                    padding: '2px 5px',
+                                                                    fontSize: '0.62rem',
+                                                                    fontWeight: 700,
+                                                                    display: 'flex',
+                                                                    alignItems: 'center',
+                                                                    gap: '3px',
+                                                                    boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
+                                                                    backdropFilter: 'blur(4px)'
+                                                                }}
+                                                                title={isCloudSaved ? 'In Supabase/Cloud gespeichert' : 'Lokal gesichert'}
+                                                            >
+                                                                <Database size={10} style={{ strokeWidth: 2.5 }} />
+                                                                <span>{isCloudSaved ? 'In Supabase' : 'Lokal gesichert'}</span>
+                                                            </div>
+                                                            {hasOneDrive && (
+                                                                <div
+                                                                    style={{
+                                                                        backgroundColor: 'rgba(59, 130, 246, 0.92)',
+                                                                        color: '#FFFFFF',
+                                                                        borderRadius: '4px',
+                                                                        padding: '2px 5px',
+                                                                        fontSize: '0.62rem',
+                                                                        fontWeight: 700,
+                                                                        display: 'flex',
+                                                                        alignItems: 'center',
+                                                                        gap: '3px',
+                                                                        boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
+                                                                        backdropFilter: 'blur(4px)'
+                                                                    }}
+                                                                    title="Erfolgreich auf OneDrive gesichert"
+                                                                >
+                                                                    <span>☁️ OneDrive</span>
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     );
                                                 })()}
