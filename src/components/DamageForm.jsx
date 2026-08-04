@@ -628,11 +628,24 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
             }
         }
 
-        // Restore stripped image previews (Base64) from Supabase load
+        // Restore stripped image previews (Base64) from Supabase load, or populate if empty
         if (initialData?.images && Array.isArray(initialData.images)) {
             setFormData(prev => {
                 let changed = false;
-                const nextImages = prev.images.map(img => {
+
+                // If local state has no images but database has them, populate them!
+                if ((!prev.images || prev.images.length === 0) && initialData.images.length > 0) {
+                    changed = true;
+                    const nextData = {
+                        ...prev,
+                        images: initialData.images.map(img => typeof img === 'string' ? { preview: img, name: 'Existing Image', date: new Date().toISOString() } : img)
+                    };
+                    lastSavedData.current = nextData;
+                    latestFormData.current = nextData;
+                    return nextData;
+                }
+
+                const nextImages = (prev.images || []).map(img => {
                     if (!img.preview) {
                         const fresh = initialData.images.find(i => i.id === img.id);
                         if (fresh && fresh.preview) {
