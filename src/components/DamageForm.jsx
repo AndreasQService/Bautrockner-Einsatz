@@ -9982,6 +9982,42 @@ END:VCARD`;
                                                 })()}
                                                 <button
                                                     type="button"
+                                                    onClick={async () => {
+                                                        let url = img.preview || img.url;
+                                                        if (img.storagePath || img.supabasePath) {
+                                                            url = `https://yxdoecdqttgdncgbzyus.supabase.co/storage/v1/object/public/case-files/${img.storagePath || img.supabasePath}`;
+                                                        }
+                                                        try {
+                                                            await navigator.clipboard.writeText(url);
+                                                            alert('Foto-URL in die Zwischenablage kopiert!');
+                                                        } catch (err) {
+                                                            console.error('Failed to copy URL:', err);
+                                                        }
+                                                    }}
+                                                    style={{
+                                                        position: 'absolute',
+                                                        top: '6px',
+                                                        right: '6px',
+                                                        backgroundColor: 'rgba(0,0,0,0.6)',
+                                                        color: '#FFFFFF',
+                                                        border: 'none',
+                                                        borderRadius: '4px',
+                                                        padding: '4px 6px',
+                                                        cursor: 'pointer',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
+                                                        zIndex: 2,
+                                                        backdropFilter: 'blur(4px)'
+                                                    }}
+                                                    title="Foto-Link kopieren"
+                                                >
+                                                    <Link size={10} style={{ marginRight: '3px' }} />
+                                                    <span style={{ fontSize: '0.62rem', fontWeight: 700 }}>Link</span>
+                                                </button>
+                                                <button
+                                                    type="button"
                                                     onClick={() => {
                                                         setEditingImage(img);
                                                         setEditingImageIndex(i);
