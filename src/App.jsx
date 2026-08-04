@@ -696,7 +696,11 @@ function App() {
 
     const syncSession = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        const getSessionPromise = supabase.auth.getSession();
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Session Timeout')), 3000)
+        );
+        const { data: { session } } = await Promise.race([getSessionPromise, timeoutPromise]);
         setSupabaseSession(session);
         if (session && session.user && session.user.email === 'a.strehler@q-service.ch') {
           const saved = localStorage.getItem('qtool_current_user');
