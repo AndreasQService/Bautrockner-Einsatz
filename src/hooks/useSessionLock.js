@@ -316,9 +316,15 @@ export function useSessionLock(
       supabase,
       upsertSession,
       pollSessions,
-      deleteSession,
+      deleteSession: () => {
+        if (myDevice !== 'iPad') {
+          deleteSession();
+        } else {
+          console.log('[SessionLock] iPad lock bypass: preserving lock session for 20 mins.');
+        }
+      },
     });
-  }, [enabled, supabase, upsertSession, pollSessions, deleteSession]);
+  }, [enabled, supabase, upsertSession, pollSessions, deleteSession, myDevice]);
 
   // Trigger immediate lock check when opening project
   useEffect(() => {
