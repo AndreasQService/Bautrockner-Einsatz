@@ -1942,26 +1942,20 @@ function App() {
     }
 
     if (supabase) {
-      // SOFT-DELETE: Projekt aus DB als gelöscht markieren
-      // Spalte deleted_at muss in Supabase existieren – falls nicht, wird nur lokal gelöscht
+      // HARD-DELETE: Projekt endgültig aus DB löschen
       try {
         const { error } = await supabase
           .from('damage_reports')
-          .update({ deleted_at: new Date().toISOString() })
+          .delete()
           .eq('id', reportId);
         if (error) {
-          if (error.code === '42703') {
-            console.warn('[Soft-Delete] deleted_at Spalte fehlt in DB – nur lokal gelöscht');
-            showToast('Projekt lokal gelöscht', 'success');
-          } else {
-            console.error('[Soft-Delete] Fehler:', error);
-            showToast(`Fehler: ${error.message || error.code}`, 'error');
-          }
+          console.error('[Hard-Delete] Fehler:', error);
+          showToast(`Fehler beim Löschen: ${error.message || error.code}`, 'error');
         } else {
-          showToast('Projekt gelöscht', 'success');
+          showToast('Projekt endgültig gelöscht', 'success');
         }
       } catch (e) {
-        console.warn('[Soft-Delete] Exception:', e.message);
+        console.warn('[Hard-Delete] Exception:', e.message);
         showToast('Projekt lokal gelöscht', 'success');
       }
     } else {
