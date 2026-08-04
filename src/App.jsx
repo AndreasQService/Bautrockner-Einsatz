@@ -611,6 +611,17 @@ function App() {
         openedReportBackupRef.current[reportId] = JSON.parse(JSON.stringify(finalSyncedReport));
         logAudit('success');
 
+        // Clean up preserved session lock in Supabase if we have already navigated away from the project
+        if (selectedReportRef.current?.id !== reportId || (viewRef.current !== 'details' && viewRef.current !== 'new-report')) {
+          supabase
+            .from('project_sessions')
+            .delete()
+            .eq('open_project_id', reportId)
+            .eq('session_token', sessionTokenRef.current)
+            .then(() => console.log('[Sync] Released preserved session lock after background sync completion:', reportId))
+            .catch(e => console.warn('[Sync] Failed to release preserved lock:', e));
+        }
+
         try {
           const odFolder = buildProjectFolderName(
             finalSyncedReport.projectNumber || finalSyncedReport.id || 'Unbekannt',
@@ -790,6 +801,8 @@ function App() {
   const openedReportBackupRef = useRef({});
   const sessionStartedAtRef = useRef(Date.now());
   const silentSaveDebounceTimers = useRef({});
+  const viewRef = useRef(view);
+  useEffect(() => { viewRef.current = view; }, [view]);
 
   // Synchronize loaded version ref when selected report changes
   useEffect(() => {
