@@ -1374,32 +1374,9 @@ function App() {
   }, [fetchReports]);
 
   const handleSelectReport = async (report) => {
-    let activeReport = report;
-    if (supabase && report.isLightweight) {
-      try {
-        const { data, error } = await supabase
-          .from('damage_reports')
-          .select('report_data, updated_at')
-          .eq('id', report.id)
-          .single();
-        
-        if (data && !error && data.report_data) {
-          activeReport = {
-            ...sanitizeMeasurementStorage(data.report_data),
-            id: report.id,
-            _supabase_updated_at: data.updated_at,
-            isLightweight: false
-          };
-          setReports(prev => prev.map(r => r.id === report.id ? activeReport : r));
-        } else {
-          console.error("[fetchReports] Failed to load full report:", { data, error });
-        }
-      } catch (err) {
-        console.error("Failed to fetch full report details:", err);
-      }
-    }
-    openedReportBackupRef.current[activeReport.id] = JSON.parse(JSON.stringify(activeReport));
-    setSelectedReport(activeReport);
+    // 1. Sofort in die Detailansicht wechseln und Ladezustand anzeigen
+    openedReportBackupRef.current[report.id] = JSON.parse(JSON.stringify(report));
+    setSelectedReport(report);
     setView('details');
     setIsSessionActive(true);
 
@@ -1411,13 +1388,41 @@ function App() {
     } catch (e) {
       console.warn('Fehler beim Speichern von qservice_last_opened:', e);
     }
+
+    // 2. Falls leichtgewichtig, Details asynchron im Hintergrund laden
+    if (supabase && report.isLightweight) {
+      try {
+        const { data, error } = await supabase
+          .from('damage_reports')
+          .select('report_data, updated_at')
+          .eq('id', report.id)
+          .single();
+        
+        if (data && !error && data.report_data) {
+          const activeReport = {
+            ...sanitizeMeasurementStorage(data.report_data),
+            id: report.id,
+            _supabase_updated_at: data.updated_at,
+            isLightweight: false
+          };
+          setReports(prev => prev.map(r => r.id === report.id ? activeReport : r));
+          // Nur aktualisieren, wenn der Benutzer das Projekt in der Zwischenzeit nicht schon wieder geschlossen hat
+          setSelectedReport(prev => prev && prev.id === report.id ? activeReport : prev);
+          openedReportBackupRef.current[report.id] = JSON.parse(JSON.stringify(activeReport));
+        } else {
+          console.error("[fetchReports] Failed to load full report:", { data, error });
+        }
+      } catch (err) {
+        console.error("Failed to fetch full report details:", err);
+      }
+    }
     // Projektspezifischen Modus laden
-    const savedMode = activeReport?._projectMode;
+    const savedMode = report?._projectMode;
     const initialMode = (userRole === 'technician' || isTechnicianMode)
       ? 'technician'
       : ((savedMode === 'technician' || savedMode === 'desktop') ? savedMode : 'desktop');
     setProjectMode(initialMode);
-  }
+  };
 
   // Automatisches Nachladen der vollständigen Projektdaten im Hintergrund, wenn ein Projekt geöffnet wird/ist
   useEffect(() => {
