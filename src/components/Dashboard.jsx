@@ -766,7 +766,19 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
 
             {/* Pass Filtered Reports to Monitors (only when not in Archive OR Technician Mode) */}
             {!showArchive && mode !== 'technician' && (
-                <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'stretch', flexWrap: 'wrap', width: '100%' }}>
+                <div className="dashboard-layout-wrap" style={{ display: 'flex', gap: '1.5rem', alignItems: 'stretch', flexWrap: 'wrap', width: '100%' }}>
+                    <style>{`
+                        @media (max-width: 1024px) {
+                            .dashboard-layout-wrap {
+                                flex-direction: column !important;
+                            }
+                            .dashboard-side-col {
+                                width: 100% !important;
+                                position: static !important;
+                                max-height: none !important;
+                            }
+                        }
+                    `}</style>
                     {/* Left Column: Monitors */}
                     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1.5rem', minWidth: 0 }}>
                         <TodoMonitor reports={reports} users={users || []} currentUser={currentUser} onSelectReport={onSelectReport} onReportsChanged={onReportsChanged} />
@@ -780,7 +792,7 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
 
                     {/* Right Column: All Projects & Compact Devices List */}
                     {(showAllCases || showDevices) && (
-                        <div style={{
+                        <div className="dashboard-side-col" style={{
                             width: '400px',
                             flexShrink: 0,
                             display: 'flex',
