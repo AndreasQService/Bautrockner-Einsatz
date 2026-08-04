@@ -65,6 +65,11 @@ export function useSessionLock(
   const [isLockedByIPad, setIsLockedByIPad]       = useState(false);
   const [activeLockActivity, setActiveLockActivity] = useState(null);
 
+  const isSessionActiveRef = useRef(!enabled || !selectedReportId);
+  useEffect(() => {
+    isSessionActiveRef.current = isSessionActive;
+  }, [isSessionActive]);
+
   const isTestAgent = typeof navigator !== 'undefined' && navigator.userAgent.includes('QToolDeepTest');
   const isLockEnabled = enabled || isTestAgent;
 
@@ -215,7 +220,7 @@ export function useSessionLock(
     const inProject   = myView === 'details' || myView === 'new-report';
 
     // 1. Check local inactivity timeout first
-    if (inProject && isSessionActive) {
+    if (inProject && isSessionActiveRef.current) {
       const inactiveMs = Date.now() - lastLocalActivityRef.current;
       if (inactiveMs >= SESSION_TIMEOUT) {
         console.warn('[SessionLock] INACTIVITY_TIMEOUT reached!');
@@ -299,7 +304,7 @@ export function useSessionLock(
       setActiveLockDevice(winningSession?.deviceType || 'Gerät');
       setActiveLockActivity(winningSession?.last_seen || new Date().toISOString());
     }
-  }, [supabase, myDevice, username, isSessionActive, onInactivityTimeout, deleteSession]);
+  }, [supabase, myDevice, username, onInactivityTimeout, deleteSession]);
 
   // Main lifecycle loop setup
   useEffect(() => {
