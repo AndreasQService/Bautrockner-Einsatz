@@ -2719,7 +2719,7 @@ function App() {
                         )}
                       </div>
                     </div>
-                    {activeLockUser && (
+                    {!isSessionActive && activeLockUser && (
                       <div style={{
                         borderTop: '1px solid rgba(255,255,255,0.08)',
                         paddingTop: '0.5rem',
