@@ -716,7 +716,17 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         const restoreLocalPreviews = async () => {
             if (!formData.id) return;
 
-            // 1. Fetch all local photos from IndexedDB for this project
+            // 1. Migrate any local photos from 'temp' to this new project ID
+            if (formData.id !== 'temp') {
+                try {
+                    const { migrateTempPhotos } = await import('../services/PhotoStorage');
+                    await migrateTempPhotos(formData.id);
+                } catch (migErr) {
+                    console.warn("[restoreLocalPreviews] Temp photo migration failed:", migErr);
+                }
+            }
+
+            // 2. Fetch all local photos from IndexedDB for this project
             let localPhotos = [];
             try {
                 localPhotos = await getProjectPhotos(formData.id);

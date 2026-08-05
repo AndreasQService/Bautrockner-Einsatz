@@ -356,3 +356,46 @@ export async function getPendingCount() {
         }
     });
 }
+
+/**
+ * Migriert alle Fotos von der ID "temp" zu einer echten Projekt-ID
+ */
+export async function migrateTempPhotos(realProjectId) {
+    if (!realProjectId || realProjectId === 'temp') return 0;
+    
+    const db = await openDB();
+    if (!db.objectStoreNames.contains(STORE_PHOTOS)) return 0;
+    
+    return new Promise((resolve, reject) => {
+        try {
+            const tx = db.transaction(STORE_PHOTOS, 'readwrite');
+            const store = tx.objectStore(STORE_PHOTOS);
+            const index = store.index('projectId');
+            const req = index.getAll('temp');
+            
+            req.onsuccess = () => {
+                const tempPhotos = req.result || [];
+                if (tempPhotos.length === 0) {
+                    resolve(0);
+                    return;
+                }
+                
+                let migratedCount = 0;
+                for (const photo of tempPhotos) {
+                    photo.projectId = realProjectId;
+                    store.put(photo);
+                    migratedCount++;
+                }
+                
+                tx.oncomplete = () => {
+                    console.log(`[PhotoStorage] 🚀 Migrated ${migratedCount} photos from "temp" to "${realProjectId}"`);
+                    resolve(migratedCount);
+                };
+            };
+            
+            req.onerror = () => reject(req.error);
+        } catch (e) {
+            reject(e);
+        }
+    });
+}
