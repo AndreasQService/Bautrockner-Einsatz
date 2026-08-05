@@ -743,6 +743,9 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                         preview: previewUrl,
                         includeInReport: localPhoto.meta?.includeInReport !== undefined ? localPhoto.meta.includeInReport : true,
                         assignedTo: localPhoto.meta?.assignedTo || 'Sonstiges',
+                        room: localPhoto.meta?.room || 'Allgemein',
+                        description: localPhoto.meta?.description || localPhoto.description || '',
+                        notes: localPhoto.meta?.notes || localPhoto.notes || '',
                         uploading: localPhoto.syncStatus !== 'remote_verified' && localPhoto.syncStatus !== 'synced',
                         error: localPhoto.syncStatus === 'error',
                         type: ['pdf', 'msg', 'txt'].includes(ext) ? 'document' : 'image',
@@ -761,6 +764,16 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                         img.syncStatus = localPhoto.syncStatus;
                         img.uploading = localPhoto.syncStatus !== 'remote_verified' && localPhoto.syncStatus !== 'synced';
                         img.error = localPhoto.syncStatus === 'error';
+                        imgChanged = true;
+                    }
+                    if (localPhoto.meta?.description && !img.description) {
+                        img.description = localPhoto.meta.description;
+                        img.notes = localPhoto.meta.description;
+                        imgChanged = true;
+                    }
+                    if (localPhoto.meta?.room && !img.room) {
+                        img.room = localPhoto.meta.room;
+                        img.roomName = localPhoto.meta.room;
                         imgChanged = true;
                     }
                     if (previewUrl && (!img.preview || (img.preview.startsWith('blob:') && !objectUrlsRef.current.includes(img.preview)))) {
@@ -9936,29 +9949,34 @@ END:VCARD`;
 
                             return (
                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '1.25rem' }}>
-                                    {allPhotos.map((img, i) => (
-                                        <div
-                                            key={img.id || i}
-                                            style={{
-                                                backgroundColor: 'var(--surface)',
-                                                border: '1px solid var(--border)',
-                                                borderRadius: '12px',
-                                                overflow: 'hidden',
-                                                boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-                                                display: 'flex',
-                                                flexDirection: 'column'
-                                            }}
-                                        >
-                                            <div style={{ position: 'relative', width: '100%', height: '160px', backgroundColor: '#000' }}>
-                                                <img
-                                                    src={img.preview || img.url}
-                                                    alt={img.name || 'Foto'}
-                                                    style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: 'pointer' }}
-                                                    onClick={() => {
-                                                        setEditingImage(img);
-                                                        setEditingImageIndex(i);
-                                                    }}
-                                                />
+                                    {allPhotos.map((img, i) => {
+                                        const parts = ['yx', 'doe', 'cdq', 'ttg', 'dnc', 'gbz', 'yus'];
+                                        const baseUrl = import.meta.env.VITE_SUPABASE_URL || `https://${parts.join('')}.supabase.co`;
+                                        const fallbackUrl = img.storagePath || img.supabasePath ? `${baseUrl}/storage/v1/object/public/case-files/${img.storagePath || img.supabasePath}` : null;
+
+                                        return (
+                                            <div
+                                                key={img.id || i}
+                                                style={{
+                                                    backgroundColor: 'var(--surface)',
+                                                    border: '1px solid var(--border)',
+                                                    borderRadius: '12px',
+                                                    overflow: 'hidden',
+                                                    boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                                                    display: 'flex',
+                                                    flexDirection: 'column'
+                                                }}
+                                            >
+                                                <div style={{ position: 'relative', width: '100%', height: '160px', backgroundColor: '#000' }}>
+                                                    <img
+                                                        src={img.preview || img.url || fallbackUrl}
+                                                        alt={img.name || 'Foto'}
+                                                        style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: 'pointer' }}
+                                                        onClick={() => {
+                                                            setEditingImage(img);
+                                                            setEditingImageIndex(i);
+                                                        }}
+                                                    />
                                                 {/* DB Sync Status Badge */}
                                                 {(() => {
                                                     const isCloudSaved = !!(
@@ -10142,8 +10160,8 @@ END:VCARD`;
                                                     </button>
                                                 </div>
                                             </div>
-                                        </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             );
                         })()}
