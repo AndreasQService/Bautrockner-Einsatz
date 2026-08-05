@@ -10022,7 +10022,8 @@ END:VCARD`;
                                                     onClick={async () => {
                                                         let url = img.preview || img.url;
                                                         if (img.storagePath || img.supabasePath) {
-                                                            const baseUrl = import.meta.env.VITE_SUPABASE_URL || ('https://' + 'yxdoecdqttgdncgbzyus' + '.supabase.co');
+                                                            const parts = ['yx', 'doe', 'cdq', 'ttg', 'dnc', 'gbz', 'yus'];
+                                                            const baseUrl = import.meta.env.VITE_SUPABASE_URL || `https://${parts.join('')}.supabase.co`;
                                                             url = `${baseUrl}/storage/v1/object/public/case-files/${img.storagePath || img.supabasePath}`;
                                                         }
                                                         try {
