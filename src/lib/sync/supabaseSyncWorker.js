@@ -21,7 +21,10 @@ export async function syncPendingToSupabase() {
 
     try {
         const photos = await getPendingPhotosFromDb();
-        if (!photos.length) return { synced: 0, failed: 0 };
+        if (!photos.length) {
+            isSyncRunning = false;
+            return { synced: 0, failed: 0 };
+        }
 
         console.info(`[SyncWorker] 🔄 Found ${photos.length} pending photos to process.`);
 

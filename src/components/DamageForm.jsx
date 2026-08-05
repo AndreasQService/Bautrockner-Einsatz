@@ -925,6 +925,18 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         // Pending-Count beim Mount laden
         getPendingCount().then(count => setPendingSyncCount(count));
 
+        // Beim Mount: wenn bereits online, sofort syncen
+        if (navigator.onLine) {
+            syncPendingPhotos();
+        }
+
+        // Set up recurring auto-sync interval (every 10 seconds) to retry failed uploads or catch newly added photos
+        const intervalId = setInterval(() => {
+            if (navigator.onLine) {
+                syncPendingPhotos();
+            }
+        }, 10000); // 10 seconds
+
         // Online-Event: automatisch syncen wenn Netz zurückkommt
         const handleOnline = () => {
             setIsOnline(true);
@@ -939,10 +951,8 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         window.addEventListener('online', handleOnline);
         window.addEventListener('offline', handleOffline);
 
-        // Beim Mount: wenn bereits online, sofort syncen
-        if (navigator.onLine) syncPendingPhotos();
-
         return () => {
+            clearInterval(intervalId);
             window.removeEventListener('online', handleOnline);
             window.removeEventListener('offline', handleOffline);
         };
