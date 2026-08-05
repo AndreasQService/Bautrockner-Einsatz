@@ -10022,7 +10022,8 @@ END:VCARD`;
                                                     onClick={async () => {
                                                         let url = img.preview || img.url;
                                                         if (img.storagePath || img.supabasePath) {
-                                                            url = `https://yxdoecdqttgdncgbzyus.supabase.co/storage/v1/object/public/case-files/${img.storagePath || img.supabasePath}`;
+                                                            const baseUrl = import.meta.env.VITE_SUPABASE_URL || ('https://' + 'yxdoecdqttgdncgbzyus' + '.supabase.co');
+                                                            url = `${baseUrl}/storage/v1/object/public/case-files/${img.storagePath || img.supabasePath}`;
                                                         }
                                                         try {
                                                             await navigator.clipboard.writeText(url);
