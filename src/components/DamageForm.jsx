@@ -831,98 +831,97 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         };
     }, [formData.id]);
 
-    // ── Auto-Sync: Pending Fotos hochladen wenn Netz zurückkommt ─────────────
-    useEffect(() => {
+    const syncPendingPhotos = useCallback(async () => {
         const isCloudFirstEnabled = import.meta.env.VITE_CLOUD_FIRST_IMAGES === 'true' || import.meta.env.VITE_CLOUD_FIRST_IMAGES === true;
+        if (isSyncing) return;
+        setIsSyncing(true);
 
-        const syncPendingPhotos = async () => {
-            if (isSyncing) return;
-            setIsSyncing(true);
+        console.log('[Sync] 🔄 Starte Sync ausstehender Fotos...');
 
-            console.log('[Sync] 🔄 Netz verfügbar – starte Sync ausstehender Fotos...');
+        try {
+            if (IS_TEST_ENV || isCloudFirstEnabled) {
+                const { syncPendingToSupabase } = await import('../lib/sync/supabaseSyncWorker');
+                const { synced, failed } = await syncPendingToSupabase();
+                console.log(`[Sync] Cloud-first sync done. Synced: ${synced}, Failed: ${failed}`);
+                if (synced > 0) {
+                    try {
+                        const updatedLocal = await getProjectPhotos(formData.id || 'temp');
+                        setFormData(prev => ({
+                            ...prev,
+                            images: (prev.images || []).map(img => {
+                                const lp = updatedLocal.find(p => p.id === img.id);
+                                return lp && lp.syncStatus ? {
+                                    ...img,
+                                    syncStatus: lp.syncStatus,
+                                    supabasePath: lp.supabasePath || img.supabasePath,
+                                    oneDriveItemId: lp.oneDriveItemId || img.oneDriveItemId,
+                                    uploading: lp.syncStatus !== 'remote_verified' && lp.syncStatus !== 'synced'
+                                } : img;
+                            })
+                        }));
+                    } catch (e) {}
+                }
+            } else {
+                // Legacy sync loop
+                const { getPendingPhotos } = await import('../services/PhotoStorage');
+                const pending = await getPendingPhotos(formData.id || 'temp');
 
-            try {
-                if (IS_TEST_ENV || isCloudFirstEnabled) {
-                    const { syncPendingToSupabase } = await import('../lib/sync/supabaseSyncWorker');
-                    const { synced, failed } = await syncPendingToSupabase();
-                    console.log(`[Sync] Cloud-first sync done. Synced: ${synced}, Failed: ${failed}`);
-                    if (synced > 0) {
-                        try {
-                            const updatedLocal = await getProjectPhotos(formData.id || 'temp');
-                            setFormData(prev => ({
-                                ...prev,
-                                images: (prev.images || []).map(img => {
-                                    const lp = updatedLocal.find(p => p.id === img.id);
-                                    return lp && lp.syncStatus ? {
-                                        ...img,
-                                        syncStatus: lp.syncStatus,
-                                        supabasePath: lp.supabasePath || img.supabasePath,
-                                        oneDriveItemId: lp.oneDriveItemId || img.oneDriveItemId,
-                                        uploading: lp.syncStatus !== 'remote_verified' && lp.syncStatus !== 'synced'
-                                    } : img;
-                                })
-                            }));
-                        } catch (e) {}
-                    }
-                } else {
-                    // Legacy sync loop
-                    const { getPendingPhotos } = await import('../services/PhotoStorage');
-                    const pending = await getPendingPhotos(formData.id || 'temp');
+                if (pending.length === 0) {
+                    setPendingSyncCount(0);
+                    return;
+                }
 
-                    if (pending.length === 0) {
-                        setPendingSyncCount(0);
-                        return;
-                    }
+                let synced = 0;
+                for (const photo of pending) {
+                    try {
+                        const meta = photo.meta || {};
+                        const subFolder = meta.subFolder || 'Sonstiges';
+                        const odFolder = meta.odFolder || buildProjectFolderName(formData.projectNumber || formData.id || 'Unbekannt', formData);
 
-                    let synced = 0;
-                    for (const photo of pending) {
-                        try {
-                            const meta = photo.meta || {};
-                            const subFolder = meta.subFolder || 'Sonstiges';
-                            const odFolder = meta.odFolder || buildProjectFolderName(formData.projectNumber || formData.id || 'Unbekannt', formData);
-
-                            // Supabase Upload
-                            let supabasePath = photo.supabasePath;
-                            if (!supabasePath && supabase) {
-                                const ext = photo.name.split('.').pop();
-                                const fileName = `cases/${formData.id || 'temp'}/images/${Date.now()}_${photo.id}.${ext}`;
-                                const { error } = await supabase.storage.from('case-files').upload(fileName, photo.blob);
-                                if (!error) supabasePath = fileName;
-                            }
-
-                            // OneDrive Upload
-                            let oneDriveItemId = photo.oneDriveItemId;
-                            let oneDrivePath = photo.oneDrivePath;
-                            if (!oneDriveItemId) {
-                                const odResult = await uploadPhotoAndGetUrl(odFolder, subFolder, new File([photo.blob], photo.name, { type: photo.type }));
-                                if (odResult) {
-                                    oneDriveItemId = odResult.itemId;
-                                    oneDrivePath = odResult.odPath;
-                                }
-                            }
-
-                            await updatePhotoSyncStatus(photo.id, {
-                                supabasePath,
-                                oneDriveItemId,
-                                oneDrivePath,
-                                syncStatus: oneDriveItemId ? 'synced' : (supabasePath ? 'synced' : 'error'),
-                            });
-
-                            synced++;
-                        } catch (photoErr) {
-                            console.warn(`[Sync] Foto ${photo.id} fehlgeschlagen:`, photoErr.message);
+                        // Supabase Upload
+                        let supabasePath = photo.supabasePath;
+                        if (!supabasePath && supabase) {
+                            const ext = photo.name.split('.').pop();
+                            const fileName = `cases/${formData.id || 'temp'}/images/${Date.now()}_${photo.id}.${ext}`;
+                            const { error } = await supabase.storage.from('case-files').upload(fileName, photo.blob);
+                            if (!error) supabasePath = fileName;
                         }
+
+                        // OneDrive Upload
+                        let oneDriveItemId = photo.oneDriveItemId;
+                        let oneDrivePath = photo.oneDrivePath;
+                        if (!oneDriveItemId) {
+                            const odResult = await uploadPhotoAndGetUrl(odFolder, subFolder, new File([photo.blob], photo.name, { type: photo.type }));
+                            if (odResult) {
+                                oneDriveItemId = odResult.itemId;
+                                oneDrivePath = odResult.odPath;
+                            }
+                        }
+
+                        await updatePhotoSyncStatus(photo.id, {
+                            supabasePath,
+                            oneDriveItemId,
+                            oneDrivePath,
+                            syncStatus: oneDriveItemId ? 'synced' : (supabasePath ? 'synced' : 'error'),
+                        });
+
+                        synced++;
+                    } catch (photoErr) {
+                        console.warn(`[Sync] Foto ${photo.id} fehlgeschlagen:`, photoErr.message);
                     }
                 }
-                const count = await getPendingCount();
-                setPendingSyncCount(count);
-            } catch (e) {
-                console.warn('[Sync] Fehler:', e.message);
-            } finally {
-                setIsSyncing(false);
             }
-        };
+            const count = await getPendingCount();
+            setPendingSyncCount(count);
+        } catch (e) {
+            console.warn('[Sync] Fehler:', e.message);
+        } finally {
+            setIsSyncing(false);
+        }
+    }, [formData.id, formData.projectNumber, isSyncing, supabase]);
 
+    // ── Auto-Sync: Pending Fotos hochladen wenn Netz zurückkommt ─────────────
+    useEffect(() => {
         // Pending-Count beim Mount laden
         getPendingCount().then(count => setPendingSyncCount(count));
 
@@ -947,7 +946,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
             window.removeEventListener('online', handleOnline);
             window.removeEventListener('offline', handleOffline);
         };
-    }, [formData.id]); // Nur neu starten wenn Projekt wechselt
+    }, [formData.id, syncPendingPhotos]);
 
     // ── OneDrive-Backfill: Supabase-Fotos → persönliches OneDrive ─────────────
     // Läuft einmal beim Öffnen eines Projekts. Findet alle Fotos die in Supabase
@@ -9815,9 +9814,37 @@ END:VCARD`;
                 {mode === 'desktop' && desktopTab === 'fotos' && (
                     <div className="card" style={{ padding: '1.5rem', marginBottom: '1.5rem', backgroundColor: 'var(--surface)', border: '1px solid var(--border)' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
-                            <h3 className="section-header" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem', border: 'none' }}>
-                                <Camera size={20} /> Fotodokumentation ({((formData.images || []).filter(img => !(img.type === 'document' || img.name?.toLowerCase().endsWith('.msg') || img.name?.toLowerCase().endsWith('.pdf')))).length + (formData.photos || []).length} Fotos)
-                            </h3>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                <h3 className="section-header" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem', border: 'none' }}>
+                                    <Camera size={20} /> Fotodokumentation ({((formData.images || []).filter(img => !(img.type === 'document' || img.name?.toLowerCase().endsWith('.msg') || img.name?.toLowerCase().endsWith('.pdf')))).length + (formData.photos || []).length} Fotos)
+                                </h3>
+                                {pendingSyncCount > 0 && (
+                                    <button
+                                        type="button"
+                                        onClick={async () => {
+                                            if (isSyncing) return;
+                                            alert("Synchronisation wird manuell gestartet...");
+                                            await syncPendingPhotos();
+                                        }}
+                                        style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '0.4rem',
+                                            backgroundColor: '#F59E0B',
+                                            color: '#FFFFFF',
+                                            border: 'none',
+                                            borderRadius: '6px',
+                                            padding: '0.4rem 0.8rem',
+                                            fontSize: '0.8rem',
+                                            fontWeight: 700,
+                                            cursor: 'pointer'
+                                        }}
+                                    >
+                                        <Database size={12} />
+                                        <span>Jetzt hochladen ({pendingSyncCount})</span>
+                                    </button>
+                                )}
+                            </div>
 
                             {/* Kamera / Upload Button */}
                             <label
