@@ -1349,7 +1349,22 @@ function App() {
 
               const existing = prev.find(r => r.id === fresh.id);
               if (existing && !existing.isLightweight) {
-                return { ...existing, ...merged, _supabase_updated_at: merged._supabase_updated_at || existing._supabase_updated_at, isLightweight: false };
+                // Nur vom Lightweight-Query gelieferte Metadaten übernehmen, falls definiert.
+                // Reiche Daten und den ursprünglichen Supabase-Versionsstand (_supabase_updated_at) absolut schützen.
+                return {
+                  ...existing,
+                  projectTitle: merged.projectTitle !== undefined ? merged.projectTitle : existing.projectTitle,
+                  projectNumber: merged.projectNumber !== undefined ? merged.projectNumber : existing.projectNumber,
+                  client: merged.client !== undefined ? merged.client : existing.client,
+                  address: merged.address !== undefined ? merged.address : existing.address,
+                  status: merged.status !== undefined ? merged.status : existing.status,
+                  assignedTo: merged.assignedTo !== undefined ? merged.assignedTo : existing.assignedTo,
+                  date: merged.date !== undefined ? merged.date : existing.date,
+                  dryingStarted: merged.dryingStarted !== undefined ? merged.dryingStarted : existing.dryingStarted,
+                  deletedAt: merged.deletedAt !== undefined ? merged.deletedAt : existing.deletedAt,
+                  _supabase_updated_at: existing._supabase_updated_at,
+                  isLightweight: false
+                };
               }
               return merged;
             });
