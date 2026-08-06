@@ -289,6 +289,28 @@ export async function deleteOldSyncedPhotos(olderThanDays = 30) {
 }
 
 /**
+ * Foto aus IndexedDB löschen
+ */
+export async function deletePhotoLocally(photoId) {
+    const db = await openDB();
+    if (!db.objectStoreNames.contains(STORE_PHOTOS)) {
+        return;
+    }
+
+    return new Promise((resolve, reject) => {
+        try {
+            const tx = db.transaction(STORE_PHOTOS, 'readwrite');
+            const store = tx.objectStore(STORE_PHOTOS);
+            const req = store.delete(photoId);
+            req.onsuccess = () => resolve();
+            req.onerror = () => reject(req.error);
+        } catch (e) {
+            reject(e);
+        }
+    });
+}
+
+/**
  * Auto-migrates photos in IndexedDB that are already uploaded to Supabase or OneDrive,
  * setting their syncStatus to 'remote_verified'.
  */

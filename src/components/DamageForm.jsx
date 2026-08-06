@@ -22,7 +22,7 @@ import { supabase } from '../supabaseClient';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import { buildProjectFolderName, uploadPhotoAndGetUrl, getPhotoDownloadUrl, uploadReport } from '../services/OneDriveService';
-import { savePhotoLocally, updatePhotoSyncStatus, deleteOldSyncedPhotos, getPendingCount, getPhotoBlob, getProjectPhotos } from '../services/PhotoStorage';
+import { savePhotoLocally, updatePhotoSyncStatus, deleteOldSyncedPhotos, getPendingCount, getPhotoBlob, getProjectPhotos, deletePhotoLocally } from '../services/PhotoStorage';
 const IS_TEST_ENV = !!(typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_EXPECTED_SUPABASE_PROJECT_ID === 'aoxduqspiezzyqeqyzzl');
 import { swissPLZ } from '../data/swiss_plz';
 
@@ -522,6 +522,43 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
 
     // Sync asynchronously loaded initialData fields (like exteriorPhoto, images, rooms, and measurementRooms) back to local state
     useEffect(() => {
+        if (initialData) {
+            setFormData(prev => {
+                let changed = false;
+                const next = { ...prev };
+                if (initialData.findings && !prev.findings) {
+                    next.findings = initialData.findings;
+                    changed = true;
+                }
+                if (initialData.description && !prev.description) {
+                    next.description = initialData.description;
+                    changed = true;
+                }
+                if (initialData.cause && !prev.cause) {
+                    next.cause = initialData.cause;
+                    changed = true;
+                }
+                if (initialData.notes && !prev.notes) {
+                    next.notes = initialData.notes;
+                    changed = true;
+                }
+                if (initialData.selectedMeasures && (!prev.selectedMeasures || prev.selectedMeasures.length === 0)) {
+                    next.selectedMeasures = initialData.selectedMeasures;
+                    changed = true;
+                }
+                if (initialData.measureNotes && (!prev.measureNotes || Object.keys(prev.measureNotes).length === 0)) {
+                    next.measureNotes = initialData.measureNotes;
+                    changed = true;
+                }
+                if (changed) {
+                    lastSavedData.current = next;
+                    latestFormData.current = next;
+                    return next;
+                }
+                return prev;
+            });
+        }
+
         if (
             initialData?.exteriorPhoto &&
             !formData.exteriorPhoto &&
@@ -646,11 +683,41 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                 }
 
                 const nextImages = (prev.images || []).map(img => {
-                    if (!img.preview) {
-                        const fresh = initialData.images.find(i => i.id === img.id);
-                        if (fresh && fresh.preview) {
+                    const fresh = initialData.images.find(i => i.id === img.id);
+                    if (fresh) {
+                        let imgChanged = false;
+                        const merged = { ...img };
+
+                        if (!merged.preview && fresh.preview) {
+                            merged.preview = fresh.preview;
+                            imgChanged = true;
+                        }
+                        if (fresh.description && merged.description !== fresh.description) {
+                            merged.description = fresh.description;
+                            merged.notes = fresh.description;
+                            imgChanged = true;
+                        }
+                        if (fresh.room && merged.room !== fresh.room) {
+                            merged.room = fresh.room;
+                            merged.roomName = fresh.room;
+                            imgChanged = true;
+                        }
+                        if (fresh.includeInReport !== undefined && merged.includeInReport !== fresh.includeInReport) {
+                            merged.includeInReport = fresh.includeInReport;
+                            imgChanged = true;
+                        }
+                        if (fresh.storagePath && merged.storagePath !== fresh.storagePath) {
+                            merged.storagePath = fresh.storagePath;
+                            imgChanged = true;
+                        }
+                        if (fresh.supabasePath && merged.supabasePath !== fresh.supabasePath) {
+                            merged.supabasePath = fresh.supabasePath;
+                            imgChanged = true;
+                        }
+
+                        if (imgChanged) {
                             changed = true;
-                            return { ...img, preview: fresh.preview };
+                            return merged;
                         }
                     }
                     return img;
@@ -663,7 +730,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                 return nextData;
             });
         }
-    }, [initialData?.exteriorPhoto, initialData?.exteriorPhotoDeleted, initialData?.customMapImage, initialData?.damageTypeImage, initialData?.images, initialData?.isLightweight, initialData?.measurementRooms, initialData?.rooms]);
+    }, [initialData?.exteriorPhoto, initialData?.exteriorPhotoDeleted, initialData?.customMapImage, initialData?.damageTypeImage, initialData?.images, initialData?.isLightweight, initialData?.measurementRooms, initialData?.rooms, initialData?.findings, initialData?.description, initialData?.cause, initialData?.notes, initialData?.selectedMeasures, initialData?.measureNotes]);
 
     const [isSaving, setIsSaving] = useState(false);
     const [lastSaved, setLastSaved] = useState(null);
@@ -694,11 +761,45 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         }
         return url;
     };
+    const getImageSrc = (img) => {
+        if (!img) return null;
+        const parts = ['yx', 'doe', 'cdq', 'ttg', 'dnc', 'gbz', 'yus'];
+        const baseUrl = import.meta.env.VITE_SUPABASE_URL || `https://${parts.join('')}.supabase.co`;
+        const fallbackUrl = img.storagePath || img.supabasePath ? `${baseUrl}/storage/v1/object/public/case-files/${img.storagePath || img.supabasePath}` : null;
+
+        let src = null;
+        if (img.preview) {
+            if (img.preview.startsWith('blob:')) {
+                if (objectUrlsRef.current && objectUrlsRef.current.includes(img.preview)) {
+                    src = img.preview;
+                }
+            } else {
+                src = img.preview;
+            }
+        }
+        if (!src && img.url) {
+            if (img.url.startsWith('blob:')) {
+                if (objectUrlsRef.current && objectUrlsRef.current.includes(img.url)) {
+                    src = img.url;
+                }
+            } else {
+                src = img.url;
+            }
+        }
+        return src || fallbackUrl;
+    };
     const revokeImageBlob = (img) => {
-        if (img && img.preview && img.preview.startsWith('blob:')) {
-            try {
-                URL.revokeObjectURL(img.preview);
-            } catch (e) {}
+        if (img) {
+            if (img.preview && img.preview.startsWith('blob:')) {
+                try {
+                    URL.revokeObjectURL(img.preview);
+                } catch (e) {}
+            }
+            if (img.id) {
+                deletePhotoLocally(img.id).catch(err => {
+                    console.error("[revokeImageBlob] Failed to delete photo from IndexedDB:", err);
+                });
+            }
         }
     };
     useEffect(() => {
@@ -830,6 +931,19 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                                 }
                             }
                         } catch (e) {}
+                    }
+                }
+
+                // If not found in IndexedDB and has OneDrive ID, fetch fresh OneDrive URL!
+                if (!freshBlobUrl && isInvalidPreview && img.oneDriveItemId) {
+                    try {
+                        const freshUrl = await getPhotoDownloadUrl(img.oneDriveItemId);
+                        if (freshUrl && img.url !== freshUrl) {
+                            nextImages[i] = { ...img, url: freshUrl };
+                            updated = true;
+                        }
+                    } catch (e) {
+                        console.warn("[restoreLocalPreviews] Failed to get OneDrive URL:", e);
                     }
                 }
 
@@ -1936,6 +2050,21 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         };
     }, [onSave]);
 
+    // Warn on Unload/Refresh with unsaved changes
+    useEffect(() => {
+        const handleBeforeUnload = (e) => {
+            if (latestFormData.current !== lastSavedData.current) {
+                e.preventDefault();
+                e.returnValue = 'Es gibt ungespeicherte Änderungen. Möchten Sie die Seite wirklich verlassen?';
+                return e.returnValue;
+            }
+        };
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        return () => {
+            window.removeEventListener('beforeunload', handleBeforeUnload);
+        };
+    }, []);
+
     const [newDevice, setNewDevice] = useState({
         deviceNumber: '', // Will be populated from selection
         apartment: '',
@@ -2592,11 +2721,17 @@ END:VCARD`;
     }
 
     const handleRemoveRoom = (id) => {
-        setFormData(prev => ({
-            ...prev,
-            rooms: (prev.rooms || []).filter(r => r.id !== id),
-            measurementRooms: (prev.measurementRooms || []).filter(r => r.id !== id)
-        }));
+        setFormData(prev => {
+            const next = {
+                ...prev,
+                rooms: (prev.rooms || []).filter(r => r.id !== id),
+                measurementRooms: (prev.measurementRooms || []).filter(r => r.id !== id)
+            };
+            if (typeof onSave === 'function') {
+                onSave(next, true);
+            }
+            return next;
+        });
     }
 
     const handleSaveRoomEdit = (roomId) => {
@@ -5237,7 +5372,7 @@ END:VCARD`;
                                         </div>
                                         {/* Delete */}
                                         <div style={{ display: 'flex', flexDirection: 'column', height: '140px', justifyContent: 'flex-start' }}>
-                                            <button type="button" onClick={() => setFormData(prev => ({ ...prev, images: prev.images.filter(i => { if (i === img) revokeImageBlob(i); return i !== img; }) }))} style={{ color: '#EF4444', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '6px', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}><Trash size={16} /></button>
+                                            <button type="button" onClick={() => { if (window.confirm('Bild wirklich löschen?')) { setFormData(prev => ({ ...prev, images: prev.images.filter(i => { if (i === img) revokeImageBlob(i); return i !== img; }) })); } }} style={{ color: '#EF4444', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '6px', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}><Trash size={16} /></button>
                                         </div>
                                     </div>
                                 ))}
@@ -6020,7 +6155,7 @@ END:VCARD`;
                                                         flexShrink: 0,
                                                         border: img.includeInReport !== false ? '2px solid #0F6EA3' : '1px solid var(--border)'
                                                     }}>
-                                                        <img src={img.preview} style={{ width: '100%', height: '100%', objectFit: 'contain', cursor: 'pointer' }} onClick={() => setEditingImage(img)} />
+                                                        <img src={getImageSrc(img)} style={{ width: '100%', height: '100%', objectFit: 'contain', cursor: 'pointer' }} onClick={() => setEditingImage(img)} />
 
                                                         {/* Include in Report Toggle (Centered/Unified) */}
                                                         <div
@@ -6424,7 +6559,7 @@ END:VCARD`;
                                 <div style={{ padding: '0.75rem' }}>
                                 <>
                                     {(() => {
-                                        const roomImages = formData.images.filter(img => img.roomId === room.id);
+                                        const roomImages = formData.images.filter(img => img.assignedTo !== 'Schadenfotos' && img.assignedTo !== 'Schadensberichte' && (img.roomId === room.id || (img.assignedTo === room.name && room.name)));
                                         const shouldCollapse = mode === 'technician' && formData.status === 'Trocknung';
                                         const isVisible = !shouldCollapse || visibleRoomImages[room.id];
 
@@ -6521,19 +6656,19 @@ END:VCARD`;
                                                                                 }
                                                                             }}
                                                                         >
-                                                                            <img src={img.preview} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} onClick={async (e) => {
+                                                                            <img src={getImageSrc(img)} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} onClick={async (e) => {
                                                                                 e.stopPropagation();
                                                                                 if (!linkingImageId) {
                                                                                     // OneDrive-Bild: frische URL holen
                                                                                     if (img.oneDriveItemId) {
                                                                                         try {
                                                                                             const freshUrl = await getPhotoDownloadUrl(img.oneDriveItemId);
-                                                                                            window.open(freshUrl || img.preview, '_blank');
+                                                                                            window.open(freshUrl || getImageSrc(img), '_blank');
                                                                                         } catch {
-                                                                                            window.open(img.preview, '_blank');
+                                                                                            window.open(getImageSrc(img), '_blank');
                                                                                         }
                                                                                     } else {
-                                                                                        window.open(img.preview, '_blank');
+                                                                                        window.open(getImageSrc(img), '_blank');
                                                                                     }
                                                                                 } else {
                                                                                     setFormData(prev => ({
@@ -7017,7 +7152,6 @@ END:VCARD`;
                                     />
                                 </div>
                             </div>
-
                             <div>
                                 <h4 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '0.5rem', color: 'white' }}>Fotos zur Ursache</h4>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
@@ -7026,7 +7160,7 @@ END:VCARD`;
                                             {/* Thumbnail + Controls */}
                                             <div style={{ flex: '0 0 160px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
                                                 <div style={{ width: '160px', height: '160px', borderRadius: '6px', overflow: 'hidden', backgroundColor: '#E5E7EB', border: '1px solid var(--border)', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-                                                    <img src={item.preview} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain', cursor: 'pointer' }} onClick={() => setEditingImage(item)} />
+                                                    <img src={getImageSrc(item)} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain', cursor: 'pointer' }} onClick={() => setEditingImage(item)} />
                                                 </div>
                                                 <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', padding: '0 2px', alignItems: 'center' }}>
                                                     <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', fontSize: '0.75rem', cursor: 'pointer', color: 'var(--text-main)' }}>
@@ -7877,17 +8011,17 @@ END:VCARD`;
                                 {formData.images.filter(img => img.assignedTo === 'Schadensberichte').map((item, idx) => (
                                     <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem', backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
                                         {(item.file && item.file.type === 'application/pdf') || (item.name && item.name.toLowerCase().endsWith('.pdf')) ? (
-                                            <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '1rem', cursor: 'pointer' }} onClick={() => { if (item.file) { const pdfUrl = URL.createObjectURL(item.file); window.open(pdfUrl, '_blank'); } else if (item.preview) { window.open(item.preview, '_blank'); } else { alert("PDF Vorschau nicht verfügbar."); } }}>
+                                            <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '1rem', cursor: 'pointer' }} onClick={() => { if (item.file) { const pdfUrl = URL.createObjectURL(item.file); window.open(pdfUrl, '_blank'); } else { const src = getImageSrc(item); if (src) { window.open(src, '_blank'); } else { alert("PDF Vorschau nicht verfügbar."); } } }}>
                                                 <div style={{ padding: '0.5rem', backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: '4px' }}><FileText size={24} color="var(--text-main)" /></div>
                                                 <div style={{ fontSize: '1rem', color: 'white', fontWeight: 500, textDecoration: 'underline' }}>{item.name}</div>
                                             </div>
                                         ) : (
                                             <div style={{ width: '80px', height: '80px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: '4px' }}>
-                                                <img src={item.preview} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '4px' }} />
+                                                <img src={getImageSrc(item)} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '4px' }} />
                                             </div>
                                         )}
                                         {!((item.file && item.file.type === 'application/pdf') || (item.name && item.name.toLowerCase().endsWith('.pdf'))) && <div style={{ flex: 1, fontWeight: 500, color: 'white' }}>{item.name}</div>}
-                                        <button type="button" className="btn btn-ghost" onClick={() => setFormData(prev => ({ ...prev, images: prev.images.filter(i => { if (i === item) revokeImageBlob(i); return i !== item; }) }))} style={{ color: '#EF4444', padding: '0.5rem', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(239, 68, 68, 0.1)' }}><Trash size={18} /></button>
+                                        <button type="button" className="btn btn-ghost" onClick={() => { if (window.confirm('Bild wirklich löschen?')) { setFormData(prev => ({ ...prev, images: prev.images.filter(i => { if (i === item) revokeImageBlob(i); return i !== item; }) })); } }} style={{ color: '#EF4444', padding: '0.5rem', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(239, 68, 68, 0.1)' }}><Trash size={18} /></button>
                                     </div>
                                 ))}
                                 {formData.images.filter(img => img.assignedTo === 'Schadensberichte').length === 0 && <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.9rem', fontStyle: 'italic' }}>Keine Schadensberichte vorhanden.</div>}
@@ -8592,7 +8726,7 @@ END:VCARD`;
                                         </div>
                                     ) : (
                                         <>
-                                            <img src={item.preview} alt="Vorschau" className="hover-zoom" style={{ width: '44px', height: '44px', objectFit: 'contain', borderRadius: '8px' }} />
+                                            <img src={getImageSrc(item)} alt="Vorschau" className="hover-zoom" style={{ width: '44px', height: '44px', objectFit: 'contain', borderRadius: '8px' }} />
                                             <div style={{ flex: 1, overflow: 'hidden' }}>
                                                 <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'white' }}>{item.name || item.assignedTo}</div>
                                                 {item.description && (
@@ -8724,7 +8858,7 @@ END:VCARD`;
                                         >
                                             <div style={{ position: 'relative', width: '100%', height: '120px', backgroundColor: '#000' }}>
                                                 <img
-                                                    src={img.preview || img.url}
+                                                    src={getImageSrc(img)}
                                                     alt={img.name || 'Foto'}
                                                     style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: 'pointer' }}
                                                     onClick={() => {
@@ -9964,6 +10098,30 @@ END:VCARD`;
                                         const baseUrl = import.meta.env.VITE_SUPABASE_URL || `https://${parts.join('')}.supabase.co`;
                                         const fallbackUrl = img.storagePath || img.supabasePath ? `${baseUrl}/storage/v1/object/public/case-files/${img.storagePath || img.supabasePath}` : null;
 
+                                        let validSrc = null;
+                                        if (img.preview) {
+                                            if (img.preview.startsWith('blob:')) {
+                                                if (objectUrlsRef.current && objectUrlsRef.current.includes(img.preview)) {
+                                                    validSrc = img.preview;
+                                                }
+                                            } else {
+                                                validSrc = img.preview;
+                                            }
+                                        }
+                                        if (!validSrc && img.url) {
+                                            if (img.url.startsWith('blob:')) {
+                                                if (objectUrlsRef.current && objectUrlsRef.current.includes(img.url)) {
+                                                    validSrc = img.url;
+                                                }
+                                            } else {
+                                                validSrc = img.url;
+                                            }
+                                        }
+                                        if (!validSrc) {
+                                            validSrc = fallbackUrl;
+                                        }
+                                        console.log('[DEBUG-IMAGE-RENDER]', img.name, { id: img.id, preview: img.preview, url: img.url, fallbackUrl, validSrc });
+
                                         return (
                                             <div
                                                 key={img.id || i}
@@ -9979,7 +10137,7 @@ END:VCARD`;
                                             >
                                                 <div style={{ position: 'relative', width: '100%', height: '160px', backgroundColor: '#000' }}>
                                                     <img
-                                                        src={img.preview || img.url || fallbackUrl}
+                                                        src={validSrc}
                                                         alt={img.name || 'Foto'}
                                                         style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: 'pointer' }}
                                                         onClick={() => {
@@ -10170,8 +10328,9 @@ END:VCARD`;
                                                     </button>
                                                 </div>
                                             </div>
-                                        );
-                                    })}
+                                        </div>
+                                    );
+                                })}
                                 </div>
                             );
                         })()}
