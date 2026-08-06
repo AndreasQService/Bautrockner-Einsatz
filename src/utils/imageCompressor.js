@@ -104,11 +104,10 @@ export async function calculateSha256(blob) {
 export function queueImageCompression(file, isSketch = false) {
     // Add to the sequential promise queue
     const task = compressionQueue.then(async () => {
-        const fileName = file.name || 'image.jpg';
-        console.log(`[imageCompressor] 🔄 Processing image compression for: ${fileName}`);
+        console.log(`[imageCompressor] 🔄 Processing image compression for: ${file.name}`);
         
-        const isHeic = fileName.toLowerCase().endsWith('.heic') || fileName.toLowerCase().endsWith('.heif') || (file.type && (file.type.includes('heic') || file.type.includes('heif')));
-        const lossless = isSketch || isLossless(fileName, file.type);
+        const isHeic = file.name.toLowerCase().endsWith('.heic') || file.name.toLowerCase().endsWith('.heif') || file.type.includes('heic') || file.type.includes('heif');
+        const lossless = isSketch || isLossless(file.name, file.type);
         
         let originalBlob = file;
         
