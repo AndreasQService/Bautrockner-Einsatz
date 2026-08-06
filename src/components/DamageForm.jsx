@@ -2721,11 +2721,29 @@ END:VCARD`;
     }
 
     const handleRemoveRoom = (id) => {
+        const roomName = (formData.rooms || []).find(r => String(r.id) === String(id))?.name ||
+                         (formData.measurementRooms || []).find(r => String(r.id) === String(id))?.name ||
+                         'Unbenannter Raum';
+
+        const affectedImages = (formData.images || []).filter(img => String(img.roomId) === String(id));
+
+        let confirmMsg = `Raum "${roomName}" wirklich löschen?\nMessdaten und Skizzen dieses Raums werden entfernt.`;
+        if (affectedImages.length > 0) {
+            confirmMsg += `\n${affectedImages.length} zugeordnete Bilder bleiben erhalten und werden nach 'Sonstiges' verschoben.`;
+        }
+
+        if (!window.confirm(confirmMsg)) return;
+
         setFormData(prev => {
             const next = {
                 ...prev,
-                rooms: (prev.rooms || []).filter(r => r.id !== id),
-                measurementRooms: (prev.measurementRooms || []).filter(r => r.id !== id)
+                rooms: (prev.rooms || []).filter(r => String(r.id) !== String(id)),
+                measurementRooms: (prev.measurementRooms || []).filter(r => String(r.id) !== String(id)),
+                images: (prev.images || []).map(img => String(img.roomId) === String(id) ? {
+                    ...img,
+                    roomId: null,
+                    assignedTo: 'Sonstiges'
+                } : img)
             };
             if (typeof onSave === 'function') {
                 onSave(next, true);
@@ -6531,9 +6549,7 @@ END:VCARD`;
                                         type="button"
                                         onClick={(e) => {
                                             e.stopPropagation();
-                                            if (window.confirm(`Sind Sie sicher, dass Sie den Raum "${room.name}" löschen möchten? Alle zugehörigen Bilder und Messdaten gehen verloren.`)) {
-                                                handleRemoveRoom(room.id);
-                                            }
+                                            handleRemoveRoom(room.id);
                                         }}
                                         title="Raum löschen"
                                         style={{
@@ -8154,12 +8170,10 @@ END:VCARD`;
                                                         <button
                                                             type="button"
                                                             onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                if (window.confirm(`Sind Sie sicher, dass Sie den Raum "${rName}" löschen möchten? Alle zugehörigen Bilder und Messdaten gehen verloren.`)) {
-                                                                    handleRemoveRoom(room.id);
-                                                                }
-                                                            }}
-                                                            title="Raum löschen"
+                                                                 e.stopPropagation();
+                                                                 handleRemoveRoom(room.id);
+                                                             }}
+                                                             title="Raum löschen"
                                                             style={{
                                                                 background: 'transparent',
                                                                 border: 'none',
@@ -8465,9 +8479,7 @@ END:VCARD`;
                                                             type="button"
                                                             onClick={() => {
                                                                 const rName = room.name || 'Unbenannter Raum';
-                                                                if (window.confirm(`Sind Sie sicher, dass Sie den Raum "${rName}" löschen möchten? Alle zugehörigen Bilder und Messdaten gehen verloren.`)) {
-                                                                    handleRemoveRoom(room.id);
-                                                                }
+                                                                handleRemoveRoom(room.id);
                                                             }}
                                                             title="Raum löschen"
                                                             style={{

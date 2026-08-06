@@ -1678,10 +1678,8 @@ function App() {
 
     if (supabase) {
       // ── Schutz vor unvollständigem Speichern: Kein Supabase-Save wenn Report noch lädt ──
-      const isCurrentlyLightweight = selectedReport && selectedReport.id === finalReport.id && selectedReport.isLightweight;
       // ── Client-side self-healing due date calculator ──
       try {
-        console.log('DEBUG: handleSaveReport rooms:', JSON.stringify(finalReport.rooms), 'measurementRooms:', JSON.stringify(finalReport.measurementRooms));
         let latestDate = null;
         const rooms = finalReport.measurementRooms || finalReport.rooms || finalReport.report_data?.measurementRooms || finalReport.report_data?.rooms || [];
         if (Array.isArray(rooms)) {
@@ -1709,7 +1707,9 @@ function App() {
         console.error('Error computing next due date locally:', e);
       }
 
-      const cachedRep = reports.find(r => r.id === finalReport.id);
+      const currentSelected = selectedReportRef.current;
+      const isCurrentlyLightweight = currentSelected && currentSelected.id === finalReport.id && currentSelected.isLightweight;
+      const cachedRep = reportsRef.current.find(r => r.id === finalReport.id);
       const isLightweightInState = cachedRep && cachedRep.isLightweight;
 
       const isTestEnv = window.navigator.webdriver || window.IS_TEST_ENV;
