@@ -1349,7 +1349,22 @@ function App() {
 
               const existing = prev.find(r => r.id === fresh.id);
               if (existing && !existing.isLightweight) {
-                return { ...existing, ...merged, _supabase_updated_at: merged._supabase_updated_at || existing._supabase_updated_at, isLightweight: false };
+                // Nur vom Lightweight-Query gelieferte Metadaten übernehmen, falls definiert.
+                // Reiche Daten und den ursprünglichen Supabase-Versionsstand (_supabase_updated_at) absolut schützen.
+                return {
+                  ...existing,
+                  projectTitle: merged.projectTitle !== undefined ? merged.projectTitle : existing.projectTitle,
+                  projectNumber: merged.projectNumber !== undefined ? merged.projectNumber : existing.projectNumber,
+                  client: merged.client !== undefined ? merged.client : existing.client,
+                  address: merged.address !== undefined ? merged.address : existing.address,
+                  status: merged.status !== undefined ? merged.status : existing.status,
+                  assignedTo: merged.assignedTo !== undefined ? merged.assignedTo : existing.assignedTo,
+                  date: merged.date !== undefined ? merged.date : existing.date,
+                  dryingStarted: merged.dryingStarted !== undefined ? merged.dryingStarted : existing.dryingStarted,
+                  deletedAt: merged.deletedAt !== undefined ? merged.deletedAt : existing.deletedAt,
+                  _supabase_updated_at: existing._supabase_updated_at,
+                  isLightweight: false
+                };
               }
               return merged;
             });
@@ -1663,10 +1678,8 @@ function App() {
 
     if (supabase) {
       // ── Schutz vor unvollständigem Speichern: Kein Supabase-Save wenn Report noch lädt ──
-      const isCurrentlyLightweight = selectedReport && selectedReport.id === finalReport.id && selectedReport.isLightweight;
       // ── Client-side self-healing due date calculator ──
       try {
-        console.log('DEBUG: handleSaveReport rooms:', JSON.stringify(finalReport.rooms), 'measurementRooms:', JSON.stringify(finalReport.measurementRooms));
         let latestDate = null;
         const rooms = finalReport.measurementRooms || finalReport.rooms || finalReport.report_data?.measurementRooms || finalReport.report_data?.rooms || [];
         if (Array.isArray(rooms)) {
@@ -1694,7 +1707,9 @@ function App() {
         console.error('Error computing next due date locally:', e);
       }
 
-      const cachedRep = reports.find(r => r.id === finalReport.id);
+      const currentSelected = selectedReportRef.current;
+      const isCurrentlyLightweight = currentSelected && currentSelected.id === finalReport.id && currentSelected.isLightweight;
+      const cachedRep = reportsRef.current.find(r => r.id === finalReport.id);
       const isLightweightInState = cachedRep && cachedRep.isLightweight;
 
       const isTestEnv = window.navigator.webdriver || window.IS_TEST_ENV;
