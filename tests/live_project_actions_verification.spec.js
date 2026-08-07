@@ -14,12 +14,16 @@ test.describe('Compulsory Live Test: Archive & Soft-Delete', () => {
         await page.locator('input[type="password"]').fill('admin');
         await page.getByRole('button', { name: /anmelden/i }).click();
         await page.waitForSelector('header.app-header', { timeout: 15000 });
+        await page.waitForLoadState('networkidle');
+        await page.waitForTimeout(1500);
 
         // 2. Create a clearly designated test project via the UI
-        await page.getByRole('button', { name: /Neuer Auftrag/i }).click().catch(async () => {
-            // fallback if translation differs
-            await page.locator('button:has-text("Neuer Auftrag"), button:has-text("New Order")').click();
-        });
+        const newOrderBtn = page.locator('button:has-text("Neuer Auftrag"), button:has-text("New Order")');
+        await expect(newOrderBtn).toBeVisible({ timeout: 10000 });
+        await newOrderBtn.click();
+        
+        // Wait for the form inputs to appear
+        await page.waitForSelector('input[placeholder="Projekt-Nr."]', { timeout: 10000 });
         await page.locator('input[placeholder="Projekt-Nr."]').fill(uniqueNumber);
         await page.locator('input[placeholder="Strasse & Nr."]').first().fill('Testweg 99');
         await page.locator('input[placeholder="PLZ"]').first().fill('8000');
@@ -74,6 +78,8 @@ test.describe('Compulsory Live Test: Archive & Soft-Delete', () => {
         await newPage.locator('input[type="password"]').fill('admin');
         await newPage.getByRole('button', { name: /anmelden/i }).click();
         await newPage.waitForSelector('header.app-header', { timeout: 15000 });
+        await newPage.waitForLoadState('networkidle');
+        await newPage.waitForTimeout(1500);
 
         // Ensure "Alle Fälle" is checked
         const allCasesCheckbox2 = newPage.locator('input[type="checkbox"]').nth(1);
@@ -138,6 +144,8 @@ test.describe('Compulsory Live Test: Archive & Soft-Delete', () => {
         await secondPage.locator('input[type="password"]').fill('admin');
         await secondPage.getByRole('button', { name: /anmelden/i }).click();
         await secondPage.waitForSelector('header.app-header', { timeout: 15000 });
+        await secondPage.waitForLoadState('networkidle');
+        await secondPage.waitForTimeout(1500);
 
         // Ensure "Alle Fälle" is checked
         const allCasesCheckbox3 = secondPage.locator('input[type="checkbox"]').nth(1);
