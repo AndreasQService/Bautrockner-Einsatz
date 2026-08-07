@@ -249,7 +249,8 @@ if (isWebDriver) {
         console.log('[MOCK DB] select called:', tableName, columns);
         if (tableName === 'damage_reports') {
           console.log('[MOCK DB] returning projects count:', mockProjects.length);
-          const hasReportData = columns && columns.includes('report_data');
+          const colList = (columns || '').split(',').map(c => c.trim().split(':')[0].split('->')[0].split('->>')[0]);
+          const hasReportData = colList.includes('report_data');
           const projects = mockProjects.map(p => {
             if (!hasReportData) {
               const { report_data, ...rest } = p;

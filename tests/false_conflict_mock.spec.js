@@ -230,6 +230,9 @@ test.describe('False Conflict Prevention (Local Mocks)', () => {
         await row.click();
         await page.waitForSelector('text=Kontakte');
 
+        // Simulate offline mode to trigger local unsaved cache fallback
+        await page.context().setOffline(true);
+
         // Make a real semantic user change: fill schadenort field
         const schadenortInput = page.locator('input[placeholder*="Küche / Keller"]').first();
         await schadenortInput.fill('Echter Schadenort Keller');
@@ -245,6 +248,9 @@ test.describe('False Conflict Prevention (Local Mocks)', () => {
         const entry = Object.values(unsaved)[0];
         expect(entry.source).toBeDefined();
         expect(entry.isCompleteSnapshot).toBe(true);
+
+        // Clean up offline mode simulation
+        await page.context().setOffline(false);
     });
 
     test('8. Zehn Projekte nacheinander nur öffnen', async ({ page }) => {
