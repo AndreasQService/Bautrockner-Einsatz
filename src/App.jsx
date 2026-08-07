@@ -297,20 +297,37 @@ function App() {
         if (cached) {
           const parsed = JSON.parse(cached);
           let changed = false;
+          let backup = {};
+          try {
+            const existingBackup = localStorage.getItem('qservice_unsaved_reports_backup');
+            if (existingBackup) backup = JSON.parse(existingBackup);
+          } catch (e) {}
+
           for (const id of Object.keys(parsed)) {
             const entry = parsed[id];
             const hasNoValidSource = entry.source !== 'failed-save' && entry.source !== 'offline-edit';
-            const isLightweight = entry.reportData && (entry.reportData.isLightweight || (!entry.reportData.rooms?.length && !entry.reportData.images?.length && !entry.reportData.contacts?.length));
-            const hasNoChanges = !entry.changedPaths || entry.changedPaths.length === 0;
+            const isNotComplete = entry.isCompleteSnapshot !== true;
             
-            if (hasNoValidSource && (isLightweight || hasNoChanges)) {
+            const isLightweight = entry.reportData && (
+              entry.reportData.isLightweight || 
+              (!entry.reportData.rooms?.length && !entry.reportData.images?.length && !entry.reportData.contacts?.length)
+            );
+            const hasNoChanges = !entry.changedPaths || entry.changedPaths.length === 0;
+
+            if (hasNoValidSource && isNotComplete && (isLightweight || hasNoChanges)) {
+              backup[id] = {
+                ...entry,
+                backedUpAt: new Date().toISOString(),
+                reason: 'automatic-hydration-cleanup'
+              };
               delete parsed[id];
               changed = true;
-              console.log(`[Init-Cleanup] Automatically removed false hydration legacy entry: ${id}`);
+              console.log(`[Init-Cleanup] Automatically removed false hydration legacy entry and backed it up: ${id}`);
             }
           }
           if (changed) {
             safeSetItem('qservice_unsaved_reports', JSON.stringify(parsed));
+            safeSetItem('qservice_unsaved_reports_backup', JSON.stringify(backup));
           }
           setUnsavedReports(parsed);
         }
@@ -325,6 +342,11 @@ function App() {
 
   const saveToUnsavedReports = (finalReport, isConflict = false, dbUpdatedAt = null) => {
     const existingRecord = openedReportBackupRef.current[finalReport.id] || reportsRef.current.find(r => r.id === finalReport.id);
+    const isLightweight = finalReport.isLightweight || (existingRecord && existingRecord.isLightweight);
+    if (isLightweight) {
+      console.warn('[Sync-Guard] Blocked saving lightweight report to unsaved cache:', finalReport.id);
+      return;
+    }
     const baseUpdatedAt = finalReport._supabase_updated_at || existingRecord?._supabase_updated_at || null;
     const { changedPaths, operations } = diffReports(existingRecord, finalReport);
 
@@ -1379,6 +1401,7 @@ function App() {
            measurementRoomsLength: loadedReports[0]?.measurementRooms?.length,
            names: loadedReports[0]?.measurementRooms?.map(r=>r.name)
         });
+        console.log('[DEBUG fetchReports] mapped reports isLightweight:', loadedReports.map(r => ({ id: r.id, isLightweight: r.isLightweight })));
         setSupabaseStatus({ ok: true, count: loadedReports.length, total: data.length, error: null });
 
         if (loadedReports.length > 0) {
@@ -1475,6 +1498,7 @@ function App() {
   }, [fetchReports]);
 
   const handleSelectReport = async (report) => {
+    console.log('[DEBUG handleSelectReport] report passed:', { id: report.id, isLightweight: report.isLightweight });
     // 1. Lokale ungespeicherte Änderungen einmischen falls vorhanden
     let activeReport = report;
     const cached = localStorage.getItem('qservice_unsaved_reports');
@@ -1625,6 +1649,18 @@ function App() {
                 const unsaved = JSON.parse(cached);
                 const entry = unsaved[targetProjectId];
                 if (entry && entry.source !== 'failed-save' && entry.source !== 'offline-edit') {
+                  let backup = {};
+                  try {
+                    const existingBackup = localStorage.getItem('qservice_unsaved_reports_backup');
+                    if (existingBackup) backup = JSON.parse(existingBackup);
+                  } catch (e) {}
+                  backup[targetProjectId] = {
+                    ...entry,
+                    backedUpAt: new Date().toISOString(),
+                    reason: 'load-full-report-hydration-cleanup'
+                  };
+                  safeSetItem('qservice_unsaved_reports_backup', JSON.stringify(backup));
+
                   delete unsaved[targetProjectId];
                   safeSetItem('qservice_unsaved_reports', JSON.stringify(unsaved));
                   setUnsavedReports(unsaved);
@@ -1953,6 +1989,10 @@ function App() {
 
         const handleSaveError = (err) => {
           console.error('[Supabase Save Error/Exception]', err);
+          if (err && err.message && err.message.includes('SAVE BLOCKED')) {
+            console.log('[Supabase-Guard] Ignored saveToUnsavedReports because report is lightweight / not fully loaded.');
+            return;
+          }
           if (!silent) {
             showToast(`⚠️ Offline: Speicherfehler (${err.message || 'Verbindungsfehler'}). Daten wurden lokal gesichert!`, 'warning', 5000);
           }
@@ -2886,9 +2926,9 @@ function App() {
                           <strong style={{ color: '#38bdf8' }}>Version:</strong> {selectedReport.report_data?.version || selectedReport.version || 1}
                         </div>
                         <div>
-                          <strong style={{ color: '#38bdf8' }}>Zuletzt geändert:</strong> {selectedReport.report_data?.last_edited_by || 'Keine Angabe'}
-                          {selectedReport.report_data?.last_edited_device && ` (${selectedReport.report_data.last_edited_device})`}
-                          {selectedReport.report_data?.last_edited_at && ` am ${new Date(selectedReport.report_data.last_edited_at).toLocaleString('de-DE')}`}
+                          <strong style={{ color: '#38bdf8' }}>Zuletzt geändert:</strong> {selectedReport.last_edited_by || selectedReport.report_data?.last_edited_by || 'Keine Angabe'}
+                          {(selectedReport.last_edited_device || selectedReport.report_data?.last_edited_device) && ` (${selectedReport.last_edited_device || selectedReport.report_data.last_edited_device})`}
+                          {(selectedReport.last_edited_at || selectedReport.report_data?.last_edited_at) && ` am ${new Date(selectedReport.last_edited_at || selectedReport.report_data.last_edited_at).toLocaleString('de-DE')}`}
                         </div>
                       </div>
                       <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>

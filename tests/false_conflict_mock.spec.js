@@ -8,6 +8,10 @@ test.describe('False Conflict Prevention (Local Mocks)', () => {
 
         // Inject custom lightweight mock project into sessionStorage
         await page.evaluate(() => {
+            sessionStorage.clear();
+            localStorage.removeItem('qservice_unsaved_reports');
+            localStorage.removeItem('qservice_unsaved_reports_backup');
+            localStorage.removeItem('qservice_reports_prod');
             const mockProjects = [
                 {
                     id: 'proj-lightweight',
@@ -192,6 +196,97 @@ test.describe('False Conflict Prevention (Local Mocks)', () => {
         // But forcing is blocked because isCompleteSnapshot is not true / no valid source
         const forceBtn = page.locator('button:has-text("Lokalen Stand erzwingen")');
         await expect(forceBtn).toBeDisabled();
+    });
+
+    test('6. Full-Load künstlich länger als 2 Sekunden verzögern', async ({ page }) => {
+        // Set simulated mock database delay to 4000ms
+        await page.evaluate(() => {
+            sessionStorage.setItem('mock_db_delay', '4000');
+        });
+
+        // Open lightweight project
+        const row = page.locator('tr.hover-row', { hasText: 'Projekt Hydration Test' }).first();
+        await row.click();
+
+        // Loading spinner/overlay should be visible immediately
+        await expect(page.locator('text=Projektdaten werden vollständig geladen...')).toBeVisible();
+
+        // Wait for the simulated delay to pass and hydration to finish
+        await page.waitForTimeout(5000);
+
+        // Loading spinner should have disappeared
+        await expect(page.locator('text=Projektdaten werden vollständig geladen...')).not.toBeVisible();
+        await page.waitForSelector('text=Kontakte');
+
+        // Verify no unsaved entries were generated during this slow hydration
+        const unsaved = await page.evaluate(() => {
+            return JSON.parse(localStorage.getItem('qservice_unsaved_reports') || '{}');
+        });
+        expect(Object.keys(unsaved).length).toBe(0);
+    });
+
+    test('7. Echte Benutzereingabe nach Full-Hydration', async ({ page }) => {
+        // Open project
+        const row = page.locator('tr', { hasText: 'Projekt Hydration Test' });
+        await row.click();
+        await page.waitForSelector('text=Kontakte');
+
+        // Simulate offline mode to trigger local unsaved cache fallback
+        await page.context().setOffline(true);
+
+        // Make a real semantic user change: fill schadenort field
+        const schadenortInput = page.locator('input[placeholder*="Küche / Keller"]').first();
+        await schadenortInput.fill('Echter Schadenort Keller');
+
+        // Wait 3 seconds for the 2-second autosave debounce to fire
+        await page.waitForTimeout(3000);
+
+        // Verify that an unsaved report with genuine source 'failed-save' or 'offline-edit' was created
+        const unsaved = await page.evaluate(() => {
+            return JSON.parse(localStorage.getItem('qservice_unsaved_reports') || '{}');
+        });
+        expect(Object.keys(unsaved).length).toBe(1);
+        const entry = Object.values(unsaved)[0];
+        expect(entry.source).toBeDefined();
+        expect(entry.isCompleteSnapshot).toBe(true);
+
+        // Clean up offline mode simulation
+        await page.context().setOffline(false);
+    });
+
+    test('8. Zehn Projekte nacheinander nur öffnen', async ({ page }) => {
+        // We will open and close the same project 10 times to verify no false conflicts accumulate
+        for (let i = 0; i < 10; i++) {
+            const row = page.locator('tr.hover-row', { hasText: 'Projekt Hydration Test' }).first();
+            await row.click();
+            await page.waitForSelector('text=Kontakte');
+            await page.click('button:has-text("Dashboard"), button:has-text("Zurück")');
+            await page.waitForSelector('tr.hover-row');
+        }
+
+        const unsaved = await page.evaluate(() => {
+            return JSON.parse(localStorage.getItem('qservice_unsaved_reports') || '{}');
+        });
+        expect(Object.keys(unsaved).length).toBe(0);
+    });
+
+    test('9. Zuletzt geändert verwendet Root-Feld korrekt', async ({ page }) => {
+        // Add last_edited_by metadata to report_data JSON column (which gets spread onto root)
+        await page.evaluate(() => {
+            const mockProjects = JSON.parse(sessionStorage.getItem('mock_db_projects') || '[]');
+            mockProjects[0].report_data.last_edited_by = 'Test Techniker 123';
+            sessionStorage.setItem('mock_db_projects', JSON.stringify(mockProjects));
+        });
+
+        await page.reload({ waitUntil: 'networkidle' });
+        await page.waitForSelector('header.app-header');
+
+        const row = page.locator('tr', { hasText: 'Projekt Hydration Test' });
+        await row.click();
+        await page.waitForSelector('text=Kontakte');
+
+        // Verify that the metadata is correctly rendered using the root property
+        await expect(page.locator('text=Zuletzt geändert: Test Techniker 123')).toBeVisible();
     });
 
 });

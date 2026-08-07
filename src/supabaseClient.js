@@ -168,7 +168,17 @@ if (isWebDriver) {
   let imageUploads = getSessionStorageItem('mock_db_image_uploads', []);
 
   function makeMockQuery(tableName, data, error = null) {
-    const promise = Promise.resolve({ data, error });
+    const delayStr = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('mock_db_delay') : '0';
+    const delay = parseInt(delayStr || '0', 10) || 0;
+
+    
+    let promise;
+    if (delay > 0) {
+      const p = new Promise(resolve => setTimeout(() => resolve({ data, error }), delay));
+      promise = p;
+    } else {
+      promise = Promise.resolve({ data, error });
+    }
     promise.order = (col, opts) => promise;
     promise.gte = (col, val) => promise;
     promise.lte = (col, val) => promise;
@@ -240,7 +250,17 @@ if (isWebDriver) {
         console.log('[MOCK DB] select called:', tableName, columns);
         if (tableName === 'damage_reports') {
           console.log('[MOCK DB] returning projects count:', mockProjects.length);
-          return makeMockQuery(tableName, mockProjects);
+          const colList = (columns || '').split(',').map(c => c.trim().split(':')[0].split('->')[0].split('->>')[0]);
+          const hasReportData = colList.includes('report_data');
+
+          const projects = mockProjects.map(p => {
+            if (!hasReportData) {
+              const { report_data, ...rest } = p;
+              return rest;
+            }
+            return p;
+          });
+          return makeMockQuery(tableName, projects);
         }
         return makeMockQuery(tableName, null);
       },
