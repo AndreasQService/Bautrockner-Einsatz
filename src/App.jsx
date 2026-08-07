@@ -279,6 +279,7 @@ function App() {
   const selectedReportRef = useRef(null);
   const reportsRef = useRef([]);
   const openedReportBackupRef = useRef({});
+  const activeLoadRequestsRef = useRef({});
   const sessionStartedAtRef = useRef(Date.now());
   const silentSaveDebounceTimers = useRef({});
   const viewRef = useRef('dashboard');
@@ -313,6 +314,24 @@ function App() {
     const baseUpdatedAt = finalReport._supabase_updated_at || existingRecord?._supabase_updated_at || null;
     const { changedPaths, operations } = diffReports(existingRecord, finalReport);
 
+    // Hydration, lightweight, and technical field guard
+    const realChangedPaths = changedPaths.filter(path => {
+      if (['isLightweight', '_supabase_updated_at', 'updated_at', 'created_at', 'id', 'version'].includes(path)) return false;
+      const baseVal = existingRecord ? (existingRecord.report_data?.[path] || existingRecord[path]) : undefined;
+      if (['rooms', 'measurementRooms', 'images', 'contacts', 'equipment', 'history'].includes(path)) {
+        const baseEmpty = !baseVal || (Array.isArray(baseVal) && baseVal.length === 0);
+        if (baseEmpty || (existingRecord && existingRecord.isLightweight)) {
+          return false;
+        }
+      }
+      return true;
+    });
+
+    if (realChangedPaths.length === 0) {
+      console.log('[Sync-Guard] Blocked false hydration/lightweight diff.');
+      return;
+    }
+
     let prev = {};
     try {
       const cached = localStorage.getItem('qservice_unsaved_reports');
@@ -320,9 +339,10 @@ function App() {
     } catch (e) {}
 
     const existingEntry = prev[finalReport.id] || {};
-    const mergedPaths = Array.from(new Set([...(existingEntry.changedPaths || []), ...changedPaths]));
+    const mergedPaths = Array.from(new Set([...(existingEntry.changedPaths || []), ...realChangedPaths]));
     const mergedOps = [...(existingEntry.operations || [])];
     for (const op of operations) {
+      if (!realChangedPaths.includes(op.path)) continue;
       const idx = mergedOps.findIndex(x => x.path === op.path && x.type === op.type && x.itemId === op.itemId);
       if (idx >= 0) {
         mergedOps[idx] = op;
@@ -331,10 +351,17 @@ function App() {
       }
     }
 
+    const source = !navigator.onLine ? 'offline-edit' : 'failed-save';
     const next = {
       ...prev,
       [finalReport.id]: {
         reportId: finalReport.id,
+        projectId: finalReport.id,
+        source: source,
+        baseServerUpdatedAt: baseUpdatedAt,
+        localChangedAt: new Date().toISOString(),
+        isCompleteSnapshot: !finalReport.isLightweight,
+
         baseUpdatedAt: baseUpdatedAt,
         localUpdatedAt: new Date().toISOString(),
         reportData: finalReport,
@@ -380,6 +407,18 @@ function App() {
     if (!offlineEntry) {
       syncInProgressRef.current.delete(reportId);
       return;
+    }
+
+    if (forceOverwrite) {
+      const allowedSource = offlineEntry.source === 'failed-save' || offlineEntry.source === 'offline-edit';
+      const isComplete = offlineEntry.isCompleteSnapshot === true;
+      const isNotLightweight = offlineEntry.reportData && !offlineEntry.reportData.isLightweight;
+      if (!allowedSource || !isComplete || !isNotLightweight) {
+        console.error('[Sync-Guard] Blocked forcing local state:', { allowedSource, isComplete, isNotLightweight });
+        showToast('Erzwingen blockiert: Ungültiger oder unvollständiger Offline-Stand.', 'error');
+        syncInProgressRef.current.delete(reportId);
+        return;
+      }
     }
 
     if (!offlineEntry.reportId) {
@@ -1456,38 +1495,58 @@ function App() {
 
     // 2. Falls leichtgewichtig, Details asynchron im Hintergrund laden
     if (supabase && activeReport.isLightweight) {
+      const targetProjectId = report.id;
+      const requestGen = (activeLoadRequestsRef.current[targetProjectId] || 0) + 1;
+      activeLoadRequestsRef.current[targetProjectId] = requestGen;
+
       try {
         const { data, error } = await supabase
           .from('damage_reports')
           .select('report_data, updated_at')
-          .eq('id', report.id)
+          .eq('id', targetProjectId)
           .single();
         
+        if (activeLoadRequestsRef.current[targetProjectId] !== requestGen) return;
+
         if (data && !error && data.report_data) {
           let mergedData = data.report_data;
           const cached = localStorage.getItem('qservice_unsaved_reports');
           if (cached) {
             try {
               const unsaved = JSON.parse(cached);
-              if (unsaved[report.id]?.reportData) {
+              if (unsaved[targetProjectId]?.reportData) {
                 mergedData = {
                   ...mergedData,
-                  ...unsaved[report.id].reportData
+                  ...unsaved[targetProjectId].reportData
                 };
               }
             } catch (e) {}
           }
 
-          const activeReport = {
+          const fullReport = {
             ...sanitizeMeasurementStorage(mergedData),
-            id: report.id,
+            id: targetProjectId,
             _supabase_updated_at: data.updated_at,
             isLightweight: false
           };
-          setReports(prev => prev.map(r => r.id === report.id ? activeReport : r));
+          setReports(prev => prev.map(r => r.id === targetProjectId ? fullReport : r));
           // Nur aktualisieren, wenn der Benutzer das Projekt in der Zwischenzeit nicht schon wieder geschlossen hat
-          setSelectedReport(prev => prev && prev.id === report.id ? activeReport : prev);
-          openedReportBackupRef.current[report.id] = JSON.parse(JSON.stringify(activeReport));
+          setSelectedReport(prev => prev && prev.id === targetProjectId ? fullReport : prev);
+          openedReportBackupRef.current[targetProjectId] = JSON.parse(JSON.stringify(fullReport));
+
+          // Clean up false hydration entry if it exists and has no valid source
+          try {
+            const cached = localStorage.getItem('qservice_unsaved_reports');
+            if (cached) {
+              const unsaved = JSON.parse(cached);
+              const entry = unsaved[targetProjectId];
+              if (entry && entry.source !== 'failed-save' && entry.source !== 'offline-edit') {
+                delete unsaved[targetProjectId];
+                safeSetItem('qservice_unsaved_reports', JSON.stringify(unsaved));
+                setUnsavedReports(unsaved);
+              }
+            }
+          } catch (e) {}
         } else {
           console.error("[fetchReports] Failed to load full report:", { data, error });
         }
@@ -1506,23 +1565,30 @@ function App() {
   // Automatisches Nachladen der vollständigen Projektdaten im Hintergrund, wenn ein Projekt geöffnet wird/ist
   useEffect(() => {
     if (supabase && selectedReport && selectedReport.isLightweight) {
+      const targetProjectId = selectedReport.id;
+      const requestGen = (activeLoadRequestsRef.current[targetProjectId] || 0) + 1;
+      activeLoadRequestsRef.current[targetProjectId] = requestGen;
+
       const loadFullReport = async () => {
         try {
           const { data, error } = await supabase
             .from('damage_reports')
             .select('report_data, updated_at')
-            .eq('id', selectedReport.id)
+            .eq('id', targetProjectId)
             .single();
+
+          if (activeLoadRequestsRef.current[targetProjectId] !== requestGen) return;
+
           if (data && !error && data.report_data) {
             let mergedData = data.report_data;
             const cached = localStorage.getItem('qservice_unsaved_reports');
             if (cached) {
               try {
                 const unsaved = JSON.parse(cached);
-                if (unsaved[selectedReport.id]?.reportData) {
+                if (unsaved[targetProjectId]?.reportData) {
                   mergedData = {
                     ...mergedData,
-                    ...unsaved[selectedReport.id].reportData
+                    ...unsaved[targetProjectId].reportData
                   };
                 }
               } catch (e) {}
@@ -1530,12 +1596,27 @@ function App() {
 
             const fullReport = {
               ...sanitizeMeasurementStorage(mergedData),
-              id: selectedReport.id,
+              id: targetProjectId,
               _supabase_updated_at: data.updated_at,
               isLightweight: false
             };
-            setReports(prev => prev.map(r => r.id === selectedReport.id ? fullReport : r));
-            setSelectedReport(fullReport);
+            setReports(prev => prev.map(r => r.id === targetProjectId ? fullReport : r));
+            setSelectedReport(prev => prev && prev.id === targetProjectId ? fullReport : prev);
+            openedReportBackupRef.current[targetProjectId] = JSON.parse(JSON.stringify(fullReport));
+
+            // Clean up false hydration entry if it exists and has no valid source
+            try {
+              const cached = localStorage.getItem('qservice_unsaved_reports');
+              if (cached) {
+                const unsaved = JSON.parse(cached);
+                const entry = unsaved[targetProjectId];
+                if (entry && entry.source !== 'failed-save' && entry.source !== 'offline-edit') {
+                  delete unsaved[targetProjectId];
+                  safeSetItem('qservice_unsaved_reports', JSON.stringify(unsaved));
+                  setUnsavedReports(unsaved);
+                }
+              }
+            } catch (e) {}
           } else {
             console.error("[loadFullReport useEffect] Failed to load full report:", { data, error });
           }
@@ -2978,12 +3059,32 @@ function App() {
                       >
                         {isConflict ? 'Eigene Änderungen verwerfen' : 'Verwerfen'}
                       </button>
-                      <button 
-                        onClick={() => syncUnsavedReport(id, isConflict)}
-                        style={{ padding: '0.45rem 0.9rem', fontSize: '0.8rem', backgroundColor: isConflict ? '#f59e0b' : '#10b981', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600 }}
-                      >
-                        {isConflict ? 'Lokalen Stand erzwingen' : 'Hochladen'}
-                      </button>
+                      {(() => {
+                        const isEligible = rep.source === 'failed-save' || rep.source === 'offline-edit';
+                        const isComplete = rep.isCompleteSnapshot === true;
+                        const isNotLightweight = rep.reportData && !rep.reportData.isLightweight;
+                        const canForce = isConflict ? (isEligible && isComplete && isNotLightweight) : true;
+
+                        return (
+                          <button
+                            disabled={!canForce}
+                            onClick={() => syncUnsavedReport(id, isConflict)}
+                            style={{
+                              padding: '0.45rem 0.9rem',
+                              fontSize: '0.8rem',
+                              backgroundColor: !canForce ? '#cbd5e1' : (isConflict ? '#f59e0b' : '#10b981'),
+                              color: !canForce ? '#94a3b8' : 'white',
+                              border: 'none',
+                              borderRadius: '8px',
+                              cursor: !canForce ? 'not-allowed' : 'pointer',
+                              fontWeight: 600
+                            }}
+                            title={isConflict && !canForce ? "Lokaler Stand ist unvollständig oder ungültig und darf nicht erzwungen werden." : undefined}
+                          >
+                            {isConflict ? 'Lokalen Stand erzwingen' : 'Hochladen'}
+                          </button>
+                        );
+                      })()}
                     </div>
                   </div>
                 );
