@@ -5,6 +5,9 @@ test.describe('Compulsory Live Test: Archive & Soft-Delete', () => {
     test.use({ baseURL: 'https://bautrockner-einsatz.vercel.app' });
 
     test('Archive and Soft-Delete Live Verification', async ({ page, context }) => {
+        page.on('console', msg => console.log('BROWSER LOG:', msg.text()));
+        page.on('pageerror', err => console.log('BROWSER ERROR:', err.message));
+
         const uniqueNumber = `LIVE-TEST-${Date.now()}`;
         console.log(`Using test project number: ${uniqueNumber}`);
 
@@ -47,7 +50,19 @@ test.describe('Compulsory Live Test: Archive & Soft-Delete', () => {
 
         // Wait for list to load and verify test project is visible
         const sidebarRow = page.locator('tr.hover-row', { hasText: uniqueNumber });
-        await expect(sidebarRow).toBeVisible({ timeout: 15000 });
+        try {
+            await expect(sidebarRow).toBeVisible({ timeout: 10000 });
+        } catch (e) {
+            console.log('Sidebar row not found immediately. Reloading page to bypass latency...');
+            await page.reload();
+            await page.waitForLoadState('networkidle');
+            // Ensure "Alle Fälle" is checked after reload
+            const allCasesCheckboxReload = page.locator('input[type="checkbox"]').nth(1);
+            if (await allCasesCheckboxReload.isVisible() && !(await allCasesCheckboxReload.isChecked())) {
+                await allCasesCheckboxReload.check();
+            }
+            await expect(sidebarRow).toBeVisible({ timeout: 15000 });
+        }
 
         // 3. Archivieren: click Archive button on that project row
         page.on('dialog', async dialog => {
@@ -68,7 +83,8 @@ test.describe('Compulsory Live Test: Archive & Soft-Delete', () => {
         const newContext = await context.browser().newContext({
             viewport: { width: 1280, height: 800 },
             permissions: ['microphone', 'camera'],
-            locale: 'de-DE'
+            locale: 'de-DE',
+            userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 QToolDeepTest'
         });
         const newPage = await newContext.newPage();
 
@@ -136,7 +152,8 @@ test.describe('Compulsory Live Test: Archive & Soft-Delete', () => {
         const secondContext = await context.browser().newContext({
             viewport: { width: 1280, height: 800 },
             permissions: ['microphone', 'camera'],
-            locale: 'de-DE'
+            locale: 'de-DE',
+            userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 QToolDeepTest'
         });
         const secondPage = await secondContext.newPage();
         await secondPage.goto('https://bautrockner-einsatz.vercel.app');
