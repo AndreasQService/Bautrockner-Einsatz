@@ -953,28 +953,16 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
                                                                                     let success = false;
                                                                                     let errMsg = '';
                                                                                     if (supabase) {
-                                                                                        const { data, error: fetchError } = await supabase
+                                                                                        const { error: updateError } = await supabase
                                                                                             .from('damage_reports')
-                                                                                            .select('report_data')
-                                                                                            .eq('id', report.id)
-                                                                                            .single();
-                                                                                        if (!fetchError && data) {
-                                                                                            const serverReportData = data.report_data || {};
-                                                                                            serverReportData.status = 'Abgeschlossen';
-                                                                                            const { error: updateError } = await supabase
-                                                                                                .from('damage_reports')
-                                                                                                .update({
-                                                                                                    status: 'Abgeschlossen',
-                                                                                                    report_data: serverReportData
-                                                                                                })
-                                                                                                .eq('id', report.id);
-                                                                                            if (!updateError) {
-                                                                                                success = true;
-                                                                                            } else {
-                                                                                                errMsg = updateError.message;
-                                                                                            }
+                                                                                            .update({
+                                                                                                status: 'Abgeschlossen'
+                                                                                            })
+                                                                                            .eq('id', report.id);
+                                                                                        if (!updateError) {
+                                                                                            success = true;
                                                                                         } else {
-                                                                                            errMsg = fetchError?.message || 'Fehler beim Laden des Serverstands';
+                                                                                            errMsg = updateError.message;
                                                                                         }
                                                                                     } else {
                                                                                         success = true; // Offline / Mock mode
@@ -1031,36 +1019,26 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
                                                                                     let success = false;
                                                                                     let errMsg = '';
                                                                                     const now = new Date().toISOString();
+                                                                                    const userEmail = currentUser?.email || currentUser?.name || 'Unbekannt';
                                                                                     if (supabase) {
-                                                                                        const { data, error: fetchError } = await supabase
+                                                                                        const { error: updateError } = await supabase
                                                                                             .from('damage_reports')
-                                                                                            .select('report_data')
-                                                                                            .eq('id', report.id)
-                                                                                            .single();
-                                                                                        if (!fetchError && data) {
-                                                                                            const serverReportData = data.report_data || {};
-                                                                                            serverReportData.deletedAt = now;
-                                                                                            const { error: updateError } = await supabase
-                                                                                                .from('damage_reports')
-                                                                                                .update({
-                                                                                                    deleted_at: now,
-                                                                                                    report_data: serverReportData
-                                                                                                })
-                                                                                                .eq('id', report.id);
-                                                                                            if (!updateError) {
-                                                                                                success = true;
-                                                                                            } else {
-                                                                                                errMsg = updateError.message;
-                                                                                            }
+                                                                                            .update({
+                                                                                                deleted_at: now,
+                                                                                                deleted_by: userEmail
+                                                                                            })
+                                                                                            .eq('id', report.id);
+                                                                                        if (!updateError) {
+                                                                                            success = true;
                                                                                         } else {
-                                                                                            errMsg = fetchError?.message || 'Fehler beim Laden des Serverstands';
+                                                                                            errMsg = updateError.message;
                                                                                         }
                                                                                     } else {
                                                                                         success = true; // Offline / Mock mode
                                                                                     }
                                                                                     if (success) {
                                                                                         if (onReportsChanged) {
-                                                                                            await onReportsChanged(report.id, { deletedAt: now });
+                                                                                            await onReportsChanged(report.id, { deletedAt: now, deletedBy: userEmail });
                                                                                         }
                                                                                     } else {
                                                                                         alert('Fehler beim Löschen: ' + errMsg);

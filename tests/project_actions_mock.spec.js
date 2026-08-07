@@ -7,6 +7,34 @@ test.describe('Project Archive and Delete Actions (Local Mocks)', () => {
         // 1. Initial login to get to the domain
         await login(page);
 
+        // 2. Intercept Supabase client update calls to assert update payloads
+        await page.addInitScript(() => {
+            let supabaseInstance = null;
+            Object.defineProperty(window, 'supabase', {
+                get: () => supabaseInstance,
+                set: (val) => {
+                    supabaseInstance = val;
+                    if (supabaseInstance && supabaseInstance.from) {
+                        const originalFrom = supabaseInstance.from;
+                        supabaseInstance.from = function(tableName) {
+                            if (tableName === 'damage_reports') {
+                                const originalResult = originalFrom.call(supabaseInstance, tableName);
+                                return {
+                                    ...originalResult,
+                                    update: function(payload) {
+                                        window.lastUpdatePayload = payload;
+                                        return originalResult.update(payload);
+                                    }
+                                };
+                            }
+                            return originalFrom.apply(supabaseInstance, arguments);
+                        };
+                    }
+                },
+                configurable: true
+            });
+        });
+
         // 2. Inject custom mock projects into sessionStorage
         await page.evaluate(() => {
             const mockProjects = [
@@ -95,6 +123,15 @@ test.describe('Project Archive and Delete Actions (Local Mocks)', () => {
         // Verify it disappears from "Alle Projekte" list
         await expect(page.getByText('Projekt Alpha')).not.toBeVisible({ timeout: 5000 });
 
+        // Assert update payload contains ONLY status and NO report_data
+        const lastPayload = await page.evaluate(() => window.lastUpdatePayload);
+        expect(lastPayload).toBeDefined();
+        expect(lastPayload.report_data).toBeUndefined();
+        expect(lastPayload.rooms).toBeUndefined();
+        expect(lastPayload.measurementRooms).toBeUndefined();
+        expect(lastPayload.images).toBeUndefined();
+        expect(lastPayload).toEqual({ status: 'Abgeschlossen' });
+
         // Switch to Archiv tab
         const archiveToggle = page.getByRole('button', { name: 'Archiv', exact: true });
         await archiveToggle.click();
@@ -133,6 +170,17 @@ test.describe('Project Archive and Delete Actions (Local Mocks)', () => {
 
         // Verify it disappears from the list
         await expect(page.getByText('Projekt Alpha')).not.toBeVisible({ timeout: 5000 });
+
+        // Assert update payload contains ONLY deleted_at and deleted_by and NO report_data
+        const lastPayload = await page.evaluate(() => window.lastUpdatePayload);
+        expect(lastPayload).toBeDefined();
+        expect(lastPayload.report_data).toBeUndefined();
+        expect(lastPayload.rooms).toBeUndefined();
+        expect(lastPayload.measurementRooms).toBeUndefined();
+        expect(lastPayload.images).toBeUndefined();
+        expect(lastPayload.deleted_at).toBeDefined();
+        expect(lastPayload.deleted_by).toBeDefined();
+        expect(Object.keys(lastPayload).sort()).toEqual(['deleted_at', 'deleted_by']);
     });
 
     test('4. Gleichnamiges Projekt bleibt unverändert', async ({ page }) => {
