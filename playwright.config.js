@@ -60,6 +60,14 @@ export default defineConfig({
                 userAgent: `${devices['Desktop Chrome'].userAgent} QToolDeepTest`
             },
         },
+        {
+            name: 'mock-tests',
+            testMatch: '**/project_actions_mock.spec.js',
+            use: { 
+                ...devices['Desktop Chrome'],
+                userAgent: `${devices['Desktop Chrome'].userAgent}`
+            },
+        },
         // Auskommentiert - bei Bedarf aktivieren:
         // {
         //   name: 'firefox',

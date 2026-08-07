@@ -501,6 +501,7 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
     const [casesSearchTerm, setCasesSearchTerm] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const [selectedSidebarReport, setSelectedSidebarReport] = useState(null);
+    const [savingProjectIds, setSavingProjectIds] = useState(new Set());
 
 
     const [workflowStore, setWorkflowStore] = useState(() => {
@@ -890,7 +891,7 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
                                             <thead>
                                                 <tr style={{ borderBottom: '1px solid var(--border)', color: 'var(--text-muted)' }}>
                                                     <th style={{ padding: '0.5rem 0.4rem', fontWeight: 600 }}>Projekt-Nr. / Adresse</th>
-                                                    <th style={{ padding: '0.5rem 0.4rem', width: '30px' }}></th>
+                                                    <th style={{ padding: '0.5rem 0.4rem', width: '70px' }}></th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -935,45 +936,166 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
                                                                 </div>
                                                             </td>
 
-                                                            {/* Archive Button */}
-                                                            <td style={{ padding: '0.5rem 0.4rem', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
-                                                                <button
-                                                                    onClick={async (e) => {
-                                                                        e.stopPropagation();
-                                                                        if (window.confirm(`Projekt "${report.projectNumber || report.projectTitle || report.id}" wirklich archivieren (auf Abgeschlossen setzen)?`)) {
-                                                                            try {
-                                                                                const { error } = await supabase
-                                                                                    .from('damage_reports')
-                                                                                    .update({ status: 'Abgeschlossen' })
-                                                                                    .eq('id', report.id);
-                                                                                if (!error) {
-                                                                                    if (onReportsChanged) onReportsChanged(report.id);
-                                                                                } else {
-                                                                                    alert('Fehler beim Archivieren: ' + error.message);
+                                                            {/* Actions Column */}
+                                                            <td style={{ padding: '0.5rem 0.4rem', textAlign: 'center', width: '70px', whiteSpace: 'nowrap' }} onClick={e => e.stopPropagation()}>
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', justifyContent: 'center' }}>
+                                                                    <button
+                                                                        disabled={savingProjectIds.has(report.id)}
+                                                                        onClick={async (e) => {
+                                                                            e.stopPropagation();
+                                                                            if (window.confirm(`Projekt "${report.projectNumber || report.projectTitle || report.id}" wirklich archivieren (auf Abgeschlossen setzen)?`)) {
+                                                                                setSavingProjectIds(prev => {
+                                                                                    const next = new Set(prev);
+                                                                                    next.add(report.id);
+                                                                                    return next;
+                                                                                });
+                                                                                try {
+                                                                                    let success = false;
+                                                                                    let errMsg = '';
+                                                                                    if (supabase) {
+                                                                                        const { data, error: fetchError } = await supabase
+                                                                                            .from('damage_reports')
+                                                                                            .select('report_data')
+                                                                                            .eq('id', report.id)
+                                                                                            .single();
+                                                                                        if (!fetchError && data) {
+                                                                                            const serverReportData = data.report_data || {};
+                                                                                            serverReportData.status = 'Abgeschlossen';
+                                                                                            const { error: updateError } = await supabase
+                                                                                                .from('damage_reports')
+                                                                                                .update({
+                                                                                                    status: 'Abgeschlossen',
+                                                                                                    report_data: serverReportData
+                                                                                                })
+                                                                                                .eq('id', report.id);
+                                                                                            if (!updateError) {
+                                                                                                success = true;
+                                                                                            } else {
+                                                                                                errMsg = updateError.message;
+                                                                                            }
+                                                                                        } else {
+                                                                                            errMsg = fetchError?.message || 'Fehler beim Laden des Serverstands';
+                                                                                        }
+                                                                                    } else {
+                                                                                        success = true; // Offline / Mock mode
+                                                                                    }
+                                                                                    if (success) {
+                                                                                        if (onReportsChanged) {
+                                                                                            await onReportsChanged(report.id, { status: 'Abgeschlossen' });
+                                                                                        }
+                                                                                    } else {
+                                                                                        alert('Fehler beim Archivieren: ' + errMsg);
+                                                                                    }
+                                                                                } catch (err) {
+                                                                                    console.error(err);
+                                                                                    alert('Fehler beim Archivieren: ' + err.message);
+                                                                                } finally {
+                                                                                    setSavingProjectIds(prev => {
+                                                                                        const next = new Set(prev);
+                                                                                        next.delete(report.id);
+                                                                                        return next;
+                                                                                    });
                                                                                 }
-                                                                            } catch (err) {
-                                                                                console.error(err);
                                                                             }
-                                                                        }
-                                                                    }}
-                                                                    title="Projekt archivieren (auf Abgeschlossen setzen)"
-                                                                    style={{
-                                                                        background: 'none',
-                                                                        border: 'none',
-                                                                        cursor: 'pointer',
-                                                                        color: 'var(--text-muted, #64748B)',
-                                                                        padding: '0.2rem',
-                                                                        borderRadius: '4px',
-                                                                        display: 'flex',
-                                                                        alignItems: 'center',
-                                                                        opacity: 0.5,
-                                                                        transition: 'all 0.15s'
-                                                                    }}
-                                                                    onMouseEnter={e => e.currentTarget.style.opacity = 1}
-                                                                    onMouseLeave={e => e.currentTarget.style.opacity = 0.5}
-                                                                >
-                                                                    <Archive size={14} />
-                                                                </button>
+                                                                        }}
+                                                                        title="Projekt archivieren (auf Abgeschlossen setzen)"
+                                                                        style={{
+                                                                            background: 'none',
+                                                                            border: 'none',
+                                                                            cursor: savingProjectIds.has(report.id) ? 'not-allowed' : 'pointer',
+                                                                            color: 'var(--text-muted, #64748B)',
+                                                                            padding: '0.2rem',
+                                                                            borderRadius: '4px',
+                                                                            display: 'inline-flex',
+                                                                            alignItems: 'center',
+                                                                            opacity: savingProjectIds.has(report.id) ? 0.3 : 0.5,
+                                                                            transition: 'all 0.15s'
+                                                                        }}
+                                                                        onMouseEnter={e => { if (!savingProjectIds.has(report.id)) e.currentTarget.style.opacity = 1; }}
+                                                                        onMouseLeave={e => { if (!savingProjectIds.has(report.id)) e.currentTarget.style.opacity = 0.5; }}
+                                                                    >
+                                                                        <Archive size={14} />
+                                                                    </button>
+
+                                                                    <button
+                                                                        disabled={savingProjectIds.has(report.id)}
+                                                                        onClick={async (e) => {
+                                                                            e.stopPropagation();
+                                                                            if (window.confirm(`Projekt „${report.projectNumber || report.projectTitle || report.id}“ wirklich löschen?\n\nDas Projekt wird aus der Projektliste entfernt. Die gespeicherten Daten und Bilder werden nicht physisch gelöscht.`)) {
+                                                                                setSavingProjectIds(prev => {
+                                                                                    const next = new Set(prev);
+                                                                                    next.add(report.id);
+                                                                                    return next;
+                                                                                });
+                                                                                try {
+                                                                                    let success = false;
+                                                                                    let errMsg = '';
+                                                                                    const now = new Date().toISOString();
+                                                                                    if (supabase) {
+                                                                                        const { data, error: fetchError } = await supabase
+                                                                                            .from('damage_reports')
+                                                                                            .select('report_data')
+                                                                                            .eq('id', report.id)
+                                                                                            .single();
+                                                                                        if (!fetchError && data) {
+                                                                                            const serverReportData = data.report_data || {};
+                                                                                            serverReportData.deletedAt = now;
+                                                                                            const { error: updateError } = await supabase
+                                                                                                .from('damage_reports')
+                                                                                                .update({
+                                                                                                    deleted_at: now,
+                                                                                                    report_data: serverReportData
+                                                                                                })
+                                                                                                .eq('id', report.id);
+                                                                                            if (!updateError) {
+                                                                                                success = true;
+                                                                                            } else {
+                                                                                                errMsg = updateError.message;
+                                                                                            }
+                                                                                        } else {
+                                                                                            errMsg = fetchError?.message || 'Fehler beim Laden des Serverstands';
+                                                                                        }
+                                                                                    } else {
+                                                                                        success = true; // Offline / Mock mode
+                                                                                    }
+                                                                                    if (success) {
+                                                                                        if (onReportsChanged) {
+                                                                                            await onReportsChanged(report.id, { deletedAt: now });
+                                                                                        }
+                                                                                    } else {
+                                                                                        alert('Fehler beim Löschen: ' + errMsg);
+                                                                                    }
+                                                                                } catch (err) {
+                                                                                    console.error(err);
+                                                                                    alert('Fehler beim Löschen: ' + err.message);
+                                                                                } finally {
+                                                                                    setSavingProjectIds(prev => {
+                                                                                        const next = new Set(prev);
+                                                                                        next.delete(report.id);
+                                                                                        return next;
+                                                                                    });
+                                                                                }
+                                                                            }
+                                                                        }}
+                                                                        title="Projekt löschen"
+                                                                        style={{
+                                                                            background: 'none',
+                                                                            border: 'none',
+                                                                            cursor: savingProjectIds.has(report.id) ? 'not-allowed' : 'pointer',
+                                                                            color: '#DC2626',
+                                                                            padding: '0.2rem',
+                                                                            borderRadius: '4px',
+                                                                            display: 'inline-flex',
+                                                                            alignItems: 'center',
+                                                                            opacity: savingProjectIds.has(report.id) ? 0.3 : 0.5,
+                                                                            transition: 'all 0.15s'
+                                                                        }}
+                                                                        onMouseEnter={e => { if (!savingProjectIds.has(report.id)) e.currentTarget.style.opacity = 1; }}
+                                                                        onMouseLeave={e => { if (!savingProjectIds.has(report.id)) e.currentTarget.style.opacity = 0.5; }}
+                                                                    >
+                                                                        <Trash2 size={14} />
+                                                                    </button>
+                                                                </div>
                                                             </td>
                                                         </tr>
                                                     );

@@ -281,6 +281,9 @@ if (isWebDriver) {
               console.log('[MOCK DB] update eq called:', tableName, col, val);
               const p = mockProjects.find(x => x.id === val);
               if (p) {
+                if (payload.status !== undefined) p.status = payload.status;
+                if (payload.deleted_at !== undefined) p.deleted_at = payload.deleted_at;
+                if (payload.deleted_by !== undefined) p.deleted_by = payload.deleted_by;
                 p.report_data = { ...p.report_data, ...payload.report_data };
                 setSessionStorageItem('mock_db_projects', mockProjects);
               }

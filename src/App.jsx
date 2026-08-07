@@ -1839,7 +1839,9 @@ function App() {
           date: finalReport.date,
           drying_started: finalReport.dryingStarted,
           report_data: reportForStorage,
-          updated_at: now
+          updated_at: now,
+          deleted_at: finalReport.deletedAt || null,
+          deleted_by: finalReport.deletedBy || null
         };
 
         const oneDriveBackup = () => {
@@ -2626,14 +2628,14 @@ function App() {
           users={users}
           lockedProjectIds={lockedProjectIds}
           onLogout={handleLogout}
-          onReportsChanged={async (projId) => {
+          onReportsChanged={async (projId, updatedFields = { status: 'Abgeschlossen' }) => {
             if (projId) {
               setReports(prev => prev.map(r => {
                 if (r.id === projId) {
-                  const updatedData = r.report_data ? { ...r.report_data, status: 'Abgeschlossen' } : null;
+                  const updatedData = r.report_data ? { ...r.report_data, ...updatedFields } : null;
                   return {
                     ...r,
-                    status: 'Abgeschlossen',
+                    ...updatedFields,
                     report_data: updatedData
                   };
                 }
