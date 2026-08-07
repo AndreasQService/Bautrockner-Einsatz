@@ -4,7 +4,6 @@ import { login } from './helpers/auth.js';
 test.describe('False Conflict Prevention (Local Mocks)', () => {
 
     test.beforeEach(async ({ page }) => {
-        page.on('console', msg => console.log('BROWSER:', msg.text()));
         await login(page);
 
         // Inject custom lightweight mock project into sessionStorage
@@ -209,18 +208,14 @@ test.describe('False Conflict Prevention (Local Mocks)', () => {
         const row = page.locator('tr.hover-row', { hasText: 'Projekt Hydration Test' }).first();
         await row.click();
 
-        // Dump HTML for debugging
-        const html = await page.content();
-        console.log('[DEBUG TEST 6 HTML]:', html);
-
         // Loading spinner/overlay should be visible immediately
-        await expect(page.locator('text=Projekt-Details werden geladen...')).toBeVisible();
+        await expect(page.locator('text=Projektdaten werden vollständig geladen...')).toBeVisible();
 
         // Wait for the simulated delay to pass and hydration to finish
         await page.waitForTimeout(5000);
 
         // Loading spinner should have disappeared
-        await expect(page.locator('text=Projekt-Details werden geladen...')).not.toBeVisible();
+        await expect(page.locator('text=Projektdaten werden vollständig geladen...')).not.toBeVisible();
         await page.waitForSelector('text=Kontakte');
 
         // Verify no unsaved entries were generated during this slow hydration

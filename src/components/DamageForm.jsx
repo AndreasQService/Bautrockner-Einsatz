@@ -3978,11 +3978,7 @@ END:VCARD`;
 
     const isFullyHydrated = !initialData || !initialData.isLightweight;
 
-    console.log('[DEBUG] isFullyHydrated check:', {
-        initialDataId: initialData?.id,
-        initialDataIsLightweight: initialData?.isLightweight,
-        isFullyHydrated
-    });
+
 
     if (!isFullyHydrated) {
         return (
