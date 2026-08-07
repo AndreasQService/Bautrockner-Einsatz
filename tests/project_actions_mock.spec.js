@@ -162,6 +162,9 @@ test.describe('Project Archive & Soft-Delete Mock Tests', () => {
         await page.locator('button[type="submit"]').click();
         await page.waitForSelector('header.app-header');
 
+        // Reload to refresh in-memory mock projects state from sessionStorage
+        await page.reload({ waitUntil: 'networkidle' });
+
         // Verify we are on dashboard
         await expect(page.locator('tr.hover-row', { hasText: 'Projekt Alpha' })).toBeVisible();
 
