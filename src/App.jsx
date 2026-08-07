@@ -1498,6 +1498,7 @@ function App() {
   }, [fetchReports]);
 
   const handleSelectReport = async (report) => {
+    console.log('[DEBUG handleSelectReport] report passed:', { id: report.id, isLightweight: report.isLightweight });
     // 1. Lokale ungespeicherte Änderungen einmischen falls vorhanden
     let activeReport = report;
     const cached = localStorage.getItem('qservice_unsaved_reports');
