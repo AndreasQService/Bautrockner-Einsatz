@@ -150,12 +150,8 @@ test.describe('False Conflict Prevention (Local Mocks)', () => {
         await page.reload({ waitUntil: 'networkidle' });
         await page.waitForSelector('header.app-header');
 
-        // Open project to trigger hydration and automatic cleanup
-        const row = page.locator('tr', { hasText: 'Projekt Hydration Test' });
-        await row.click();
-
-        await page.waitForSelector('text=Kontakte');
-        await page.waitForTimeout(1000);
+        // Verify the conflict dialog is NOT visible because it was cleaned up on mount
+        await expect(page.getByRole('heading', { name: 'Lokale Änderungen gefunden!' })).not.toBeVisible();
 
         // Verify the false hydration entry has been automatically removed
         const unsaved = await page.evaluate(() => {

@@ -296,9 +296,23 @@ function App() {
         const cached = localStorage.getItem('qservice_unsaved_reports');
         if (cached) {
           const parsed = JSON.parse(cached);
-          if (Object.keys(parsed).length > 0) {
-            setUnsavedReports(parsed);
+          let changed = false;
+          for (const id of Object.keys(parsed)) {
+            const entry = parsed[id];
+            const hasNoValidSource = entry.source !== 'failed-save' && entry.source !== 'offline-edit';
+            const isLightweight = entry.reportData && (entry.reportData.isLightweight || (!entry.reportData.rooms?.length && !entry.reportData.images?.length && !entry.reportData.contacts?.length));
+            const hasNoChanges = !entry.changedPaths || entry.changedPaths.length === 0;
+            
+            if (hasNoValidSource && (isLightweight || hasNoChanges)) {
+              delete parsed[id];
+              changed = true;
+              console.log(`[Init-Cleanup] Automatically removed false hydration legacy entry: ${id}`);
+            }
           }
+          if (changed) {
+            safeSetItem('qservice_unsaved_reports', JSON.stringify(parsed));
+          }
+          setUnsavedReports(parsed);
         }
       } catch (e) {
         console.warn('[OfflineCache] Fehler beim Laden:', e);
