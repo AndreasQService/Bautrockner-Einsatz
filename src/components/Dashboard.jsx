@@ -1221,16 +1221,31 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
                                     return (
                                         <tr key={report.id} onClick={() => onSelectReport(report)} style={{ cursor: isLocked ? 'not-allowed' : 'pointer', opacity: isLocked ? 0.75 : 1 }}>
                                             <td style={{ padding: '0.25rem 0.4rem', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        if (window.confirm(`Projekt löschen?`)) onDeleteReport(report.id);
-                                                    }}
-                                                    title="Projekt löschen"
-                                                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#EF4444', padding: '0.2rem', borderRadius: '4px', display: 'flex', alignItems: 'center', opacity: 0.6 }}
-                                                    onMouseEnter={e => e.currentTarget.style.opacity = 1}
-                                                    onMouseLeave={e => e.currentTarget.style.opacity = 0.6}
-                                                ><Trash2 size={14} /></button>
+                                                {currentUser?.role === 'admin' && (
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleDeleteProject(report);
+                                                        }}
+                                                        disabled={savingProjectIds.has(report.id)}
+                                                        title="Projekt löschen"
+                                                        style={{
+                                                            background: 'none',
+                                                            border: 'none',
+                                                            cursor: savingProjectIds.has(report.id) ? 'not-allowed' : 'pointer',
+                                                            color: '#dc3545',
+                                                            padding: '0.2rem',
+                                                            borderRadius: '4px',
+                                                            display: 'inline-flex',
+                                                            alignItems: 'center',
+                                                            opacity: savingProjectIds.has(report.id) ? 0.3 : 0.6
+                                                        }}
+                                                        onMouseEnter={e => { if (!savingProjectIds.has(report.id)) e.currentTarget.style.opacity = 1; }}
+                                                        onMouseLeave={e => { if (!savingProjectIds.has(report.id)) e.currentTarget.style.opacity = 0.6; }}
+                                                    >
+                                                        <Trash2 size={14} />
+                                                    </button>
+                                                )}
                                             </td>
                                             <td style={{ fontWeight: 600, fontSize: '0.9rem' }}>
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
