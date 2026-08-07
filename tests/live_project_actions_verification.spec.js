@@ -2,7 +2,10 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Compulsory Live Test: Archive & Soft-Delete', () => {
     // Override the default baseURL for this test to the production URL
-    test.use({ baseURL: 'https://bautrockner-einsatz.vercel.app' });
+    test.use({ 
+        baseURL: 'https://bautrockner-einsatz.vercel.app',
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 QToolDeepTest'
+    });
 
     test('Archive and Soft-Delete Live Verification', async ({ page, context }) => {
         page.on('console', msg => console.log('BROWSER LOG:', msg.text()));
