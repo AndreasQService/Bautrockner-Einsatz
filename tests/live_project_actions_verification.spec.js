@@ -26,6 +26,8 @@ test.describe('Compulsory Live Test: Archive & Soft-Delete', () => {
         await page.locator('input[placeholder="Ort"]').first().fill('Zürich');
         await page.locator('input[placeholder="Name oder Firma des Auftraggebers"]').fill('Live Test GmbH');
         
+        // Wait for auto-save to start (Speichert...)
+        await expect(page.locator('text=Speichert...')).toBeVisible({ timeout: 5000 });
         // Wait for auto-save to complete and show "Gespeichert"
         await expect(page.locator('text=Gespeichert')).toBeVisible({ timeout: 15000 });
         
