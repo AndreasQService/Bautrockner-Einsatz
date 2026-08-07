@@ -209,6 +209,10 @@ test.describe('False Conflict Prevention (Local Mocks)', () => {
         const row = page.locator('tr.hover-row', { hasText: 'Projekt Hydration Test' }).first();
         await row.click();
 
+        // Dump HTML for debugging
+        const html = await page.content();
+        console.log('[DEBUG TEST 6 HTML]:', html);
+
         // Loading spinner/overlay should be visible immediately
         await expect(page.locator('text=Projekt-Details werden geladen...')).toBeVisible();
 
