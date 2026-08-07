@@ -4,6 +4,7 @@ import { login } from './helpers/auth.js';
 test.describe('False Conflict Prevention (Local Mocks)', () => {
 
     test.beforeEach(async ({ page }) => {
+        page.on('console', msg => console.log('BROWSER:', msg.text()));
         await login(page);
 
         // Inject custom lightweight mock project into sessionStorage
@@ -11,6 +12,7 @@ test.describe('False Conflict Prevention (Local Mocks)', () => {
             sessionStorage.clear();
             localStorage.removeItem('qservice_unsaved_reports');
             localStorage.removeItem('qservice_unsaved_reports_backup');
+            localStorage.removeItem('qservice_reports_prod');
             const mockProjects = [
                 {
                     id: 'proj-lightweight',
