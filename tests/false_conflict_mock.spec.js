@@ -9,6 +9,7 @@ test.describe('False Conflict Prevention (Local Mocks)', () => {
         // Inject custom lightweight mock project into sessionStorage
         await page.evaluate(() => {
             sessionStorage.clear();
+            localStorage.clear();
             const mockProjects = [
                 {
                     id: 'proj-lightweight',
@@ -228,9 +229,9 @@ test.describe('False Conflict Prevention (Local Mocks)', () => {
         await row.click();
         await page.waitForSelector('text=Kontakte');
 
-        // Make a real semantic user change: fill client field
-        const clientInput = page.locator('input[placeholder*="Mieter, Eigentümer"]').first();
-        await clientInput.fill('Echter Test Mieter');
+        // Make a real semantic user change: fill schadenort field
+        const schadenortInput = page.locator('input[placeholder*="Küche / Keller"]').first();
+        await schadenortInput.fill('Echter Schadenort Keller');
 
         // Wait 3 seconds for the 2-second autosave debounce to fire
         await page.waitForTimeout(3000);
@@ -262,10 +263,10 @@ test.describe('False Conflict Prevention (Local Mocks)', () => {
     });
 
     test('9. Zuletzt geändert verwendet Root-Feld korrekt', async ({ page }) => {
-        // Add root-level last_edited_by metadata to mock project
+        // Add last_edited_by metadata to report_data JSON column (which gets spread onto root)
         await page.evaluate(() => {
             const mockProjects = JSON.parse(sessionStorage.getItem('mock_db_projects') || '[]');
-            mockProjects[0].last_edited_by = 'Test Techniker 123';
+            mockProjects[0].report_data.last_edited_by = 'Test Techniker 123';
             sessionStorage.setItem('mock_db_projects', JSON.stringify(mockProjects));
         });
 
