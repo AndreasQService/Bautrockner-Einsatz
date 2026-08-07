@@ -155,9 +155,9 @@ test.describe('Project Archive & Soft-Delete Mock Tests', () => {
     });
 
     test('5. Lösch-Button ist für Nicht-Admins unsichtbar', async ({ page }) => {
-        // Logout and log in as normal technician (Techniker 1)
+        // Logout and log in as normal disponent user (Disponent 1)
         await page.locator('button[title="Abmelden"]').click();
-        await page.locator('input[type="text"]').fill('Techniker 1');
+        await page.locator('input[type="text"]').fill('Disponent 1');
         await page.locator('input[type="password"]').fill('123');
         await page.locator('button[type="submit"]').click();
         await page.waitForSelector('header.app-header');
