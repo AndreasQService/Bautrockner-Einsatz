@@ -9,7 +9,8 @@ test.describe('False Conflict Prevention (Local Mocks)', () => {
         // Inject custom lightweight mock project into sessionStorage
         await page.evaluate(() => {
             sessionStorage.clear();
-            localStorage.clear();
+            localStorage.removeItem('qservice_unsaved_reports');
+            localStorage.removeItem('qservice_unsaved_reports_backup');
             const mockProjects = [
                 {
                     id: 'proj-lightweight',
