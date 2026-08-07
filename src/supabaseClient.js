@@ -249,7 +249,15 @@ if (isWebDriver) {
         console.log('[MOCK DB] select called:', tableName, columns);
         if (tableName === 'damage_reports') {
           console.log('[MOCK DB] returning projects count:', mockProjects.length);
-          return makeMockQuery(tableName, mockProjects);
+          const hasReportData = columns && columns.includes('report_data');
+          const projects = mockProjects.map(p => {
+            if (!hasReportData) {
+              const { report_data, ...rest } = p;
+              return rest;
+            }
+            return p;
+          });
+          return makeMockQuery(tableName, projects);
         }
         return makeMockQuery(tableName, null);
       },
