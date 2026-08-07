@@ -72,7 +72,7 @@ test.describe('False Conflict Prevention (Local Mocks)', () => {
                     changedPaths: ['rooms'],
                     reportData: {
                         id: 'proj-lightweight',
-                        isLightweight: true // lightweight
+                        isLightweight: false
                     },
                     _sync_conflict: true,
                     projectTitle: 'Projekt Hydration Test'
