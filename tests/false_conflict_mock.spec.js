@@ -69,6 +69,7 @@ test.describe('False Conflict Prevention (Local Mocks)', () => {
                     projectId: 'proj-lightweight',
                     source: 'hydration', // invalid source
                     isCompleteSnapshot: false, // incomplete snapshot
+                    changedPaths: ['rooms'],
                     reportData: {
                         id: 'proj-lightweight',
                         isLightweight: true // lightweight
@@ -167,6 +168,7 @@ test.describe('False Conflict Prevention (Local Mocks)', () => {
                 'proj-lightweight': {
                     reportId: 'proj-lightweight',
                     // no source, no isCompleteSnapshot
+                    changedPaths: ['rooms'],
                     reportData: {
                         id: 'proj-lightweight',
                         projectTitle: 'Projekt Hydration Test',
