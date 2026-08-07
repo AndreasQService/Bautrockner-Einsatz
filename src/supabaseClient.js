@@ -232,6 +232,11 @@ if (isWebDriver) {
       const singleData = Array.isArray(data) ? data[0] : data;
       return makeMockQuery(tableName, singleData, error);
     };
+    promise.maybeSingle = () => {
+      console.log('[MOCK DB] maybeSingle called:', tableName);
+      const singleData = Array.isArray(data) ? data[0] : data;
+      return makeMockQuery(tableName, singleData || null, error);
+    };
     return promise;
   }
 

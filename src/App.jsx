@@ -1252,7 +1252,10 @@ function App() {
           .from('damage_reports')
           .select('report_data')
           .eq('id', 'SYSTEM_SETTINGS')
-          .single();
+          .maybeSingle();
+        if (error && error.code !== 'PGRST116') {
+          console.warn("Failed to load users from Supabase:", error);
+        }
         if (data && data.report_data && data.report_data.users) {
           setUsers(data.report_data.users);
         }
