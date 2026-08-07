@@ -941,7 +941,9 @@ function App() {
   useEffect(() => {
     selectedReportRef.current = selectedReport;
     if (selectedReport) {
-      loadedProjectVersionRef.current = selectedReport.report_data?.version || selectedReport.version || 1;
+      // The fully loaded report stores the canonical version at root level.
+      // Prefer it over any stale nested/lightweight snapshot.
+      loadedProjectVersionRef.current = selectedReport.version || selectedReport.report_data?.version || 1;
       console.log('[Version] Loaded project version set to:', loadedProjectVersionRef.current, 'for:', selectedReport.id);
     } else {
       loadedProjectVersionRef.current = 1;
@@ -1611,23 +1613,12 @@ function App() {
         if (activeLoadRequestsRef.current[targetProjectId] !== requestGen) return;
 
         if (data && !error && data.report_data) {
-          let mergedData = data.report_data;
-          const cached = localStorage.getItem('qservice_unsaved_reports');
-          if (cached) {
-            try {
-              const unsaved = JSON.parse(cached);
-              if (unsaved[targetProjectId]?.reportData) {
-                mergedData = {
-                  ...mergedData,
-                  ...unsaved[targetProjectId].reportData
-                };
-              }
-            } catch (e) {}
-          }
-
+          // Hydrate from the canonical server snapshot. A pending local version
+          // is resolved separately and must never replace the server baseline.
+          const mergedData = sanitizeMeasurementStorage(data.report_data);
           const fullReport = {
-            ...sanitizeMeasurementStorage(mergedData),
             ...activeReport,
+            ...mergedData,
             id: targetProjectId,
             _supabase_updated_at: data.updated_at,
             isLightweight: false
@@ -1690,23 +1681,12 @@ function App() {
           if (activeLoadRequestsRef.current[targetProjectId] !== requestGen) return;
 
           if (data && !error && data.report_data) {
-            let mergedData = data.report_data;
-            const cached = localStorage.getItem('qservice_unsaved_reports');
-            if (cached) {
-              try {
-                const unsaved = JSON.parse(cached);
-                if (unsaved[targetProjectId]?.reportData) {
-                  mergedData = {
-                    ...mergedData,
-                    ...unsaved[targetProjectId].reportData
-                  };
-                }
-              } catch (e) {}
-            }
-
+            // Always hydrate from the canonical server snapshot. Pending local
+            // changes stay separate until the user explicitly resolves them.
+            const mergedData = sanitizeMeasurementStorage(data.report_data);
             const fullReport = {
-              ...sanitizeMeasurementStorage(mergedData),
               ...selectedReport,
+              ...mergedData,
               id: targetProjectId,
               _supabase_updated_at: data.updated_at,
               isLightweight: false
@@ -1745,7 +1725,19 @@ function App() {
     setIsSessionActive(true);
   }
 
-  const handleSaveReport = useCallback(async (updatedReport, silent = false, isDirty = true) => {
+  const handleSaveReport = useCallback(async (updatedReport, silent = false, isDirty = false) => {
+    const existingBeforeSave = updatedReport?.id
+      ? ((selectedReportRef.current && selectedReportRef.current.id === updatedReport.id)
+          ? selectedReportRef.current
+          : reportsRef.current.find(r => r.id === updatedReport.id))
+      : null;
+
+    // ERP invariant: opening, hydrating or normalizing an existing report is
+    // never a save. Existing data may only be written after an explicit user edit.
+    if (existingBeforeSave && isDirty !== true) {
+      return existingBeforeSave;
+    }
+
     const isLocked = (projectMode === 'technician' || isTechnicianMode) ? false : !isSessionActiveRef.current;
     if (isLocked) {
       console.warn('[handleSaveReport] Aborted save because project is locked by another device/mode.');
@@ -2426,7 +2418,7 @@ function App() {
       history: []
     };
 
-    handleSaveReport(newReport);
+    handleSaveReport(newReport, false, true);
     setShowEmailImport(false);
     showToast('Projekt erfolgreich importiert', 'success');
   };

@@ -541,26 +541,35 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
     const [isDirty, setIsDirty] = useState(false);
     const [hydrationComplete, setHydrationComplete] = useState(() => initialData ? !initialData.isLightweight : false);
 
-    const isDirtyRef = useRef(false);
-    const hydrationCompleteRef = useRef(false);
-
-    useEffect(() => {
-        isDirtyRef.current = isDirty;
-    }, [isDirty]);
+    const hydrationCompleteRef = useRef(initialData ? !initialData.isLightweight : false);
+    const userDirtyRef = useRef(false);
 
     useEffect(() => {
         hydrationCompleteRef.current = hydrationComplete;
     }, [hydrationComplete]);
 
-    const setFormData = useCallback((value) => {
-        setFormDataRaw(prev => {
-            const next = typeof value === 'function' ? value(prev) : value;
-            if (hydrationCompleteRef.current) {
-                setIsDirty(true);
-            }
-            return next;
-        });
+    const markUserDirty = useCallback(() => {
+        if (!hydrationCompleteRef.current) return;
+        userDirtyRef.current = true;
+        setIsDirty(true);
     }, []);
+
+    // State updates are neutral by default. Hydration, normalization and other
+    // programmatic updates must never be interpreted as user edits.
+    const setFormData = setFormDataRaw;
+
+    // Buttons and drop targets do not emit input/change events. After such an
+    // interaction, mark dirty only if persisted form data actually changed.
+    const scheduleUserMutationCheck = useCallback(() => {
+        if (!hydrationCompleteRef.current) return;
+        window.setTimeout(() => {
+            if (!hydrationCompleteRef.current) return;
+            if (lastSavedData.current && latestFormData.current &&
+                hasSemanticChanges(lastSavedData.current, latestFormData.current)) {
+                markUserDirty();
+            }
+        }, 0);
+    }, [markUserDirty]);
 
     useEffect(() => {
         if (initialData && !initialData.isLightweight && !hydrationComplete) {
@@ -624,6 +633,8 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                 })(),
                 measurementRooms: Array.isArray(initialData.measurementRooms) ? initialData.measurementRooms : []
             }));
+            userDirtyRef.current = false;
+            setIsDirty(false);
             setHydrationComplete(true);
         }
     }, [initialData, hydrationComplete]);
@@ -1255,6 +1266,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
             recognition.onresult = (event) => {
                 const transcript = event.results[0][0].transcript;
                 if (transcript) {
+                    markUserDirty();
                     setFormData(prev => {
                         if (fieldId === 'measures') {
                             const current = prev.measures ? prev.measures + ' ' : '';
@@ -1301,6 +1313,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         rec.onresult = (event) => {
             const transcript = event.results[0][0].transcript;
             if (transcript) {
+                markUserDirty();
                 setFormData(prev => ({ ...prev, findings: (prev.findings ? prev.findings + ' ' : '') + transcript }));
             }
         };
@@ -1989,46 +2002,43 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
     const lastSavedData = useRef(formData);
 
     const isHydratedRef = useRef(false);
-    const hasUserEditedRef = useRef(false);
 
-    // Track user edit status:
+    // Establish a clean server baseline. Never infer user intent merely from
+    // formData changing, because hydration and normalization also change it.
     useEffect(() => {
-        if (!initialData || initialData.isLightweight) {
+        if (!initialData || initialData.isLightweight || !hydrationComplete) {
             isHydratedRef.current = false;
-            hasUserEditedRef.current = false;
+            userDirtyRef.current = false;
+            setIsDirty(false);
             return;
         }
 
         // Initialize baseline if not present, changed ID, or was not yet hydrated
         if (!lastSavedData.current || lastSavedData.current.id !== formData.id || !isHydratedRef.current) {
             lastSavedData.current = JSON.parse(JSON.stringify(formData));
+            latestFormData.current = formData;
             isHydratedRef.current = true;
-            hasUserEditedRef.current = false;
+            userDirtyRef.current = false;
+            setIsDirty(false);
             return;
         }
+    }, [formData.id, initialData?.id, initialData?.isLightweight, hydrationComplete]);
 
-        // If hydrated and there are semantic changes compared to baseline
-        if (isHydratedRef.current) {
-            const hasChanges = hasSemanticChanges(lastSavedData.current, formData);
-            if (hasChanges) {
-                hasUserEditedRef.current = true;
-            }
-        }
-    }, [formData, initialData]);
-
-    useEffect(() => {
-        latestFormData.current = formData;
-    }, [formData]);
+    // Keep the unmount/click audit ref current on every render.
+    latestFormData.current = formData;
 
     useEffect(() => {
         // Condition checks for starting the autosave timer:
-        if (!isHydratedRef.current) return;
+        if (hydrationComplete !== true || isDirty !== true) return;
         if (!initialData || initialData.isLightweight === true) return;
         if (!formData.projectTitle && !formData.id) return;
-        if (!hasUserEditedRef.current) return;
 
         const hasChanges = hasSemanticChanges(lastSavedData.current, formData);
-        if (!hasChanges) return;
+        if (!hasChanges) {
+            userDirtyRef.current = false;
+            setIsDirty(false);
+            return;
+        }
 
         setIsSaving(true);
         const timeoutId = setTimeout(async () => {
@@ -2045,10 +2055,11 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
             };
 
             try {
-                const savedReport = await onSave(reportData, true, 'user-edit');
+                const savedReport = await onSave(reportData, true, true);
                 if (savedReport) {
                     lastSavedData.current = JSON.parse(JSON.stringify(reportData));
-                    hasUserEditedRef.current = false;
+                    userDirtyRef.current = false;
+                    setIsDirty(false);
                     // If the report was new (no ID) and the save generated one, update local state
                     if (savedReport.id && !formData.id) {
                         setFormData(prev => ({ ...prev, id: savedReport.id }));
@@ -2063,7 +2074,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         }, 2000); // 2 second debounce
 
         return () => clearTimeout(timeoutId);
-    }, [formData, onSave, initialData]);
+    }, [formData, onSave, initialData, isDirty, hydrationComplete]);
 
     // Save on Unmount
     useEffect(() => {
@@ -2071,8 +2082,8 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
             console.log("Component Unmounting - Saving final state...");
             if (onSave && latestFormData.current && lastSavedData.current && latestFormData.current.id === lastSavedData.current.id) {
                 const hasChanges = hasSemanticChanges(lastSavedData.current, latestFormData.current);
-                if (hasUserEditedRef.current && hasChanges) {
-                    onSave(latestFormData.current, true, 'user-edit');
+                if (hydrationCompleteRef.current === true && userDirtyRef.current === true && hasChanges) {
+                    onSave(latestFormData.current, true, true);
                 }
             }
         };
@@ -2292,6 +2303,7 @@ END:VCARD`;
 
     const handleImageUpload = async (files, contextData = {}) => {
         if (!files || files.length === 0) return;
+        markUserDirty();
 
         const isCloudFirstEnabled = import.meta.env.VITE_CLOUD_FIRST_IMAGES === 'true' || import.meta.env.VITE_CLOUD_FIRST_IMAGES === true;
 
@@ -2744,6 +2756,7 @@ END:VCARD`;
             ...prev,
             rooms: [...prev.rooms, roomEntry]
         }));
+        markUserDirty();
 
         // Keep apartment and stockwerk, only clear name/customName
         setNewRoom(prev => ({ ...prev, name: '', customName: '' }));
@@ -2773,6 +2786,7 @@ END:VCARD`;
                 assignedTo: 'Sonstiges'
             } : img)
         }));
+        markUserDirty();
     }
 
     const handleSaveRoomEdit = (roomId) => {
@@ -2801,6 +2815,7 @@ END:VCARD`;
             } : img)
         }));
         setEditingRoomId(null);
+        markUserDirty();
     }
 
     const generatePDFExport = async (customFormData = null) => {
@@ -2887,7 +2902,7 @@ END:VCARD`;
 
 
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault()
 
         // Combine address parts
@@ -2900,7 +2915,13 @@ END:VCARD`;
             type: formData.damageType, // Map back to 'type'
             imageCount: formData.images.length
         }
-        onSave(reportData, false, true)
+        try {
+            await onSave(reportData, false, true);
+            userDirtyRef.current = false;
+            setIsDirty(false);
+        } catch (err) {
+            console.error("Save failed:", err);
+        }
     }
 
     const handleDamageTypeImageUpload = (e) => {
@@ -3100,6 +3121,7 @@ END:VCARD`;
     const handleEmailImport = (data) => {
         console.log("handleEmailImport v2026.2 called with:", data);
         if (!data) return;
+        markUserDirty();
 
         setFormData(prev => {
             const newConflicts = { ...conflicts };
@@ -3274,15 +3296,17 @@ END:VCARD`;
 
     const handleUploadPanelExtraction = useCallback((data) => {
         console.log('Extraction complete, applying data direct:', data);
+        markUserDirty();
         handleEmailImport(data);
-    }, [handleEmailImport]);
+    }, [handleEmailImport, markUserDirty]);
 
     const handleUploadPanelImages = useCallback((newImages) => {
+        markUserDirty();
         setFormData(prev => ({
             ...prev,
             images: [...(prev.images || []), ...newImages],
         }));
-    }, []);
+    }, [markUserDirty]);
 
     const handlePDFClick = () => {
 
@@ -3959,6 +3983,7 @@ END:VCARD`;
                                 : { ...prev, measurementRooms: updatedMeasurementRooms, rooms: updatedRooms };
 
                             setFormData(updatedFormData);
+                            markUserDirty();
 
                             if (typeof onSave === 'function') {
                                 onSave(updatedFormData, data?.isAutosave ?? false, true);
@@ -4081,6 +4106,7 @@ END:VCARD`;
                                                 ...prev,
                                                 images: prev.images.filter(img => img.id !== file.id)
                                             }));
+                                            markUserDirty();
                                         }
                                     }}
                                     style={{
@@ -4106,7 +4132,14 @@ END:VCARD`;
 
     return (
         <>
-            <div className="card" style={{ maxWidth: mode === 'desktop' ? '1920px' : '800px', margin: '0 auto', padding: mode === 'desktop' ? '1.5rem' : '1rem' }}>
+            <div
+                className="card"
+                onInputCapture={markUserDirty}
+                onChangeCapture={markUserDirty}
+                onClickCapture={scheduleUserMutationCheck}
+                onDropCapture={scheduleUserMutationCheck}
+                style={{ maxWidth: mode === 'desktop' ? '1920px' : '800px', margin: '0 auto', padding: mode === 'desktop' ? '1.5rem' : '1rem' }}
+            >
                 {isSyncPending && (
                     <div style={{
                         padding: '1rem',
@@ -4528,6 +4561,7 @@ END:VCARD`;
                                             if (e.target.checked && nextStatus) {
                                                 const updated = { ...formData, status: nextStatus };
                                                 setFormData(updated);
+                                                markUserDirty();
                                                 // Auto-save damit Workflow-Dashboard sofort aktualisiert wird
                                                 if (onSave) setTimeout(() => onSave(updated, true, true), 200);
                                             }
@@ -10824,6 +10858,7 @@ END:VCARD`;
                                 : { ...prev, measurementRooms: updatedMeasurementRooms, rooms: updatedRooms };
 
                             setFormData(updatedFormData);
+                            markUserDirty();
 
                             if (typeof onSave === 'function') {
                                 onSave(updatedFormData, data?.isAutosave ?? false, true);
