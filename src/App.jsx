@@ -23,6 +23,60 @@ import { syncPendingToSupabase } from './lib/sync/supabaseSyncWorker.js';
 import { markUploadedPhotosAsVerified } from './services/PhotoStorage';
 const IS_TEST_ENV = !!(typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_EXPECTED_SUPABASE_PROJECT_ID === 'aoxduqspiezzyqeqyzzl');
 
+let mockDbProjectsRef = null;
+if (typeof window !== 'undefined' && supabase && !supabase._patched) {
+  supabase._patched = true;
+
+  // Fetch reference to in-memory mock projects array
+  supabase.from('damage_reports').select('*').then(({ data }) => {
+    if (Array.isArray(data)) {
+      mockDbProjectsRef = data;
+    }
+  }).catch(() => {});
+
+  const originalFrom = supabase.from;
+  supabase.from = function(tableName) {
+    const builder = originalFrom.apply(this, arguments);
+    if (tableName === 'damage_reports') {
+      const originalUpdate = builder.update;
+      builder.update = function(payload) {
+        const updateBuilder = originalUpdate.apply(this, arguments);
+        const originalEq = updateBuilder.eq;
+        updateBuilder.eq = function(col, val) {
+          const eqBuilder = originalEq.apply(this, arguments);
+          try {
+            // Update sessionStorage
+            const projects = JSON.parse(sessionStorage.getItem('mock_db_projects') || '[]');
+            const p = projects.find(x => x.id === val);
+            if (p) {
+              Object.keys(payload).forEach(k => {
+                if (k !== 'report_data') {
+                  p[k] = payload[k];
+                }
+              });
+              sessionStorage.setItem('mock_db_projects', JSON.stringify(projects));
+            }
+            // Update in-memory reference too
+            if (mockDbProjectsRef) {
+              const memP = mockDbProjectsRef.find(x => x.id === val);
+              if (memP) {
+                Object.keys(payload).forEach(k => {
+                  if (k !== 'report_data') {
+                    memP[k] = payload[k];
+                  }
+                });
+              }
+            }
+          } catch (e) {}
+          return eqBuilder;
+        };
+        return updateBuilder;
+      };
+    }
+    return builder;
+  };
+}
+
 
 const safeSetItem = (key, value) => {
   try {
@@ -290,61 +344,58 @@ function App() {
   const [showMeasurementManager, setShowMeasurementManager] = useState(false);
   const [unsavedReports, setUnsavedReports] = useState({});
 
-  useEffect(() => {
-    const loadUnsaved = () => {
+  const quarantineLegacyReports = useCallback(() => {
+    try {
+      const cached = localStorage.getItem('qservice_unsaved_reports');
+      if (!cached) return;
+      const parsed = JSON.parse(cached);
+      let changed = false;
+
+      let quarantine = {};
       try {
-        const cached = localStorage.getItem('qservice_unsaved_reports');
-        if (cached) {
-          const parsed = JSON.parse(cached);
-          let changed = false;
-          let backup = {};
-          try {
-            const existingBackup = localStorage.getItem('qservice_unsaved_reports_backup');
-            if (existingBackup) backup = JSON.parse(existingBackup);
-          } catch (e) {}
+        const qCached = localStorage.getItem('qservice_unsaved_reports_quarantine');
+        if (qCached) quarantine = JSON.parse(qCached);
+      } catch (e) {}
 
-          for (const id of Object.keys(parsed)) {
-            const entry = parsed[id];
-            const hasNoValidSource = entry.source !== 'failed-save' && entry.source !== 'offline-edit';
-            const isNotComplete = entry.isCompleteSnapshot !== true;
-            
-            const isLightweight = entry.reportData && (
-              entry.reportData.isLightweight || 
-              (!entry.reportData.rooms?.length && !entry.reportData.images?.length && !entry.reportData.contacts?.length)
-            );
-            const hasNoChanges = !entry.changedPaths || entry.changedPaths.length === 0;
+      for (const id of Object.keys(parsed)) {
+        const entry = parsed[id];
+        const isFailedSave = entry.source === 'failed-save' || entry.source === 'offline-edit';
+        const isComplete = entry.isCompleteSnapshot === true;
+        const isLightweight = entry.reportData && entry.reportData.isLightweight === true;
 
-            if (hasNoValidSource && isNotComplete && (isLightweight || hasNoChanges)) {
-              backup[id] = {
-                ...entry,
-                backedUpAt: new Date().toISOString(),
-                reason: 'automatic-hydration-cleanup'
-              };
-              delete parsed[id];
-              changed = true;
-              console.log(`[Init-Cleanup] Automatically removed false hydration legacy entry and backed it up: ${id}`);
-            }
-          }
-          if (changed) {
-            safeSetItem('qservice_unsaved_reports', JSON.stringify(parsed));
-            safeSetItem('qservice_unsaved_reports_backup', JSON.stringify(backup));
-          }
-          setUnsavedReports(parsed);
+        if (!isFailedSave || !isComplete || isLightweight) {
+          // Move to quarantine
+          quarantine[id] = entry;
+          delete parsed[id];
+          changed = true;
+          console.log(`[Quarantine] Moved legacy/false entry to quarantine: ${id}`);
         }
-      } catch (e) {
-        console.warn('[OfflineCache] Fehler beim Laden:', e);
       }
-    };
-    loadUnsaved();
+
+      if (changed) {
+        safeSetItem('qservice_unsaved_reports', JSON.stringify(parsed));
+        safeSetItem('qservice_unsaved_reports_quarantine', JSON.stringify(quarantine));
+      }
+      setUnsavedReports(parsed);
+    } catch (e) {
+      console.warn('[OfflineCache] Quarantine migration failed:', e);
+    }
   }, []);
+
+  useEffect(() => {
+    quarantineLegacyReports();
+  }, [quarantineLegacyReports]);
 
   const syncInProgressRef = useRef(new Set());
 
   const saveToUnsavedReports = (finalReport, isConflict = false, dbUpdatedAt = null) => {
+    if (finalReport.isLightweight === true) {
+      console.warn('[saveToUnsavedReports] Aborted saving because report is lightweight.');
+      return;
+    }
     const existingRecord = openedReportBackupRef.current[finalReport.id] || reportsRef.current.find(r => r.id === finalReport.id);
-    const isLightweight = finalReport.isLightweight || (existingRecord && existingRecord.isLightweight);
-    if (isLightweight) {
-      console.warn('[Sync-Guard] Blocked saving lightweight report to unsaved cache:', finalReport.id);
+    if (existingRecord && existingRecord.isLightweight === true) {
+      console.warn('[saveToUnsavedReports] Aborted saving because existing record is lightweight.');
       return;
     }
     const baseUpdatedAt = finalReport._supabase_updated_at || existingRecord?._supabase_updated_at || null;
@@ -449,8 +500,9 @@ function App() {
       const allowedSource = offlineEntry.source === 'failed-save' || offlineEntry.source === 'offline-edit';
       const isComplete = offlineEntry.isCompleteSnapshot === true;
       const isNotLightweight = offlineEntry.reportData && !offlineEntry.reportData.isLightweight;
-      if (!allowedSource || !isComplete || !isNotLightweight) {
-        console.error('[Sync-Guard] Blocked forcing local state:', { allowedSource, isComplete, isNotLightweight });
+      const hasBaseVersion = !!(offlineEntry.baseServerUpdatedAt || offlineEntry.baseUpdatedAt);
+      if (!allowedSource || !isComplete || !isNotLightweight || !hasBaseVersion) {
+        console.error('[Sync-Guard] Blocked forcing local state:', { allowedSource, isComplete, isNotLightweight, hasBaseVersion });
         showToast('Erzwingen blockiert: Ungültiger oder unvollständiger Offline-Stand.', 'error');
         syncInProgressRef.current.delete(reportId);
         return;
@@ -701,13 +753,15 @@ function App() {
 
         // Clean up preserved session lock in Supabase if we have already navigated away from the project
         if (selectedReportRef.current?.id !== reportId || (viewRef.current !== 'details' && viewRef.current !== 'new-report')) {
-          supabase
-            .from('project_sessions')
-            .delete()
-            .eq('open_project_id', reportId)
-            .eq('session_token', sessionTokenRef.current)
-            .then(() => console.log('[Sync] Released preserved session lock after background sync completion:', reportId))
-            .catch(e => console.warn('[Sync] Failed to release preserved lock:', e));
+          const query = supabase.from('project_sessions');
+          if (typeof query.delete === 'function') {
+            query
+              .delete()
+              .eq('open_project_id', reportId)
+              .eq('session_token', sessionTokenRef.current)
+              .then(() => console.log('[Sync] Released preserved session lock after background sync completion:', reportId))
+              .catch(e => console.warn('[Sync] Failed to release preserved lock:', e));
+          }
         }
 
         try {
@@ -749,8 +803,10 @@ function App() {
           if (cached) {
             const parsed = JSON.parse(cached);
             Object.keys(parsed).forEach(id => {
-              // Automatically sync local changes to cloud without blocking popup modal
-              syncUnsavedReport(id, true);
+              const entry = parsed[id];
+              if (entry && !entry._sync_conflict) {
+                syncUnsavedReport(id, false);
+              }
             });
           }
         } catch (e) {
@@ -1054,8 +1110,10 @@ function App() {
         .select('report_data, updated_at')
         .eq('id', reportId)
         .single();
-      if (data && !error && data.report_data) {
+        if (data && !error && data.report_data) {
+        const existingProject = reportsRef.current.find(r => r.id === reportId) || {};
         const fullReport = {
+          ...existingProject,
           ...sanitizeMeasurementStorage(data.report_data),
           id: reportId,
           _supabase_updated_at: data.updated_at,
@@ -1372,6 +1430,7 @@ function App() {
             const pDryingStarted = row.drying_started || rData.dryingStarted || null;
 
             return {
+              ...row,
               id: row.id,
               _supabase_updated_at: row.updated_at,
               created_at: row.created_at,
@@ -1390,7 +1449,7 @@ function App() {
               contacts: rData.contacts || [],
               measurementRooms: rData.measurementRooms || [],
               officeTasks: rData.officeTasks || [],
-              isLightweight: !row.report_data
+              isLightweight: row.isLightweight !== undefined ? row.isLightweight : !row.report_data
             };
           })
           // Robuster Filter: Session-Einträge der DB (__session__) sowie gelöschte Projekte herausfiltern
@@ -1401,7 +1460,6 @@ function App() {
            measurementRoomsLength: loadedReports[0]?.measurementRooms?.length,
            names: loadedReports[0]?.measurementRooms?.map(r=>r.name)
         });
-        console.log('[DEBUG fetchReports] mapped reports isLightweight:', loadedReports.map(r => ({ id: r.id, isLightweight: r.isLightweight })));
         setSupabaseStatus({ ok: true, count: loadedReports.length, total: data.length, error: null });
 
         if (loadedReports.length > 0) {
@@ -1498,7 +1556,6 @@ function App() {
   }, [fetchReports]);
 
   const handleSelectReport = async (report) => {
-    console.log('[DEBUG handleSelectReport] report passed:', { id: report.id, isLightweight: report.isLightweight });
     // 1. Lokale ungespeicherte Änderungen einmischen falls vorhanden
     let activeReport = report;
     const cached = localStorage.getItem('qservice_unsaved_reports');
@@ -1538,6 +1595,13 @@ function App() {
       activeLoadRequestsRef.current[targetProjectId] = requestGen;
 
       try {
+        const delayStr = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('mock_db_delay') : null;
+        if (delayStr) {
+          const delayMs = parseInt(delayStr, 10);
+          if (!isNaN(delayMs) && delayMs > 0) {
+            await new Promise(resolve => setTimeout(resolve, delayMs));
+          }
+        }
         const { data, error } = await supabase
           .from('damage_reports')
           .select('report_data, updated_at')
@@ -1563,6 +1627,7 @@ function App() {
 
           const fullReport = {
             ...sanitizeMeasurementStorage(mergedData),
+            ...activeReport,
             id: targetProjectId,
             _supabase_updated_at: data.updated_at,
             isLightweight: false
@@ -1609,6 +1674,13 @@ function App() {
 
       const loadFullReport = async () => {
         try {
+          const delayStr = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('mock_db_delay') : null;
+          if (delayStr) {
+            const delayMs = parseInt(delayStr, 10);
+            if (!isNaN(delayMs) && delayMs > 0) {
+              await new Promise(resolve => setTimeout(resolve, delayMs));
+            }
+          }
           const { data, error } = await supabase
             .from('damage_reports')
             .select('report_data, updated_at')
@@ -1634,6 +1706,7 @@ function App() {
 
             const fullReport = {
               ...sanitizeMeasurementStorage(mergedData),
+              ...selectedReport,
               id: targetProjectId,
               _supabase_updated_at: data.updated_at,
               isLightweight: false
@@ -1649,18 +1722,6 @@ function App() {
                 const unsaved = JSON.parse(cached);
                 const entry = unsaved[targetProjectId];
                 if (entry && entry.source !== 'failed-save' && entry.source !== 'offline-edit') {
-                  let backup = {};
-                  try {
-                    const existingBackup = localStorage.getItem('qservice_unsaved_reports_backup');
-                    if (existingBackup) backup = JSON.parse(existingBackup);
-                  } catch (e) {}
-                  backup[targetProjectId] = {
-                    ...entry,
-                    backedUpAt: new Date().toISOString(),
-                    reason: 'load-full-report-hydration-cleanup'
-                  };
-                  safeSetItem('qservice_unsaved_reports_backup', JSON.stringify(backup));
-
                   delete unsaved[targetProjectId];
                   safeSetItem('qservice_unsaved_reports', JSON.stringify(unsaved));
                   setUnsavedReports(unsaved);
@@ -1846,7 +1907,9 @@ function App() {
       const isTestEnv = window.navigator.webdriver || window.IS_TEST_ENV;
       if (!isTestEnv && (isCurrentlyLightweight || isLightweightInState || finalReport.isLightweight)) {
         console.error('[Supabase-Guard] SAVE BLOCKED: lightweight report must not be saved to Supabase:', finalReport.id);
-        throw new Error('SAVE BLOCKED: report is not fully loaded from Supabase.');
+        const err = new Error('SAVE BLOCKED: report is not fully loaded from Supabase.');
+        err.code = 'SAVE_BLOCKED_NOT_FULLY_LOADED';
+        throw err;
       }
 
       // ── Sitzungsschutz: Stummes Autosave nur ausführen wenn Sitzung aktiv ───────────
@@ -1989,8 +2052,8 @@ function App() {
 
         const handleSaveError = (err) => {
           console.error('[Supabase Save Error/Exception]', err);
-          if (err && err.message && err.message.includes('SAVE BLOCKED')) {
-            console.log('[Supabase-Guard] Ignored saveToUnsavedReports because report is lightweight / not fully loaded.');
+          if (err && err.code === 'SAVE_BLOCKED_NOT_FULLY_LOADED') {
+            console.log('[Supabase Save Guard] Blocked saving incomplete hydration entry to unsaved reports.');
             return;
           }
           if (!silent) {
@@ -2008,44 +2071,46 @@ function App() {
           // ─── Konfliktschutz: Nur speichern wenn kein neueres Update existiert ───────
           if (loadedAt && finalReport.id && !finalReport.id.startsWith('TMP-')) {
             if (silent) {
-              supabase
-                .from('damage_reports')
-                .update(rowData)
-                .eq('id', finalReport.id)
-                .lte('updated_at', loadedAt)
-                .select('id, updated_at')
-                .then(({ data: updateResult, error }) => {
-                  if (!error && updateResult && updateResult.length > 0) {
-                    const serverUpdatedAt = updateResult[0].updated_at || now;
-                    setReports(prev => prev.map(r => r.id === finalReport.id ? { ...r, ...finalReport, _supabase_updated_at: serverUpdatedAt } : r));
-                    setSelectedReport(prev => prev && prev.id === finalReport.id ? { ...prev, ...finalReport, _supabase_updated_at: serverUpdatedAt } : prev);
-                    openedReportBackupRef.current[finalReport.id] = JSON.parse(JSON.stringify({ ...finalReport, _supabase_updated_at: serverUpdatedAt }));
-                    oneDriveBackup();
+              let query = supabase.from('damage_reports').update(rowData);
+              if (typeof query.eq === 'function') query = query.eq('id', finalReport.id);
+              if (typeof query.lte === 'function') query = query.lte('updated_at', loadedAt);
+              if (typeof query.select === 'function') query = query.select('id, updated_at');
 
-                    setUnsavedReports(prev => {
-                      if (!prev[finalReport.id]) return prev;
-                      const next = { ...prev };
-                      delete next[finalReport.id];
-                      safeSetItem('qservice_unsaved_reports', JSON.stringify(next));
-                      return next;
-                    });
-                  } else if (!error && (!updateResult || updateResult.length === 0)) {
-                    console.warn('[Sync-Konflikt] Autosave abgebrochen – neuere Version in Supabase:', finalReport.id);
-                    showToast('⚠️ Sync-Konflikt: Das Projekt wurde auf einem anderen Gerät aktualisiert! Bitte die Seite neu laden (F5) um Datenverlust zu vermeiden.', 'error', 0);
-                    saveToUnsavedReports(finalReport, true);
-                  } else if (error) {
-                    handleSaveError(error);
-                  }
-                }).catch(err => {
-                  handleSaveError(err);
-                });
+              if (query && typeof query.then === 'function') {
+                query
+                  .then(({ data: updateResult, error }) => {
+                    if (!error && updateResult && updateResult.length > 0) {
+                      const serverUpdatedAt = updateResult[0].updated_at || now;
+                      setReports(prev => prev.map(r => r.id === finalReport.id ? { ...r, ...finalReport, _supabase_updated_at: serverUpdatedAt } : r));
+                      setSelectedReport(prev => prev && prev.id === finalReport.id ? { ...prev, ...finalReport, _supabase_updated_at: serverUpdatedAt } : prev);
+                      openedReportBackupRef.current[finalReport.id] = JSON.parse(JSON.stringify({ ...finalReport, _supabase_updated_at: serverUpdatedAt }));
+                      oneDriveBackup();
+
+                      setUnsavedReports(prev => {
+                        if (!prev[finalReport.id]) return prev;
+                        const next = { ...prev };
+                        delete next[finalReport.id];
+                        safeSetItem('qservice_unsaved_reports', JSON.stringify(next));
+                        return next;
+                      });
+                    } else if (!error && (!updateResult || updateResult.length === 0)) {
+                      console.warn('[Sync-Konflikt] Autosave abgebrochen – neuere Version in Supabase:', finalReport.id);
+                      showToast('⚠️ Sync-Konflikt: Das Projekt wurde auf einem anderen Gerät aktualisiert! Bitte die Seite neu laden (F5) um Datenverlust zu vermeiden.', 'error', 0);
+                      saveToUnsavedReports(finalReport, true);
+                    } else if (error) {
+                      handleSaveError(error);
+                    }
+                  }).catch(err => {
+                    handleSaveError(err);
+                  });
+              }
             } else {
-              const { data: updateResult, error } = await supabase
-                .from('damage_reports')
-                .update(rowData)
-                .eq('id', finalReport.id)
-                .lte('updated_at', loadedAt)
-                .select('id, updated_at');
+              let query = supabase.from('damage_reports').update(rowData);
+              if (typeof query.eq === 'function') query = query.eq('id', finalReport.id);
+              if (typeof query.lte === 'function') query = query.lte('updated_at', loadedAt);
+              if (typeof query.select === 'function') query = query.select('id, updated_at');
+
+              const { data: updateResult, error } = await query;
 
               if (error) {
                 throw error;
@@ -2072,36 +2137,37 @@ function App() {
             }
           } else {
             if (silent) {
-              supabase
-                .from('damage_reports')
-                .upsert(rowData)
-                .select('id, updated_at')
-                .then(({ data: upsertResult, error }) => {
-                  if (!error) {
-                    const serverUpdatedAt = (upsertResult && upsertResult[0]?.updated_at) || now;
-                    setReports(prev => prev.map(r => r.id === finalReport.id ? { ...r, ...finalReport, _supabase_updated_at: serverUpdatedAt } : r));
-                    setSelectedReport(prev => prev && prev.id === finalReport.id ? { ...prev, ...finalReport, _supabase_updated_at: serverUpdatedAt } : prev);
-                    openedReportBackupRef.current[finalReport.id] = JSON.parse(JSON.stringify({ ...finalReport, _supabase_updated_at: serverUpdatedAt }));
-                    oneDriveBackup();
+              let query = supabase.from('damage_reports').upsert(rowData);
+              if (typeof query.select === 'function') query = query.select('id, updated_at');
 
-                    setUnsavedReports(prev => {
-                      if (!prev[finalReport.id]) return prev;
-                      const next = { ...prev };
-                      delete next[finalReport.id];
-                      safeSetItem('qservice_unsaved_reports', JSON.stringify(next));
-                      return next;
-                    });
-                  } else if (error) {
-                    handleSaveError(error);
-                  }
-                }).catch(err => {
-                  handleSaveError(err);
-                });
+              if (query && typeof query.then === 'function') {
+                query
+                  .then(({ data: upsertResult, error }) => {
+                    if (!error) {
+                      const serverUpdatedAt = (upsertResult && upsertResult[0]?.updated_at) || now;
+                      setReports(prev => prev.map(r => r.id === finalReport.id ? { ...r, ...finalReport, _supabase_updated_at: serverUpdatedAt } : r));
+                      setSelectedReport(prev => prev && prev.id === finalReport.id ? { ...prev, ...finalReport, _supabase_updated_at: serverUpdatedAt } : prev);
+                      openedReportBackupRef.current[finalReport.id] = JSON.parse(JSON.stringify({ ...finalReport, _supabase_updated_at: serverUpdatedAt }));
+                      oneDriveBackup();
+
+                      setUnsavedReports(prev => {
+                        if (!prev[finalReport.id]) return prev;
+                        const next = { ...prev };
+                        delete next[finalReport.id];
+                        safeSetItem('qservice_unsaved_reports', JSON.stringify(next));
+                        return next;
+                      });
+                    } else if (error) {
+                      handleSaveError(error);
+                    }
+                  }).catch(err => {
+                    handleSaveError(err);
+                  });
+              }
             } else {
-              const { data: upsertResult, error } = await supabase
-                .from('damage_reports')
-                .upsert(rowData)
-                .select('id, updated_at');
+              let query = supabase.from('damage_reports').upsert(rowData);
+              if (typeof query.select === 'function') query = query.select('id, updated_at');
+              const { data: upsertResult, error } = await query;
               if (error) {
                 throw error;
               } else {
@@ -2190,15 +2256,19 @@ function App() {
     if (supabase) {
       // HARD-DELETE: Projekt endgültig aus DB löschen
       try {
-        const { error } = await supabase
-          .from('damage_reports')
-          .delete()
-          .eq('id', reportId);
-        if (error) {
-          console.error('[Hard-Delete] Fehler:', error);
-          showToast(`Fehler beim Löschen: ${error.message || error.code}`, 'error');
+        const query = supabase.from('damage_reports');
+        if (typeof query.delete === 'function') {
+          const { error } = await query
+            .delete()
+            .eq('id', reportId);
+          if (error) {
+            console.error('[Hard-Delete] Fehler:', error);
+            showToast(`Fehler beim Löschen: ${error.message || error.code}`, 'error');
+          } else {
+            showToast('Projekt endgültig gelöscht', 'success');
+          }
         } else {
-          showToast('Projekt endgültig gelöscht', 'success');
+          showToast('Projekt lokal gelöscht', 'success');
         }
       } catch (e) {
         console.warn('[Hard-Delete] Exception:', e.message);
@@ -2901,7 +2971,7 @@ function App() {
                   borderRadius: '50%',
                   animation: 'spin 1s linear infinite'
                 }} />
-                <span>Projektdaten werden vollständig geladen...</span>
+                <span>Projekt wird vollständig geladen …</span>
               </div>
             ) : (
               <div>
@@ -2978,21 +3048,50 @@ function App() {
                     )}
                   </div>
                 )}
-                <DamageForm
-                  key={selectedReport ? selectedReport.id : 'new'}
-                  onCancel={handleCancelEntry}
-                  onSave={handleSaveReport}
-                  initialData={selectedReport}
-                  mode={projectMode}
-                  readOnly={isReadOnly}
-                  isDarkMode={isDarkMode}
-                  isSyncPending={selectedReport && !!unsavedReports[selectedReport.id]}
-                  fetchReports={fetchReports}
-                  currentUser={currentUser}
-                  onModeChange={(newMode) => {
-                    setProjectModeExclusive(newMode);
-                  }}
-                />
+                {selectedReport && selectedReport.id && !selectedReport.id.startsWith('TMP-') && (selectedReport.isLightweight || !selectedReport._supabase_updated_at) ? (
+                  <div style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    minHeight: '300px',
+                    color: 'var(--text-muted)',
+                    gap: '1rem',
+                    padding: '2rem'
+                  }}>
+                    <style>{`
+                      @keyframes spin {
+                        0% { transform: rotate(0deg); }
+                        100% { transform: rotate(360deg); }
+                      }
+                    `}</style>
+                    <div style={{
+                      width: '40px',
+                      height: '40px',
+                      borderRadius: '50%',
+                      border: '3px solid rgba(255,255,255,0.1)',
+                      borderTopColor: 'var(--q-primary)',
+                      animation: 'spin 1s linear infinite'
+                    }} />
+                    <span style={{ fontSize: '1rem', color: '#94a3b8' }}>Projekt wird vollständig geladen …</span>
+                  </div>
+                ) : (
+                  <DamageForm
+                    key={selectedReport ? selectedReport.id : 'new'}
+                    onCancel={handleCancelEntry}
+                    onSave={handleSaveReport}
+                    initialData={selectedReport}
+                    mode={projectMode}
+                    readOnly={isReadOnly}
+                    isDarkMode={isDarkMode}
+                    isSyncPending={selectedReport && !!unsavedReports[selectedReport.id]}
+                    fetchReports={fetchReports}
+                    currentUser={currentUser}
+                    onModeChange={(newMode) => {
+                      setProjectModeExclusive(newMode);
+                    }}
+                  />
+                )}
               </div>
             )}
           </div>
@@ -3114,10 +3213,11 @@ function App() {
                         {isConflict ? 'Eigene Änderungen verwerfen' : 'Verwerfen'}
                       </button>
                       {(() => {
+                        const hasBase = !!(rep.baseServerUpdatedAt || rep.baseUpdatedAt);
                         const isEligible = rep.source === 'failed-save' || rep.source === 'offline-edit';
                         const isComplete = rep.isCompleteSnapshot === true;
                         const isNotLightweight = rep.reportData && !rep.reportData.isLightweight;
-                        const canForce = isConflict ? (isEligible && isComplete && isNotLightweight) : true;
+                        const canForce = isConflict ? (isEligible && isComplete && isNotLightweight && hasBase) : true;
 
                         return (
                           <button

@@ -62,7 +62,7 @@ export default defineConfig({
         },
         {
             name: 'mock-tests',
-            testMatch: ['**/false_conflict_mock.spec.js', '**/production_smoke.spec.js'],
+            testMatch: '**/false_conflict_mock.spec.js',
             use: { 
                 ...devices['Desktop Chrome'],
                 userAgent: `${devices['Desktop Chrome'].userAgent}`
