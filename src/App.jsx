@@ -1401,6 +1401,7 @@ function App() {
            measurementRoomsLength: loadedReports[0]?.measurementRooms?.length,
            names: loadedReports[0]?.measurementRooms?.map(r=>r.name)
         });
+        console.log('[DEBUG fetchReports] mapped reports isLightweight:', loadedReports.map(r => ({ id: r.id, isLightweight: r.isLightweight })));
         setSupabaseStatus({ ok: true, count: loadedReports.length, total: data.length, error: null });
 
         if (loadedReports.length > 0) {
