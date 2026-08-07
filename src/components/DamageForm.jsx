@@ -248,6 +248,49 @@ const compressAndResizeImage = (file, maxDimension = 1200, quality = 0.7) => {
 };
 
 
+function hasSemanticChanges(base, current) {
+    const baseData = base || {};
+    const currentData = current || {};
+
+    const allKeys = new Set([...Object.keys(baseData), ...Object.keys(currentData)]);
+    const ignoredKeys = [
+        'id', 'isLightweight', 'created_at', 'updated_at', '_supabase_updated_at', 'version',
+        'last_edited_by', 'last_edited_device', 'last_edited_at', 'clientCityMatched', 'exteriorPhotoDeleted'
+    ];
+
+    for (const key of allKeys) {
+        if (ignoredKeys.includes(key) || key.startsWith('_')) continue;
+
+        const baseVal = baseData[key];
+        const currVal = currentData[key];
+
+        // Stringify helper to handle arrays/objects cleanly and compare value
+        const val1 = baseVal === undefined || baseVal === null ? '' : baseVal;
+        const val2 = currVal === undefined || currVal === null ? '' : currVal;
+
+        if (typeof val1 === 'object' || typeof val2 === 'object') {
+            // Strip out preview Base64 strings or technical properties from images/rooms if any
+            const clean1 = JSON.stringify(val1, (k, v) => {
+                if (['preview', 'storagePath', 'oneDrivePath', 'oneDriveItemId', 'syncStatus', '_supabase_updated_at', 'updated_at'].includes(k)) return undefined;
+                return v;
+            });
+            const clean2 = JSON.stringify(val2, (k, v) => {
+                if (['preview', 'storagePath', 'oneDrivePath', 'oneDriveItemId', 'syncStatus', '_supabase_updated_at', 'updated_at'].includes(k)) return undefined;
+                return v;
+            });
+            if (clean1 !== clean2) {
+                return true;
+            }
+        } else {
+            if (String(val1) !== String(val2)) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+
 export default function DamageForm({ onCancel, initialData, onSave, mode = 'desktop', isDarkMode = true, isSyncPending, fetchReports }) {
     // Helper to parse address string if editing
     const parseAddress = (addr) => {
@@ -456,6 +499,13 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         rooms: [],
         measurementRooms: []
     }));
+
+    // Refs to hold latest and last successfully saved formData to prevent loops
+    const latestFormData = useRef(null);
+    const lastSavedData = useRef(null);
+
+    if (latestFormData.current === null) latestFormData.current = formData;
+    if (lastSavedData.current === null) lastSavedData.current = formData;
 
     const uniqueCities = React.useMemo(() => {
         const seen = new Set();
@@ -1024,33 +1074,37 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
     // Auto-Save Effect
 
     useEffect(() => {
-        // Skip auto-save if it's the very first render/empty (optional check)
         if (!formData.projectTitle && !formData.id) return;
+        const isFullyHydrated = !initialData || !initialData.isLightweight;
+        if (!isFullyHydrated) return;
+
+        // Skip if there are no semantic changes compared to baseline
+        if (!hasSemanticChanges(lastSavedData.current, formData)) return;
 
         setIsSaving(true);
         const timer = setTimeout(async () => {
             if (!formData.projectTitle && !formData.id) return; // Re-check inside timeout
+            if (!hasSemanticChanges(lastSavedData.current, formData)) {
+                setIsSaving(false);
+                return;
+            }
 
             setIsSaving(true);
-            // Prepare data similar to handleSubmit
             const fullAddress = `${formData.street}, ${formData.zip} ${formData.city}`;
             const reportData = {
                 ...formData,
-                address: fullAddress, // Save standardized address string
-                type: formData.damageType, // Map back to 'type'
+                address: fullAddress,
+                type: formData.damageType,
                 imageCount: formData.images.length
             };
 
-            console.log('[MEASUREMENT-ROOMS TRACE] 3. Vor Aufruf onSave (AutoSave):', {
-                payloadMeasurementRoomsLength: (reportData.measurementRooms || []).length,
-                payloadRoomNames: (reportData.measurementRooms || []).map(r => r.name),
-                payloadHistoryCounts: (reportData.measurementRooms || []).map(r => r.measurementHistory?.length)
-            });
-
             try {
-                const savedReport = await onSave(reportData, true); // silent=true
+                // Update baseline before save to avoid loop triggers
+                lastSavedData.current = formData;
+                latestFormData.current = formData;
 
-                // If the report was new (no ID) and the save generated one, update local state
+                const savedReport = await onSave(reportData, true);
+
                 if (savedReport && savedReport.id && !formData.id) {
                     setFormData(prev => ({ ...prev, id: savedReport.id }));
                 }
@@ -1063,7 +1117,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         }, 2000); // 2 second debounce
 
         return () => clearTimeout(timer);
-    }, [formData, onSave]);
+    }, [formData, onSave, initialData]);
 
 
 
@@ -1857,11 +1911,6 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
     // AUTO-SAVE: Save formData 1 second after last change
     // AND save on unmount/unfocus to prevent data loss
 
-    // Ref to hold latest formData for unmount cleanup
-    const latestFormData = useRef(formData);
-    // Ref to hold last successfully saved data to prevent loops
-    const lastSavedData = useRef(formData);
-
     useEffect(() => {
         latestFormData.current = formData;
     }, [formData]);
@@ -1869,19 +1918,23 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
     useEffect(() => {
         const timeoutId = setTimeout(async () => {
             if (onSave) {
-                if (formData !== lastSavedData.current) {
+                const isFullyHydrated = !initialData || !initialData.isLightweight;
+                if (!isFullyHydrated) return;
+
+                if (hasSemanticChanges(lastSavedData.current, formData)) {
                     setIsSaving(true);
                     try {
+                        lastSavedData.current = formData;
+                        latestFormData.current = formData;
                         await onSave(formData, true);
                     } catch (e) {}
-                    lastSavedData.current = formData;
                     setTimeout(() => setIsSaving(false), 800);
                 }
             }
         }, 800);
 
         return () => clearTimeout(timeoutId);
-    }, [formData, onSave]);
+    }, [formData, onSave, initialData]);
 
 
 
@@ -3922,6 +3975,41 @@ END:VCARD`;
             </div>
         );
     };
+
+    const isFullyHydrated = !initialData || !initialData.isLightweight;
+
+    if (!isFullyHydrated) {
+        return (
+            <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                minHeight: '300px',
+                color: 'var(--text)',
+                gap: '1rem',
+                padding: '2rem',
+                backgroundColor: 'var(--card-bg, #1e293b)',
+                borderRadius: '12px',
+                border: '1px solid var(--border)'
+            }}>
+                <div style={{
+                    width: '36px',
+                    height: '36px',
+                    borderRadius: '50%',
+                    border: '3px solid var(--border)',
+                    borderTopColor: '#38bdf8',
+                    animation: 'spin 1s linear infinite'
+                }} />
+                <span style={{ fontWeight: 500 }}>Projekt-Details werden geladen...</span>
+                <style>{`
+                    @keyframes spin {
+                        to { transform: rotate(360deg); }
+                    }
+                `}</style>
+            </div>
+        );
+    }
 
     return (
         <>
