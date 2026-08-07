@@ -2831,14 +2831,14 @@ function App() {
           users={users}
           lockedProjectIds={lockedProjectIds}
           onLogout={handleLogout}
-          onReportsChanged={async (projId) => {
+          onReportsChanged={async (projId, updatedFields = { status: 'Abgeschlossen' }) => {
             if (projId) {
               setReports(prev => prev.map(r => {
                 if (r.id === projId) {
-                  const updatedData = r.report_data ? { ...r.report_data, status: 'Abgeschlossen' } : null;
+                  const updatedData = r.report_data ? { ...r.report_data, ...updatedFields } : null;
                   return {
                     ...r,
-                    status: 'Abgeschlossen',
+                    ...updatedFields,
                     report_data: updatedData
                   };
                 }
