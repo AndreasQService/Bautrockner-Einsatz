@@ -204,7 +204,7 @@ test.describe('False Conflict Prevention (Local Mocks)', () => {
         });
 
         // Open lightweight project
-        const row = page.locator('tr', { hasText: 'Projekt Hydration Test' });
+        const row = page.locator('tr.hover-row', { hasText: 'Projekt Hydration Test' }).first();
         await row.click();
 
         // Loading spinner/overlay should be visible immediately
@@ -256,7 +256,7 @@ test.describe('False Conflict Prevention (Local Mocks)', () => {
     test('8. Zehn Projekte nacheinander nur öffnen', async ({ page }) => {
         // We will open and close the same project 10 times to verify no false conflicts accumulate
         for (let i = 0; i < 10; i++) {
-            const row = page.locator('tr', { hasText: 'Projekt Hydration Test' });
+            const row = page.locator('tr.hover-row', { hasText: 'Projekt Hydration Test' }).first();
             await row.click();
             await page.waitForSelector('text=Kontakte');
             await page.click('button:has-text("Dashboard"), button:has-text("Zurück")');
