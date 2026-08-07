@@ -248,6 +248,87 @@ const compressAndResizeImage = (file, maxDimension = 1200, quality = 0.7) => {
 };
 
 
+function isEquivalentEmpty(val1, val2) {
+    const isEmpty1 = val1 === null || val1 === undefined || val1 === '' || (Array.isArray(val1) && val1.length === 0) || (typeof val1 === 'object' && Object.keys(val1).length === 0);
+    const isEmpty2 = val2 === null || val2 === undefined || val2 === '' || (Array.isArray(val2) && val2.length === 0) || (typeof val2 === 'object' && Object.keys(val2).length === 0);
+    if (isEmpty1 && isEmpty2) return true;
+    return false;
+}
+
+function cleanObjectForDiff(obj) {
+    if (!obj) return null;
+    const clean = JSON.parse(JSON.stringify(obj));
+
+    // Remove technical/transient keys
+    delete clean.isLightweight;
+    delete clean._supabase_updated_at;
+    delete clean.updated_at;
+    delete clean.created_at;
+    delete clean.version;
+    delete clean.last_edited_by;
+    delete clean.last_edited_device;
+    delete clean.last_edited_at;
+    delete clean.syncStatus;
+    delete clean.exteriorPhotoDeleted;
+
+    if (Array.isArray(clean.images)) {
+        clean.images = clean.images.map(img => {
+            const { preview, uploading, progress, oneDriveItemId, oneDrivePath, error, ...rest } = img;
+            return rest;
+        });
+    }
+
+    if (Array.isArray(clean.contacts)) {
+        clean.contacts = clean.contacts.filter(c => c.name || c.phone || c.apartment);
+    }
+
+    if (Array.isArray(clean.rooms)) {
+        clean.rooms = clean.rooms.map(r => {
+            const { canvasImage, sketch, measurementData, ...rest } = r;
+            const cleanMeasData = measurementData ? { ...measurementData } : null;
+            if (cleanMeasData) {
+                delete cleanMeasData.canvasImage;
+                delete cleanMeasData.sketch;
+            }
+            return { ...rest, measurementData: cleanMeasData };
+        });
+    }
+
+    if (Array.isArray(clean.measurementRooms)) {
+        clean.measurementRooms = clean.measurementRooms.map(r => {
+            const { canvasImage, sketch, measurementData, ...rest } = r;
+            const cleanMeasData = measurementData ? { ...measurementData } : null;
+            if (cleanMeasData) {
+                delete cleanMeasData.canvasImage;
+                delete cleanMeasData.sketch;
+            }
+            return { ...rest, measurementData: cleanMeasData };
+        });
+    }
+
+    return clean;
+}
+
+export function hasSemanticChanges(base, current) {
+    if (!base && !current) return false;
+    if (!base || !current) return true;
+
+    const cleanBase = cleanObjectForDiff(base);
+    const cleanCurrent = cleanObjectForDiff(current);
+
+    const keys = new Set([...Object.keys(cleanBase), ...Object.keys(cleanCurrent)]);
+    for (const key of keys) {
+        const val1 = cleanBase[key];
+        const val2 = cleanCurrent[key];
+        if (isEquivalentEmpty(val1, val2)) continue;
+        if (JSON.stringify(val1) !== JSON.stringify(val2)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+
 export default function DamageForm({ onCancel, initialData, onSave, mode = 'desktop', isDarkMode = true, isSyncPending, fetchReports }) {
     // Helper to parse address string if editing
     const parseAddress = (addr) => {
@@ -1021,49 +1102,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         return () => clearTimeout(timer);
     }, [formData.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    // Auto-Save Effect
-
-    useEffect(() => {
-        // Skip auto-save if it's the very first render/empty (optional check)
-        if (!formData.projectTitle && !formData.id) return;
-
-        setIsSaving(true);
-        const timer = setTimeout(async () => {
-            if (!formData.projectTitle && !formData.id) return; // Re-check inside timeout
-
-            setIsSaving(true);
-            // Prepare data similar to handleSubmit
-            const fullAddress = `${formData.street}, ${formData.zip} ${formData.city}`;
-            const reportData = {
-                ...formData,
-                address: fullAddress, // Save standardized address string
-                type: formData.damageType, // Map back to 'type'
-                imageCount: formData.images.length
-            };
-
-            console.log('[MEASUREMENT-ROOMS TRACE] 3. Vor Aufruf onSave (AutoSave):', {
-                payloadMeasurementRoomsLength: (reportData.measurementRooms || []).length,
-                payloadRoomNames: (reportData.measurementRooms || []).map(r => r.name),
-                payloadHistoryCounts: (reportData.measurementRooms || []).map(r => r.measurementHistory?.length)
-            });
-
-            try {
-                const savedReport = await onSave(reportData, true); // silent=true
-
-                // If the report was new (no ID) and the save generated one, update local state
-                if (savedReport && savedReport.id && !formData.id) {
-                    setFormData(prev => ({ ...prev, id: savedReport.id }));
-                }
-            } catch (err) {
-                console.error("Auto-save failed", err);
-            } finally {
-                setIsSaving(false);
-                setLastSaved(new Date());
-            }
-        }, 2000); // 2 second debounce
-
-        return () => clearTimeout(timer);
-    }, [formData, onSave]);
+    // Primary Auto-Save Effect (Handled in unified effect below)
 
 
 
@@ -1854,36 +1893,100 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
     const [showCameraModal, setShowCameraModal] = useState(false);
     const [cameraContext, setCameraContext] = useState(null);
 
-    // AUTO-SAVE: Save formData 1 second after last change
-    // AND save on unmount/unfocus to prevent data loss
-
     // Ref to hold latest formData for unmount cleanup
     const latestFormData = useRef(formData);
     // Ref to hold last successfully saved data to prevent loops
     const lastSavedData = useRef(formData);
+
+    const isHydratedRef = useRef(false);
+    const hasUserEditedRef = useRef(false);
+
+    // Track user edit status:
+    useEffect(() => {
+        if (!initialData || initialData.isLightweight) {
+            isHydratedRef.current = false;
+            hasUserEditedRef.current = false;
+            return;
+        }
+
+        // Initialize baseline if not present, changed ID, or was not yet hydrated
+        if (!lastSavedData.current || lastSavedData.current.id !== formData.id || !isHydratedRef.current) {
+            lastSavedData.current = JSON.parse(JSON.stringify(formData));
+            isHydratedRef.current = true;
+            hasUserEditedRef.current = false;
+            return;
+        }
+
+        // If hydrated and there are semantic changes compared to baseline
+        if (isHydratedRef.current) {
+            const hasChanges = hasSemanticChanges(lastSavedData.current, formData);
+            if (hasChanges) {
+                hasUserEditedRef.current = true;
+            }
+        }
+    }, [formData, initialData]);
 
     useEffect(() => {
         latestFormData.current = formData;
     }, [formData]);
 
     useEffect(() => {
+        // Condition checks for starting the autosave timer:
+        if (!isHydratedRef.current) return;
+        if (!initialData || initialData.isLightweight === true) return;
+        if (!formData.projectTitle && !formData.id) return;
+        if (!hasUserEditedRef.current) return;
+
+        const hasChanges = hasSemanticChanges(lastSavedData.current, formData);
+        if (!hasChanges) return;
+
+        setIsSaving(true);
         const timeoutId = setTimeout(async () => {
-            if (onSave) {
-                if (formData !== lastSavedData.current) {
-                    setIsSaving(true);
-                    try {
-                        await onSave(formData, true);
-                    } catch (e) {}
-                    lastSavedData.current = formData;
-                    setTimeout(() => setIsSaving(false), 800);
+            if (!formData.projectTitle && !formData.id) return;
+            setIsSaving(true);
+
+            // Prepare data similar to handleSubmit
+            const fullAddress = `${formData.street || ''}, ${formData.zip || ''} ${formData.city || ''}`;
+            const reportData = {
+                ...formData,
+                address: fullAddress, // Save standardized address string
+                type: formData.damageType, // Map back to 'type'
+                imageCount: (formData.images || []).length
+            };
+
+            try {
+                const savedReport = await onSave(reportData, true, 'user-edit');
+                if (savedReport) {
+                    lastSavedData.current = JSON.parse(JSON.stringify(reportData));
+                    hasUserEditedRef.current = false;
+                    // If the report was new (no ID) and the save generated one, update local state
+                    if (savedReport.id && !formData.id) {
+                        setFormData(prev => ({ ...prev, id: savedReport.id }));
+                    }
                 }
+            } catch (e) {
+                console.error("Auto-save failed:", e);
+            } finally {
+                setIsSaving(false);
+                setLastSaved(new Date());
             }
-        }, 800);
+        }, 2000); // 2 second debounce
 
         return () => clearTimeout(timeoutId);
-    }, [formData, onSave]);
+    }, [formData, onSave, initialData]);
 
-
+    // Save on Unmount
+    useEffect(() => {
+        return () => {
+            console.log("Component Unmounting - Saving final state...");
+            if (onSave && latestFormData.current && lastSavedData.current && latestFormData.current.id === lastSavedData.current.id) {
+                const hasChanges = hasSemanticChanges(lastSavedData.current, latestFormData.current);
+                if (hasUserEditedRef.current && hasChanges) {
+                    onSave(latestFormData.current, true, 'user-edit');
+                }
+            }
+        };
+    }, [onSave]);
 
     // Aggressive Auto-populate clientCity from clientZip
     useEffect(() => {
@@ -1900,18 +2003,6 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
             }
         }
     }, [formData.clientZip]);
-
-
-    // Save on Unmount
-    useEffect(() => {
-        return () => {
-            console.log("Component Unmounting - Saving final state...");
-            // Optimization: Use reference check instead of JSON.stringify
-            if (onSave && latestFormData.current !== lastSavedData.current) {
-                onSave(latestFormData.current, true);
-            }
-        };
-    }, [onSave]);
 
     const [newDevice, setNewDevice] = useState({
         deviceNumber: '', // Will be populated from selection
@@ -4255,6 +4346,14 @@ END:VCARD`;
                 )}
 
                 {/* Title Row */}
+                {mode === 'desktop' && (
+                    <input
+                        type="hidden"
+                        className="text-gradient"
+                        value={(formData.projectTitle && !formData.projectTitle.startsWith('TMP-')) ? formData.projectTitle : (formData.projectNumber || '')}
+                        readOnly
+                    />
+                )}
                 {mode !== 'desktop' && (
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', paddingBottom: '1rem', borderBottom: '1px solid var(--border)' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1 }}>
