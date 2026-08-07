@@ -88,7 +88,7 @@ test.describe('Project Archive & Soft-Delete Mock Tests', () => {
         });
 
         // Verify "Projekt Alpha" is present in All Projects list
-        await expect(page.getByText('Projekt Alpha')).toBeVisible();
+        await expect(page.locator('tr', { hasText: 'Projekt Alpha' })).toBeVisible();
 
         // Click Archive button for proj-1-alpha
         const row = page.locator('tr', { hasText: 'Projekt Alpha' });
@@ -96,14 +96,14 @@ test.describe('Project Archive & Soft-Delete Mock Tests', () => {
         await archiveBtn.click();
 
         // Verify it disappears from "Alle Projekte" list
-        await expect(page.getByText('Projekt Alpha')).not.toBeVisible({ timeout: 5000 });
+        await expect(page.locator('tr', { hasText: 'Projekt Alpha' })).not.toBeVisible({ timeout: 5000 });
 
         // Switch to Archiv tab
         const archiveToggle = page.getByRole('button', { name: 'Archiv', exact: true });
         await archiveToggle.click();
 
         // Verify it is visible in Archiv list
-        await expect(page.getByText('Projekt Alpha')).toBeVisible();
+        await expect(page.locator('tr', { hasText: 'Projekt Alpha' })).toBeVisible();
     });
 
     test('2. Löschen abbrechen verändert nichts', async ({ page }) => {
@@ -119,7 +119,7 @@ test.describe('Project Archive & Soft-Delete Mock Tests', () => {
         await deleteBtn.click();
 
         // Verify it remains visible in the list
-        await expect(page.getByText('Projekt Alpha')).toBeVisible();
+        await expect(page.locator('tr', { hasText: 'Projekt Alpha' })).toBeVisible();
     });
 
     test('3. Löschen ohne richtiges Kennwort (LÖSCHEN) verändert nichts', async ({ page }) => {
@@ -135,7 +135,7 @@ test.describe('Project Archive & Soft-Delete Mock Tests', () => {
         await deleteBtn.click();
 
         // Verify it remains visible in the list
-        await expect(page.getByText('Projekt Alpha')).toBeVisible();
+        await expect(page.locator('tr', { hasText: 'Projekt Alpha' })).toBeVisible();
     });
 
     test('4. Löschen mit LÖSCHEN setzt Soft-Delete', async ({ page }) => {
@@ -151,7 +151,7 @@ test.describe('Project Archive & Soft-Delete Mock Tests', () => {
         await deleteBtn.click();
 
         // Verify it disappears from the list
-        await expect(page.getByText('Projekt Alpha')).not.toBeVisible({ timeout: 5000 });
+        await expect(page.locator('tr', { hasText: 'Projekt Alpha' })).not.toBeVisible({ timeout: 5000 });
     });
 
     test('5. Lösch-Button ist für Nicht-Admins unsichtbar', async ({ page }) => {
@@ -163,7 +163,7 @@ test.describe('Project Archive & Soft-Delete Mock Tests', () => {
         await page.waitForSelector('header.app-header');
 
         // Verify we are on dashboard
-        await expect(page.getByText('Projekt Alpha')).toBeVisible();
+        await expect(page.locator('tr', { hasText: 'Projekt Alpha' })).toBeVisible();
 
         // Check that Delete button is NOT present in the row
         const row = page.locator('tr', { hasText: 'Projekt Alpha' });
