@@ -4,16 +4,13 @@ test.describe('Compulsory Live Test: Archive & Soft-Delete', () => {
     // Override the default baseURL for this test to the production URL
     test.use({ 
         baseURL: 'https://bautrockner-einsatz.vercel.app',
-        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 QToolDeepTest'
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 QToolDeepTest',
+        launchOptions: {
+            args: ['--disable-service-workers']
+        }
     });
 
     test('Archive and Soft-Delete Live Verification', async ({ page, context }) => {
-        // Disable Service Worker to prevent caching of old JS bundles
-        await page.addInitScript(() => {
-            Object.defineProperty(navigator, 'serviceWorker', {
-                get() { return undefined; }
-            });
-        });
 
         page.on('console', msg => console.log('BROWSER LOG:', msg.text()));
         page.on('pageerror', err => console.log('BROWSER ERROR:', err.message));
@@ -97,11 +94,6 @@ test.describe('Compulsory Live Test: Archive & Soft-Delete', () => {
             userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 QToolDeepTest'
         });
         const newPage = await newContext.newPage();
-        await newPage.addInitScript(() => {
-            Object.defineProperty(navigator, 'serviceWorker', {
-                get() { return undefined; }
-            });
-        });
 
         // Log in again in the new context
         await newPage.goto('https://bautrockner-einsatz.vercel.app');
@@ -171,11 +163,6 @@ test.describe('Compulsory Live Test: Archive & Soft-Delete', () => {
             userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 QToolDeepTest'
         });
         const secondPage = await secondContext.newPage();
-        await secondPage.addInitScript(() => {
-            Object.defineProperty(navigator, 'serviceWorker', {
-                get() { return undefined; }
-            });
-        });
         await secondPage.goto('https://bautrockner-einsatz.vercel.app');
         await secondPage.locator('input[type="text"]').fill('Admin User');
         await secondPage.locator('input[type="password"]').fill('admin');
