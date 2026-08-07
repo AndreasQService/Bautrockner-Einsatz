@@ -170,6 +170,7 @@ if (isWebDriver) {
   function makeMockQuery(tableName, data, error = null) {
     const delayStr = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('mock_db_delay') : '0';
     const delay = parseInt(delayStr || '0', 10) || 0;
+    console.log('[MOCK DB makeMockQuery] delayStr:', delayStr, 'delay:', delay);
     
     let promise;
     if (delay > 0) {
@@ -251,6 +252,7 @@ if (isWebDriver) {
           console.log('[MOCK DB] returning projects count:', mockProjects.length);
           const colList = (columns || '').split(',').map(c => c.trim().split(':')[0].split('->')[0].split('->>')[0]);
           const hasReportData = colList.includes('report_data');
+          console.log('[MOCK DB select debug] columns:', columns, 'colList:', colList, 'hasReportData:', hasReportData);
           const projects = mockProjects.map(p => {
             if (!hasReportData) {
               const { report_data, ...rest } = p;
