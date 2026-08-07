@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { ClipboardList, Plus, Search, Calendar, User, Check, Edit2, AlertTriangle, HelpCircle, Archive, AlertCircle, Clock, Trash2, ShieldAlert, History } from 'lucide-react';
-import { fetchAllTodos, completeTodoAndArchiveProjectRpc, deleteTodo } from '../services/TodoService';
+import { fetchAllTodos, completeTodoAndArchiveProjectRpc, deleteTodo, completeTodo } from '../services/TodoService';
 import TodoModal from './TodoModal';
 import TodoHistoryModal from './TodoHistoryModal';
 
@@ -270,9 +270,18 @@ const TodoMonitor = ({
                 setConfirmArchiveDialog({ todo: todoItem });
             }
         } else {
-            // Regular To-do completion: opens Follow-up modal
-            setFollowUpTodo(todoItem);
-            setPendingActionTodoId(null);
+            // Regular To-do completion: immediately mark as done
+            setLoading(true);
+            try {
+                await completeTodo(todoItem.id, currentUser?.name || 'System');
+                await loadTodos();
+                setFollowUpTodo(todoItem);
+            } catch (err) {
+                alert('Fehler beim Erledigen des To-dos: ' + err.message);
+            } finally {
+                setLoading(false);
+                setPendingActionTodoId(null);
+            }
         }
     };
 

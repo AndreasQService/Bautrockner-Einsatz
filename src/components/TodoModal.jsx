@@ -69,8 +69,8 @@ const TodoModal = ({
                 setNote(todo.note || '');
                 setClosesProject(!!todo.closes_project);
             } else {
-                // Follow-up mode: prefill some values if desired, but keep task/due_date clean
-                setTask('');
+                // Follow-up mode: prefill project, task and person from old todo
+                setTask(todo.task || '');
                 setDueDate('');
                 setAssignedUserId(todo.assigned_user_id || '');
                 setNote('');
@@ -225,8 +225,9 @@ const TodoModal = ({
             console.log('[TodoModal] handleSave saving todo. isFollowUpMode:', isFollowUpMode, 'todo:', todo, 'dataToSave:', dataToSave);
 
             if (isFollowUpMode && todo) {
-                // Save follow-up: completes old todo and creates new todo atomically
-                await completeAndCreateTodoRpc(todo.id, currentUser?.name || 'System', dataToSave);
+                // Since the old todo is already completed when clicking "Erledigt",
+                // we just create the new follow-up todo!
+                await createTodo(dataToSave);
             } else if (todo) {
                 // Edit mode
                 await updateTodo(todo.id, dataToSave, todo.updated_at);

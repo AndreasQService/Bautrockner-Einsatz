@@ -630,6 +630,125 @@ export async function deleteTodo(todoId) {
 }
 
 /**
+ * Completes a To-do by ID.
+ */
+export async function completeTodo(todoId, completedBy) {
+    invalidateTodoCache();
+    if (!todoId) return false;
+
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(todoId);
+
+    // 1. Mark done in local storage if present
+    try {
+        const local = JSON.parse(localStorage.getItem('qservice_local_todos') || '[]');
+        const idx = local.findIndex(t => t.id === todoId);
+        if (idx >= 0) {
+            local[idx] = {
+                ...local[idx],
+                status: 'done',
+                completed_at: new Date().toISOString(),
+                completed_by: completedBy,
+                updated_at: new Date().toISOString()
+            };
+            localStorage.setItem('qservice_local_todos', JSON.stringify(local));
+        }
+    } catch (e) {
+        console.error('[TodoService] Local storage complete update failed:', e);
+    }
+
+    // 2. Mark done in Supabase database
+    if (isUuid) {
+        await ensureAuthenticated().catch(() => {});
+        if (supabase) {
+            try {
+                if (String(todoId).startsWith('a0d0a0d0-')) {
+                    const { count, error: countErr } = await supabase
+                        .from('project_todos')
+                        .select('*', { count: 'exact', head: true })
+                        .eq('id', todoId);
+                    if (!countErr && count === 0) {
+                        const cachedTodo = fetchAllTodosCache?.find(t => t.id === todoId);
+                        const payload = {
+                            id: todoId,
+                            project_id: cachedTodo?.project_id || null,
+                            task: cachedTodo?.task || 'Nächste Feuchtekontrolle durchführen',
+                            due_date: cachedTodo?.due_date || new Date().toISOString().split('T')[0],
+                            assigned_user_id: 'office',
+                            assigned_user_name: 'Innendienst',
+                            note: 'Kategorie: auto',
+                            closes_project: false,
+                            status: 'done',
+                            created_by: 'system:measurement_followup',
+                            updated_by: 'system:measurement_followup',
+                            completed_at: new Date().toISOString(),
+                            completed_by: completedBy || 'System',
+                            created_at: new Date().toISOString(),
+                            updated_at: new Date().toISOString()
+                        };
+                        await supabase.from('project_todos').insert(payload).catch(() => {});
+                        invalidateTodoCache();
+                        return true;
+                    }
+                }
+
+                const { error } = await supabase
+                    .from('project_todos')
+                    .update({
+                        status: 'done',
+                        completed_by: completedBy,
+                        completed_at: new Date().toISOString(),
+                        updated_by: completedBy,
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('id', todoId);
+                if (error) throw error;
+            } catch (err) {
+                console.error('[TodoService] Supabase complete update failed:', err.message);
+                throw err;
+            }
+        }
+    } else {
+        if (supabase) {
+            const cachedTodo = fetchAllTodosCache?.find(t => t.id === todoId);
+            const projectId = cachedTodo?.project_id;
+            if (projectId) {
+                try {
+                    const { data: report, error: fetchErr } = await supabase
+                        .from('damage_reports')
+                        .select('report_data')
+                        .eq('id', projectId)
+                        .single();
+                    if (!fetchErr && report && report.report_data) {
+                        const rd = report.report_data;
+                        const tasks = rd.officeTasks || [];
+                        const taskIdx = tasks.findIndex(t => t.id === todoId);
+                        if (taskIdx >= 0) {
+                            tasks[taskIdx] = {
+                                ...tasks[taskIdx],
+                                done: true,
+                                completedAt: new Date().toISOString(),
+                                completedBy: completedBy
+                            };
+                            rd.officeTasks = tasks;
+                            await supabase
+                                .from('damage_reports')
+                                .update({ report_data: rd })
+                                .eq('id', projectId);
+                        }
+                    }
+                } catch (e) {
+                    console.error('[TodoService] Non-UUID report update failed:', e);
+                }
+            }
+        }
+    }
+
+    invalidateTodoCache();
+    return true;
+}
+
+
+/**
  * Updates a To-do with optimistic locking (checks updated_at and status = 'open').
  */
 export async function updateTodo(todoId, updateData, expectedUpdatedAt) {
