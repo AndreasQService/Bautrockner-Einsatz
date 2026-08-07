@@ -124,4 +124,75 @@ test.describe('False Conflict Prevention (Local Mocks)', () => {
         await expect(forceBtn).toBeEnabled();
     });
 
+    test('4. Legacy-Lightweight-Eintrag ohne source und ohne echte Änderungen wird bereinigt', async ({ page }) => {
+        // Inject a legacy lightweight entry (no source, empty/default data, isLightweight)
+        await page.evaluate(() => {
+            const legacyEntry = {
+                'proj-lightweight': {
+                    reportId: 'proj-lightweight',
+                    // no source, no isCompleteSnapshot
+                    reportData: {
+                        id: 'proj-lightweight',
+                        projectTitle: 'Projekt Hydration Test',
+                        isLightweight: true,
+                        rooms: [],
+                        measurementRooms: [],
+                        images: [],
+                        contacts: []
+                    },
+                    _sync_conflict: true,
+                    projectTitle: 'Projekt Hydration Test'
+                }
+            };
+            localStorage.setItem('qservice_unsaved_reports', JSON.stringify(legacyEntry));
+        });
+
+        await page.reload({ waitUntil: 'networkidle' });
+        await page.waitForSelector('header.app-header');
+
+        // Open project to trigger hydration and automatic cleanup
+        const row = page.locator('tr', { hasText: 'Projekt Hydration Test' });
+        await row.click();
+
+        await page.waitForSelector('text=Kontakte');
+        await page.waitForTimeout(1000);
+
+        // Verify the false hydration entry has been automatically removed
+        const unsaved = await page.evaluate(() => {
+            return JSON.parse(localStorage.getItem('qservice_unsaved_reports') || '{}');
+        });
+        expect(unsaved['proj-lightweight']).toBeUndefined();
+    });
+
+    test('5. Legacy-Eintrag mit echten semantischen Änderungen bleibt erhalten aber blockiert Erzwingen', async ({ page }) => {
+        // Inject legacy entry with semantic changes (e.g. customized room) but no verified complete snapshot
+        await page.evaluate(() => {
+            const legacySemanticEntry = {
+                'proj-lightweight': {
+                    reportId: 'proj-lightweight',
+                    // no source, no isCompleteSnapshot
+                    reportData: {
+                        id: 'proj-lightweight',
+                        projectTitle: 'Projekt Hydration Test',
+                        isLightweight: false,
+                        rooms: [{ id: 'room-1', name: 'Custom Room Name Added Offline' }]
+                    },
+                    _sync_conflict: true,
+                    projectTitle: 'Projekt Hydration Test'
+                }
+            };
+            localStorage.setItem('qservice_unsaved_reports', JSON.stringify(legacySemanticEntry));
+        });
+
+        await page.reload({ waitUntil: 'networkidle' });
+        await page.waitForSelector('header.app-header');
+
+        // The conflict dialog should be visible to preserve the legacy local backup
+        await expect(page.getByRole('heading', { name: 'Lokale Änderungen gefunden!' })).toBeVisible();
+
+        // But forcing is blocked because isCompleteSnapshot is not true / no valid source
+        const forceBtn = page.locator('button:has-text("Lokalen Stand erzwingen")');
+        await expect(forceBtn).toBeDisabled();
+    });
+
 });
