@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { ArrowLeft, ChevronDown } from 'lucide-react';
+import { isVisibleProjectRow } from '../utils/projectVisibility.js';
 
 export default function ProjectSelection({ reports, onSelect, onBack }) {
   const [selectedId, setSelectedId] = useState('');
+  const visibleReports = reports.filter(isVisibleProjectRow);
 
   const handleProceed = () => {
-    const report = reports.find(r => r.id === selectedId);
+    const report = visibleReports.find(r => r.id === selectedId);
     if (report) {
       onSelect(report);
     }
@@ -53,7 +55,7 @@ export default function ProjectSelection({ reports, onSelect, onBack }) {
           }}
         >
           <option value="" disabled>Bitte Projekt wählen</option>
-          {reports.map(report => (
+          {visibleReports.map(report => (
             <option key={report.id} value={report.id}>
               {report.projectTitle || report.orderNumber || report.id}
             </option>
