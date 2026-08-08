@@ -1601,8 +1601,8 @@ function App() {
           }
 
           const fullReport = {
-            ...sanitizeMeasurementStorage(mergedData),
             ...activeReport,
+            ...sanitizeMeasurementStorage(mergedData),
             id: targetProjectId,
             _supabase_updated_at: data.updated_at,
             isLightweight: false
@@ -1680,8 +1680,8 @@ function App() {
             }
 
             const fullReport = {
-              ...sanitizeMeasurementStorage(mergedData),
               ...selectedReport,
+              ...sanitizeMeasurementStorage(mergedData),
               id: targetProjectId,
               _supabase_updated_at: data.updated_at,
               isLightweight: false
