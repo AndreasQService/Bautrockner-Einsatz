@@ -21,6 +21,7 @@ import i18n from './i18n'
 import { buildProjectFolderName, uploadProjectJson } from "./services/OneDriveService";
 import { syncPendingToSupabase } from './lib/sync/supabaseSyncWorker.js';
 import { markUploadedPhotosAsVerified } from './services/PhotoStorage';
+import { isVisibleProjectRow } from './utils/projectVisibility.js';
 const IS_TEST_ENV = !!(typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_EXPECTED_SUPABASE_PROJECT_ID === 'aoxduqspiezzyqeqyzzl');
 
 let mockDbProjectsRef = null;
@@ -1453,7 +1454,7 @@ function App() {
             };
           })
           // Robuster Filter: Session-Einträge der DB (__session__) sowie gelöschte Projekte herausfiltern
-          .filter(r => r && r.id !== '__session__' && !r.id.startsWith('session_') && r.projectTitle !== '__session__' && !r.deletedAt); // Session + soft-deleted ausblenden
+          .filter(r => isVisibleProjectRow(r) && !r.deletedAt); // technische Zeilen + soft-deleted ausblenden
 
         console.log(`[Supabase] ${loadedReports.length} Projekte geladen (${data.length} DB-Einträge gesamt).`);
         console.log('[MEASROOM TRACE] fetchReports loaded', {
