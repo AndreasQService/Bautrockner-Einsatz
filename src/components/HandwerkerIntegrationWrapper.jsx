@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Hammer, Search, ArrowLeft, Folder, Image as ImageIcon, Info, MapPin, Phone, Mail, User, Clock, Check, Plus, Trash2 } from 'lucide-react';
+import { isVisibleProjectRow } from '../utils/projectVisibility.js';
 
 export default function HandwerkerIntegrationWrapper({ reports = [], onBack }) {
     const [searchQuery, setSearchQuery] = useState('');
@@ -11,6 +12,7 @@ export default function HandwerkerIntegrationWrapper({ reports = [], onBack }) {
 
     // 1. Filter reports locally based on search query
     const filteredReports = reports.filter(project => {
+        if (!isVisibleProjectRow(project)) return false;
         const query = searchQuery.toLowerCase();
         return (
             (project.projectTitle && project.projectTitle.toLowerCase().includes(query)) ||
@@ -23,7 +25,7 @@ export default function HandwerkerIntegrationWrapper({ reports = [], onBack }) {
     });
 
     // 2. Retrieve selected project
-    const selectedProject = reports.find(p => p.id === selectedProjectId);
+    const selectedProject = filteredReports.find(p => p.id === selectedProjectId);
 
     // 3. Local simulation photo handler
     const handleLocalPhotoUpload = (e) => {

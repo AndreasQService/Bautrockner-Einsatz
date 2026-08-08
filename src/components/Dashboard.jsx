@@ -8,6 +8,7 @@ import DashboardReportTableHeader from './DashboardReportTableHeader'
 import DashboardTechnicianProjectInfo from './DashboardTechnicianProjectInfo'
 import OfficeProjectsPage from '../features/projects/OfficeProjectsPage'
 import { formatDate } from '../utils/formatUtils'
+import { isVisibleProjectRow } from '../utils/projectVisibility.js'
 import { formatActiveEquipmentRuntime, formatCompletedEquipmentRuntime, formatEquipmentDate, formatEquipmentLocation, formatEquipmentProjectAddress, formatEquipmentTypeModel, getDryingStartDate, getEquipmentStatus } from '../utils/dashboardUtils'
 import { DASHBOARD_STATUS_COLORS as statusColors } from '../config/dashboardConfig'
 
@@ -582,6 +583,8 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
 
     // Filter Logic
     const filteredReports = useMemo(() => reports.filter(r => {
+        if (!isVisibleProjectRow(r)) return false;
+
         // Exclude soft-deleted projects
         if (r.deletedAt || r.deleted_at || r.report_data?.deletedAt) return false;
 

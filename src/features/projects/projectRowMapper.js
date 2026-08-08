@@ -15,6 +15,7 @@ import { getProjectPriority, getDaysInStatus, getStatusLabel } from './statusRul
 import { getAllOpenTasks, getOpenTasksCount, getOverdueTasksCount } from './tasks.js';
 import { getNextAction } from './nextAction.js';
 import { buildDisplayName } from '../../utils/projectUtils.js';
+import { isVisibleProjectRow } from '../../utils/projectVisibility.js';
 
 
 /**
@@ -64,6 +65,7 @@ export const mapProjectToRowViewModel = (project, now = new Date()) => {
 export const mapProjectsToRows = (projects) => {
   const now = new Date();
   return projects
+    .filter(isVisibleProjectRow)
     .filter(p => p.status !== 'Abgeschlossen' && p.status !== 'rechnung')
     .map(p => mapProjectToRowViewModel(p, now));
 };
