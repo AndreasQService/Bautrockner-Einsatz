@@ -20,7 +20,6 @@ const createHarness = (enabled) => {
     supabase,
     upsertSession: () => calls.push('upsert'),
     pollSessions: () => calls.push('poll'),
-    cleanupOldSessions: () => calls.push('cleanup'),
     deleteSession: () => calls.push('delete'),
     eventTarget: {
       addEventListener: (name, listener) => {
@@ -43,7 +42,6 @@ const createHarness = (enabled) => {
       calls.push(`clear:${timer.delay}`);
       intervals.splice(intervals.indexOf(timer), 1);
     },
-    fetchFn: (url, init) => calls.push({ url, init }),
   };
 
   return { calls, enabledRef, intervals, listeners, options };
@@ -59,33 +57,23 @@ test('enabled false creates no requests, timers, listener, cleanup, or DELETE', 
   assert.equal(harness.listeners.size, 0);
 });
 
-test('enabled true preserves initial work, intervals, and beforeunload DELETE', () => {
+test('enabled true starts polling and preserves the lock on beforeunload', () => {
   const harness = createHarness(true);
   const cleanup = startSessionLockLifecycle(harness.options);
 
-  assert.deepEqual(harness.calls.slice(0, 5), [
+  assert.deepEqual(harness.calls.slice(0, 4), [
     'upsert',
     'poll',
-    'interval:10000',
     'interval:5000',
-    'interval:300000',
+    'add:beforeunload',
   ]);
   assert.equal(harness.listeners.has('beforeunload'), true);
 
   harness.intervals[0].callback();
-  harness.intervals[1].callback();
-  harness.intervals[2].callback();
-  assert.deepEqual(harness.calls.slice(6, 9), ['upsert', 'poll', 'cleanup']);
+  assert.equal(harness.calls.filter((call) => call === 'poll').length, 2);
 
   harness.listeners.get('beforeunload')();
-  assert.deepEqual(harness.calls[9], {
-    url: 'https://example.supabase.co/rest/v1/project_sessions?session_token=eq.session%20token',
-    init: {
-      method: 'DELETE',
-      headers: { apikey: 'test-key', Authorization: 'Bearer test-key' },
-      keepalive: true,
-    },
-  });
+  assert.equal(harness.calls.includes('delete'), false);
 
   cleanup();
   assert.equal(harness.intervals.length, 0);
@@ -102,7 +90,7 @@ test('false to true starts once without duplicate intervals', () => {
 
   assert.equal(harness.calls.filter((call) => call === 'upsert').length, 1);
   assert.equal(harness.calls.filter((call) => call === 'poll').length, 1);
-  assert.equal(harness.intervals.length, 3);
+  assert.equal(harness.intervals.length, 1);
   assert.equal(harness.listeners.size, 1);
   cleanup();
 });
