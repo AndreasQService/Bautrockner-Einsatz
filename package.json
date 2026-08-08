@@ -40,9 +40,7 @@
     "react-dom": "^19.2.0",
     "react-leaflet": "^5.0.0",
     "rosetta": "^1.1.0",
-    "uuid": "^14.0.0",
-    "xlsx": "^0.18.5",
-    "xlsx-js-style": "^1.2.0"
+    "uuid": "^14.0.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
