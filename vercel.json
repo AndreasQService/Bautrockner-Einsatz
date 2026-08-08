@@ -1,4 +1,7 @@
 {
+  "git": {
+    "deploymentEnabled": false
+  },
   "ignoreCommand": "node scripts/vercel-ignore.js",
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/$1" },
