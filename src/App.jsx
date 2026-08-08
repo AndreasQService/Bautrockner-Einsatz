@@ -14,7 +14,6 @@ import UserManagementModal from './components/UserManagementModal'
 import MeasurementDeviceManager from './components/MeasurementDeviceManager'
 import LoginScreen from './components/LoginScreen'
 import TodoProjectSection from './components/TodoProjectSection'
-import { ensureAuthenticated, lastAuthError } from './services/TodoService'
 import EmailImportModalV2 from './components/EmailImportModalV2'
 import DisponentMockup from './components/mockups/DisponentMockup'
 import i18n from './i18n'
@@ -1354,31 +1353,6 @@ function App() {
     }
 
     const requestId = ++latestSearchRequestRef.current;
-
-    if (IS_TEST_ENV) {
-      let authErrorMsg = null;
-      try {
-        const authOk = await ensureAuthenticated();
-        if (!authOk) {
-          authErrorMsg = lastAuthError || 'Silent login returned false';
-        }
-      } catch (err) {
-        console.warn('Silent authentication failed:', err);
-        authErrorMsg = err.message || String(err);
-      }
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError) {
-        authErrorMsg = sessionError.message;
-      }
-      if (!session && !navigator.userAgent.includes('QToolDeepTest')) {
-        setSupabaseStatus({
-          ok: false,
-          count: 0,
-          error: `Nicht authentifiziert (keine Supabase-Session). Details: ${authErrorMsg || 'Keine Session'}`
-        });
-        return;
-      }
-    }
 
     setSupabaseStatus({ ok: null, count: null, error: null }); // Laden...
     try {
