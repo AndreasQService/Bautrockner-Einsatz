@@ -1009,16 +1009,16 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
                                                                             background: 'none',
                                                                             border: 'none',
                                                                             cursor: (savingProjectIds.has(report.id) || isActuallyOffline) ? 'not-allowed' : 'pointer',
-                                                                            color: 'var(--text-muted, #64748B)',
+                                                                            color: 'var(--text-main, #F1F5F9)',
                                                                             padding: '0.2rem',
                                                                             borderRadius: '4px',
                                                                             display: 'inline-flex',
                                                                             alignItems: 'center',
-                                                                            opacity: (savingProjectIds.has(report.id) || isActuallyOffline) ? 0.3 : 0.5,
+                                                                            opacity: (savingProjectIds.has(report.id) || isActuallyOffline) ? 0.3 : 0.8,
                                                                             transition: 'all 0.15s'
                                                                         }}
                                                                         onMouseEnter={e => { if (!savingProjectIds.has(report.id) && !isActuallyOffline) e.currentTarget.style.opacity = 1; }}
-                                                                        onMouseLeave={e => { if (!savingProjectIds.has(report.id) && !isActuallyOffline) e.currentTarget.style.opacity = 0.5; }}
+                                                                        onMouseLeave={e => { if (!savingProjectIds.has(report.id) && !isActuallyOffline) e.currentTarget.style.opacity = 0.8; }}
                                                                     >
                                                                         <Archive size={14} />
                                                                     </button>
@@ -1110,11 +1110,11 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
                                                                             borderRadius: '4px',
                                                                             display: 'inline-flex',
                                                                             alignItems: 'center',
-                                                                            opacity: (savingProjectIds.has(report.id) || isActuallyOffline) ? 0.3 : 0.5,
+                                                                            opacity: (savingProjectIds.has(report.id) || isActuallyOffline) ? 0.3 : 0.8,
                                                                             transition: 'all 0.15s'
                                                                         }}
                                                                         onMouseEnter={e => { if (!savingProjectIds.has(report.id) && !isActuallyOffline) e.currentTarget.style.opacity = 1; }}
-                                                                        onMouseLeave={e => { if (!savingProjectIds.has(report.id) && !isActuallyOffline) e.currentTarget.style.opacity = 0.5; }}
+                                                                        onMouseLeave={e => { if (!savingProjectIds.has(report.id) && !isActuallyOffline) e.currentTarget.style.opacity = 0.8; }}
                                                                     >
                                                                         <Trash2 size={14} />
                                                                     </button>
