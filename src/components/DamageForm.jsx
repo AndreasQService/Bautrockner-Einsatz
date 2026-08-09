@@ -631,76 +631,80 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
             setFormData(prev => ({ ...prev, damageTypeImage: initialData.damageTypeImage }));
         }
 
-        // Sync asynchronously loaded rooms and measurementRooms when transitioning from lightweight to fully loaded
+        // Sync asynchronously loaded rooms, measurementRooms and equipment when transitioning from lightweight to fully loaded
         if (initialData && !initialData.isLightweight) {
             const localHasMeasurements = formData.measurementRooms && formData.measurementRooms.length > 0;
             const incomingHasMeasurements = initialData.measurementRooms && initialData.measurementRooms.length > 0;
+            const localHasEquipment = formData.equipment && formData.equipment.length > 0;
+            const incomingHasEquipment = initialData.equipment && initialData.equipment.length > 0;
 
-            if (!localHasMeasurements && incomingHasMeasurements) {
-                console.log('[SYNC] Populating rooms and measurementRooms from fully loaded initialData');
+            if ((!localHasMeasurements && incomingHasMeasurements) || (!localHasEquipment && incomingHasEquipment)) {
+                console.log('[SYNC] Populating rooms, measurementRooms and equipment from fully loaded initialData');
                 setFormData(prev => {
-                    if (prev.measurementRooms && prev.measurementRooms.length > 0) return prev;
+                    const rList = (!prev.measurementRooms || prev.measurementRooms.length === 0) && Array.isArray(initialData.rooms) ? [...initialData.rooms] : [...(prev.rooms || [])];
+                    const mList = (!prev.measurementRooms || prev.measurementRooms.length === 0) && Array.isArray(initialData.measurementRooms) ? initialData.measurementRooms : (prev.measurementRooms || []);
+                    const eqList = (!prev.equipment || prev.equipment.length === 0) && Array.isArray(initialData.equipment) ? initialData.equipment : (prev.equipment || []);
 
-                    const rList = Array.isArray(initialData.rooms) ? [...initialData.rooms] : [];
-                    const mList = Array.isArray(initialData.measurementRooms) ? initialData.measurementRooms : [];
+                    if ((!prev.measurementRooms || prev.measurementRooms.length === 0) && incomingHasMeasurements) {
+                        mList.forEach(mr => {
+                            const normApt = String(mr.apartment || 'Allgemeiner Bereich').trim().toLowerCase().replace(/-/g, ' ').replace(/\s+/g, ' ');
+                            const normName = String(mr.name || 'Unbenannter Raum').trim().toLowerCase().replace(/-/g, ' ').replace(/\s+/g, ' ');
 
-                    mList.forEach(mr => {
-                        const normApt = String(mr.apartment || 'Allgemeiner Bereich').trim().toLowerCase().replace(/-/g, ' ').replace(/\s+/g, ' ');
-                        const normName = String(mr.name || 'Unbenannter Raum').trim().toLowerCase().replace(/-/g, ' ').replace(/\s+/g, ' ');
+                            const existingIdx = rList.findIndex(r =>
+                                r.id === mr.id || (
+                                    String(r.apartment || 'Allgemeiner Bereich').trim().toLowerCase().replace(/-/g, ' ').replace(/\s+/g, ' ') === normApt &&
+                                    String(r.name || 'Unbenannter Raum').trim().toLowerCase().replace(/-/g, ' ').replace(/\s+/g, ' ') === normName
+                                )
+                            );
+                            if (existingIdx >= 0) {
+                                const oldMData = rList[existingIdx].measurementData || {};
+                                const newMData = mr.measurementData || {};
 
-                        const existingIdx = rList.findIndex(r =>
-                            r.id === mr.id || (
-                                String(r.apartment || 'Allgemeiner Bereich').trim().toLowerCase().replace(/-/g, ' ').replace(/\s+/g, ' ') === normApt &&
-                                String(r.name || 'Unbenannter Raum').trim().toLowerCase().replace(/-/g, ' ').replace(/\s+/g, ' ') === normName
-                            )
-                        );
-                        if (existingIdx >= 0) {
-                            const oldMData = rList[existingIdx].measurementData || {};
-                            const newMData = mr.measurementData || {};
+                                const existingCanvas = rList[existingIdx].canvasImage || rList[existingIdx].measurementData?.canvasImage || mr.canvasImage || mr.measurementData?.canvasImage || null;
+                                const existingSketch = rList[existingIdx].sketch || rList[existingIdx].measurementData?.sketch || mr.sketch || mr.measurementData?.sketch || null;
 
-                            const existingCanvas = rList[existingIdx].canvasImage || rList[existingIdx].measurementData?.canvasImage || mr.canvasImage || mr.measurementData?.canvasImage || null;
-                            const existingSketch = rList[existingIdx].sketch || rList[existingIdx].measurementData?.sketch || mr.sketch || mr.measurementData?.sketch || null;
+                                const mergedMData = mr.measurementData ? {
+                                    ...oldMData,
+                                    ...newMData,
+                                    canvasImage: newMData.canvasImage || oldMData.canvasImage || existingCanvas,
+                                    sketch: newMData.sketch || oldMData.sketch || existingSketch
+                                } : {
+                                    ...oldMData,
+                                    canvasImage: oldMData.canvasImage || existingCanvas,
+                                    sketch: oldMData.sketch || existingSketch
+                                };
 
-                            const mergedMData = mr.measurementData ? {
-                                ...oldMData,
-                                ...newMData,
-                                canvasImage: newMData.canvasImage || oldMData.canvasImage || existingCanvas,
-                                sketch: newMData.sketch || oldMData.sketch || existingSketch
-                            } : {
-                                ...oldMData,
-                                canvasImage: oldMData.canvasImage || existingCanvas,
-                                sketch: oldMData.sketch || existingSketch
-                            };
-
-                            rList[existingIdx] = {
-                                ...mr,
-                                ...rList[existingIdx],
-                                id: rList[existingIdx].id || mr.id,
-                                measurementData: mergedMData,
-                                measurementHistory: mr.measurementHistory || rList[existingIdx].measurementHistory,
-                                canvasImage: existingCanvas,
-                                sketch: existingSketch
-                            };
-                        } else {
-                            const sketchImg = mr.canvasImage || mr.measurementData?.canvasImage || null;
-                            const sketchField = mr.sketch || mr.measurementData?.sketch || null;
-                            rList.push({
-                                ...mr,
-                                canvasImage: sketchImg,
-                                sketch: sketchField,
-                                measurementData: mr.measurementData ? {
-                                    ...mr.measurementData,
-                                    canvasImage: mr.measurementData.canvasImage || sketchImg,
-                                    sketch: mr.measurementData.sketch || sketchField
-                                } : (sketchImg || sketchField ? { canvasImage: sketchImg, sketch: sketchField } : null)
-                            });
-                        }
-                    });
+                                rList[existingIdx] = {
+                                    ...mr,
+                                    ...rList[existingIdx],
+                                    id: rList[existingIdx].id || mr.id,
+                                    measurementData: mergedMData,
+                                    measurementHistory: mr.measurementHistory || rList[existingIdx].measurementHistory,
+                                    canvasImage: existingCanvas,
+                                    sketch: existingSketch
+                                };
+                            } else {
+                                const sketchImg = mr.canvasImage || mr.measurementData?.canvasImage || null;
+                                const sketchField = mr.sketch || mr.measurementData?.sketch || null;
+                                rList.push({
+                                    ...mr,
+                                    canvasImage: sketchImg,
+                                    sketch: sketchField,
+                                    measurementData: mr.measurementData ? {
+                                        ...mr.measurementData,
+                                        canvasImage: mr.measurementData.canvasImage || sketchImg,
+                                        sketch: mr.measurementData.sketch || sketchField
+                                    } : (sketchImg || sketchField ? { canvasImage: sketchImg, sketch: sketchField } : null)
+                                });
+                            }
+                        });
+                    }
 
                     const nextData = {
                         ...prev,
                         rooms: rList,
-                        measurementRooms: mList
+                        measurementRooms: mList,
+                        equipment: eqList
                     };
                     lastSavedData.current = nextData;
                     latestFormData.current = nextData;
