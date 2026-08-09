@@ -59,7 +59,7 @@
     "tailwindcss": "^4.2.2",
     "vite": "^7.3.6",
     "vite-plugin-pwa": "^1.2.0",
-    "workbox-window": "^7.4.0"
+    "workbox-window": "^7.4.1"
   },
   "overrides": {
     "brace-expansion@1": "1.1.18",
@@ -78,6 +78,7 @@
     "js-yaml": "4.3.1",
     "lodash": "4.18.1",
     "picomatch@2": "2.3.2",
-    "picomatch@4": "4.0.5"
+    "picomatch@4": "4.0.5",
+    "workbox-build": "7.4.1"
   }
 }
