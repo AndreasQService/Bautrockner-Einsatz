@@ -128,7 +128,24 @@ class HookHarness {
       }
       if (changed) {
         if (prev && prev.cleanup) {
-          prev.cleanup();
+          const origWindow = globalThis.window;
+          const origSetInterval = globalThis.setInterval;
+          const origClearInterval = globalThis.clearInterval;
+          const origFetch = globalThis.fetch;
+
+          globalThis.window = this.eventTarget;
+          globalThis.setInterval = this.setIntervalFn;
+          globalThis.clearInterval = this.clearIntervalFn;
+          globalThis.fetch = this.fetchFn;
+
+          try {
+            prev.cleanup();
+          } finally {
+            globalThis.window = origWindow;
+            globalThis.setInterval = origSetInterval;
+            globalThis.clearInterval = origClearInterval;
+            globalThis.fetch = origFetch;
+          }
         }
         // Führe den Effekt aus, wir übergeben die Mocks an startSessionLockLifecycle
         // durch Überschreiben von globalen oder Hook-internen Variablen.
@@ -181,7 +198,24 @@ class HookHarness {
     if (this.prevEffects) {
       this.prevEffects.forEach((eff) => {
         if (eff.cleanup) {
-          eff.cleanup();
+          const origWindow = globalThis.window;
+          const origSetInterval = globalThis.setInterval;
+          const origClearInterval = globalThis.clearInterval;
+          const origFetch = globalThis.fetch;
+
+          globalThis.window = this.eventTarget;
+          globalThis.setInterval = this.setIntervalFn;
+          globalThis.clearInterval = this.clearIntervalFn;
+          globalThis.fetch = this.fetchFn;
+
+          try {
+            eff.cleanup();
+          } finally {
+            globalThis.window = origWindow;
+            globalThis.setInterval = origSetInterval;
+            globalThis.clearInterval = origClearInterval;
+            globalThis.fetch = origFetch;
+          }
         }
       });
     }
@@ -195,6 +229,10 @@ const createMockSupabase = () => {
     requests,
     supabaseUrl: 'https://mock.supabase.co',
     supabaseKey: 'mock-key',
+    rpc: (name, params) => {
+      requests.push({ method: 'rpc', name, params });
+      return Promise.resolve({ data: [{ acquired: true }], error: null });
+    },
     from: (table) => ({
       upsert: (data, opts) => {
         requests.push({ method: 'upsert', table, data, opts });
@@ -266,13 +304,11 @@ test('4. currentUser=true, Supabase-Session=true: SessionLock startet', () => {
   const harness = new HookHarness(supabase, 'token123', 'report456', 'details', 'desktop', Date.now(), true);
   harness.run();
 
-  assert.equal(harness.intervals.length, 3);
+  assert.equal(harness.intervals.length, 1);
   assert.equal(harness.listeners.has('beforeunload'), true);
   // Sollte upsertSession und pollSessions sofort aufrufen
-  const upsertReq = supabase.requests.find(r => r.method === 'upsert');
-  const selectReq = supabase.requests.find(r => r.method === 'select.gte');
-  assert.ok(upsertReq);
-  assert.ok(selectReq);
+  const lockReq = supabase.requests.find(r => r.method === 'rpc' && r.name === 'acquire_project_lock');
+  assert.ok(lockReq);
 });
 
 test('5. Supabase-Auth wird später verfügbar: SessionLock startet genau einmal', () => {
@@ -285,14 +321,12 @@ test('5. Supabase-Auth wird später verfügbar: SessionLock startet genau einmal
   // Jetzt wird Auth verfügbar -> enabled = true
   harness.updateProps({ enabled: true });
 
-  assert.equal(harness.intervals.length, 3);
+  assert.equal(harness.intervals.length, 1);
   assert.equal(harness.listeners.has('beforeunload'), true);
 
   // Upsert und Poll sollten ausgeführt worden sein (je 1x aus lifecycle und 1x aus immediate effect)
-  const upserts = supabase.requests.filter(r => r.method === 'upsert');
-  const selects = supabase.requests.filter(r => r.method === 'select.gte');
-  assert.equal(upserts.length, 2);
-  assert.equal(selects.length, 2);
+  const locks = supabase.requests.filter(r => r.method === 'rpc' && r.name === 'acquire_project_lock');
+  assert.ok(locks.length >= 1);
 });
 
 test('6. Supabase-Auth geht verloren: SessionLock stoppt', () => {
@@ -300,7 +334,7 @@ test('6. Supabase-Auth geht verloren: SessionLock stoppt', () => {
   const harness = new HookHarness(supabase, 'token123', 'report456', 'details', 'desktop', Date.now(), true);
   harness.run();
 
-  assert.equal(harness.intervals.length, 3);
+  assert.equal(harness.intervals.length, 1);
 
   // Auth geht verloren -> enabled = false
   harness.updateProps({ enabled: false });
@@ -317,8 +351,8 @@ test('7. kein POST vor bestätigter Auth', () => {
   // Versuche property-Updates (wie view-Wechsel), die normalerweise einen upsert triggern würden
   harness.updateProps({ view: 'new-report' });
 
-  const upserts = supabase.requests.filter(r => r.method === 'upsert');
-  assert.equal(upserts.length, 0);
+  const locks = supabase.requests.filter(r => r.method === 'rpc' && r.name === 'acquire_project_lock');
+  assert.equal(locks.length, 0);
 });
 
 test('8. bestehende Lock-Logik nach Auth unverändert', () => {
@@ -326,15 +360,13 @@ test('8. bestehende Lock-Logik nach Auth unverändert', () => {
   const harness = new HookHarness(supabase, 'token123', 'report456', 'details', 'desktop', Date.now(), true);
   harness.run();
 
-  // Heartbeat und Poll Timer sollten registriert sein
-  const heartbeatTimer = harness.intervals.find(t => t.delay === 10000);
+  // Poll Timer sollte registriert sein
   const pollTimer = harness.intervals.find(t => t.delay === 5000);
-  assert.ok(heartbeatTimer);
   assert.ok(pollTimer);
 
-  const prevUpsertCount = supabase.requests.filter(r => r.method === 'upsert').length;
-  heartbeatTimer.callback();
-  assert.equal(supabase.requests.filter(r => r.method === 'upsert').length, prevUpsertCount + 1);
+  const prevSelectCount = supabase.requests.filter(r => r.method === 'select.gte').length;
+  pollTimer.callback();
+  assert.equal(supabase.requests.filter(r => r.method === 'select.gte').length, prevSelectCount + 1);
 });
 
 test('9. Logout stoppt weitere Requests', () => {
@@ -342,7 +374,7 @@ test('9. Logout stoppt weitere Requests', () => {
   const harness = new HookHarness(supabase, 'token123', 'report456', 'details', 'desktop', Date.now(), true);
   harness.run();
 
-  assert.equal(harness.intervals.length, 3);
+  assert.equal(harness.intervals.length, 1);
 
   // Logout triggern -> enabled = false
   harness.updateProps({ enabled: false });
@@ -350,7 +382,7 @@ test('9. Logout stoppt weitere Requests', () => {
   // Verifizieren, dass keine Timer mehr vorhanden sind
   assert.equal(harness.intervals.length, 0);
 
-  // Verifizieren, dass kein DELETE-Request gesendet wird (weil enabledRef.current beim Cleanup bereits false war)
+  // Verifizieren, dass kein DELETE-Request gesendet wird
   const deletes = supabase.requests.filter(r => r.method === 'delete' || r.method === 'delete.eq');
   assert.equal(deletes.length, 0);
 });

@@ -10,7 +10,7 @@ export default defineConfig({
     tailwindcss(),
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
+      registerType: 'prompt',
       includeAssets: ['vite.svg', 'logo.png'],
       manifest: {
         name: 'QTool – Q-Service (Test)',
@@ -21,6 +21,8 @@ export default defineConfig({
         display: 'standalone',
         orientation: 'any',
         lang: 'de',
+        start_url: '/',
+        scope: '/',
         icons: [
           { src: 'app-icon.png', sizes: '192x192', type: 'image/png' },
           { src: 'app-icon.png', sizes: '512x512', type: 'image/png' }
@@ -34,7 +36,16 @@ export default defineConfig({
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         runtimeCaching: [
           {
+            // Do not cache any API requests or database calls
             urlPattern: /supabase\.co/i,
+            handler: 'NetworkOnly',
+          },
+          {
+            urlPattern: /\/rest\/v1\//i,
+            handler: 'NetworkOnly',
+          },
+          {
+            urlPattern: /\/auth\/v1\//i,
             handler: 'NetworkOnly',
           }
         ]

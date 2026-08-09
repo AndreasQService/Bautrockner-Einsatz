@@ -17,7 +17,7 @@ if (typeof window !== 'undefined') {
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { Camera, Image, Trash, X, Plus, Edit3, Save, Upload, FileText, CheckCircle, Circle, AlertTriangle, Play, HelpCircle, ArrowLeft, Mail, Map, MapPin, Folder, Mic, Paperclip, Table, Download, Check, Settings, RotateCcw, ChevronDown, ChevronUp, Briefcase, Hammer, ClipboardList, MicOff, Eye, Database, Phone, UserPlus, Link, Unlink, GripVertical, Delete, Move } from 'lucide-react'
+import { Camera, Image, Trash, Trash2, Archive, X, Plus, Edit3, Save, Upload, FileText, CheckCircle, Circle, AlertTriangle, Play, HelpCircle, ArrowLeft, Mail, Map, MapPin, Folder, Mic, Paperclip, Table, Download, Check, Settings, RotateCcw, ChevronDown, ChevronUp, Briefcase, Hammer, ClipboardList, MicOff, Eye, Database, Phone, UserPlus, Link, Unlink, GripVertical, Delete, Move } from 'lucide-react'
 import { supabase } from '../supabaseClient';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
@@ -329,7 +329,7 @@ export function hasSemanticChanges(base, current) {
 }
 
 
-export default function DamageForm({ onCancel, initialData, onSave, mode = 'desktop', isDarkMode = true, isSyncPending, fetchReports }) {
+export default function DamageForm({ onCancel, initialData, onSave, mode = 'desktop', isDarkMode = true, isSyncPending, fetchReports, readOnly, currentUser, isActuallyOffline, supabase, onDeleteProject }) {
     // Helper to parse address string if editing
     const parseAddress = (addr) => {
         if (!addr) return { street: '', zip: '', city: '' };
@@ -765,6 +765,92 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
     const [isOnline, setIsOnline] = useState(navigator.onLine);
     const [pendingSyncCount, setPendingSyncCount] = useState(0);
     const [isSyncing, setIsSyncing] = useState(false);
+
+    const handleArchiveProject = async () => {
+        const streetPart = formData.street || (initialData?.address ? initialData.address.split(',')[0] : 'Keine Strasse');
+        const cityPart = formData.city || (() => {
+            const parts = (initialData?.address || '').split(',');
+            return parts.length > 1 ? parts[1].trim().replace(/^\d+\s*/, '') : '';
+        })();
+        const addressStr = cityPart ? `${streetPart}, ${cityPart}` : streetPart;
+        const projectLabel = [formData.projectNumber, addressStr].filter(Boolean).join(' - ') || formData.projectTitle || formData.id;
+
+        if (window.confirm(`Projekt "${projectLabel}" wirklich archivieren (auf Abgeschlossen setzen)?`)) {
+            setIsSaving(true);
+            try {
+                if (onSave) {
+                    await onSave({ ...formData, status: 'Abgeschlossen' });
+                }
+                if (supabase) {
+                    await supabase
+                        .from('damage_reports')
+                        .update({
+                            status: 'Abgeschlossen'
+                        })
+                        .eq('id', formData.id)
+                        .catch(err => console.warn('Supabase archive failed (will retry when online):', err.message));
+                }
+                if (fetchReports) {
+                    await fetchReports().catch(() => {});
+                }
+                onCancel();
+            } catch (err) {
+                console.error(err);
+                alert('Fehler beim Archivieren: ' + err.message);
+            } finally {
+                setIsSaving(false);
+            }
+        }
+    };
+
+    const handleDeleteProject = async () => {
+        const streetPart = formData.street || (initialData?.address ? initialData.address.split(',')[0] : 'Keine Strasse');
+        const cityPart = formData.city || (() => {
+            const parts = (initialData?.address || '').split(',');
+            return parts.length > 1 ? parts[1].trim().replace(/^\d+\s*/, '') : '';
+        })();
+        const addressStr = cityPart ? `${streetPart}, ${cityPart}` : streetPart;
+        const projectLabel = [formData.projectNumber, addressStr].filter(Boolean).join(' - ') || formData.projectTitle || formData.id;
+
+        const promptText = `Projekt „${projectLabel}“ wirklich löschen?\n\nDas Projekt wird aus der Projektliste entfernt. Die gespeicherten Daten und Bilder werden nicht physisch gelöscht.\n\nBitte geben Sie zum Bestätigen das Wort LÖSCHEN ein:`;
+        const confirmVal = window.prompt(promptText);
+        if (confirmVal === 'LÖSCHEN') {
+            setIsSaving(true);
+            try {
+                if (onDeleteProject) {
+                    await onDeleteProject(formData.id);
+                } else if (supabase) {
+                    const now = new Date().toISOString();
+                    const userEmail = currentUser?.email || currentUser?.name || 'Unbekannt';
+                    const { data: fullReport } = await supabase
+                        .from('damage_reports')
+                        .select('report_data')
+                        .eq('id', formData.id)
+                        .single();
+                    const updatedReportData = {
+                        ...(fullReport?.report_data || {}),
+                        deletedAt: now,
+                        deletedBy: userEmail
+                    };
+                    await supabase
+                        .from('damage_reports')
+                        .update({
+                            report_data: updatedReportData
+                        })
+                        .eq('id', formData.id);
+                }
+                if (fetchReports) {
+                    await fetchReports().catch(() => {});
+                }
+                onCancel();
+            } catch (err) {
+                console.error(err);
+                alert('Fehler beim Löschen: ' + err.message);
+            } finally {
+                setIsSaving(false);
+            }
+        }
+    };
 
 
     // ── Object URL Tracking and Reload Preview Restoration ────────────────
@@ -4016,7 +4102,13 @@ END:VCARD`;
 
     return (
         <>
-            <div className="card" style={{ maxWidth: mode === 'desktop' ? '1920px' : '800px', margin: '0 auto', padding: mode === 'desktop' ? '1.5rem' : '1rem' }}>
+            <div className="card" style={{
+                maxWidth: mode === 'desktop' ? '1920px' : '800px',
+                margin: '0 auto',
+                padding: mode === 'desktop' ? '1.5rem' : '1rem',
+                pointerEvents: readOnly ? 'none' : 'auto',
+                opacity: readOnly ? 0.9 : 1
+            }}>
                 {isSyncPending && (
                     <div style={{
                         padding: '1rem',
@@ -4044,7 +4136,8 @@ END:VCARD`;
                         gap: '1rem',
                         overflowX: 'auto',
                         paddingBottom: '2px',
-                        flexWrap: 'wrap'
+                        flexWrap: 'wrap',
+                        pointerEvents: 'auto'
                     }}>
                         {[
                             { id: 'auftrag', label: 'Auftrag und Schadenort' },
@@ -4355,7 +4448,7 @@ END:VCARD`;
                     />
                 )}
                 {mode !== 'desktop' && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', paddingBottom: '1rem', borderBottom: '1px solid var(--border)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', paddingBottom: '1rem', borderBottom: '1px solid var(--border)', pointerEvents: 'auto' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1 }}>
                             <button
                                 onClick={mode === 'technician' ? () => setTechTab(null) : onCancel}
@@ -10305,7 +10398,8 @@ END:VCARD`;
                     justifyContent: 'space-between',
                     gap: '1rem',
                     zIndex: 100,
-                    boxShadow: mode === 'technician' ? '0 -4px 12px rgba(0,0,0,0.05)' : '0 -4px 12px rgba(0, 0, 0, 0.5)'
+                    boxShadow: mode === 'technician' ? '0 -4px 12px rgba(0,0,0,0.05)' : '0 -4px 12px rgba(0, 0, 0, 0.5)',
+                    pointerEvents: 'auto'
                 }}>
                     {/* Status Indicator */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem', color: isSaving ? '#fbbf24' : '#1E6DB7', transition: 'color 0.3s' }}>
@@ -10320,15 +10414,63 @@ END:VCARD`;
                         )}
                     </div>
 
-                    <button
-                        type="button"
-                        className="btn btn-primary"
-                        onClick={onCancel}
-                        style={{ padding: '0.35rem 1rem', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.4rem', borderRadius: '20px' }}
-                    >
-                        <CheckCircle size={14} />
-                        Fertig
-                    </button>
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                        {formData?.id && (
+                            <>
+                                <button
+                                    type="button"
+                                    onClick={handleArchiveProject}
+                                    disabled={isSaving}
+                                    title="Projekt archivieren"
+                                    style={{
+                                        padding: '0.35rem 0.75rem',
+                                        fontSize: '0.85rem',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '0.4rem',
+                                        borderRadius: '20px',
+                                        backgroundColor: isSaving ? 'rgba(100, 116, 139, 0.1)' : 'rgba(30, 109, 183, 0.1)',
+                                        color: isSaving ? '#64748B' : '#1E6DB7',
+                                        border: `1px solid ${isSaving ? 'rgba(100, 116, 139, 0.3)' : 'rgba(30, 109, 183, 0.3)'}`,
+                                        cursor: isSaving ? 'not-allowed' : 'pointer'
+                                    }}
+                                >
+                                    <Archive size={14} />
+                                    <span className="hide-mobile">Archivieren</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleDeleteProject}
+                                    disabled={isSaving}
+                                    title="Projekt löschen"
+                                    style={{
+                                        padding: '0.35rem 0.75rem',
+                                        fontSize: '0.85rem',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '0.4rem',
+                                        borderRadius: '20px',
+                                        backgroundColor: isSaving ? 'rgba(100, 116, 139, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                                        color: isSaving ? '#64748B' : '#EF4444',
+                                        border: `1px solid ${isSaving ? 'rgba(100, 116, 139, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
+                                        cursor: isSaving ? 'not-allowed' : 'pointer'
+                                    }}
+                                >
+                                    <Trash2 size={14} />
+                                    <span className="hide-mobile">Löschen</span>
+                                </button>
+                            </>
+                        )}
+                        <button
+                            type="button"
+                            className="btn btn-primary"
+                            onClick={onCancel}
+                            style={{ padding: '0.35rem 1rem', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.4rem', borderRadius: '20px' }}
+                        >
+                            <CheckCircle size={14} />
+                            Fertig
+                        </button>
+                    </div>
                 </div>
                 {
                     editingImage && (

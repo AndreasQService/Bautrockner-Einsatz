@@ -3,6 +3,7 @@
    PERMISSION FROM THE USER. THIS APPLIES TO CORE/CRITICAL LOGIC.
    ========================================================================== */
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { useRegisterSW } from 'virtual:pwa-register/react'
 import { useSessionLock } from './hooks/useSessionLock'
 import { Plus, LayoutDashboard, Settings, User, Users, LogOut, Thermometer, Database, RotateCcw, Download, Sun, Moon, Hammer } from 'lucide-react';
 import ProjectSelection from './components/ProjectSelection';
@@ -23,6 +24,10 @@ import { syncPendingToSupabase } from './lib/sync/supabaseSyncWorker.js';
 import { markUploadedPhotosAsVerified } from './services/PhotoStorage';
 import { isVisibleProjectRow } from './utils/projectVisibility.js';
 const IS_TEST_ENV = !!(typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_EXPECTED_SUPABASE_PROJECT_ID === 'aoxduqspiezzyqeqyzzl');
+const PROJECT_ID = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_EXPECTED_SUPABASE_PROJECT_ID) || 'prod';
+const KEY_CURRENT_USER = `qtool_current_user_${PROJECT_ID}`;
+const KEY_REPORTS = `qservice_reports_${PROJECT_ID}`;
+const KEY_SESSION_TOKEN = `qtool_session_token_${PROJECT_ID}`;
 
 let mockDbProjectsRef = null;
 if (typeof window !== 'undefined' && supabase && !supabase._patched) {
@@ -314,7 +319,7 @@ function App() {
   const [selectedReport, setSelectedReport] = useState(() => {
     if (_isNewTab || (typeof navigator !== 'undefined' && navigator.webdriver)) return null; // Neuer Tab/E2E startet ohne offenes Projekt
     const savedId = localStorage.getItem('qservice_selected_report_id');
-    const savedReports = localStorage.getItem('qservice_reports_prod');
+    const savedReports = localStorage.getItem(KEY_REPORTS);
     if (savedId && savedReports) {
       try {
         const reports = JSON.parse(savedReports);
@@ -344,6 +349,33 @@ function App() {
   const [showUserModal, setShowUserModal] = useState(false);
   const [showMeasurementManager, setShowMeasurementManager] = useState(false);
   const [unsavedReports, setUnsavedReports] = useState({});
+
+  const [isOnline, setIsOnline] = useState(() => typeof navigator !== 'undefined' ? navigator.onLine : true);
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  const {
+    needRefresh: [needRefresh, setNeedRefresh],
+    updateServiceWorker,
+  } = useRegisterSW({
+    onRegistered(r) {
+      console.log('[SW] Service Worker registered:', r);
+    },
+    onRegisterError(error) {
+      console.error('[SW] Service Worker registration error:', error);
+    }
+  });
 
   const quarantineLegacyReports = useCallback(() => {
     try {
@@ -827,7 +859,7 @@ function App() {
   }, []);
 
   const [currentUser, setCurrentUser] = useState(() => {
-    const saved = localStorage.getItem('qtool_current_user');
+    const saved = localStorage.getItem(KEY_CURRENT_USER);
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
@@ -859,7 +891,7 @@ function App() {
         const { data: { session } } = await Promise.race([getSessionPromise, timeoutPromise]);
         setSupabaseSession(session);
         if (session && session.user && session.user.email === 'a.strehler@q-service.ch') {
-          const saved = localStorage.getItem('qtool_current_user');
+          const saved = localStorage.getItem(KEY_CURRENT_USER);
           let existingUserObj = null;
           if (saved) {
             try {
@@ -873,22 +905,22 @@ function App() {
           setUserRole('admin');
           setIsTechnicianMode(false);
           setProjectMode('desktop');
-          localStorage.setItem('qtool_current_user', JSON.stringify(existingUserObj));
+          localStorage.setItem(KEY_CURRENT_USER, JSON.stringify(existingUserObj));
         } else {
           // If no session exists, only clear a stale Andreas Strehler state
           setCurrentUser(prev => {
             if (prev && prev.name && prev.name.toLowerCase() === 'andreas strehler') {
-              localStorage.removeItem('qtool_current_user');
+              localStorage.removeItem(KEY_CURRENT_USER);
               return null;
             }
             return prev;
           });
-          const saved = localStorage.getItem('qtool_current_user');
+          const saved = localStorage.getItem(KEY_CURRENT_USER);
           if (saved) {
             try {
               const parsed = JSON.parse(saved);
               if (parsed && parsed.name && parsed.name.toLowerCase() === 'andreas strehler') {
-                localStorage.removeItem('qtool_current_user');
+                localStorage.removeItem(KEY_CURRENT_USER);
               }
             } catch {}
           }
@@ -905,7 +937,7 @@ function App() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setSupabaseSession(session);
       if (session && session.user && session.user.email === 'a.strehler@q-service.ch') {
-        const saved = localStorage.getItem('qtool_current_user');
+        const saved = localStorage.getItem(KEY_CURRENT_USER);
         let existingUserObj = null;
         if (saved) {
           try {
@@ -919,11 +951,11 @@ function App() {
         setUserRole('admin');
         setIsTechnicianMode(false);
         setProjectMode('desktop');
-        localStorage.setItem('qtool_current_user', JSON.stringify(existingUserObj));
+        localStorage.setItem(KEY_CURRENT_USER, JSON.stringify(existingUserObj));
       } else if (event === 'SIGNED_OUT') {
         setCurrentUser(prev => {
           if (prev && prev.name && prev.name.toLowerCase() === 'andreas strehler') {
-            localStorage.removeItem('qtool_current_user');
+            localStorage.removeItem(KEY_CURRENT_USER);
             return null;
           }
           return prev;
@@ -950,10 +982,10 @@ function App() {
   }, [selectedReport]);
 
   const [mySessionToken] = useState(() => {
-    let t = localStorage.getItem('qtool_session_token');
+    let t = localStorage.getItem(KEY_SESSION_TOKEN);
     if (!t) {
       t = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-      localStorage.setItem('qtool_session_token', t);
+      localStorage.setItem(KEY_SESSION_TOKEN, t);
     }
     sessionTokenRef.current = t;
     return t;
@@ -965,7 +997,7 @@ function App() {
 
   // ── State-Deklarationen ───────────────────────────────────────────────────
   const [userRole, setUserRole] = useState(() => {
-    const saved = localStorage.getItem('qtool_current_user');
+    const saved = localStorage.getItem(KEY_CURRENT_USER);
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
@@ -978,7 +1010,7 @@ function App() {
     return 'admin';
   });
   const [isTechnicianMode, setIsTechnicianMode] = useState(() => {
-    const saved = localStorage.getItem('qtool_current_user');
+    const saved = localStorage.getItem(KEY_CURRENT_USER);
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
@@ -1145,6 +1177,7 @@ function App() {
 
   // UI-Sperr-Variablen
   // Im Techniker-Modus ist der Lock komplett deaktiviert — Techniker arbeiten immer im Feld
+  const isActuallyOffline = !isOnline || (supabaseStatus && supabaseStatus.ok === false);
   const isLockedByOtherMode = (projectMode === 'technician' || isTechnicianMode) ? false : !isSessionActive;
   const isReadOnly = isLockedByOtherMode;
   const sessionLockMessage = isLockedByIPad
@@ -1299,7 +1332,7 @@ function App() {
     setUserRole(user.role);
     setIsTechnicianMode(user.role === 'technician');
     setProjectMode(user.role === 'technician' ? 'technician' : 'desktop');
-    localStorage.setItem('qtool_current_user', JSON.stringify(user));
+    localStorage.setItem(KEY_CURRENT_USER, JSON.stringify(user));
     showToast(`Angemeldet als ${user.name}`, 'success');
   };
 
@@ -1317,12 +1350,12 @@ function App() {
     setProjectMode('desktop');
     setView('dashboard');
     setSelectedReport(null);
-    localStorage.removeItem('qtool_current_user');
+    localStorage.removeItem(KEY_CURRENT_USER);
   };
 
   // Initialize reports from LocalStorage
   const [reports, setReports] = useState(() => {
-    const saved = localStorage.getItem('qservice_reports_prod');
+    const saved = localStorage.getItem(KEY_REPORTS);
     if (saved) {
       try {
         return JSON.parse(saved);
@@ -1374,12 +1407,7 @@ function App() {
         authErrorMsg = sessionError.message;
       }
       if (!session && !navigator.userAgent.includes('QToolDeepTest')) {
-        setSupabaseStatus({
-          ok: false,
-          count: 0,
-          error: `Nicht authentifiziert (keine Supabase-Session). Details: ${authErrorMsg || 'Keine Session'}`
-        });
-        return;
+        console.warn(`[Supabase Auth] Nicht authentifiziert (keine Supabase-Session). Details: ${authErrorMsg || 'Keine Session'}`);
       }
     }
 
@@ -1541,7 +1569,7 @@ function App() {
                 preview: (img.preview && (img.preview.startsWith('blob:') || img.preview.startsWith('data:'))) ? null : img.preview
               })) : []
             }));
-            localStorage.setItem('qservice_reports_prod', JSON.stringify(cachedReports));
+            localStorage.setItem(KEY_REPORTS, JSON.stringify(cachedReports));
           } catch (e) {
             console.warn('LocalStorage cache fehlgeschlagen:', e.message);
           }
@@ -1841,10 +1869,10 @@ function App() {
         }));
 
         try {
-          safeSetItem('qservice_reports_prod', JSON.stringify(minimalReports));
+          safeSetItem(KEY_REPORTS, JSON.stringify(minimalReports));
         } catch (innerE) {
           if (innerE.name === 'QuotaExceededError') {
-            safeSetItem('qservice_reports_prod', JSON.stringify(minimalReports.slice(0, 5)));
+            safeSetItem(KEY_REPORTS, JSON.stringify(minimalReports.slice(0, 5)));
           }
         }
       } catch (e) {
@@ -2245,7 +2273,7 @@ function App() {
     setReports(prev => {
       const newReports = prev.filter(r => r.id !== reportId);
       try {
-        localStorage.setItem('qservice_reports_prod', JSON.stringify(newReports));
+        localStorage.setItem(KEY_REPORTS, JSON.stringify(newReports));
       } catch (e) {
         console.error("LocalStorage Update Failed", e);
       }
@@ -2497,7 +2525,7 @@ function App() {
   // --- AUTH INITIALIZATION CHECK ---
   let isAndreasStored = false;
   try {
-    const saved = localStorage.getItem('qtool_current_user');
+    const saved = localStorage.getItem(KEY_CURRENT_USER);
     if (saved) {
       const parsed = JSON.parse(saved);
       isAndreasStored = !!(parsed && parsed.name && parsed.name.toLowerCase() === 'andreas strehler');
@@ -2655,12 +2683,18 @@ function App() {
 
                 {!isTechnicianMode && (
                   <>
-                    <button className="btn btn-primary" onClick={() => { setSelectedReport(null); setProjectMode('desktop'); setView('new-report'); }}>
+                    <button
+                      className="btn btn-primary"
+                      onClick={() => { setSelectedReport(null); setProjectMode('desktop'); setView('new-report'); }}
+                    >
                       <Plus size={18} />
                       {i18n.t('newOrder')}
                     </button>
 
-                    <button className="btn btn-outline" onClick={() => { console.log('Import button clicked! Toggling showEmailImport to true.'); setShowEmailImport(true); }}>
+                    <button
+                      className="btn btn-outline"
+                      onClick={() => { console.log('Import button clicked! Toggling showEmailImport to true.'); setShowEmailImport(true); }}
+                    >
                       <Database size={18} />
                       <span className="hide-mobile">Import</span>
                     </button>
@@ -2719,7 +2753,7 @@ function App() {
                       className="btn btn-ghost"
                       onClick={() => {
                         if (confirm('Lokal gespeicherte Berichte (Cache) löschen? Echte Daten in der Cloud bleiben erhalten.')) {
-                          localStorage.removeItem('qservice_reports_prod');
+                          localStorage.removeItem(KEY_REPORTS);
                           window.location.reload();
                         }
                       }}
@@ -2821,6 +2855,73 @@ function App() {
       </header>
 
       <main className="container" style={{ marginTop: effectiveMode === 'technician' ? '0.5rem' : '1rem', padding: effectiveMode === 'technician' ? '0.5rem' : '1rem 1.25rem', maxWidth: effectiveMode === 'technician' ? undefined : 'none' }}>
+        {needRefresh && (
+          <div style={{
+            backgroundColor: '#3b82f6',
+            color: 'white',
+            padding: '1rem',
+            borderRadius: '8px',
+            marginBottom: '1rem',
+            textAlign: 'center',
+            fontWeight: 'bold',
+            boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '1rem',
+            zIndex: 9999
+          }}>
+            <span>Neue Version verfügbar!</span>
+            <button
+              onClick={() => updateServiceWorker(true)}
+              style={{
+                backgroundColor: 'white',
+                color: '#3b82f6',
+                border: 'none',
+                padding: '0.4rem 1rem',
+                borderRadius: '6px',
+                fontWeight: 'bold',
+                cursor: 'pointer'
+              }}
+            >
+              Aktualisieren
+            </button>
+            <button
+              onClick={() => setNeedRefresh(false)}
+              style={{
+                backgroundColor: 'transparent',
+                color: 'white',
+                border: '1px solid white',
+                padding: '0.4rem 1rem',
+                borderRadius: '6px',
+                fontWeight: 'bold',
+                cursor: 'pointer'
+              }}
+            >
+              Später
+            </button>
+          </div>
+        )}
+
+        {isActuallyOffline && (
+          <div style={{
+            backgroundColor: '#ef4444',
+            color: 'white',
+            padding: '1rem',
+            borderRadius: '8px',
+            marginBottom: '1rem',
+            textAlign: 'center',
+            fontWeight: 'bold',
+            boxShadow: '0 4px 12px rgba(239, 68, 68, 0.3)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '0.5rem',
+            zIndex: 9999
+          }}>
+            <span>📡 Offline – Änderungen werden nur lokal gespeichert (Synchronisation ausstehend)</span>
+          </div>
+        )}
 
 
         {view === 'dashboard' && <Dashboard
@@ -2835,6 +2936,7 @@ function App() {
           users={users}
           lockedProjectIds={lockedProjectIds}
           onLogout={handleLogout}
+          isActuallyOffline={isActuallyOffline}
           onReportsChanged={async (projId, updatedFields = { status: 'Abgeschlossen' }) => {
             if (projId) {
               setReports(prev => prev.map(r => {
@@ -3084,6 +3186,7 @@ function App() {
                     key={selectedReport ? selectedReport.id : 'new'}
                     onCancel={handleCancelEntry}
                     onSave={handleSaveReport}
+                    onDeleteProject={handleDeleteReport}
                     initialData={selectedReport}
                     mode={projectMode}
                     readOnly={isReadOnly}
@@ -3091,6 +3194,8 @@ function App() {
                     isSyncPending={selectedReport && !!unsavedReports[selectedReport.id]}
                     fetchReports={fetchReports}
                     currentUser={currentUser}
+                    isActuallyOffline={isActuallyOffline}
+                    supabase={supabase}
                     onModeChange={(newMode) => {
                       setProjectModeExclusive(newMode);
                     }}

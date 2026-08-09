@@ -2,15 +2,25 @@ import { test, expect } from '@playwright/test';
 
 test.use({ 
     baseURL: 'https://bautrockner-einsatz.vercel.app',
-    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 QToolDeepTest',
-    launchOptions: {
-        args: ['--disable-service-workers']
-    }
+    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 QToolDeepTest'
 });
 
 test.describe('Compulsory Live Test: Archive & Soft-Delete', () => {
 
     test('Archive and Soft-Delete Live Verification', async ({ page, context }) => {
+        // Mock navigator.serviceWorker.register to cleanly disable service workers
+        await page.addInitScript(() => {
+            if (navigator.serviceWorker) {
+                navigator.serviceWorker.register = () => Promise.resolve({
+                    active: null,
+                    installing: null,
+                    waiting: null,
+                    addEventListener: () => {},
+                    removeEventListener: () => {},
+                    dispatchEvent: () => false
+                });
+            }
+        });
 
         page.on('console', msg => console.log('BROWSER LOG:', msg.text()));
         page.on('pageerror', err => console.log('BROWSER ERROR:', err.message));
@@ -94,6 +104,18 @@ test.describe('Compulsory Live Test: Archive & Soft-Delete', () => {
             userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 QToolDeepTest'
         });
         const newPage = await newContext.newPage();
+        await newPage.addInitScript(() => {
+            if (navigator.serviceWorker) {
+                navigator.serviceWorker.register = () => Promise.resolve({
+                    active: null,
+                    installing: null,
+                    waiting: null,
+                    addEventListener: () => {},
+                    removeEventListener: () => {},
+                    dispatchEvent: () => false
+                });
+            }
+        });
 
         // Log in again in the new context
         await newPage.goto('https://bautrockner-einsatz.vercel.app');
@@ -163,6 +185,18 @@ test.describe('Compulsory Live Test: Archive & Soft-Delete', () => {
             userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 QToolDeepTest'
         });
         const secondPage = await secondContext.newPage();
+        await secondPage.addInitScript(() => {
+            if (navigator.serviceWorker) {
+                navigator.serviceWorker.register = () => Promise.resolve({
+                    active: null,
+                    installing: null,
+                    waiting: null,
+                    addEventListener: () => {},
+                    removeEventListener: () => {},
+                    dispatchEvent: () => false
+                });
+            }
+        });
         await secondPage.goto('https://bautrockner-einsatz.vercel.app');
         await secondPage.locator('input[type="text"]').fill('Admin User');
         await secondPage.locator('input[type="password"]').fill('admin');

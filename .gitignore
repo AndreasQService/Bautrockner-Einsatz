@@ -49,6 +49,7 @@ backup_*/
 artifacts/
 brain/
 scratch/
+scratch*
 reports/
 
 # Root Backups (Specific)

@@ -19,6 +19,15 @@ QTool ist eine spezialisierte ERP-Anwendung für die Q-Service AG zur Verwaltung
 *   **dev**: Integrationszweig für getestete Features.
 *   **feature/***: Arbeit an einzelnen Aufgaben (z.B. `feature/sync-fix`).
 
+## Setup & Dokumentation
+
+Für die vollständige Einrichtung der Cloud-Dienste existieren detaillierte Anleitungen:
+*   **Gesamte Cloud-Architektur & Integration**: [CLOUD_INTEGRATION_GUIDE.md](file:///c:/QTool/docs/CLOUD_INTEGRATION_GUIDE.md) – Zusammenspiel der Dienste.
+*   **Supabase**: [SUPABASE_SETUP.md](file:///c:/QTool/SUPABASE_SETUP.md) – Datenbank aufsetzen & anbinden.
+*   **Vercel**: [VERCEL_GUIDE.md](file:///c:/QTool/VERCEL_GUIDE.md) – App live schalten & Deployment-Pipeline einrichten.
+*   **OneDrive**: [ONEDRIVE_SETUP.md](file:///c:/QTool/ONEDRIVE_SETUP.md) – Microsoft Graph API & MSAL-Authentifizierung einrichten.
+
+
 ## Sicherheitsregeln (ULTRA-STRICT)
 *   **Keine .env**: Credentials niemals einchecken!
 *   **Keine Kundendaten**: Testdaten in `tests/` verwenden.
@@ -27,3 +36,4 @@ QTool ist eine spezialisierte ERP-Anwendung für die Q-Service AG zur Verwaltung
 
 ---
 © 2026 Q-Service AG
+

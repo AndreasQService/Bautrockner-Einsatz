@@ -497,7 +497,7 @@ const DeviceInventoryList = ({ reports, onSelectReport }) => {
     );
 };
 
-export default function Dashboard({ reports, onSelectReport, onDeleteReport, mode, supabase, currentUser, users, onReportsChanged, lockedProjectIds, onLogout }) {
+export default function Dashboard({ reports, onSelectReport, onDeleteReport, mode, supabase, currentUser, users, onReportsChanged, lockedProjectIds, onLogout, isActuallyOffline }) {
     const [searchTerm, setSearchTerm] = useState('')
     const [casesSearchTerm, setCasesSearchTerm] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
@@ -946,9 +946,13 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
                                                             <td style={{ padding: '0.5rem 0.4rem', textAlign: 'center', width: '70px', whiteSpace: 'nowrap' }} onClick={e => e.stopPropagation()}>
                                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', justifyContent: 'center' }}>
                                                                     <button
-                                                                        disabled={savingProjectIds.has(report.id)}
+                                                                        disabled={savingProjectIds.has(report.id) || isActuallyOffline}
                                                                         onClick={async (e) => {
                                                                             e.stopPropagation();
+                                                                            if (isActuallyOffline) {
+                                                                                alert('Offline – Änderungen derzeit nicht möglich');
+                                                                                return;
+                                                                            }
                                                                             const streetPart = report.street || (report.address ? report.address.split(',')[0] : 'Keine Strasse');
                                                                             const cityPart = report.city || (() => {
                                                                                 const parts = (report.address || '').split(',');
@@ -1000,118 +1004,120 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
                                                                                 }
                                                                             }
                                                                         }}
-                                                                        title="Projekt archivieren (auf Abgeschlossen setzen)"
+                                                                        title={isActuallyOffline ? "Offline – Änderungen derzeit nicht möglich" : "Projekt archivieren (auf Abgeschlossen setzen)"}
                                                                         style={{
                                                                             background: 'none',
                                                                             border: 'none',
-                                                                            cursor: savingProjectIds.has(report.id) ? 'not-allowed' : 'pointer',
+                                                                            cursor: (savingProjectIds.has(report.id) || isActuallyOffline) ? 'not-allowed' : 'pointer',
                                                                             color: 'var(--text-muted, #64748B)',
                                                                             padding: '0.2rem',
                                                                             borderRadius: '4px',
                                                                             display: 'inline-flex',
                                                                             alignItems: 'center',
-                                                                            opacity: savingProjectIds.has(report.id) ? 0.3 : 0.5,
+                                                                            opacity: (savingProjectIds.has(report.id) || isActuallyOffline) ? 0.3 : 0.5,
                                                                             transition: 'all 0.15s'
                                                                         }}
-                                                                        onMouseEnter={e => { if (!savingProjectIds.has(report.id)) e.currentTarget.style.opacity = 1; }}
-                                                                        onMouseLeave={e => { if (!savingProjectIds.has(report.id)) e.currentTarget.style.opacity = 0.5; }}
+                                                                        onMouseEnter={e => { if (!savingProjectIds.has(report.id) && !isActuallyOffline) e.currentTarget.style.opacity = 1; }}
+                                                                        onMouseLeave={e => { if (!savingProjectIds.has(report.id) && !isActuallyOffline) e.currentTarget.style.opacity = 0.5; }}
                                                                     >
                                                                         <Archive size={14} />
                                                                     </button>
 
-                                                                    {currentUser?.role === 'admin' && (
-                                                                        <button
-                                                                            disabled={savingProjectIds.has(report.id)}
-                                                                            onClick={async (e) => {
-                                                                                e.stopPropagation();
-                                                                                const streetPart = report.street || (report.address ? report.address.split(',')[0] : 'Keine Strasse');
-                                                                                const cityPart = report.city || (() => {
-                                                                                    const parts = (report.address || '').split(',');
-                                                                                    return parts.length > 1 ? parts[1].trim().replace(/^\d+\s*/, '') : '';
-                                                                                })();
-                                                                                const addressStr = cityPart ? `${streetPart}, ${cityPart}` : streetPart;
-                                                                                const projectLabel = [report.projectNumber, addressStr].filter(Boolean).join(' - ') || report.projectTitle || report.id;
+                                                                    <button
+                                                                        disabled={savingProjectIds.has(report.id) || isActuallyOffline}
+                                                                        onClick={async (e) => {
+                                                                            e.stopPropagation();
+                                                                            if (isActuallyOffline) {
+                                                                                alert('Offline – Änderungen derzeit nicht möglich');
+                                                                                return;
+                                                                            }
+                                                                            const streetPart = report.street || (report.address ? report.address.split(',')[0] : 'Keine Strasse');
+                                                                            const cityPart = report.city || (() => {
+                                                                                const parts = (report.address || '').split(',');
+                                                                                return parts.length > 1 ? parts[1].trim().replace(/^\d+\s*/, '') : '';
+                                                                            })();
+                                                                            const addressStr = cityPart ? `${streetPart}, ${cityPart}` : streetPart;
+                                                                            const projectLabel = [report.projectNumber, addressStr].filter(Boolean).join(' - ') || report.projectTitle || report.id;
 
-                                                                                const promptText = `Projekt „${projectLabel}“ wirklich löschen?\n\nDas Projekt wird aus der Projektliste entfernt. Die gespeicherten Daten und Bilder werden nicht physisch gelöscht.\n\nBitte geben Sie zum Bestätigen das Wort LÖSCHEN ein:`;
-                                                                                const confirmVal = window.prompt(promptText);
-                                                                                if (confirmVal === 'LÖSCHEN') {
+                                                                            const promptText = `Projekt „${projectLabel}“ wirklich löschen?\n\nDas Projekt wird aus der Projektliste entfernt. Die gespeicherten Daten und Bilder werden nicht physisch gelöscht.\n\nBitte geben Sie zum Bestätigen das Wort LÖSCHEN ein:`;
+                                                                            const confirmVal = window.prompt(promptText);
+                                                                            if (confirmVal === 'LÖSCHEN') {
+                                                                                setSavingProjectIds(prev => {
+                                                                                    const next = new Set(prev);
+                                                                                    next.add(report.id);
+                                                                                    return next;
+                                                                                });
+                                                                                try {
+                                                                                    let success = false;
+                                                                                    let errMsg = '';
+                                                                                    const now = new Date().toISOString();
+                                                                                    const userEmail = currentUser?.email || currentUser?.name || 'Unbekannt';
+                                                                                    if (supabase) {
+                                                                                        const { data: fullReport, error: fetchError } = await supabase
+                                                                                            .from('damage_reports')
+                                                                                            .select('report_data')
+                                                                                            .eq('id', report.id)
+                                                                                            .single();
+                                                                                        if (!fetchError && fullReport) {
+                                                                                            const updatedReportData = {
+                                                                                                ...(fullReport.report_data || {}),
+                                                                                                deletedAt: now,
+                                                                                                deletedBy: userEmail
+                                                                                            };
+                                                                                            const { error: updateError } = await supabase
+                                                                                                .from('damage_reports')
+                                                                                                .update({
+                                                                                                    report_data: updatedReportData
+                                                                                                })
+                                                                                                .eq('id', report.id);
+                                                                                            if (!updateError) {
+                                                                                                success = true;
+                                                                                            } else {
+                                                                                                errMsg = updateError.message;
+                                                                                            }
+                                                                                        } else {
+                                                                                            errMsg = fetchError?.message || 'Fehler beim Laden des Berichts';
+                                                                                        }
+                                                                                    } else {
+                                                                                        success = true; // Offline / Mock mode
+                                                                                    }
+                                                                                    if (success) {
+                                                                                        if (onReportsChanged) {
+                                                                                            await onReportsChanged(report.id, { deletedAt: now, deletedBy: userEmail });
+                                                                                        }
+                                                                                    } else {
+                                                                                        alert('Fehler beim Löschen: ' + errMsg);
+                                                                                    }
+                                                                                } catch (err) {
+                                                                                    console.error(err);
+                                                                                    alert('Fehler beim Löschen: ' + err.message);
+                                                                                } finally {
                                                                                     setSavingProjectIds(prev => {
                                                                                         const next = new Set(prev);
-                                                                                        next.add(report.id);
+                                                                                        next.delete(report.id);
                                                                                         return next;
                                                                                     });
-                                                                                    try {
-                                                                                        let success = false;
-                                                                                        let errMsg = '';
-                                                                                        const now = new Date().toISOString();
-                                                                                        const userEmail = currentUser?.email || currentUser?.name || 'Unbekannt';
-                                                                                        if (supabase) {
-                                                                                            const { data: fullReport, error: fetchError } = await supabase
-                                                                                                .from('damage_reports')
-                                                                                                .select('report_data')
-                                                                                                .eq('id', report.id)
-                                                                                                .single();
-                                                                                            if (!fetchError && fullReport) {
-                                                                                                const updatedReportData = {
-                                                                                                    ...(fullReport.report_data || {}),
-                                                                                                    deletedAt: now,
-                                                                                                    deletedBy: userEmail
-                                                                                                };
-                                                                                                const { error: updateError } = await supabase
-                                                                                                    .from('damage_reports')
-                                                                                                    .update({
-                                                                                                        report_data: updatedReportData
-                                                                                                    })
-                                                                                                    .eq('id', report.id);
-                                                                                                if (!updateError) {
-                                                                                                    success = true;
-                                                                                                } else {
-                                                                                                    errMsg = updateError.message;
-                                                                                                }
-                                                                                            } else {
-                                                                                                errMsg = fetchError?.message || 'Fehler beim Laden des Berichts';
-                                                                                            }
-                                                                                        } else {
-                                                                                            success = true; // Offline / Mock mode
-                                                                                        }
-                                                                                        if (success) {
-                                                                                            if (onReportsChanged) {
-                                                                                                await onReportsChanged(report.id, { deletedAt: now, deletedBy: userEmail });
-                                                                                            }
-                                                                                        } else {
-                                                                                            alert('Fehler beim Löschen: ' + errMsg);
-                                                                                        }
-                                                                                    } catch (err) {
-                                                                                        console.error(err);
-                                                                                        alert('Fehler beim Löschen: ' + err.message);
-                                                                                    } finally {
-                                                                                        setSavingProjectIds(prev => {
-                                                                                            const next = new Set(prev);
-                                                                                            next.delete(report.id);
-                                                                                            return next;
-                                                                                        });
-                                                                                    }
                                                                                 }
-                                                                            }}
-                                                                            title="Projekt löschen"
-                                                                            style={{
-                                                                                background: 'none',
-                                                                                border: 'none',
-                                                                                cursor: savingProjectIds.has(report.id) ? 'not-allowed' : 'pointer',
-                                                                                color: '#DC2626',
-                                                                                padding: '0.2rem',
-                                                                                borderRadius: '4px',
-                                                                                display: 'inline-flex',
-                                                                                alignItems: 'center',
-                                                                                opacity: savingProjectIds.has(report.id) ? 0.3 : 0.5,
-                                                                                transition: 'all 0.15s'
-                                                                            }}
-                                                                            onMouseEnter={e => { if (!savingProjectIds.has(report.id)) e.currentTarget.style.opacity = 1; }}
-                                                                            onMouseLeave={e => { if (!savingProjectIds.has(report.id)) e.currentTarget.style.opacity = 0.5; }}
-                                                                        >
-                                                                            <Trash2 size={14} />
-                                                                        </button>
-                                                                    )}
+                                                                            }
+                                                                        }}
+                                                                        title={isActuallyOffline ? "Offline – Änderungen derzeit nicht möglich" : "Projekt löschen"}
+                                                                        style={{
+                                                                            background: 'none',
+                                                                            border: 'none',
+                                                                            cursor: (savingProjectIds.has(report.id) || isActuallyOffline) ? 'not-allowed' : 'pointer',
+                                                                            color: '#DC2626',
+                                                                            padding: '0.2rem',
+                                                                            borderRadius: '4px',
+                                                                            display: 'inline-flex',
+                                                                            alignItems: 'center',
+                                                                            opacity: (savingProjectIds.has(report.id) || isActuallyOffline) ? 0.3 : 0.5,
+                                                                            transition: 'all 0.15s'
+                                                                        }}
+                                                                        onMouseEnter={e => { if (!savingProjectIds.has(report.id) && !isActuallyOffline) e.currentTarget.style.opacity = 1; }}
+                                                                        onMouseLeave={e => { if (!savingProjectIds.has(report.id) && !isActuallyOffline) e.currentTarget.style.opacity = 0.5; }}
+                                                                    >
+                                                                        <Trash2 size={14} />
+                                                                    </button>
                                                                 </div>
                                                             </td>
                                                         </tr>
