@@ -85,9 +85,8 @@ const DryingManager = ({
 
     return (
         <>
-            {/* 4. Drying Equipment - Visible in 'Trocknung' status OR when equipment is present */}
-            {(formData.status === 'Trocknung' || (Array.isArray(formData.equipment) && formData.equipment.length > 0)) && (
-                <div style={{ marginBottom: '2rem', borderTop: '1px solid var(--border)', paddingTop: '1.5rem', ...(mode === 'desktop' ? { display: 'flex', flexDirection: 'column' } : {}) }}>
+            {/* 4. Drying Equipment - Always visible unconditionally */}
+            <div style={{ marginBottom: '2rem', borderTop: '1px solid var(--border)', paddingTop: '1.5rem', ...(mode === 'desktop' ? { display: 'flex', flexDirection: 'column' } : {}) }}>
                     <h2 style={{ fontSize: '1.25rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', color: 'var(--primary)' }}>
                         <Settings size={24} />
                         Trocknungsgeräte
@@ -544,7 +543,6 @@ const DryingManager = ({
                         </table>
                     </div>
                 </div>
-            )}
         </>
     );
 };
