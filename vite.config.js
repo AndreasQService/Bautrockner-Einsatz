@@ -29,7 +29,8 @@ export default defineConfig({
         ]
       },
       workbox: {
-        cacheId: 'qtool-ipad-test-v3',
+        cacheId: 'qtool-ipad-test-v5',
+        cleanupOutdatedCaches: true,
         skipWaiting: true,
         clientsClaim: true,
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2,ttf}'],

@@ -1164,7 +1164,7 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
                                     flexDirection: 'column',
                                     gap: '1rem'
                                 }}>
-                                    <CompactDeviceInventoryList reports={filteredReports} onSelectReport={onSelectReport} />
+                                    <CompactDeviceInventoryList reports={reports} onSelectReport={onSelectReport} />
                                 </div>
                             )}
                         </div>
