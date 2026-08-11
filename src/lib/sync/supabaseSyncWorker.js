@@ -191,30 +191,7 @@ async function syncOnePhoto(photo) {
 
         console.log(`[SyncWorker] ✅ Storage upload successful: ${storagePath}`);
 
-        // Construct OneDrive remote path for database journal
-        const subFolder = photo.meta?.subFolder || 'Sonstiges';
-        const odFolder = photo.meta?.odFolder || 'Unbekannt';
-        const remotePath = `QTool/${odFolder}/Fotos/${subFolder.replace(/[^a-zA-Z0-9]/g, '_')}/${photo.name}`;
-        // 4. Update project_image_uploads journal table in database
-        const { error: journalErr } = await supabase
-            .from('project_image_uploads')
-            .upsert({
-                local_image_id: photo.id,
-                project_id: projectId,
-                filename: photo.name,
-                mime_type: photo.compressed?.mimeType || photo.type || 'image/jpeg',
-                size_bytes: photo.compressed?.size || compressedBlob.size || photo.size || 0,
-                sha256: sha256,
-                storage_bucket: 'case-files',
-                storage_path: storagePath,
-                storage_status: 'uploaded_to_backend',
-                remote_path: remotePath,
-                updated_at: new Date().toISOString()
-            }, { onConflict: 'local_image_id' });
-
-        if (journalErr) {
-            console.warn(`[SyncWorker] ⚠️ Journal upsert skipped: ${journalErr.message}`);
-        }
+        // Note: project_image_uploads journal table is managed directly by backend edge functions and triggers.
 
         await updatePhotoSyncStatus(photo.id, {
             syncStatus: 'uploaded_to_backend',
