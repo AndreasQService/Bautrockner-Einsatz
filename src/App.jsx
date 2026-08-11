@@ -1826,10 +1826,65 @@ function App() {
               }
             } catch (e) {}
           } else {
-            console.error("[loadFullReport useEffect] Failed to load full report:", { data, error });
+            console.error("[loadFullReport useEffect] Failed to load full report from network:", { data, error });
+            // Fallback for Offline mode: if network request fails or device is offline, check local cache
+            const cachedUnsaved = localStorage.getItem('qservice_unsaved_reports');
+            const cachedReports = localStorage.getItem(KEY_REPORTS);
+            let cachedData = null;
+            try {
+              if (cachedUnsaved) {
+                const parsedUnsaved = JSON.parse(cachedUnsaved);
+                if (parsedUnsaved[targetProjectId]?.reportData) {
+                  cachedData = parsedUnsaved[targetProjectId].reportData;
+                }
+              }
+              if (!cachedData && cachedReports) {
+                const parsedReports = JSON.parse(cachedReports);
+                const found = parsedReports.find(r => r.id === targetProjectId);
+                if (found && !found.isLightweight) {
+                  cachedData = found;
+                }
+              }
+            } catch (e) {}
+
+            const fallbackReport = {
+              ...selectedReport,
+              ...(cachedData || {}),
+              id: targetProjectId,
+              isLightweight: false,
+              _is_offline_fallback: true
+            };
+            setSelectedReport(prev => prev && prev.id === targetProjectId ? fallbackReport : prev);
           }
         } catch (err) {
           console.error("Background loading of full report failed:", err);
+          const cachedUnsaved = localStorage.getItem('qservice_unsaved_reports');
+          const cachedReports = localStorage.getItem(KEY_REPORTS);
+          let cachedData = null;
+          try {
+            if (cachedUnsaved) {
+              const parsedUnsaved = JSON.parse(cachedUnsaved);
+              if (parsedUnsaved[targetProjectId]?.reportData) {
+                cachedData = parsedUnsaved[targetProjectId].reportData;
+              }
+            }
+            if (!cachedData && cachedReports) {
+              const parsedReports = JSON.parse(cachedReports);
+              const found = parsedReports.find(r => r.id === targetProjectId);
+              if (found && !found.isLightweight) {
+                cachedData = found;
+              }
+            }
+          } catch (e) {}
+
+          const fallbackReport = {
+            ...selectedReport,
+            ...(cachedData || {}),
+            id: targetProjectId,
+            isLightweight: false,
+            _is_offline_fallback: true
+          };
+          setSelectedReport(prev => prev && prev.id === targetProjectId ? fallbackReport : prev);
         }
       };
       loadFullReport();
