@@ -1503,6 +1503,7 @@ function App() {
         }
       } else if (data) {
         const loadedReports = data
+          .filter(row => !row.deleted_at && !row.report_data?.deletedAt)
           // Sortierung auf dem Client um DB Statement Timeouts zu vermeiden
           .sort((a, b) => new Date(b.date || b.updated_at).getTime() - new Date(a.date || a.updated_at).getTime())
           .map(row => {
@@ -2497,10 +2498,7 @@ function App() {
   };
 
   const handleDeleteReport = async (reportId) => {
-    const reportToDelete = reports.find(r => r.id === reportId);
-    if (!reportToDelete) return;
-
-    // ── Soft-Delete: Projekt aus lokalem State entfernen, aber in DB nur markieren ──
+    // 1. Immediately remove from local state
     setReports(prev => {
       const newReports = prev.filter(r => r.id !== reportId);
       try {
@@ -2516,25 +2514,43 @@ function App() {
       setView('dashboard');
     }
 
+    // 2. Clear unsaved draft from local storage
+    try {
+      const cached = localStorage.getItem('qservice_unsaved_reports');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed[reportId]) {
+          delete parsed[reportId];
+          safeSetItem('qservice_unsaved_reports', JSON.stringify(parsed));
+          setUnsavedReports(parsed);
+        }
+      }
+    } catch (e) {}
+
     if (supabase) {
-      // HARD-DELETE: Projekt endgültig aus DB löschen
       try {
-        const query = supabase.from('damage_reports');
-        if (typeof query.delete === 'function') {
-          const { error } = await query
-            .delete()
-            .eq('id', reportId);
-          if (error) {
-            console.error('[Hard-Delete] Fehler:', error);
-            showToast(`Fehler beim Löschen: ${error.message || error.code}`, 'error');
-          } else {
-            showToast('Projekt endgültig gelöscht', 'success');
+        // Clean up child tables first to avoid foreign key constraint errors
+        await supabase.from('project_todos').delete().eq('project_id', reportId).catch(() => {});
+        await supabase.from('project_sessions').delete().eq('open_project_id', reportId).catch(() => {});
+
+        const { error } = await supabase
+          .from('damage_reports')
+          .delete()
+          .eq('id', reportId);
+
+        if (error) {
+          console.warn('[Hard-Delete] Fallback to soft delete due to error:', error);
+          const { data: currentRec } = await supabase.from('damage_reports').select('report_data').eq('id', reportId).single();
+          if (currentRec) {
+            const updatedRd = { ...(currentRec.report_data || {}), deletedAt: new Date().toISOString() };
+            await supabase.from('damage_reports').update({ report_data: updatedRd }).eq('id', reportId);
           }
+          showToast('Projekt erfolgreich gelöscht', 'success');
         } else {
-          showToast('Projekt lokal gelöscht', 'success');
+          showToast('Projekt endgültig gelöscht', 'success');
         }
       } catch (e) {
-        console.warn('[Hard-Delete] Exception:', e.message);
+        console.warn('[Delete] Exception:', e);
         showToast('Projekt lokal gelöscht', 'success');
       }
     } else {
