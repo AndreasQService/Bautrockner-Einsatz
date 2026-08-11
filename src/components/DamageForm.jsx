@@ -9680,98 +9680,7 @@ END:VCARD`;
                                 </div>
                             )}
 
-                            {Object.keys(unsubscribeStates).length > 0 && (() => {
-                                const idxStr = Object.keys(unsubscribeStates)[0];
-                                const idx = parseInt(idxStr, 10);
-                                const draft = unsubscribeStates[idxStr];
-                                const device = formData.equipment[idx];
-                                if (!device) return null;
 
-                                return (
-                                    <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(4px)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-                                        <div style={{ backgroundColor: 'var(--surface)', borderRadius: '16px', width: '100%', maxWidth: '400px', padding: '1.5rem', color: 'var(--text-main)', border: '1px solid var(--border)', boxShadow: '0 10px 25px rgba(0,0,0,0.05)' }}>
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-                                                <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700 }}>Gerät abmelden</h3>
-                                                <button onClick={() => {
-                                                    const newStates = { ...unsubscribeStates };
-                                                    delete newStates[idxStr];
-                                                    setUnsubscribeStates(newStates);
-                                                    setTechFocusDeviceIndex(null);
-                                                }} style={{ background: 'transparent', border: 'none', color: '#94A3B8', cursor: 'pointer' }}><X size={20} /></button>
-                                            </div>
-
-                                            <div style={{ marginBottom: '1.5rem', padding: '1rem', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: '8px' }}>
-                                                <div style={{ fontWeight: 600, fontSize: '1.1rem', color: 'var(--primary)', marginBottom: '0.25rem' }}>#{device.deviceNumber} {device.model || device.type ? `- ${device.model || device.type}` : ''}</div>
-                                                <div style={{ fontSize: '0.9rem', color: '#94A3B8' }}>{device.room} {device.apartment ? `(${device.apartment})` : ''}</div>
-                                                <div style={{ fontSize: '0.85rem', color: '#94A3B8', marginTop: '0.5rem', borderTop: '1px solid var(--border)', boxShadow: '0 -4px 20px rgba(0,0,0,0.04)', paddingTop: '0.5rem' }}>Start: {device.startDate} • Zähler: {device.counterStart} kWh</div>
-                                            </div>
-
-                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                                                    <div>
-                                                        <label style={{ fontSize: '0.8rem', color: '#94A3B8', display: 'block', marginBottom: '0.3rem', fontWeight: 600 }}>Zähler Ende</label>
-                                                        <input
-                                                            type="number"
-                                                            className="form-input"
-                                                            placeholder="Endstand"
-                                                            autoFocus
-                                                            style={{ fontSize: '1.1rem', padding: '0.75rem', width: '100%' }}
-                                                            value={draft.counterEnd || ''}
-                                                            onChange={(e) => setUnsubscribeStates(prev => ({ ...prev, [idx]: { ...prev[idx], counterEnd: e.target.value } }))}
-                                                        />
-                                                    </div>
-                                                    <div>
-                                                        <label style={{ fontSize: '0.8rem', color: '#94A3B8', display: 'block', marginBottom: '0.3rem', fontWeight: 600 }}>Laufzeit/Std.</label>
-                                                        <input
-                                                            type="number"
-                                                            className="form-input"
-                                                            placeholder="Std."
-                                                            style={{ fontSize: '1.1rem', padding: '0.75rem', width: '100%' }}
-                                                            value={draft.hours || ''}
-                                                            onChange={(e) => setUnsubscribeStates(prev => ({ ...prev, [idx]: { ...prev[idx], hours: e.target.value } }))}
-                                                        />
-                                                    </div>
-                                                </div>
-
-                                                <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
-                                                    <button
-                                                        type="button"
-                                                        className="btn btn-ghost"
-                                                        style={{ flex: 1, color: '#94A3B8', border: '1px solid var(--border)', padding: '0.75rem' }}
-                                                        onClick={() => {
-                                                            const newStates = { ...unsubscribeStates };
-                                                            delete newStates[idxStr];
-                                                            setUnsubscribeStates(newStates);
-                                                            setTechFocusDeviceIndex(null);
-                                                        }}
-                                                    >
-                                                        Abbrechen
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        className="btn btn-primary"
-                                                        style={{ flex: 1, padding: '0.75rem', fontWeight: 600 }}
-                                                        onClick={() => {
-                                                            const newEquipment = [...formData.equipment];
-                                                            newEquipment[idx].endDate = draft.endDate || new Date().toISOString().split('T')[0];
-                                                            newEquipment[idx].counterEnd = draft.counterEnd;
-                                                            newEquipment[idx].hours = draft.hours;
-                                                            setFormData(prev => ({ ...prev, equipment: newEquipment }));
-
-                                                            const newStates = { ...unsubscribeStates };
-                                                            delete newStates[idxStr];
-                                                            setUnsubscribeStates(newStates);
-                                                            setTechFocusDeviceIndex(null);
-                                                        }}
-                                                    >
-                                                        Speichern
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                );
-                            })()}
                         </div>
 
 
@@ -10033,6 +9942,114 @@ END:VCARD`;
                 )}
 
                 {/* Fotos Reiter (Desktop Only) */}
+                {Object.keys(unsubscribeStates).length > 0 && createPortal((() => {
+                    const idxStr = Object.keys(unsubscribeStates)[0];
+                    const idx = parseInt(idxStr, 10);
+                    const draft = unsubscribeStates[idxStr];
+                    const device = (formData.equipment || [])[idx];
+                    if (!device) return null;
+
+                    return (
+                        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(4px)', zIndex: 100000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+                            <div style={{ backgroundColor: 'var(--surface)', borderRadius: '16px', width: '100%', maxWidth: '400px', padding: '1.5rem', color: 'var(--text-main)', border: '1px solid var(--border)', boxShadow: '0 10px 25px rgba(0,0,0,0.5)' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                                    <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700 }}>Gerät abmelden</h3>
+                                    <button type="button" onClick={() => {
+                                        const newStates = { ...unsubscribeStates };
+                                        delete newStates[idxStr];
+                                        setUnsubscribeStates(newStates);
+                                        setTechFocusDeviceIndex(null);
+                                    }} style={{ background: 'transparent', border: 'none', color: '#94A3B8', cursor: 'pointer' }}><X size={20} /></button>
+                                </div>
+
+                                <div style={{ marginBottom: '1.5rem', padding: '1rem', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: '8px' }}>
+                                    <div style={{ fontWeight: 600, fontSize: '1.1rem', color: 'var(--primary)', marginBottom: '0.25rem' }}>#{device.deviceNumber} {device.model || device.type ? `- ${device.model || device.type}` : ''}</div>
+                                    <div style={{ fontSize: '0.9rem', color: '#94A3B8' }}>{device.room} {device.apartment ? `(${device.apartment})` : ''}</div>
+                                    <div style={{ fontSize: '0.85rem', color: '#94A3B8', marginTop: '0.5rem', borderTop: '1px solid var(--border)', boxShadow: '0 -4px 20px rgba(0,0,0,0.04)', paddingTop: '0.5rem' }}>Start: {device.startDate} • Zähler: {device.counterStart} kWh</div>
+                                </div>
+
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                                        <div>
+                                            <label style={{ fontSize: '0.8rem', color: '#94A3B8', display: 'block', marginBottom: '0.3rem', fontWeight: 600 }}>Zähler Ende (kWh)</label>
+                                            <input
+                                                type="number"
+                                                className="form-input"
+                                                placeholder="Endstand"
+                                                autoFocus
+                                                style={{ fontSize: '1.1rem', padding: '0.75rem', width: '100%' }}
+                                                value={draft.counterEnd || ''}
+                                                onChange={(e) => setUnsubscribeStates(prev => ({ ...prev, [idx]: { ...prev[idx], counterEnd: e.target.value } }))}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label style={{ fontSize: '0.8rem', color: '#94A3B8', display: 'block', marginBottom: '0.3rem', fontWeight: 600 }}>Enddatum</label>
+                                            <input
+                                                type="date"
+                                                className="form-input"
+                                                style={{ fontSize: '0.9rem', padding: '0.75rem', width: '100%' }}
+                                                value={draft.endDate || new Date().toISOString().split('T')[0]}
+                                                onChange={(e) => setUnsubscribeStates(prev => ({ ...prev, [idx]: { ...prev[idx], endDate: e.target.value } }))}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label style={{ fontSize: '0.8rem', color: '#94A3B8', display: 'block', marginBottom: '0.3rem', fontWeight: 600 }}>Betriebsstunden (Gesamt)</label>
+                                        <input
+                                            type="number"
+                                            className="form-input"
+                                            placeholder="Stunden"
+                                            style={{ fontSize: '1.1rem', padding: '0.75rem', width: '100%' }}
+                                            value={draft.hours || ''}
+                                            onChange={(e) => setUnsubscribeStates(prev => ({ ...prev, [idx]: { ...prev[idx], hours: e.target.value } }))}
+                                        />
+                                    </div>
+
+                                    <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
+                                        <button
+                                            type="button"
+                                            className="btn btn-ghost"
+                                            style={{ flex: 1, color: '#94A3B8', border: '1px solid var(--border)', padding: '0.75rem' }}
+                                            onClick={() => {
+                                                const newStates = { ...unsubscribeStates };
+                                                delete newStates[idxStr];
+                                                setUnsubscribeStates(newStates);
+                                                setTechFocusDeviceIndex(null);
+                                            }}
+                                        >
+                                            Abbrechen
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="btn btn-primary"
+                                            style={{ flex: 1, padding: '0.75rem', fontWeight: 600 }}
+                                            onClick={() => {
+                                                const newEquipment = [...(formData.equipment || [])];
+                                                newEquipment[idx] = {
+                                                    ...newEquipment[idx],
+                                                    endDate: draft.endDate || new Date().toISOString().split('T')[0],
+                                                    counterEnd: draft.counterEnd || '',
+                                                    hours: draft.hours || ''
+                                                };
+                                                const updatedForm = { ...formData, equipment: newEquipment };
+                                                setFormData(updatedForm);
+                                                if (onSave) onSave(updatedForm);
+
+                                                const newStates = { ...unsubscribeStates };
+                                                delete newStates[idxStr];
+                                                setUnsubscribeStates(newStates);
+                                                setTechFocusDeviceIndex(null);
+                                            }}
+                                        >
+                                            Speichern
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    );
+                })(), document.body)}
                 {mode === 'desktop' && desktopTab === 'fotos' && (
                     <div className="card" style={{ padding: '1.5rem', marginBottom: '1.5rem', backgroundColor: 'var(--surface)', border: '1px solid var(--border)' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
