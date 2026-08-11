@@ -631,10 +631,22 @@ export async function deleteTodo(todoId) {
     if (supabase) {
         await ensureAuthenticated().catch(() => {});
         try {
-            await supabase
-                .from('project_todos')
-                .delete()
-                .eq('id', todoId);
+            const isUuidVal = (id) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+            if (isUuidVal(todoId)) {
+                await supabase
+                    .from('project_todos')
+                    .delete()
+                    .eq('id', todoId);
+            } else {
+                const parts = String(todoId).split('_');
+                const projId = parts[0];
+                const taskTitle = parts.slice(1, -1).join('_') || parts[1];
+                if (projId) {
+                    let q = supabase.from('project_todos').delete().eq('project_id', projId);
+                    if (taskTitle) q = q.eq('task', taskTitle);
+                    await q;
+                }
+            }
         } catch (e) {
             console.warn('[TodoService] Supabase delete failed:', e.message);
         }
