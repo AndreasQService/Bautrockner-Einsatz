@@ -1487,7 +1487,7 @@ function App() {
             // Support database columns or nested report_data fallback if present
             const rData = row.report_data || {};
             const rawPNum = String(row.projectNumber || rData.projectNumber || '').trim();
-            const pNum = /^20\d{2}/.test(rawPNum) ? rawPNum : '';
+            const pNum = /^20\d{4,}$/.test(rawPNum) ? rawPNum : '';
             const pTitle = row.project_title || rData.projectTitle || '';
             const pClient = row.client || rData.client || '';
             const pAddress = row.address || rData.address || '';

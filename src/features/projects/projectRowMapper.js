@@ -35,7 +35,7 @@ export const mapProjectToRowViewModel = (project, now = new Date()) => {
 
   return {
     id:                 project.id,
-    projectNumber:      /^20\d{2}/.test(String(project.projectNumber || '').trim()) ? String(project.projectNumber).trim() : '',
+    projectNumber:      /^20\d{4,}$/.test(String(project.projectNumber || '').trim()) ? String(project.projectNumber).trim() : '',
     displayName:        buildDisplayName(project),
     client:             project.client || '—',
     currentStatus:      project.status,
