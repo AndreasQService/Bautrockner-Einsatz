@@ -125,8 +125,14 @@ async function syncOnePhoto(photo) {
     if (!photo.compressed || !photo.compressed.blob) {
         console.log(`[SyncWorker] ⚙️ Compressing photo ${photo.id}...`);
         const targetBlob = photo.blob || photo.original?.blob;
-        if (!targetBlob) {
-            throw new Error(`Photo ${photo.id} has no image data blob in storage.`);
+        if (!targetBlob || (targetBlob instanceof Blob && targetBlob.size === 0)) {
+            console.warn(`[SyncWorker] ⚠️ Bypassing invalid/corrupt photo blob for ${photo.id}`);
+            await updatePhotoSyncStatus(photo.id, { 
+                syncStatus: 'error',
+                errorMessage: 'Invalid or empty photo blob in local storage',
+                retryCount: 99
+            }).catch(() => {});
+            return;
         }
         let fileToCompress = targetBlob;
         if (!(targetBlob instanceof File)) {
