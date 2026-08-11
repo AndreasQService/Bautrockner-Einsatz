@@ -1508,7 +1508,7 @@ function App() {
               deletedAt: row.deleted_at || rData.deletedAt || null,
               rooms: rData.rooms || [],
               images: rData.images || [],
-              equipment: rData.equipment || [],
+              equipment: (Array.isArray(rData.equipment) && rData.equipment.length > 0) ? rData.equipment : (Array.isArray(rData.devices) && rData.devices.length > 0 ? rData.devices : (Array.isArray(rData.dryingData?.equipment) ? rData.dryingData.equipment : (rData.equipment || []))),
               contacts: rData.contacts || [],
               measurementRooms: rData.measurementRooms || [],
               officeTasks: rData.officeTasks || [],

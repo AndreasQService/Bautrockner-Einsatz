@@ -405,7 +405,11 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         findings: initialData.findings || '',
         dryingStarted: initialData.dryingStarted || null,
         dryingEnded: initialData.dryingEnded || null,
-        equipment: Array.isArray(initialData.equipment) ? initialData.equipment : [],
+        equipment: (Array.isArray(initialData?.equipment) && initialData.equipment.length > 0)
+            ? initialData.equipment
+            : ((Array.isArray(initialData?.devices) && initialData.devices.length > 0)
+                ? initialData.devices
+                : (Array.isArray(initialData?.dryingData?.equipment) ? initialData.dryingData.equipment : [])),
         images: Array.isArray(initialData.images)
             ? initialData.images.map(img => typeof img === 'string' ? { preview: img, name: 'Existing Image', date: new Date().toISOString() } : img)
             : [],
