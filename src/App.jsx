@@ -1691,6 +1691,11 @@ function App() {
           const fullReport = {
             ...activeReport,
             ...sanitizeMeasurementStorage(mergedData),
+            equipment: (Array.isArray(mergedData?.equipment) && mergedData.equipment.length > 0)
+              ? mergedData.equipment
+              : ((Array.isArray(mergedData?.devices) && mergedData.devices.length > 0)
+                ? mergedData.devices
+                : (Array.isArray(mergedData?.dryingData?.equipment) ? mergedData.dryingData.equipment : (mergedData?.equipment || []))),
             id: targetProjectId,
             _supabase_updated_at: data.updated_at,
             isLightweight: false
@@ -1769,6 +1774,11 @@ function App() {
             const fullReport = {
               ...selectedReport,
               ...sanitizeMeasurementStorage(mergedData),
+              equipment: (Array.isArray(mergedData?.equipment) && mergedData.equipment.length > 0)
+                ? mergedData.equipment
+                : ((Array.isArray(mergedData?.devices) && mergedData.devices.length > 0)
+                  ? mergedData.devices
+                  : (Array.isArray(mergedData?.dryingData?.equipment) ? mergedData.dryingData.equipment : (mergedData?.equipment || []))),
               id: targetProjectId,
               _supabase_updated_at: data.updated_at,
               isLightweight: false

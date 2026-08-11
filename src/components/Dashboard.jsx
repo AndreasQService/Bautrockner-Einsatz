@@ -90,7 +90,15 @@ const getUrgencyStyle = (days, thresholds = [7, 10]) => {
 const DryingMonitor = ({ reports, onSelectReport, onDeleteReport, workflowStore = {} }) => {
     // Only active dryings with active equipment/devices are relevant
     const dryingReports = reports.filter(r => {
-        const hasActiveDevices = r.equipment && r.equipment.length > 0;
+        const eqList = (Array.isArray(r.equipment) && r.equipment.length > 0)
+            ? r.equipment
+            : ((Array.isArray(r.devices) && r.devices.length > 0)
+                ? r.devices
+                : (Array.isArray(r.report_data?.equipment)
+                    ? r.report_data.equipment
+                    : (Array.isArray(r.dryingData?.equipment) ? r.dryingData.equipment : (r.equipment || []))));
+
+        const hasActiveDevices = eqList.some(item => !item.endDate);
         if (!hasActiveDevices) return false;
 
         // Filter out if the workflow milestone 'trocknung' is set to done or skip
@@ -288,8 +296,16 @@ const CompactDeviceInventoryList = ({ reports, onSelectReport }) => {
     const devicesList = useMemo(() => {
         const list = [];
         reports.forEach(report => {
-            if (report.equipment && Array.isArray(report.equipment)) {
-                report.equipment.forEach(item => {
+            const eqList = (Array.isArray(report.equipment) && report.equipment.length > 0)
+                ? report.equipment
+                : ((Array.isArray(report.devices) && report.devices.length > 0)
+                    ? report.devices
+                    : (Array.isArray(report.report_data?.equipment)
+                        ? report.report_data.equipment
+                        : (Array.isArray(report.dryingData?.equipment) ? report.dryingData.equipment : (report.equipment || []))));
+
+            if (Array.isArray(eqList)) {
+                eqList.forEach(item => {
                     const { isAktiv } = getEquipmentStatus(item);
                     if (isAktiv) {
                         list.push({ report, item });
@@ -375,8 +391,16 @@ const DeviceInventoryList = ({ reports, onSelectReport }) => {
     const devicesList = useMemo(() => {
         const list = [];
         reports.forEach(report => {
-            if (report.equipment && Array.isArray(report.equipment)) {
-                report.equipment.forEach(item => {
+            const eqList = (Array.isArray(report.equipment) && report.equipment.length > 0)
+                ? report.equipment
+                : ((Array.isArray(report.devices) && report.devices.length > 0)
+                    ? report.devices
+                    : (Array.isArray(report.report_data?.equipment)
+                        ? report.report_data.equipment
+                        : (Array.isArray(report.dryingData?.equipment) ? report.dryingData.equipment : (report.equipment || []))));
+
+            if (Array.isArray(eqList)) {
+                eqList.forEach(item => {
                     const { isAktiv } = getEquipmentStatus(item);
                     if (isAktiv) {
                         list.push({ report, item });
