@@ -1480,7 +1480,7 @@ function App() {
 
       const cleanTerm = String(searchTerm || '').trim();
       if (cleanTerm.length >= 2) {
-        query = query.or(`project_title.ilike.%${cleanTerm}%,client.ilike.%${cleanTerm}%,address.ilike.%${cleanTerm}%`);
+        query = query.or(`project_title.ilike.%${cleanTerm}%,client.ilike.%${cleanTerm}%,address.ilike.%${cleanTerm}%,report_data->>projectNumber.ilike.%${cleanTerm}%`);
       }
 
       const fetchPromise = query

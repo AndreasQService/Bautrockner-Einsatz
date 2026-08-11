@@ -627,6 +627,8 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
         const lowerSearch = searchTerm.toLowerCase();
 
         // Basic fields
+        if (r.projectNumber?.toString().toLowerCase().includes(lowerSearch)) return true;
+        if (r.report_data?.projectNumber?.toString().toLowerCase().includes(lowerSearch)) return true;
         if (r.client?.toLowerCase().includes(lowerSearch)) return true;
         if (r.projectTitle?.toLowerCase().includes(lowerSearch)) return true; // Search inside projectTitle
         if (r.id?.toLowerCase().includes(lowerSearch)) return true;
