@@ -433,9 +433,20 @@ export async function fetchAllTodos(reports = [], forceRefresh = false) {
         console.log('[DEBUG FETCH] final combined todos returning from fetchAllTodos:', JSON.stringify(combined.map(t => ({ id: t.id, task: t.task, project_id: t.project_id, status: t.status, category: t.category, assigned_user_id: t.assigned_user_id, assignedUserId: t.assignedUserId }))));
     }
 
-    fetchAllTodosCache = combined;
+    const uniqueCombined = [];
+    const seenOpen = new Set();
+    combined.forEach(t => {
+        if (t.status === 'open') {
+            const key = `${t.project_id}__${t.task}`;
+            if (seenOpen.has(key)) return;
+            seenOpen.add(key);
+        }
+        uniqueCombined.push(t);
+    });
+
+    fetchAllTodosCache = uniqueCombined;
     lastFetchTime = Date.now();
-    return combined;
+    return uniqueCombined;
 }
 
 /**
