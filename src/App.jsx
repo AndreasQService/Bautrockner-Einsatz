@@ -765,7 +765,7 @@ function App() {
           .update(rowData)
           .eq('id', reportId);
         
-        if (!forceOverwrite) {
+        if (!forceOverwrite && !isOwnClientUpdate) {
           query = query.eq('updated_at', offlineEntry.baseUpdatedAt);
         }
         
@@ -773,6 +773,18 @@ function App() {
 
         if (updateError) throw updateError;
         success = updateResult && updateResult.length === 1;
+
+        if (!success && !isLockLost) {
+          // Fallback retry for same client update if baseUpdatedAt was slightly skewed by previous auto-save
+          const { data: retryResult, error: retryError } = await supabase
+            .from('damage_reports')
+            .update(rowData)
+            .eq('id', reportId)
+            .select('id');
+          if (!retryError && retryResult && retryResult.length === 1) {
+            success = true;
+          }
+        }
       } else {
         const { error: insertError } = await supabase
           .from('damage_reports')
