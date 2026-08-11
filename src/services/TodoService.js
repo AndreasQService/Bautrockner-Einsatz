@@ -1389,3 +1389,50 @@ export function syncCompletedAutoTodos(reports, combined) {
         }
     });
 }
+
+export async function createMeasurementAutoTodo(projectId, measurementDateStr) {
+    if (!projectId || !measurementDateStr) return null;
+    try {
+        const baseDate = new Date(measurementDateStr);
+        if (isNaN(baseDate.getTime())) return null;
+
+        const nextDue = new Date(baseDate);
+        nextDue.setDate(nextDue.getDate() + 7);
+        const nextDueStr = nextDue.toISOString().substring(0, 10);
+        const nextDueLabelStr = nextDue.toLocaleDateString('de-CH');
+
+        const autoTodo = {
+            project_id: projectId,
+            task: `Nächste Feuchtekontrolle durchführen (fällig ${nextDueLabelStr})`,
+            due_date: nextDueStr,
+            assigned_user_id: 'technician',
+            assigned_user_name: 'Techniker',
+            status: 'open',
+            created_by: 'system:measurement_followup',
+            updated_by: 'system:measurement_followup'
+        };
+
+        if (supabase) {
+            const { data: existing } = await supabase
+                .from('project_todos')
+                .select('id')
+                .eq('project_id', projectId)
+                .eq('created_by', 'system:measurement_followup')
+                .eq('status', 'open');
+
+            if (!existing || existing.length === 0) {
+                const { data, error } = await supabase
+                    .from('project_todos')
+                    .insert(autoTodo)
+                    .select()
+                    .single();
+
+                invalidateTodoCache();
+                return data;
+            }
+        }
+    } catch (e) {
+        console.warn('[TodoService] createMeasurementAutoTodo failed:', e);
+    }
+    return null;
+}
