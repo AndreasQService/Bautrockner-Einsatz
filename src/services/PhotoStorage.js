@@ -382,7 +382,7 @@ export async function sanitizeCorruptPhotosInDb() {
                 let fixedCount = 0;
                 all.forEach(p => {
                     const targetBlob = p.blob || p.original?.blob;
-                    const isCorrupt = !targetBlob || (targetBlob instanceof Blob && targetBlob.size === 0);
+                    const isCorrupt = !targetBlob || !(targetBlob instanceof Blob) || targetBlob.size === 0;
                     const isInvalidName = !p.name || p.name === 'undefined' || p.name === 'null';
 
                     if (isCorrupt && p.syncStatus !== 'error') {

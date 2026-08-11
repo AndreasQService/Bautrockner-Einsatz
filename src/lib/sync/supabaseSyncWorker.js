@@ -45,22 +45,26 @@ export async function syncPendingToSupabase() {
                 failed++;
                 let errMsg = 'Unknown sync error';
                 if (err instanceof Error) {
-                    errMsg = err.message;
+                    errMsg = err.message || err.name || 'Error without message';
                 } else if (typeof err === 'string') {
                     errMsg = err;
                 } else if (err && typeof err === 'object') {
                     if (err.message) {
                         errMsg = String(err.message);
+                    } else if (err.error_description) {
+                        errMsg = String(err.error_description);
                     } else if (err.type) {
                         errMsg = `DOM Event Error (${err.type})`;
                     } else {
                         try {
-                            errMsg = JSON.stringify(err);
+                            const str = JSON.stringify(err);
+                            errMsg = (str && str !== '{}') ? str : String(err);
                         } catch (e) {
                             errMsg = String(err);
                         }
                     }
                 }
+                if (!errMsg || errMsg === 'undefined') errMsg = 'Unspecified Sync Error';
                 console.error('[SyncWorker] ❌ Failed to sync photo:', photo.id, errMsg);
                 await updatePhotoSyncStatus(photo.id, { 
                     syncStatus: 'error',
@@ -125,7 +129,7 @@ async function syncOnePhoto(photo) {
     if (!photo.compressed || !photo.compressed.blob) {
         console.log(`[SyncWorker] ⚙️ Compressing photo ${photo.id}...`);
         const targetBlob = photo.blob || photo.original?.blob;
-        if (!targetBlob || (targetBlob instanceof Blob && targetBlob.size === 0)) {
+        if (!targetBlob || !(targetBlob instanceof Blob) || targetBlob.size === 0) {
             console.warn(`[SyncWorker] ⚠️ Bypassing invalid/corrupt photo blob for ${photo.id}`);
             await updatePhotoSyncStatus(photo.id, { 
                 syncStatus: 'error',

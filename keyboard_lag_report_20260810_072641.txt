@@ -1,0 +1,186 @@
+﻿
+======================================================
+  Keyboard Lag Diagnose - Letzte 15 Minuten
+======================================================
+
+[1] USB-Fehler im System-EventLog:
+   Keine USB-Fehler gefunden
+
+[2] PnP Geraete-Events (Verbinden/Trennen):
+
+TimeCreated          Id Message                                                                                        
+-----------          -- -------                                                                                        
+10.08.2026 07:19:46 219 Fehler beim Laden des Treibers \Driver\WudfRd.                                                 
+                        Gerät: DISPLAY\LGD07AB\4&f34a428&0&UID8388688                                                  
+                        Status: 0xC0000365                                                                             
+10.08.2026 07:19:45 219 Fehler beim Laden des Treibers \Driver\WudfRd.                                                 
+                        Gerät: HID\Target_SAM&Category_HID\5&116af383&0&0000                                           
+                        Status: 0xC0000365                                                                             
+10.08.2026 07:19:43 219 Fehler beim Laden des Treibers \Driver\WudfRd.                                                 
+                        Gerät: HID\Target_KIP&Category_HID&Col02\4&eec327f&0&0001                                      
+                        Status: 0xC0000365                                                                             
+10.08.2026 07:19:43 219 Fehler beim Laden des Treibers \Driver\WudfRd.                                                 
+                        Gerät:                                                                                         
+                        {46D68EA0-8B35-45CE-8238-B84DBDF4E77A}\SurfaceSystemTelemetryDriver\3&33717f5c&0&SID_DEVICE_01 
+                        Status: 0xC0000365                                                                             
+10.08.2026 07:19:43 219 Fehler beim Laden des Treibers \Driver\WudfRd.                                                 
+                        Gerät: {80D5A276-8285-4696-9FA4-8A6D824F74FF}\SurfaceRadioTelemetryDriver&0001\3&33717f5c&0&SID
+                        _DEVICE_05                                                                                     
+                        Status: 0xC0000365                                                                             
+10.08.2026 07:19:43 219 Fehler beim Laden des Treibers \Driver\WudfRd.                                                 
+                        Gerät: {98DE32A9-5D44-419E-B67D-66072BCEF58B}\SurfaceSarManager\3&33717f5c&0&SID_DEVICE_04     
+                        Status: 0xC0000365                                                                             
+10.08.2026 07:19:41 219 Fehler beim Laden des Treibers \Driver\WudfRd.                                                 
+                        Gerät: HID\VEN_8086&DEV_7E49&SUBSYS_00981414&REV_20&Col06\4&2d47a035&0&0005                    
+                        Status: 0xC0000365                                                                             
+10.08.2026 07:19:33 219 Fehler beim Laden des Treibers \Driver\WudfRd.                                                 
+                        Gerät: ROOT\WINDOWSHELLOFACESOFTWAREDRIVER\0000                                                
+                        Status: 0xC0000365                                                                             
+
+
+
+[3] Installierte HID-Filter-Treiber (potenzielle Stoerer):
+   HID Filter gefunden:
+   - 
+   - 
+
+[4] Keyboard-Filter-Treiber:
+   Keyboard Filter gefunden:
+   - kbdclass
+   - 
+
+[5] Aktuell verbundene USB HID Geraete:
+
+FriendlyName                                      InstanceId                                                           
+------------                                      ----------                                                           
+HID-konformes, vom Hersteller definiertes Gerät   HID\VID_03F0&PID_046B&MI_02&COL01\8&25C3761E&0&0000                  
+Surface HID Consumer Control Device               HID\TARGET_KIP&CATEGORY_HID&COL03\4&1B7A6C65&0&0002                  
+HID-konformes Benutzersteuergerät                 HID\VID_03F0&PID_056B&MI_03&COL01\8&14865D7E&0&0000                  
+USB-Eingabegerät                                  USB\VID_03F0&PID_046B&MI_02\7&2261DCE4&0&0002                        
+Surface Hid Mini Driver                           {2DEDC554-A829-42AB-90E9-E4E4B4772981}\TARGET_KIP&CATEGORY_HID\3&3...
+Surface HID Consumer Control Device               HID\HID_DEVICE_SYSTEM_VHF&COL02\4&2FE1F27&0&0001                     
+Surface HID Keyboard                              HID\HID_DEVICE_SYSTEM_VHF&COL01\4&2FE1F27&0&0000                     
+Surface Touch Communications                      HID\VEN_8086&DEV_7E49&SUBSYS_00981414&REV_20&COL01\4&2D47A035&0&0000 
+Surface HID Keyboard                              HID\CONVERTEDDEVICE&COL01\6&16B2E87E&0&0000                          
+PDC (Portable Device Control)-Gerät               HID\HID_DEVICE_SYSTEM_VHF&COL01\4&15D956B6&0&0000                    
+HID-konformer Systemcontroller                    HID\VID_03F0&PID_046B&MI_02&COL02\8&25C3761E&0&0001                  
+Surface Navigation Accessory                      HID\TARGET_KIP&CATEGORY_HID&COL04\4&1B7A6C65&0&0003                  
+HID-konformes Telefon                             HID\VID_03F0&PID_056B&MI_03&COL02\8&14865D7E&0&0001                  
+Surface Hid Mini Driver                           {2DEDC554-A829-42AB-90E9-E4E4B4772981}\TARGET_KIP&CATEGORY_HID\3&3...
+Surface Hid Mini Driver                           {2DEDC554-A829-42AB-90E9-E4E4B4772981}\TARGET_SAM&CATEGORY_HID\4&1...
+Surface Touch Pen Processor                       HID\VEN_8086&DEV_7E49&SUBSYS_00981414&REV_20&COL02\4&2D47A035&0&0001 
+Surface HID Consumer Control Device               HID\CONVERTEDDEVICE&COL02\6&16B2E87E&0&0001                          
+Surface Touch Pen Device                          HID\VEN_8086&DEV_7E49&SUBSYS_00981414&REV_20&COL07\4&2D47A035&0&0006 
+Surface Pen Utility                               HID\VEN_8086&DEV_7E49&SUBSYS_00981414&REV_20&COL0A\4&2D47A035&0&0009 
+Surface HID USP Encapsulation                     HID\TARGET_KIP&CATEGORY_HID&COL03\4&EEC327F&0&0002                   
+Surface Button Converted Portable Button Device   BUTTONCONVERTER\CONVERTEDDEVICE\5&25D3E157&0&0                       
+Surface HID Consumer Control Device               HID\HID_DEVICE_SYSTEM_VHF&COL02\4&15D956B6&0&0001                    
+HID-konformes, vom Hersteller definiertes Gerät   HID\TARGET_KIP&CATEGORY_HID&COL05\4&1B7A6C65&0&0004                  
+HID-konformes, vom Hersteller definiertes Gerät   HID\VID_03F0&PID_056B&MI_03&COL03\8&14865D7E&0&0002                  
+Surface HID Color                                 HID\TARGET_KIP&CATEGORY_HID&COL01\4&EEC327F&0&0000                   
+Surface Button VHF HID Device                     VHF\HID_DEVICE_SYSTEM_VHF\3&12F55104&0&{B5A92F8D-FC23-590D-A967-03...
+Surface Digitizer Utility                         HID\VEN_8086&DEV_7E49&SUBSYS_00981414&REV_20&COL03\4&2D47A035&0&0002 
+Surface HID System Controller                     HID\CONVERTEDDEVICE&COL03\6&16B2E87E&0&0002                          
+Surface Pen Firmware Update                       HID\VEN_8086&DEV_7E49&SUBSYS_00981414&REV_20&COL08\4&2D47A035&0&0007 
+Surface HID Keyboard                              HID\TARGET_KIP&CATEGORY_HID&COL01\4&3384714D&0&0000                  
+HID-konformes Gerät                               HID\{00001812-0000-1000-8000-00805F9B34FB}_DEV_VID&02045E_PID&0C0F...
+HID-konformes, vom Hersteller definiertes Gerät   HID\{00001812-0000-1000-8000-00805F9B34FB}_DEV_VID&02045E_PID&0C0F...
+USB-Eingabegerät                                  USB\VID_03F0&PID_056B&MI_03\7&1B6C710D&0&0003                        
+Surface Hid Mini Driver                           {2DEDC554-A829-42AB-90E9-E4E4B4772981}\TARGET_SAM&CATEGORY_HID\4&1...
+Surface Pen Generic Device                        HID\{00001812-0000-1000-8000-00805F9B34FB}_DEV_VID&02045E_PID&0C0F...
+Surface HID Keyboard                              HID\{00001812-0000-1000-8000-00805F9B34FB}_DEV_VID&02045E_PID&0C0F...
+Surface HID Keyboard                              HID\TARGET_KIP&CATEGORY_HID&COL01\4&1B7A6C65&0&0000                  
+HID-konformes Gerät                               HID\TARGET_KIP&CATEGORY_HID&COL06\4&1B7A6C65&0&0005                  
+HID-konformes, vom Hersteller definiertes Gerät   HID\VID_03F0&PID_056B&MI_03&COL04\8&14865D7E&0&0003                  
+Surface Hid Mini Driver                           {2DEDC554-A829-42AB-90E9-E4E4B4772981}\TARGET_KIP&CATEGORY_HID\3&3...
+Surface HID USP Encapsulation                     HID\TARGET_KIP&CATEGORY_HID&COL05\4&6471CF3&0&0004                   
+Surface Touch Screen Device                       HID\VEN_8086&DEV_7E49&SUBSYS_00981414&REV_20&COL04\4&2D47A035&0&0003 
+Surface Navigation Accessory                      HID\TARGET_KIP&CATEGORY_HID&COL04\4&6471CF3&0&0003                   
+Surface Digitizer Utility                         HID\VEN_8086&DEV_7E49&SUBSYS_00981414&REV_20&COL09\4&2D47A035&0&0008 
+Intel(R) Quick SPI Host Controller - 7E49         PCI\VEN_8086&DEV_7E49&SUBSYS_00981414&REV_20\3&11583659&0&80         
+Surface HID Pen Bluetooth OOB Coupling            HID\TARGET_KIP&CATEGORY_HID&COL02\4&3384714D&0&0001                  
+Surface Touchpad Configuration                    HID\TARGET_KIP&CATEGORY_HID&COL03\4&6471CF3&0&0002                   
+Surface HID Touchpad                              HID\TARGET_KIP&CATEGORY_HID&COL02\4&6471CF3&0&0001                   
+USB-Eingabegerät                                  USB\VID_046D&PID_C534&MI_01\8&7A49A46&0&0001                         
+USB-Eingabegerät                                  USB\VID_046D&PID_C534&MI_00\8&7A49A46&0&0000                         
+HID-Tastatur                                      HID\VID_046D&PID_C534&MI_00\9&1D97CDC9&0&0000                        
+Energiearmes Bluetooth-GATT-kompatibles HID-Gerät BTHLEDEVICE\{00001812-0000-1000-8000-00805F9B34FB}_DEV_VID&02045E_...
+Surface HID System Controller                     HID\TARGET_KIP&CATEGORY_HID&COL02\4&1B7A6C65&0&0001                  
+GPIO-Laptop/Slate-Indikatortreiber                ACPI\MSHW0005\2&DABA3FF&0                                            
+HID-konformes, vom Hersteller definiertes Gerät   HID\VID_046D&PID_C534&MI_01&COL05\9&A67B18B&0&0004                   
+Surface Button VHF HID Device                     VHF\HID_DEVICE_SYSTEM_VHF\3&12F55104&0&{8B47AF30-B90B-5DFD-BF61-87...
+Surface Pen BLE LC Adaptation Driver              HID\VEN_8086&DEV_7E49&SUBSYS_00981414&REV_20&COL05\4&2D47A035&0&0004 
+HID-konformes, vom Hersteller definiertes Gerät   HID\VID_046D&PID_C534&MI_01&COL04\9&A67B18B&0&0003                   
+Surface Pen BLE LC Adaptation Driver              HID\TARGET_KIP&CATEGORY_HID&COL03\4&3384714D&0&0002                  
+HID-konformer Systemcontroller                    HID\VID_046D&PID_C534&MI_01&COL03\9&A67B18B&0&0002                   
+HID-konformes Benutzersteuergerät                 HID\VID_046D&PID_C534&MI_01&COL02\9&A67B18B&0&0001                   
+Surface Hid Mini Driver                           {2DEDC554-A829-42AB-90E9-E4E4B4772981}\TARGET_KIP&CATEGORY_HID\3&3...
+
+
+
+[6] Surface Energiemodus (Modern Standby):
+   Normaler Standby (S3)
+
+[7] HP Dock / USB-Hub Geraete:
+
+FriendlyName                                          Status  InstanceId                                               
+------------                                          ------  ----------                                               
+Generischer Hochgeschwindigkeits-USB-Hub (SuperSpeed) Unknown USB\VID_03F0&PID_579D\5&2E8DFDCE&0&3                     
+Generischer Hochgeschwindigkeits-USB-Hub (SuperSpeed) Unknown USB\VID_03F0&PID_579D\5&2E8DFDCE&0&4                     
+NPI01B977 (HP Color LaserJet MFP M476dw)              Unknown SWD\DAFWSDPROVIDER\URN:UUID:434E4237-4742-444C-3931-38...
+hp CDDVDW GP70N USB Device                            Unknown USBSTOR\CDROM&VEN_HP&PROD_CDDVDW_GP70N&REV_RR02\K0SZ76...
+Generischer Hochgeschwindigkeits-USB-Hub (SuperSpeed) Unknown USB\VID_03F0&PID_679D\6&173E83AE&0&3                     
+Generischer USB-Hub                                   Unknown USB\VID_03F0&PID_079D\5&2E8856C4&0&1                     
+Generischer USB-Hub                                   Unknown USB\VID_03F0&PID_079D\5&2E8856C4&0&5                     
+Generischer Hochgeschwindigkeits-USB-Hub (SuperSpeed) Unknown USB\VID_05E3&PID_0612\7&3927FC43&0&1                     
+Generischer Hochgeschwindigkeits-USB-Hub (SuperSpeed) Unknown USB\VID_05E3&PID_0612\7&3927FC43&0&3                     
+Generischer USB-Hub                                   Unknown USB\VID_05E3&PID_0610\7&2AA3CDE1&0&1                     
+Generischer USB-Hub                                   Unknown USB\VID_05E3&PID_0610\7&2AA3CDE1&0&3                     
+HP Color LaserJet M476dw                              OK      SWD\PRINTENUM\{FAE95871-52B3-46BA-8DEA-AC541BA3C5A2}     
+Generischer USB-Hub                                   Unknown USB\VID_03F0&PID_036B\5&2E8856C4&0&1                     
+Generischer USB-Hub                                   OK      USB\VID_03F0&PID_036B\5&2E8856C4&0&5                     
+NPI01B977 (HP Color LaserJet MFP M476dw)              Unknown SWD\DAFWSDPROVIDER\URN:UUID:434E4237-4742-444C-3931-38...
+HP USB-C Dock Audio Headset                           Unknown USB\VID_03F0&PID_879D&MI_00\7&11FA2FAF&0&0000            
+HP USB-C Dock G5                                      Unknown USB\VID_03F0&PID_046B&MI_00\7&2B1923B2&0&0000            
+HP Z27 (2- HD Audio Driver for Display Audio)         OK      SWD\MMDEVAPI\{0.0.0.00000000}.{54607484-C3A6-4B8D-AC20...
+Generischer USB-Hub                                   Unknown USB\VID_03F0&PID_086B\6&35D0D3A6&0&3                     
+Generischer USB-Hub                                   Unknown USB\VID_03F0&PID_179D\6&353C7891&0&3                     
+Surface HID Touchpad                                  Unknown HID\TARGET_KIP&CATEGORY_HID&COL02\4&2DA44242&0&0001      
+Headphones (2- HP USB-C Dock Audio Headset)           OK      SWD\MMDEVAPI\{0.0.0.00000000}.{F0A465C3-26C4-4134-8772...
+Generic Monitor (HP Z27)                              Unknown DISPLAY\HPN3536\4&F34A428&0&UID41030                     
+Generischer Hochgeschwindigkeits-USB-Hub (SuperSpeed) Unknown USB\VID_05E3&PID_0612\7&3B36EE5A&0&1                     
+Generischer Hochgeschwindigkeits-USB-Hub (SuperSpeed) Unknown USB\VID_05E3&PID_0612\7&3B36EE5A&0&3                     
+Generic Monitor (HP Z27)                              OK      DISPLAY\HPN3536\4&F34A428&0&UID24647                     
+HP USB-C G5 Essential Dock                            Unknown USB\VID_03F0&PID_279D\6&353C7891&0&5                     
+Surface Touchpad Configuration                        Unknown HID\TARGET_KIP&CATEGORY_HID&COL03\4&2DA44242&0&0002      
+NPI01B977 (HP Color LaserJet MFP M476dw)              Unknown SWD\DAFWSDPROVIDER\URN:UUID:434E4237-4742-444C-3931-38...
+Generischer Hochgeschwindigkeits-USB-Hub (SuperSpeed) Unknown USB\VID_03F0&PID_679D\6&484D309&0&3                      
+Generischer USB-Hub                                   OK      USB\VID_03F0&PID_086B\6&2684DB19&0&3                     
+Headphones (HP USB-C Dock Audio Headset)              Unknown SWD\MMDEVAPI\{0.0.0.00000000}.{412C8B51-89CE-415E-AA15...
+NPI01B977 (HP Color LaserJet MFP M476dw)              Unknown SWD\DAFWSDPROVIDER\URN:UUID:434E4237-4742-444C-3931-38...
+Generischer USB-Hub                                   Unknown USB\VID_03F0&PID_179D\6&25F08004&0&3                     
+HP USB-C Dock G5                                      OK      USB\VID_03F0&PID_046B&MI_00\7&2261DCE4&0&0000            
+NPI01B977 (HP Color LaserJet MFP M476dw)              OK      SWD\PRINTENUM\{2859C4EE-C9C9-4EEB-BFF6-1277A81F6C2C}     
+Surface Touchpad Configuration                        Unknown HID\TARGET_KIP&CATEGORY_HID&COL03\4&D6A24C0&0&0002       
+Surface Touchpad Configuration                        OK      HID\TARGET_KIP&CATEGORY_HID&COL03\4&6471CF3&0&0002       
+Generischer USB-Hub                                   Unknown USB\VID_05E3&PID_0610\7&2CBA08B&0&1                      
+Generischer USB-Hub                                   Unknown USB\VID_05E3&PID_0610\7&2CBA08B&0&3                      
+Surface HID Touchpad                                  Unknown HID\TARGET_KIP&CATEGORY_HID&COL02\4&D6A24C0&0&0001       
+Surface HID Touchpad                                  OK      HID\TARGET_KIP&CATEGORY_HID&COL02\4&6471CF3&0&0001       
+Generischer Hochgeschwindigkeits-USB-Hub (SuperSpeed) OK      USB\VID_03F0&PID_076B\6&2F80BF0E&0&3                     
+HP USB-C G5 Essential Dock                            Unknown USB\VID_03F0&PID_279D\6&25F08004&0&5                     
+HP Z27 (3- HD Audio Driver for Display Audio)         Unknown SWD\MMDEVAPI\{0.0.0.00000000}.{4FC34983-F6BA-46F6-B5C6...
+NPI01B977 (HP Color LaserJet MFP M476dw)              Unknown SWD\DAFWSDPROVIDER\URN:UUID:434E4237-4742-444C-3931-38...
+HP Color LaserJet MFP M476dw (01B977)                 OK      SWD\IPP\434E4237-4742-444C-3931-3863BB01B977             
+Microphone (HP USB-C Dock Audio Headset)              Unknown SWD\MMDEVAPI\{0.0.1.00000000}.{80E4A423-BD84-4075-9967...
+Microphone (2- HP USB-C Dock Audio Headset)           OK      SWD\MMDEVAPI\{0.0.1.00000000}.{1487FAFB-A477-4222-B1B2...
+Generischer Hochgeschwindigkeits-USB-Hub (SuperSpeed) Unknown USB\VID_03F0&PID_076B\6&1CC70E69&0&3                     
+Generischer Hochgeschwindigkeits-USB-Hub (SuperSpeed) Unknown USB\VID_03F0&PID_066B\5&2E8DFDCE&0&3                     
+Generischer Hochgeschwindigkeits-USB-Hub (SuperSpeed) OK      USB\VID_03F0&PID_066B\5&2E8DFDCE&0&4                     
+HP USB-C Dock Audio Headset                           OK      USB\VID_03F0&PID_056B&MI_00\7&1B6C710D&0&0000            
+
+
+
+======================================================
+  Speichere Report nach: C:\QTool\keyboard_lag_report_20260810_072717.txt
+======================================================
