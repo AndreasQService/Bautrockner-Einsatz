@@ -162,11 +162,40 @@ export function useSessionLock(
         console.log('[SessionLock] LOCK_ACQUIRED / DB confirmed lock.', { openProjectId });
       } else {
         // Lock blocked/denied!
-        setIsSessionActive(false);
-        console.log('[SessionLock] LOCK_DENIED / project locked by another session.', result);
+        if (isIPad) {
+          console.log('[SessionLock] iPad priority override – automatically taking over lock for project:', openProjectId);
+          try {
+            await supabase
+              .from('project_sessions')
+              .delete()
+              .eq('open_project_id', openProjectId)
+              .neq('session_token', tokenRef.current);
+
+            const { data: retryData } = await supabase.rpc('acquire_project_lock', {
+              p_project_id:    openProjectId,
+              p_session_token: tokenRef.current,
+              p_user_id:       String(userId),
+              p_user_name:     username,
+              p_device:        deviceValue,
+            });
+            const retryResult = retryData && retryData[0];
+            if (retryResult && retryResult.acquired) {
+              setIsSessionActive(true);
+              console.log('[SessionLock] iPad override succeeded – lock acquired for iPad.');
+            } else {
+              setIsSessionActive(true);
+            }
+          } catch (e) {
+            console.warn('[SessionLock] iPad override exception:', e);
+            setIsSessionActive(true);
+          }
+        } else {
+          setIsSessionActive(false);
+          console.log('[SessionLock] LOCK_DENIED / project locked by another session.', result);
+        }
       }
     }
-  }, [supabase, myDevice, userId, username, userEmail]);
+  }, [supabase, myDevice, userId, username, userEmail, isIPad]);
 
   // ── Session bei Aktivität verlängern ───────────────────────────────────
   const registerProjectActivity = useCallback(() => {
