@@ -65,10 +65,16 @@ export const formatEquipmentLocation = (equipment) => {
     return `${equipment.apartment ? `${equipment.apartment} - ` : ''}${equipment.room}`;
 };
 
-export const formatEquipmentProjectAddress = (report) => ({
-    street: report.street || 'Keine Strasse',
-    details: `${[report.zip, report.city].filter(Boolean).join(' ')} ${report.projectNumber ? `(${report.projectNumber})` : ''}`,
-});
+export const formatEquipmentProjectAddress = (report) => {
+    if (!report) return { street: 'Keine Strasse', details: '' };
+    const street = (typeof report.street === 'string' && report.street.trim())
+        ? report.street
+        : ((typeof report.address === 'string' && report.address.trim())
+            ? report.address
+            : ((typeof report.projectTitle === 'string' && report.projectTitle.trim()) ? report.projectTitle : 'Keine Strasse'));
+    const details = `${[report.zip, report.city].filter(Boolean).join(' ')} ${report.projectNumber ? `(${report.projectNumber})` : ''}`.trim();
+    return { street, details };
+};
 
 export const getEquipmentStatus = (equipment) => {
     const isAktiv = !equipment.endDate;

@@ -347,7 +347,12 @@ const CompactDeviceInventoryList = ({ reports, onSelectReport }) => {
                         ) : (
                             devicesList.map(({ report, item }, idx) => {
                                 const typeModel = formatEquipmentTypeModel(item);
-                                const projectAddress = report.street || formatEquipmentProjectAddress(report);
+                                const addressObj = formatEquipmentProjectAddress(report);
+                                const projectAddressStr = (typeof report.street === 'string' && report.street.trim())
+                                    ? report.street
+                                    : ((typeof report.address === 'string' && report.address.trim())
+                                        ? report.address
+                                        : (addressObj.street || report.projectTitle || 'Keine Adresse'));
                                 const days = item.startDate ? Math.floor((new Date() - new Date(item.startDate)) / (1000 * 60 * 60 * 24)) : 0;
 
                                 return (
@@ -365,7 +370,7 @@ const CompactDeviceInventoryList = ({ reports, onSelectReport }) => {
                                             <div style={{ display: 'flex', flexDirection: 'column' }}>
                                                 <span style={{ fontWeight: 700 }}>{typeModel || 'Unbekannt'}</span>
                                                 <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '200px' }}>
-                                                    {projectAddress}
+                                                    {projectAddressStr}
                                                 </span>
                                             </div>
                                         </td>
