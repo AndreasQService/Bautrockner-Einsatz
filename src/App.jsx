@@ -460,7 +460,10 @@ function App() {
       const baseVal = existingRecord ? (existingRecord.report_data?.[path] || existingRecord[path]) : undefined;
       if (['rooms', 'measurementRooms', 'images', 'contacts', 'equipment', 'history'].includes(path)) {
         const baseEmpty = !baseVal || (Array.isArray(baseVal) && baseVal.length === 0);
-        if (baseEmpty || (existingRecord && existingRecord.isLightweight)) {
+        const newVal = finalReport[path];
+        const newEmpty = !newVal || (Array.isArray(newVal) && newVal.length === 0);
+        // Block diff if base was empty OR if new value is empty while base had items (accidental wipe protection)
+        if (baseEmpty || (existingRecord && existingRecord.isLightweight) || (newEmpty && !baseEmpty)) {
           return false;
         }
       }
@@ -702,12 +705,13 @@ function App() {
             const mergedArr = mergedReportData[key];
             if (Array.isArray(serverArr) && serverArr.length > 0) {
               const hasExplicitDelete = (offlineEntry.operations || []).some(op => 
-                (op.path === key && (op.type === 'deleteField' || op.type === 'set')) ||
-                (op.path === key && op.type === 'array_delete')
+                (op.path === key && op.type === 'deleteField') ||
+                (op.path === key && op.type === 'array_delete') ||
+                (op.path === key && op.type === 'set' && Array.isArray(op.value) && op.value.length === 0 && op.isUserActionDelete === true)
               );
-              if ((!Array.isArray(mergedArr) || mergedArr.length === 0) && !hasExplicitDelete) {
+              if ((!Array.isArray(mergedArr) || mergedArr.length === 0) || !hasExplicitDelete) {
                 mergedReportData[key] = serverArr;
-                console.warn(`[Sync-Schutz] Server-Array '${key}' geschützt!`);
+                console.warn(`[Sync-Schutz] Server-Array '${key}' (${serverArr.length} Elemente) vor Leer-Überschreibung geschützt!`);
               }
             }
           }
