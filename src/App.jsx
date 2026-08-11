@@ -638,8 +638,13 @@ function App() {
 
       let mergedReportData = {};
       let isConflict = false;
+      let isLockLost = false;
+      let isOwnClientUpdate = false;
 
       if (dbRecord) {
+        isOwnClientUpdate = !!offlineEntry.clientId &&
+          dbRecord.report_data?.last_edited_client_id === offlineEntry.clientId;
+
         const dbVersion = dbRecord.report_data?.version || 1;
         const localVersion = offlineEntry.reportData?.version || 1;
 
@@ -656,7 +661,6 @@ function App() {
                        (navigator.userAgent.includes('Macintosh') && 'ontouchend' in document);
         const myDeviceName = isIPad ? 'iPad' : (/iPhone|Android/i.test(navigator.userAgent) ? 'Mobil' : 'Desktop');
 
-        let isLockLost = false;
         if (!sessionErr && sessions && myDeviceName !== 'iPad') {
           const otherSessions = sessions.filter(s => s.session_token !== mySessionToken);
           const otherParsedSessions = otherSessions.map(s => {
@@ -674,8 +678,6 @@ function App() {
         }
 
         // 2. Version conflict check
-        const isOwnClientUpdate = !!offlineEntry.clientId &&
-          dbRecord.report_data?.last_edited_client_id === offlineEntry.clientId;
         if (((dbVersion > localVersion && !isOwnClientUpdate) || isLockLost) && !forceOverwrite) {
           isConflict = true;
         } else {
