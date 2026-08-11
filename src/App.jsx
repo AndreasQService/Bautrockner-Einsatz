@@ -1105,7 +1105,15 @@ function App() {
         const tx  = db.transaction('photos', 'readonly');
         const all = tx.objectStore('photos').getAll();
         all.onsuccess = () => resolve(
-          (all.result || []).filter(p => !p.oneDriveItemId).length
+          (all.result || []).filter(p => 
+            p.syncStatus !== 'error' && 
+            p.syncStatus !== 'remote_verified' && 
+            p.syncStatus !== 'synced' && 
+            p.syncStatus !== 'uploaded_to_backend' && 
+            p.syncStatus !== 'queued_for_remote' && 
+            !p.supabasePath && 
+            !p.oneDriveItemId
+          ).length
         );
         all.onerror = () => resolve(0);
       };
