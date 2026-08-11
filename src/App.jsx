@@ -1917,11 +1917,14 @@ function App() {
     }
     let finalReport = sanitizeMeasurementStorage({ ...updatedReport });
 
-    const incomingExteriorPhoto = finalReport.exteriorPhoto;
-    const deleteRequested = finalReport.exteriorPhotoDeleted === true;
     const existingRecord = (selectedReportRef.current && selectedReportRef.current.id === finalReport.id)
       ? selectedReportRef.current
       : reportsRef.current.find(r => r.id === finalReport.id);
+
+    const isNewProject = !finalReport.id || finalReport.id.startsWith('TMP-') || !existingRecord || view === 'new-report';
+    if (isNewProject) {
+      finalReport.isLightweight = false;
+    }
     // DamageForm intentionally omits technical fields in some save payloads.
     // Never let such a payload downgrade the already loaded server version.
     finalReport.version = Math.max(
@@ -2072,7 +2075,7 @@ function App() {
       const isLightweightInState = cachedRep && cachedRep.isLightweight;
 
       const isTestEnv = window.navigator.webdriver || window.IS_TEST_ENV;
-      if (!isTestEnv && (isCurrentlyLightweight || isLightweightInState || finalReport.isLightweight)) {
+      if (!isTestEnv && !isNewProject && (isCurrentlyLightweight || isLightweightInState || finalReport.isLightweight)) {
         console.error('[Supabase-Guard] SAVE BLOCKED: lightweight report must not be saved to Supabase:', finalReport.id);
         const err = new Error('SAVE BLOCKED: report is not fully loaded from Supabase.');
         err.code = 'SAVE_BLOCKED_NOT_FULLY_LOADED';
