@@ -1025,11 +1025,16 @@ function App() {
         loadedProjectVersionRef.current = selectedVersion;
       }
       console.log('[Version] Loaded project version set to:', loadedProjectVersionRef.current, 'for:', selectedReport.id);
+
+      if (unsavedReports[selectedReport.id] && navigator.onLine) {
+        console.log('[Sync] Auto-triggering sync for pending draft on project open:', selectedReport.id);
+        syncUnsavedReport(selectedReport.id);
+      }
     } else {
       loadedProjectVersionIdRef.current = null;
       loadedProjectVersionRef.current = 1;
     }
-  }, [selectedReport]);
+  }, [selectedReport, unsavedReports]);
 
 
   const [mySessionToken] = useState(() => {
