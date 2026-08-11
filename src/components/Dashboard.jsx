@@ -892,12 +892,12 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
                                     </div>
 
                                     {/* Table Area */}
-                                    <div style={{ overflowX: 'auto', marginTop: '0.5rem' }}>
-                                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem', textAlign: 'left' }}>
+                                    <div style={{ overflowX: 'hidden', marginTop: '0.5rem' }}>
+                                        <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse', fontSize: '0.82rem', textAlign: 'left' }}>
                                             <thead>
                                                 <tr style={{ borderBottom: '1px solid var(--border)', color: 'var(--text-muted)' }}>
-                                                    <th style={{ padding: '0.5rem 0.4rem', fontWeight: 600 }}>Projekt-Nr. / Adresse</th>
-                                                    <th style={{ padding: '0.5rem 0.4rem', width: '70px' }}></th>
+                                                    <th style={{ padding: '0.5rem 0.4rem', fontWeight: 600, width: 'calc(100% - 56px)' }}>Projekt-Nr. / Adresse</th>
+                                                    <th style={{ padding: '0.5rem 0.4rem', width: '56px', textAlign: 'right' }}></th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -916,13 +916,13 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
                                                             className="hover-row"
                                                         >
                                                             {/* Project Number / Adresse */}
-                                                            <td style={{ padding: '0.5rem 0.4rem' }}>
-                                                                <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                                                            <td style={{ padding: '0.5rem 0.4rem', width: 'calc(100% - 56px)', overflow: 'hidden' }}>
+                                                                <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', maxWidth: '100%' }}>
                                                                     <span style={{ fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                                                         {isLocked && <span style={{ marginRight: '0.2rem' }}>🔒</span>}
                                                                         {report.projectNumber || report.projectTitle || report.id}
                                                                     </span>
-                                                                    <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '400px' }} title={(() => {
+                                                                    <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }} title={(() => {
                                                                         const streetPart = report.street || (report.address ? report.address.split(',')[0] : 'Keine Strasse');
                                                                         const cityPart = report.city || (() => {
                                                                             const parts = (report.address || '').split(',');
@@ -943,8 +943,8 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
                                                             </td>
 
                                                             {/* Actions Column */}
-                                                            <td style={{ padding: '0.5rem 0.4rem', textAlign: 'center', width: '70px', whiteSpace: 'nowrap' }} onClick={e => e.stopPropagation()}>
-                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', justifyContent: 'center' }}>
+                                                            <td style={{ padding: '0.5rem 0.2rem', textAlign: 'right', width: '56px', whiteSpace: 'nowrap' }} onClick={e => e.stopPropagation()}>
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', justifyContent: 'flex-end' }}>
                                                                     <button
                                                                         disabled={savingProjectIds.has(report.id) || isActuallyOffline}
                                                                         onClick={async (e) => {
