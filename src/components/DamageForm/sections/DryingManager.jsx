@@ -488,15 +488,14 @@ const DryingManager = ({
                                     </div>
                                 );
                             })}
-                        {formData.equipment.length === 0 && (
+                        {equipmentList.length === 0 && (
                             <div style={{ textAlign: 'center', color: '#9CA3AF', fontSize: '0.9rem' }}>Keine Geräte installiert.</div>
                         )}
                     </div>
                 </div>
-            )}
 
             {/* Zusammenfassung Trocknung */}
-            {(mode === 'desktop' || !['Schadenaufnahme', 'Leckortung'].includes(formData.status)) && formData.equipment?.length > 0 && (
+            {equipmentList.length > 0 && (
                 <div style={{ marginBottom: '1.5rem', backgroundColor: 'var(--surface)', padding: '1.25rem', borderRadius: '12px', border: '1px solid var(--border)', color: 'var(--text-main)', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}>
                     <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.6rem', color: 'var(--primary)' }}>
                         <Database size={18} /> Zusammenfassung Trocknung

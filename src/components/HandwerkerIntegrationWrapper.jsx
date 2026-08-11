@@ -264,15 +264,18 @@ export default function HandwerkerIntegrationWrapper({ reports = [], onBack }) {
                                 <div>
                                     <span style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '0.4rem' }}>Trocknungsgeräte</span>
                                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
-                                        {selectedProject.equipment && selectedProject.equipment.length > 0 ? (
-                                            selectedProject.equipment.map((eq, idx) => (
-                                                <span key={idx} style={{ backgroundColor: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.2)', color: '#10B981', padding: '0.25rem 0.5rem', borderRadius: '4px', fontSize: '0.78rem', fontWeight: 700 }}>
-                                                    ⚙️ {eq.deviceType || eq.name || 'Trockner'} (#{eq.deviceNumber || idx})
-                                                </span>
-                                            ))
-                                        ) : (
-                                            <span style={{ fontStyle: 'italic', fontSize: '0.8rem', color: 'var(--text-muted)' }}>Keine Geräte installiert.</span>
-                                        )}
+                                        {(() => {
+                                             const eqList = (Array.isArray(selectedProject?.equipment) && selectedProject.equipment.length > 0) ? selectedProject.equipment : ((Array.isArray(selectedProject?.devices) && selectedProject.devices.length > 0) ? selectedProject.devices : []);
+                                             return eqList.length > 0 ? (
+                                                 eqList.map((eq, idx) => (
+                                                     <span key={idx} style={{ backgroundColor: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.2)', color: '#10B981', padding: '0.25rem 0.5rem', borderRadius: '4px', fontSize: '0.78rem', fontWeight: 700 }}>
+                                                         ⚙️ {eq.type || eq.deviceType || eq.model || eq.name || 'Trockner'} (#{eq.deviceNumber || idx})
+                                                     </span>
+                                                 ))
+                                             ) : (
+                                                 <span style={{ fontStyle: 'italic', fontSize: '0.8rem', color: 'var(--text-muted)' }}>Keine Geräte installiert.</span>
+                                             );
+                                         })()}
                                     </div>
                                 </div>
                             </div>
