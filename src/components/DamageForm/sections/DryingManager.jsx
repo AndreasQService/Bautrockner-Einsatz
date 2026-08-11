@@ -18,6 +18,12 @@ const DryingManager = ({
     totalDryingHours,
     totalDryingKwh
 }) => {
+    const equipmentList = (Array.isArray(formData?.equipment) && formData.equipment.length > 0)
+        ? formData.equipment
+        : ((Array.isArray(formData?.devices) && formData.devices.length > 0)
+            ? formData.devices
+            : (Array.isArray(formData?.dryingData?.equipment) ? formData.dryingData.equipment : (formData?.equipment || [])));
+
     const [showAddDeviceForm, setShowAddDeviceForm] = useState(false);
     const [selectedDevice, setSelectedDevice] = useState(null);
     const [unsubscribeStates, setUnsubscribeStates] = useState({});
@@ -286,7 +292,7 @@ const DryingManager = ({
                     )}
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', ...(mode === 'desktop' ? { order: 1 } : {}) }}>
-                        {formData.equipment
+                        {equipmentList
                             .map((d, i) => ({ ...d, _originalIndex: i }))
                             .sort((a, b) => {
                                 const aDone = !!a.endDate;
