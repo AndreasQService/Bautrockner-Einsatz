@@ -16,6 +16,16 @@ let compressionQueue = Promise.resolve();
  */
 export function compressSingleImage(blob, maxDimension, quality, format = 'image/jpeg') {
     return new Promise((resolve, reject) => {
+        if (!blob || !(blob instanceof Blob)) {
+            reject(new Error('Invalid image blob provided for compressSingleImage'));
+            return;
+        }
+
+        if (blob.size === 0) {
+            reject(new Error('Image blob is empty (0 bytes)'));
+            return;
+        }
+
         const url = URL.createObjectURL(blob);
         const img = new Image();
 
@@ -23,6 +33,12 @@ export function compressSingleImage(blob, maxDimension, quality, format = 'image
             try {
                 let width = img.naturalWidth || img.width;
                 let height = img.naturalHeight || img.height;
+
+                if (!width || !height) {
+                    URL.revokeObjectURL(url);
+                    reject(new Error('Image has 0 width or height'));
+                    return;
+                }
 
                 // Scale down if exceeding max dimension, keeping aspect ratio
                 if (width > maxDimension || height > maxDimension) {
@@ -62,13 +78,18 @@ export function compressSingleImage(blob, maxDimension, quality, format = 'image
                 }, format, quality);
             } catch (err) {
                 URL.revokeObjectURL(url);
-                reject(err);
+                reject(err instanceof Error ? err : new Error(String(err)));
             }
         };
 
-        img.onerror = (err) => {
+        img.onerror = () => {
+            console.warn('[imageCompressor] ⚠️ Image load into Canvas failed. Details:', {
+                blobSize: blob?.size,
+                blobType: blob?.type,
+                blobUrl: url
+            });
             URL.revokeObjectURL(url);
-            reject(err);
+            reject(new Error(`Failed to load image into Canvas (type: ${blob?.type || 'unknown'}, size: ${blob?.size || 0} bytes)`));
         };
 
         img.src = url;
@@ -102,71 +123,96 @@ export async function calculateSha256(blob) {
  * Prevents multiple large images from occupying memory concurrently.
  */
 export function queueImageCompression(file, isSketch = false) {
+    if (!file || !(file instanceof Blob)) {
+        return Promise.reject(new Error(`[imageCompressor] Invalid file provided: ${file}`));
+    }
+
     // Add to the sequential promise queue
     const task = compressionQueue.then(async () => {
-        console.log(`[imageCompressor] 🔄 Processing image compression for: ${file.name}`);
+        let fileName = file.name;
+        if (!fileName || fileName === 'undefined' || fileName === 'null') {
+            fileName = 'image.jpg';
+        }
+        const fileType = file.type || '';
+        console.log(`[imageCompressor] 🔄 Processing image compression for: ${fileName} (size: ${file.size || 0} bytes, type: ${fileType || 'unknown'})`);
         
-        const isHeic = file.name.toLowerCase().endsWith('.heic') || file.name.toLowerCase().endsWith('.heif') || file.type.includes('heic') || file.type.includes('heif');
-        const lossless = isSketch || isLossless(file.name, file.type);
+        const isHeic = fileName.toLowerCase().endsWith('.heic') || fileName.toLowerCase().endsWith('.heif') || fileType.includes('heic') || fileType.includes('heif');
+        const isPdf = fileType === 'application/pdf' || fileName.toLowerCase().endsWith('.pdf');
+        const isImage = fileType.startsWith('image/') || isHeic || /\.(jpe?g|png|webp|heic|heif|gif|bmp)$/i.test(fileName);
         
         let originalBlob = file;
-        
-        // 1. Calculate original details
         const originalSha = await calculateSha256(originalBlob);
-        
-        // Determine if it is already small and doesn't need re-processing
-        // Small: longest edge <= 2048px and size < 2MB (2097152 bytes) and not HEIC
-        let needsRecompression = true;
-        
-        // Since we can't easily read dimensions without loading, we load it if we need to check.
-        // But for safety, if size is < 2MB, and it is a standard JPEG/PNG, we can read size directly.
-        if (originalBlob.size < 2097152 && !isHeic && !lossless) {
-            // Check dimensions using a quick image load
-            try {
-                const dims = await new Promise((resolve, reject) => {
-                    const u = URL.createObjectURL(originalBlob);
-                    const i = new Image();
-                    i.onload = () => {
-                        resolve({ w: i.width, h: i.height });
-                        URL.revokeObjectURL(u);
-                    };
-                    i.onerror = () => {
-                        reject();
-                        URL.revokeObjectURL(u);
-                    };
-                    i.src = u;
-                });
-                if (dims.w <= 2048 && dims.h <= 2048) {
-                    needsRecompression = false;
-                }
-            } catch (e) {
-                // If dimensions reading fails, recompress to be safe
-                needsRecompression = true;
-            }
+
+        // Non-image files (PDFs, documents) skip canvas image compression
+        if (isPdf || !isImage) {
+            console.log(`[imageCompressor] 📄 Non-image file detected (${fileName}, type: ${fileType}). Skipping canvas compression.`);
+            return {
+                original: { blob: originalBlob, sha256: originalSha, size: originalBlob.size, mimeType: fileType || 'application/octet-stream' },
+                compressed: { blob: originalBlob, sha256: originalSha, size: originalBlob.size, mimeType: fileType || 'application/octet-stream' },
+                pdf: { blob: originalBlob, sha256: originalSha, size: originalBlob.size, mimeType: fileType || 'application/octet-stream' },
+                preview: { blob: originalBlob, size: originalBlob.size, mimeType: fileType || 'application/octet-stream' }
+            };
         }
+
+        const lossless = isSketch || isLossless(fileName, fileType);
         
         let compressedBlob = originalBlob;
         let pdfBlob = originalBlob;
         let previewBlob = originalBlob;
-        
-        if (lossless) {
-            // For sketches/lossless diagrams, compress to WebP or PNG lossless
-            compressedBlob = await compressSingleImage(originalBlob, 2048, 1.0, 'image/png');
-            pdfBlob = await compressSingleImage(originalBlob, 1600, 1.0, 'image/png');
-            previewBlob = await compressSingleImage(originalBlob, 480, 0.8, 'image/png');
-        } else if (needsRecompression || isHeic) {
-            // Compress main photo (JPEG quality 82%)
-            compressedBlob = await compressSingleImage(originalBlob, 2048, 0.82, 'image/jpeg');
-            // PDF version (1600px quality 78%)
-            pdfBlob = await compressSingleImage(originalBlob, 1600, 0.78, 'image/jpeg');
-            // UI preview version (480px quality 70%)
-            previewBlob = await compressSingleImage(originalBlob, 480, 0.70, 'image/jpeg');
-        } else {
-            // Already small, generate only PDF version and preview to be efficient
-            pdfBlob = await compressSingleImage(originalBlob, 1600, 0.78, 'image/jpeg');
-            previewBlob = await compressSingleImage(originalBlob, 480, 0.70, 'image/jpeg');
+
+        try {
+            // Determine if it is already small and doesn't need re-processing
+            // Small: longest edge <= 2048px and size < 2MB (2097152 bytes) and not HEIC
+            let needsRecompression = true;
+            
+            if (originalBlob.size < 2097152 && !isHeic && !lossless) {
+                try {
+                    const dims = await new Promise((resolve, reject) => {
+                        const u = URL.createObjectURL(originalBlob);
+                        const i = new Image();
+                        i.onload = () => {
+                            resolve({ w: i.width, h: i.height });
+                            URL.revokeObjectURL(u);
+                        };
+                        i.onerror = (err) => {
+                            URL.revokeObjectURL(u);
+                            reject(new Error(`Dimension check failed for ${fileName}`));
+                        };
+                        i.src = u;
+                    });
+                    if (dims.w <= 2048 && dims.h <= 2048) {
+                        needsRecompression = false;
+                    }
+                } catch (e) {
+                    needsRecompression = true;
+                }
+            }
+            
+            if (lossless) {
+                // For sketches/lossless diagrams, compress to WebP or PNG lossless
+                compressedBlob = await compressSingleImage(originalBlob, 2048, 1.0, 'image/png');
+                pdfBlob = await compressSingleImage(originalBlob, 1600, 1.0, 'image/png');
+                previewBlob = await compressSingleImage(originalBlob, 480, 0.8, 'image/png');
+            } else if (needsRecompression || isHeic) {
+                // Compress main photo (JPEG quality 82%)
+                compressedBlob = await compressSingleImage(originalBlob, 2048, 0.82, 'image/jpeg');
+                // PDF version (1600px quality 78%)
+                pdfBlob = await compressSingleImage(originalBlob, 1600, 0.78, 'image/jpeg');
+                // UI preview version (480px quality 70%)
+                previewBlob = await compressSingleImage(originalBlob, 480, 0.70, 'image/jpeg');
+            } else {
+                // Already small, generate only PDF version and preview to be efficient
+                pdfBlob = await compressSingleImage(originalBlob, 1600, 0.78, 'image/jpeg');
+                previewBlob = await compressSingleImage(originalBlob, 480, 0.70, 'image/jpeg');
+            }
+        } catch (compressionErr) {
+            const errDetail = compressionErr?.message || (compressionErr?.type ? `DOM Event (${compressionErr.type})` : String(compressionErr));
+            console.warn(`[imageCompressor] ⚠️ Canvas compression failed for ${fileName} (${errDetail}). Falling back to original blob.`);
+            compressedBlob = originalBlob;
+            pdfBlob = originalBlob;
+            previewBlob = originalBlob;
         }
-        
+
         const compressedSha = await calculateSha256(compressedBlob);
         const pdfSha = await calculateSha256(pdfBlob);
         
@@ -199,7 +245,8 @@ export function queueImageCompression(file, isSketch = false) {
     
     // Chain the queue
     compressionQueue = task.then(() => {}, (err) => {
-        console.error('[imageCompressor] ❌ Compression queue error:', err);
+        const errDetail = err?.message || (err?.type ? `DOM Event (${err.type})` : String(err));
+        console.warn('[imageCompressor] ⚠️ Compression queue error handled:', errDetail);
     });
     
     return task;

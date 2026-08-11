@@ -63,13 +63,20 @@ export async function savePhotoLocally(photoId, projectId, file, meta = {}) {
     const testRunId = import.meta.env.VITE_ONEDRIVE_TEST_RUN_ID || 'TESTRUN_DEFAULT';
     const isCloudFirstEnabled = import.meta.env.VITE_CLOUD_FIRST_IMAGES === 'true' || import.meta.env.VITE_CLOUD_FIRST_IMAGES === true;
 
+    const safeName = (file && file.name && file.name !== 'undefined' && file.name !== 'null')
+        ? file.name
+        : (meta.filename || meta.name || `photo_${photoId || Date.now()}.jpg`);
+
+    const safeType = (file && file.type) || 'image/jpeg';
+    const safeSize = (file && file.size) || 0;
+
     const entry = {
         id: photoId,
         projectId,
         blob: file, // Keep root blob for backwards compatibility
-        name: file.name,
-        type: file.type,
-        size: file.size,
+        name: safeName,
+        type: safeType,
+        size: safeSize,
         createdAt: new Date().toISOString(),
         meta,
         supabasePath: null,
@@ -81,8 +88,8 @@ export async function savePhotoLocally(photoId, projectId, file, meta = {}) {
         // Detailed data model for Cloud-First pipeline
         original: {
             blob: file,
-            size: file.size,
-            mimeType: file.type,
+            size: safeSize,
+            mimeType: safeType,
             sha256: null // will be computed and set on compression
         },
         compressed: null,

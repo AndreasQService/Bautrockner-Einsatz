@@ -34,10 +34,29 @@ export async function syncPendingToSupabase() {
                 synced++;
             } catch (err) {
                 failed++;
-                console.error('[SyncWorker] ❌ Failed to sync photo:', photo.id, err.message);
+                let errMsg = 'Unknown sync error';
+                if (err instanceof Error) {
+                    errMsg = err.message;
+                } else if (typeof err === 'string') {
+                    errMsg = err;
+                } else if (err && typeof err === 'object') {
+                    if (err.message) {
+                        errMsg = String(err.message);
+                    } else if (err.type) {
+                        errMsg = `DOM Event Error (${err.type})`;
+                    } else {
+                        try {
+                            errMsg = JSON.stringify(err);
+                        } catch (e) {
+                            errMsg = String(err);
+                        }
+                    }
+                }
+                console.error('[SyncWorker] ❌ Failed to sync photo:', photo.id, errMsg);
                 await updatePhotoSyncStatus(photo.id, { 
-                    syncStatus: 'remote_verified',
-                    errorMessage: err.message 
+                    syncStatus: 'error',
+                    errorMessage: errMsg,
+                    retryCount: (photo.retryCount || 0) + 1
                 }).catch(() => {});
             }
         }
@@ -62,14 +81,15 @@ async function getPendingPhotosFromDb() {
         const req = tx.objectStore('photos').getAll();
         req.onsuccess = () => {
             const all = req.result || [];
-            // Get everything not fully uploaded/remote_verified
+            // Get everything not fully uploaded/remote_verified, and not failed 3+ times (avoids blocking queue/CPU lock)
             resolve(all.filter(p => 
                 p.syncStatus !== 'remote_verified' && 
                 p.syncStatus !== 'synced' && 
                 p.syncStatus !== 'uploaded_to_backend' && 
                 p.syncStatus !== 'queued_for_remote' && 
                 !p.supabasePath && 
-                !p.oneDriveItemId
+                !p.oneDriveItemId &&
+                (p.retryCount || 0) < 3
             ));
         };
         req.onerror = () => reject(req.error);
@@ -84,13 +104,35 @@ async function syncOnePhoto(photo) {
     
     const projectId = photo.projectId || 'TEST__ISOLATION_001';
     const testRunId = photo.testRunId || import.meta.env.VITE_ONEDRIVE_TEST_RUN_ID || 'TESTRUN_DEFAULT';
-    const ext = photo.name?.split('.').pop().toLowerCase() || 'jpg';
+    
+    let safeName = photo.name;
+    if (!safeName || safeName === 'undefined' || safeName === 'null') {
+        safeName = `photo_${photo.id || Date.now()}.jpg`;
+    }
+    const ext = safeName.split('.').pop().toLowerCase() || 'jpg';
     const storagePath = `${testRunId}/${projectId}/Fotos/TEST__${photo.id}.${ext}`;
     
     // 1. Compression Phase
     if (!photo.compressed || !photo.compressed.blob) {
         console.log(`[SyncWorker] ⚙️ Compressing photo ${photo.id}...`);
-        const result = await queueImageCompression(photo.blob || photo.original?.blob, photo.meta?.isSketch);
+        const targetBlob = photo.blob || photo.original?.blob;
+        if (!targetBlob) {
+            throw new Error(`Photo ${photo.id} has no image data blob in storage.`);
+        }
+        let fileToCompress = targetBlob;
+        if (!(targetBlob instanceof File)) {
+            try {
+                fileToCompress = new File([targetBlob], safeName, { type: targetBlob.type || 'image/jpeg' });
+            } catch (e) {
+                fileToCompress = targetBlob;
+                try {
+                    if (!fileToCompress.name || fileToCompress.name === 'undefined') {
+                        Object.defineProperty(fileToCompress, 'name', { value: safeName, writable: true, configurable: true });
+                    }
+                } catch (e2) {}
+            }
+        }
+        const result = await queueImageCompression(fileToCompress, photo.meta?.isSketch);
         
         photo.compressed = result.compressed;
         photo.pdf = result.pdf;
