@@ -1454,7 +1454,7 @@ function App() {
 
       let query = supabase
         .from('damage_reports')
-        .select('id, updated_at, created_at, project_title, client, address, status, assigned_to, date, drying_started, projectNumber:report_data->>projectNumber');
+        .select('id, updated_at, created_at, project_title, client, address, status, assigned_to, date, drying_started, projectNumber:report_data->>projectNumber, equipment:report_data->equipment, devices:report_data->devices, dryingEquipment:report_data->dryingData->equipment');
 
       const cleanTerm = String(searchTerm || '').trim();
       if (cleanTerm.length >= 2) {
@@ -1512,7 +1512,13 @@ function App() {
               deletedAt: row.deleted_at || rData.deletedAt || null,
               rooms: rData.rooms || [],
               images: rData.images || [],
-              equipment: (Array.isArray(rData.equipment) && rData.equipment.length > 0) ? rData.equipment : (Array.isArray(rData.devices) && rData.devices.length > 0 ? rData.devices : (Array.isArray(rData.dryingData?.equipment) ? rData.dryingData.equipment : (rData.equipment || []))),
+              equipment: (Array.isArray(row.equipment) && row.equipment.length > 0)
+                ? row.equipment
+                : ((Array.isArray(row.devices) && row.devices.length > 0)
+                  ? row.devices
+                  : ((Array.isArray(row.dryingEquipment) && row.dryingEquipment.length > 0)
+                    ? row.dryingEquipment
+                    : ((Array.isArray(rData.equipment) && rData.equipment.length > 0) ? rData.equipment : (Array.isArray(rData.devices) && rData.devices.length > 0 ? rData.devices : (Array.isArray(rData.dryingData?.equipment) ? rData.dryingData.equipment : (rData.equipment || [])))))),
               contacts: rData.contacts || [],
               measurementRooms: rData.measurementRooms || [],
               officeTasks: rData.officeTasks || [],
