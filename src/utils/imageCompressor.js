@@ -82,14 +82,15 @@ export function compressSingleImage(blob, maxDimension, quality, format = 'image
             }
         };
 
-        img.onerror = () => {
+        img.onerror = (evt) => {
             console.warn('[imageCompressor] ⚠️ Image load into Canvas failed. Details:', {
                 blobSize: blob?.size,
                 blobType: blob?.type,
                 blobUrl: url
             });
             URL.revokeObjectURL(url);
-            reject(new Error(`Failed to load image into Canvas (type: ${blob?.type || 'unknown'}, size: ${blob?.size || 0} bytes)`));
+            const detail = evt?.type ? `DOM Event (${evt.type})` : 'Image load error';
+            reject(new Error(`Failed to load image into Canvas (${detail}, type: ${blob?.type || 'unknown'}, size: ${blob?.size || 0} bytes)`));
         };
 
         img.src = url;

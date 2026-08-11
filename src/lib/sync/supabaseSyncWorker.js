@@ -64,12 +64,18 @@ export async function syncPendingToSupabase() {
                         }
                     }
                 }
-                if (!errMsg || errMsg === 'undefined') errMsg = 'Unspecified Sync Error';
-                console.error('[SyncWorker] ❌ Failed to sync photo:', photo.id, errMsg);
+                if (!errMsg || errMsg === 'undefined' || errMsg === '[object Object]') {
+                    errMsg = 'Corrupt or un-decodable photo data in local storage';
+                }
+
+                const isCorruptOrInvalid = errMsg.includes('Canvas') || errMsg.includes('Invalid') || errMsg.includes('corrupt') || errMsg.includes('DOM Event');
+                const finalRetryCount = isCorruptOrInvalid ? 99 : (photo.retryCount || 0) + 1;
+
+                console.warn('[SyncWorker] ⚠️ Bypassing photo sync issue:', photo.id, errMsg);
                 await updatePhotoSyncStatus(photo.id, { 
                     syncStatus: 'error',
                     errorMessage: errMsg,
-                    retryCount: (photo.retryCount || 0) + 1
+                    retryCount: finalRetryCount
                 }).catch(() => {});
             }
         }
