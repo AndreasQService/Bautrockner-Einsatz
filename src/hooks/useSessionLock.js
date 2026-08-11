@@ -329,19 +329,7 @@ export function useSessionLock(
       supabase,
       upsertSession,
       pollSessions,
-      deleteSession: () => {
-        try {
-          const unsaved = JSON.parse(localStorage.getItem('qservice_unsaved_reports') || '{}');
-          const hasUnsaved = reportIdRef.current && !!unsaved[reportIdRef.current];
-          if (!hasUnsaved) {
-            deleteSession();
-          } else {
-            console.log('[SessionLock] Preserving lock session because of pending offline sync:', reportIdRef.current);
-          }
-        } catch (e) {
-          deleteSession();
-        }
-      },
+      deleteSession,
     });
   }, [enabled, supabase, upsertSession, pollSessions, deleteSession, myDevice]);
 
