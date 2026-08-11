@@ -1445,7 +1445,7 @@ function App() {
     setSupabaseStatus({ ok: null, count: null, error: null }); // Laden...
     try {
       const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Timeout nach 12 Sekunden')), 12000)
+        setTimeout(() => reject(new Error('Timeout nach 30 Sekunden')), 30000)
       );
 
       let query = supabase
