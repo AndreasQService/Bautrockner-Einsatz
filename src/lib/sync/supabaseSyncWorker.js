@@ -14,6 +14,15 @@ let isSyncRunning = false;
  */
 export async function syncPendingToSupabase() {
     if (isSyncRunning) return { synced: 0, failed: 0 };
+    if (!supabase) return { synced: 0, failed: 0 };
+
+    // Check if user is authenticated with Supabase before attempting Cloud Sync
+    const { data: { session } } = await supabase.auth.getSession().catch(() => ({ data: {} }));
+    if (!session) {
+        // Unauthenticated: Keep data safely in local IndexedDB without spamming HTTP 401
+        return { synced: 0, failed: 0 };
+    }
+
     isSyncRunning = true;
 
     let synced = 0;
