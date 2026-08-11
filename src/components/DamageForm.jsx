@@ -914,7 +914,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                         preview: previewUrl,
                         includeInReport: localPhoto.meta?.includeInReport !== undefined ? localPhoto.meta.includeInReport : true,
                         assignedTo: localPhoto.meta?.assignedTo || 'Sonstiges',
-                        uploading: localPhoto.syncStatus !== 'remote_verified' && localPhoto.syncStatus !== 'synced',
+                        uploading: !localPhoto.oneDriveItemId,
                         error: localPhoto.syncStatus === 'error',
                         type: ['pdf', 'msg', 'txt'].includes(ext) ? 'document' : 'image',
                         fileType: ext,
@@ -930,7 +930,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
 
                     if (localPhoto.syncStatus && img.syncStatus !== localPhoto.syncStatus) {
                         img.syncStatus = localPhoto.syncStatus;
-                        img.uploading = localPhoto.syncStatus !== 'remote_verified' && localPhoto.syncStatus !== 'synced';
+                        img.uploading = !localPhoto.oneDriveItemId;
                         img.error = localPhoto.syncStatus === 'error';
                         imgChanged = true;
                     }
@@ -1014,24 +1014,24 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                 const { syncPendingToSupabase } = await import('../lib/sync/supabaseSyncWorker');
                 const { synced, failed } = await syncPendingToSupabase();
                 console.log(`[Sync] Cloud-first sync done. Synced: ${synced}, Failed: ${failed}`);
-                if (synced > 0) {
-                    try {
-                        const updatedLocal = await getProjectPhotos(formData.id || 'temp');
-                        setFormData(prev => ({
-                            ...prev,
-                            images: (prev.images || []).map(img => {
-                                const lp = updatedLocal.find(p => p.id === img.id);
-                                return lp && lp.syncStatus ? {
-                                    ...img,
-                                    syncStatus: lp.syncStatus,
-                                    supabasePath: lp.supabasePath || img.supabasePath,
-                                    oneDriveItemId: lp.oneDriveItemId || img.oneDriveItemId,
-                                    uploading: lp.syncStatus !== 'remote_verified' && lp.syncStatus !== 'synced'
-                                } : img;
-                            })
-                        }));
-                    } catch (e) {}
-                }
+                try {
+                    const updatedLocal = await getProjectPhotos(formData.id || 'temp');
+                    setFormData(prev => ({
+                        ...prev,
+                        images: (prev.images || []).map(img => {
+                            const lp = updatedLocal.find(p => p.id === img.id);
+                            return lp && lp.syncStatus ? {
+                                ...img,
+                                syncStatus: lp.syncStatus,
+                                supabasePath: lp.supabasePath || img.supabasePath,
+                                oneDriveItemId: lp.oneDriveItemId || img.oneDriveItemId,
+                                error: lp.syncStatus === 'error',
+                                errorMessage: lp.errorMessage || null,
+                                uploading: !lp.oneDriveItemId && lp.syncStatus !== 'error'
+                            } : img;
+                        })
+                    }));
+                } catch (e) {}
             } else {
                 // Legacy sync loop
                 const { getPendingPhotos } = await import('../services/PhotoStorage');
@@ -2340,9 +2340,8 @@ END:VCARD`;
 
                     // 3. Immediately trigger background sync worker without blocking UI
                     import('../lib/sync/supabaseSyncWorker.js').then(({ syncPendingToSupabase }) => {
-                        syncPendingToSupabase().then(({ synced }) => {
-                            if (synced > 0) {
-                                getProjectPhotos(formData.id || 'temp').then(localPhotos => {
+                        syncPendingToSupabase().then(() => {
+                            getProjectPhotos(formData.id || 'temp').then(localPhotos => {
                                     setFormData(prev => ({
                                         ...prev,
                                         images: (prev.images || []).map(img => {
@@ -2352,13 +2351,14 @@ END:VCARD`;
                                                 syncStatus: lp.syncStatus,
                                                 supabasePath: lp.supabasePath || img.supabasePath,
                                                 oneDriveItemId: lp.oneDriveItemId || img.oneDriveItemId,
-                                                uploading: lp.syncStatus !== 'remote_verified' && lp.syncStatus !== 'synced'
+                                                error: lp.syncStatus === 'error',
+                                                errorMessage: lp.errorMessage || null,
+                                                uploading: !lp.oneDriveItemId && lp.syncStatus !== 'error'
                                             } : img;
                                         })
                                     }));
-                                }).catch(() => {});
-                                if (fetchReports) fetchReports().catch(() => {});
-                            }
+                            }).catch(() => {});
+                            if (fetchReports) fetchReports().catch(() => {});
                         }).catch(err => {
                             console.warn('[handleImageUpload] Background sync failed:', err.message);
                         });
@@ -2409,9 +2409,8 @@ END:VCARD`;
 
                 // 3. Immediately trigger background sync worker without blocking UI
                 import('../lib/sync/supabaseSyncWorker.js').then(({ syncPendingToSupabase }) => {
-                    syncPendingToSupabase().then(({ synced }) => {
-                        if (synced > 0) {
-                            getProjectPhotos(formData.id || 'temp').then(localPhotos => {
+                    syncPendingToSupabase().then(() => {
+                        getProjectPhotos(formData.id || 'temp').then(localPhotos => {
                                 setFormData(prev => ({
                                     ...prev,
                                     images: (prev.images || []).map(img => {
@@ -2421,13 +2420,14 @@ END:VCARD`;
                                             syncStatus: lp.syncStatus,
                                             supabasePath: lp.supabasePath || img.supabasePath,
                                             oneDriveItemId: lp.oneDriveItemId || img.oneDriveItemId,
-                                            uploading: lp.syncStatus !== 'remote_verified' && lp.syncStatus !== 'synced'
+                                            error: lp.syncStatus === 'error',
+                                            errorMessage: lp.errorMessage || null,
+                                            uploading: !lp.oneDriveItemId && lp.syncStatus !== 'error'
                                         } : img;
                                     })
                                 }));
-                            }).catch(() => {});
-                            if (fetchReports) fetchReports().catch(() => {});
-                        }
+                        }).catch(() => {});
+                        if (fetchReports) fetchReports().catch(() => {});
                     }).catch(err => {
                         console.warn('[handleImageUpload] Background sync failed:', err.message);
                     });
@@ -5413,14 +5413,14 @@ END:VCARD`;
                                                     fontWeight: 600,
                                                     padding: '2px 6px',
                                                     borderRadius: '4px',
-                                                    backgroundColor: (img.syncStatus === 'remote_verified' || img.syncStatus === 'synced' || img.oneDriveItemId) ? 'rgba(5,150,105,0.15)' :
+                                                    backgroundColor: img.oneDriveItemId ? 'rgba(5,150,105,0.15)' :
                                                                      (img.syncStatus === 'uploaded_to_backend' || img.storagePath || img.supabasePath || img.supabaseBackedUpAt) ? 'rgba(16,185,129,0.15)' :
                                                                      img.syncStatus === 'error' ? 'rgba(239,68,68,0.15)' : 'rgba(59,130,246,0.15)',
-                                                    color: (img.syncStatus === 'remote_verified' || img.syncStatus === 'synced' || img.oneDriveItemId) ? '#059669' :
+                                                    color: img.oneDriveItemId ? '#059669' :
                                                            (img.syncStatus === 'uploaded_to_backend' || img.storagePath || img.supabasePath || img.supabaseBackedUpAt) ? '#10B981' :
                                                            img.syncStatus === 'error' ? '#EF4444' : '#3B82F6'
                                                 }}>
-                                                    {(img.syncStatus === 'remote_verified' || img.syncStatus === 'synced' || img.oneDriveItemId) ? '✅ Vollständig verifiziert' :
+                                                    {img.oneDriveItemId ? '✅ Vollständig verifiziert' :
                                                      (img.syncStatus === 'uploaded_to_backend' || img.storagePath || img.supabasePath || img.supabaseBackedUpAt) ? '✅ In Supabase gespeichert' :
                                                      img.syncStatus === 'error' ? '❌ Fehler – erneut versuchen' : '💾 Lokal gesichert'}
                                                 </span>
@@ -6826,14 +6826,14 @@ END:VCARD`;
                                                                                 fontWeight: 600,
                                                                                 padding: '2px 6px',
                                                                                 borderRadius: '4px',
-                                                                                backgroundColor: (img.syncStatus === 'remote_verified' || img.syncStatus === 'synced' || img.oneDriveItemId) ? 'rgba(5,150,105,0.15)' :
+                                                                                backgroundColor: img.oneDriveItemId ? 'rgba(5,150,105,0.15)' :
                                                                                                  (img.syncStatus === 'uploaded_to_backend' || img.storagePath || img.supabasePath || img.supabaseBackedUpAt) ? 'rgba(16,185,129,0.15)' :
                                                                                                  img.syncStatus === 'error' ? 'rgba(239,68,68,0.15)' : 'rgba(59,130,246,0.15)',
-                                                                                color: (img.syncStatus === 'remote_verified' || img.syncStatus === 'synced' || img.oneDriveItemId) ? '#059669' :
+                                                                                color: img.oneDriveItemId ? '#059669' :
                                                                                        (img.syncStatus === 'uploaded_to_backend' || img.storagePath || img.supabasePath || img.supabaseBackedUpAt) ? '#10B981' :
                                                                                        img.syncStatus === 'error' ? '#EF4444' : '#3B82F6'
                                                                              }}>
-                                                                                {(img.syncStatus === 'remote_verified' || img.syncStatus === 'synced' || img.oneDriveItemId) ? '✅ Vollständig verifiziert' :
+                                                                                {img.oneDriveItemId ? '✅ Vollständig verifiziert' :
                                                                                  (img.syncStatus === 'uploaded_to_backend' || img.storagePath || img.supabasePath || img.supabaseBackedUpAt) ? '✅ In Supabase gespeichert' :
                                                                                  img.syncStatus === 'error' ? '❌ Fehler – erneut versuchen' : '💾 Lokal gesichert'}
                                                                             </span>
@@ -7290,14 +7290,14 @@ END:VCARD`;
                                                         fontWeight: 600,
                                                         padding: '2px 6px',
                                                         borderRadius: '4px',
-                                                        backgroundColor: (item.syncStatus === 'remote_verified' || item.syncStatus === 'synced' || item.oneDriveItemId) ? 'rgba(5,150,105,0.15)' :
+                                                        backgroundColor: item.oneDriveItemId ? 'rgba(5,150,105,0.15)' :
                                                                          (item.syncStatus === 'uploaded_to_backend' || item.storagePath || item.supabasePath || item.supabaseBackedUpAt) ? 'rgba(16,185,129,0.15)' :
                                                                          item.syncStatus === 'error' ? 'rgba(239,68,68,0.15)' : 'rgba(59,130,246,0.15)',
-                                                        color: (item.syncStatus === 'remote_verified' || item.syncStatus === 'synced' || item.oneDriveItemId) ? '#059669' :
+                                                        color: item.oneDriveItemId ? '#059669' :
                                                                (item.syncStatus === 'uploaded_to_backend' || item.storagePath || item.supabasePath || item.supabaseBackedUpAt) ? '#10B981' :
                                                                item.syncStatus === 'error' ? '#EF4444' : '#3B82F6'
                                                     }}>
-                                                        {(item.syncStatus === 'remote_verified' || item.syncStatus === 'synced' || item.oneDriveItemId) ? '✅ Vollständig verifiziert' :
+                                                        {item.oneDriveItemId ? '✅ Vollständig verifiziert' :
                                                          (item.syncStatus === 'uploaded_to_backend' || item.storagePath || item.supabasePath || item.supabaseBackedUpAt) ? '✅ In Supabase gespeichert' :
                                                          item.syncStatus === 'error' ? '❌ Fehler – erneut versuchen' : '💾 Lokal gesichert'}
                                                     </span>
@@ -10172,11 +10172,8 @@ END:VCARD`;
                                                     const isCloudSaved = !!(
                                                         img.supabasePath ||
                                                         img.oneDriveItemId ||
-                                                        img.synced ||
                                                         img.supabaseUrl ||
-                                                        img.syncStatus === 'remote_verified' ||
                                                         img.syncStatus === 'uploaded_to_backend' ||
-                                                        img.syncStatus === 'synced' ||
                                                         (typeof img.url === 'string' && img.url.startsWith('http')) ||
                                                         (typeof img.preview === 'string' && img.preview.startsWith('http'))
                                                     );

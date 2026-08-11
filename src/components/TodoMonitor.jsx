@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { ClipboardList, Plus, Search, Calendar, User, Check, Edit2, AlertTriangle, HelpCircle, Archive, AlertCircle, Clock, Trash2, ShieldAlert, History } from 'lucide-react';
-import { fetchAllTodos, completeTodoAndArchiveProjectRpc, deleteTodo, completeTodo } from '../services/TodoService';
+import { fetchAllTodos, completeTodoAndArchiveProjectRpc, deleteTodo } from '../services/TodoService';
 import TodoModal from './TodoModal';
 import TodoHistoryModal from './TodoHistoryModal';
 
@@ -31,10 +31,14 @@ const TodoMonitor = ({
     const [error, setError] = useState('');
 
     // Filter and search states
-    const [activeFilter, setActiveFilter] = useState('all'); // all, mine, overdue, today, week, closes, no_todos
+    const [activeFilter, setActiveFilter] = useState(() => currentUser ? 'mine' : 'all'); // all, mine, overdue, today, week, closes, no_todos
     const [assigneeFilter, setAssigneeFilter] = useState('all'); // all, office, or specific user ID
     const [showHistory, setShowHistory] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
+
+    useEffect(() => {
+        setActiveFilter(currentUser ? 'mine' : 'all');
+    }, [currentUser]);
 
     // Modal state
     const [modalOpen, setModalOpen] = useState(false);
@@ -270,18 +274,10 @@ const TodoMonitor = ({
                 setConfirmArchiveDialog({ todo: todoItem });
             }
         } else {
-            // Regular To-do completion: immediately mark as done
-            setLoading(true);
-            try {
-                await completeTodo(todoItem.id, currentUser?.name || 'System');
-                await loadTodos();
-                setFollowUpTodo(todoItem);
-            } catch (err) {
-                alert('Fehler beim Erledigen des To-dos: ' + err.message);
-            } finally {
-                setLoading(false);
-                setPendingActionTodoId(null);
-            }
+            // Completion and creation of the follow-up are committed together
+            // when the user saves the follow-up modal.
+            setFollowUpTodo(todoItem);
+            setPendingActionTodoId(null);
         }
     };
 

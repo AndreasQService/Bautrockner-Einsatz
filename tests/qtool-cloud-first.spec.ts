@@ -22,7 +22,7 @@ test.describe('QTool Cloud-First & E2E-Resilienz Tests', () => {
 
     test('1. Blob dauerhaft in IndexedDB', async ({ page }) => {
         const result = await page.evaluate(async () => {
-            const { savePhotoLocally, getPhotoBlob } = await import('/src/services/PhotoStorage.js');
+            const { savePhotoLocally, getPhotoBlob, openDB } = await import('/src/services/PhotoStorage.js');
             const testBlob = new Blob(['dummy original content'], { type: 'image/png' });
             const file = new File([testBlob], 'test.png', { type: 'image/png' });
             
@@ -115,7 +115,7 @@ test.describe('QTool Cloud-First & E2E-Resilienz Tests', () => {
         });
 
         const status = await page.evaluate(async () => {
-            const { savePhotoLocally, getPhotoBlob } = await import('/src/services/PhotoStorage.js');
+            const { savePhotoLocally, getPhotoBlob, openDB } = await import('/src/services/PhotoStorage.js');
             const { syncPendingToSupabase } = await import('/src/lib/sync/supabaseSyncWorker.js');
             
             const photoId = 'test_photo_supabase_error';
@@ -125,14 +125,55 @@ test.describe('QTool Cloud-First & E2E-Resilienz Tests', () => {
             
             // Run sync
             await syncPendingToSupabase().catch(() => {});
+
+            // The app also owns a background worker. If it was already active,
+            // wait for the next retry instead of racing its global lock.
+            const db = await openDB();
+            let entry = null;
+            for (let attempt = 0; attempt < 30; attempt++) {
+                entry = await new Promise(resolve => {
+                    const tx = db.transaction('photos', 'readonly');
+                    const req = tx.objectStore('photos').get(photoId);
+                    req.onsuccess = () => resolve(req.result);
+                    req.onerror = () => resolve(null);
+                });
+                if (entry?.syncStatus === 'error') break;
+                await new Promise(resolve => setTimeout(resolve, 500));
+                await syncPendingToSupabase().catch(() => {});
+            }
             
             // Verify blob is still in IndexedDB
             const url = await getPhotoBlob(photoId, 'original');
             if (!url) return { exists: false };
             const text = await (await fetch(url)).text();
-            return { exists: text === 'supabase test original' };
+            return {
+                exists: text === 'supabase test original',
+                syncStatus: entry?.syncStatus,
+                errorMessage: entry?.errorMessage || null
+            };
         });
         expect(status.exists).toBe(true);
+        expect(status.syncStatus).toBe('error');
+    });
+
+    test('5b. Fehlerstatus wird nicht fälschlich als remote_verified migriert', async ({ page }) => {
+        const status = await page.evaluate(async () => {
+            const { savePhotoLocally, updatePhotoSyncStatus, markUploadedPhotosAsVerified, openDB } = await import('/src/services/PhotoStorage.js');
+            const photoId = 'test_photo_error_migration';
+            const file = new File([new Blob(['original remains'], { type: 'image/png' })], 'error.png', { type: 'image/png' });
+            await savePhotoLocally(photoId, 'TEST__PROJECT', file);
+            await updatePhotoSyncStatus(photoId, { syncStatus: 'error', errorMessage: 'simulated failure' });
+            await markUploadedPhotosAsVerified();
+
+            const db = await openDB();
+            return new Promise(resolve => {
+                const tx = db.transaction('photos', 'readonly');
+                const req = tx.objectStore('photos').get(photoId);
+                req.onsuccess = () => resolve(req.result?.syncStatus);
+                req.onerror = () => resolve(null);
+            });
+        });
+        expect(status).toBe('error');
     });
 
     test('6. lokaler Blob bleibt bei Projekt-Commitfehler', async ({ page }) => {

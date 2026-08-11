@@ -94,8 +94,23 @@ const safeSetItem = (key, value) => {
   }
 };
 
+function stripEphemeralBlobUrls(value) {
+  if (typeof value === 'string') return value.startsWith('blob:') ? null : value;
+  if (Array.isArray(value)) return value.map(stripEphemeralBlobUrls);
+  if (!value || typeof value !== 'object') return value;
+  if (typeof Blob !== 'undefined' && value instanceof Blob) return undefined;
+
+  return Object.fromEntries(
+    Object.entries(value)
+      .map(([key, nested]) => [key, stripEphemeralBlobUrls(nested)])
+      .filter(([, nested]) => nested !== undefined)
+  );
+}
+
 function sanitizeMeasurementStorage(reportData) {
   if (!reportData) return reportData;
+
+  reportData = stripEphemeralBlobUrls(reportData);
 
   const normalize = (val) => String(val || '').trim().toLowerCase().replace(/-/g, ' ').replace(/\s+/g, ' ');
 
@@ -335,6 +350,11 @@ function App() {
   const isSessionActiveRef = useRef(true);
   const isLockedByIPadRef = useRef(false);
   const loadedProjectVersionRef = useRef(1);
+  const loadedProjectVersionIdRef = useRef(null);
+  // Serialize cloud writes per project. Image processing can emit several saves in
+  // quick succession; without a queue, a later save can compare against the
+  // timestamp from before our own preceding write and create a false conflict.
+  const cloudSaveChainsRef = useRef(new Map());
   const currentUserRef = useRef(null);
   const selectedReportRef = useRef(null);
   const reportsRef = useRef([]);
@@ -648,7 +668,9 @@ function App() {
         }
 
         // 2. Version conflict check
-        if ((dbVersion > localVersion || isLockLost) && !forceOverwrite) {
+        const isOwnClientUpdate = !!offlineEntry.clientId &&
+          dbRecord.report_data?.last_edited_client_id === offlineEntry.clientId;
+        if (((dbVersion > localVersion && !isOwnClientUpdate) || isLockLost) && !forceOverwrite) {
           isConflict = true;
         } else {
           const serverReportData = dbRecord.report_data || {};
@@ -974,12 +996,20 @@ function App() {
   useEffect(() => {
     selectedReportRef.current = selectedReport;
     if (selectedReport) {
-      loadedProjectVersionRef.current = selectedReport.report_data?.version || selectedReport.version || 1;
+      const selectedVersion = Number(selectedReport.report_data?.version || selectedReport.version || 1);
+      if (loadedProjectVersionIdRef.current === selectedReport.id) {
+        loadedProjectVersionRef.current = Math.max(loadedProjectVersionRef.current || 1, selectedVersion);
+      } else {
+        loadedProjectVersionIdRef.current = selectedReport.id;
+        loadedProjectVersionRef.current = selectedVersion;
+      }
       console.log('[Version] Loaded project version set to:', loadedProjectVersionRef.current, 'for:', selectedReport.id);
     } else {
+      loadedProjectVersionIdRef.current = null;
       loadedProjectVersionRef.current = 1;
     }
   }, [selectedReport]);
+
 
   const [mySessionToken] = useState(() => {
     let t = localStorage.getItem(KEY_SESSION_TOKEN);
@@ -1075,14 +1105,7 @@ function App() {
         const tx  = db.transaction('photos', 'readonly');
         const all = tx.objectStore('photos').getAll();
         all.onsuccess = () => resolve(
-          (all.result || []).filter(p =>
-            p.syncStatus !== 'synced' && 
-            p.syncStatus !== 'remote_verified' && 
-            p.syncStatus !== 'uploaded_to_backend' && 
-            p.syncStatus !== 'queued_for_remote' &&
-            !p.supabasePath && 
-            !p.oneDriveItemId
-          ).length
+          (all.result || []).filter(p => !p.oneDriveItemId).length
         );
         all.onerror = () => resolve(0);
       };
@@ -1794,6 +1817,13 @@ function App() {
     const existingRecord = (selectedReportRef.current && selectedReportRef.current.id === finalReport.id)
       ? selectedReportRef.current
       : reportsRef.current.find(r => r.id === finalReport.id);
+    // DamageForm intentionally omits technical fields in some save payloads.
+    // Never let such a payload downgrade the already loaded server version.
+    finalReport.version = Math.max(
+      Number(finalReport.version || 1),
+      Number(existingRecord?.report_data?.version || existingRecord?.version || 1),
+      loadedProjectVersionIdRef.current === finalReport.id ? Number(loadedProjectVersionRef.current || 1) : 1
+    );
     const existingExteriorPhoto = existingRecord?.exteriorPhoto || existingRecord?.report_data?.exteriorPhoto || null;
 
     let safeExteriorPhoto;
@@ -1977,8 +2007,9 @@ function App() {
               const dbReportData = dbRecord.report_data || {};
               const dbVersion = dbReportData.version || 1;
               const currentLoadedVersion = loadedProjectVersionRef.current || 1;
+              const isOwnClientUpdate = dbReportData.last_edited_client_id === getOrCreateClientId();
 
-              if (dbVersion > currentLoadedVersion) {
+              if (dbVersion > currentLoadedVersion && !isOwnClientUpdate) {
                 const conflictUser = dbReportData.last_edited_by || 'Unbekannt';
                 const conflictDevice = dbReportData.last_edited_device || 'Gerät';
                 const conflictMsg = conflictDevice === 'iPad'
@@ -1991,6 +2022,8 @@ function App() {
                 }
                 saveToUnsavedReports(finalReport, true);
                 throw new Error(conflictMsg);
+              } else if (dbVersion > currentLoadedVersion && isOwnClientUpdate) {
+                loadedProjectVersionRef.current = dbVersion;
               }
             }
 
@@ -2043,11 +2076,15 @@ function App() {
         const myDeviceName = isIPad ? 'iPad' : (/iPhone|Android/i.test(navigator.userAgent) ? 'Mobil' : 'Desktop');
         const userEmail = currentUserRef.current?.email || currentUserRef.current?.name || 'Unbekannt';
 
-        const { _supabase_updated_at: loadedAt, ...reportForStorage } = finalReport;
+        const latestPersistedReport = openedReportBackupRef.current[finalReport.id];
+        const loadedAt = latestPersistedReport?._supabase_updated_at || finalReport._supabase_updated_at;
+        const sanitizedForStorage = stripEphemeralBlobUrls(finalReport);
+        const { _supabase_updated_at: _ignoredSupabaseUpdatedAt, ...reportForStorage } = sanitizedForStorage;
 
         reportForStorage.version = nextVersion;
         reportForStorage.last_edited_by = userEmail;
         reportForStorage.last_edited_device = myDeviceName;
+        reportForStorage.last_edited_client_id = getOrCreateClientId();
         reportForStorage.last_edited_at = now;
 
         // Aktualisiere das lokale Objekt
@@ -2066,6 +2103,49 @@ function App() {
           drying_started: finalReport.dryingStarted,
           report_data: reportForStorage,
           updated_at: now
+        };
+
+        const retryAfterTechnicalImageUpdate = async () => {
+          const { data: latestRow, error: latestError } = await supabase
+            .from('damage_reports')
+            .select('updated_at, report_data')
+            .eq('id', finalReport.id)
+            .single();
+
+          if (latestError || !latestRow) return { data: null, error: latestError };
+
+          const latestVersion = latestRow.report_data?.version || 1;
+          const localVersion = loadedProjectVersionRef.current || 1;
+          if (latestVersion > localVersion) return { data: [], error: null };
+
+          const remoteImages = Array.isArray(latestRow.report_data?.images) ? latestRow.report_data.images : [];
+          const localImages = Array.isArray(reportForStorage.images) ? reportForStorage.images : [];
+          const mergedImages = localImages.map(image => {
+            const remoteImage = remoteImages.find(candidate => candidate?.id === image?.id);
+            if (!remoteImage) return image;
+            return {
+              ...image,
+              storagePath: remoteImage.storagePath || image.storagePath,
+              supabasePath: remoteImage.supabasePath || image.supabasePath,
+              supabaseBackedUpAt: remoteImage.supabaseBackedUpAt || image.supabaseBackedUpAt,
+              sha256: remoteImage.sha256 || image.sha256,
+              oneDriveItemId: remoteImage.oneDriveItemId || image.oneDriveItemId,
+              oneDrivePath: remoteImage.oneDrivePath || image.oneDrivePath,
+              syncStatus: remoteImage.syncStatus || image.syncStatus,
+              uploading: remoteImage.uploading ?? image.uploading,
+              error: remoteImage.error ?? image.error
+            };
+          });
+
+          return supabase
+            .from('damage_reports')
+            .update({
+              ...rowData,
+              report_data: { ...reportForStorage, images: mergedImages }
+            })
+            .eq('id', finalReport.id)
+            .eq('updated_at', latestRow.updated_at)
+            .select('id, updated_at');
         };
 
         const oneDriveBackup = () => {
@@ -2110,7 +2190,7 @@ function App() {
 
               if (query && typeof query.then === 'function') {
                 query
-                  .then(({ data: updateResult, error }) => {
+                  .then(async ({ data: updateResult, error }) => {
                     if (!error && updateResult && updateResult.length > 0) {
                       const serverUpdatedAt = updateResult[0].updated_at || now;
                       setReports(prev => prev.map(r => r.id === finalReport.id ? { ...r, ...finalReport, _supabase_updated_at: serverUpdatedAt } : r));
@@ -2126,9 +2206,24 @@ function App() {
                         return next;
                       });
                     } else if (!error && (!updateResult || updateResult.length === 0)) {
-                      console.warn('[Sync-Konflikt] Autosave abgebrochen – neuere Version in Supabase:', finalReport.id);
-                      showToast('⚠️ Sync-Konflikt: Das Projekt wurde auf einem anderen Gerät aktualisiert! Bitte die Seite neu laden (F5) um Datenverlust zu vermeiden.', 'error', 0);
-                      saveToUnsavedReports(finalReport, true);
+                      const retry = await retryAfterTechnicalImageUpdate();
+                      if (!retry.error && retry.data && retry.data.length > 0) {
+                        const serverUpdatedAt = retry.data[0].updated_at || now;
+                        setReports(prev => prev.map(r => r.id === finalReport.id ? { ...r, ...finalReport, _supabase_updated_at: serverUpdatedAt } : r));
+                        setSelectedReport(prev => prev && prev.id === finalReport.id ? { ...prev, ...finalReport, _supabase_updated_at: serverUpdatedAt } : prev);
+                        openedReportBackupRef.current[finalReport.id] = JSON.parse(JSON.stringify({ ...finalReport, _supabase_updated_at: serverUpdatedAt }));
+                        setUnsavedReports(prev => {
+                          if (!prev[finalReport.id]) return prev;
+                          const next = { ...prev };
+                          delete next[finalReport.id];
+                          safeSetItem('qservice_unsaved_reports', JSON.stringify(next));
+                          return next;
+                        });
+                      } else {
+                        console.warn('[Sync-Konflikt] Autosave abgebrochen – neuere Version in Supabase:', finalReport.id);
+                        showToast('⚠️ Sync-Konflikt: Das Projekt wurde auf einem anderen Gerät aktualisiert! Bitte die Seite neu laden (F5) um Datenverlust zu vermeiden.', 'error', 0);
+                        saveToUnsavedReports(finalReport, true);
+                      }
                     } else if (error) {
                       handleSaveError(error);
                     }
@@ -2147,9 +2242,25 @@ function App() {
               if (error) {
                 throw error;
               } else if (!updateResult || updateResult.length === 0) {
-                console.warn('[Sync-Konflikt] Neuere Version in Supabase – abgebrochen:', finalReport.id);
-                showToast('⚠️ Neuere Version auf anderem Gerät! Seite neu laden.', 'warning');
-                saveToUnsavedReports(finalReport, true);
+                const retry = await retryAfterTechnicalImageUpdate();
+                if (!retry.error && retry.data && retry.data.length > 0) {
+                  const serverUpdatedAt = retry.data[0].updated_at || now;
+                  setReports(prev => prev.map(r => r.id === finalReport.id ? { ...r, ...finalReport, _supabase_updated_at: serverUpdatedAt } : r));
+                  setSelectedReport(prev => prev && prev.id === finalReport.id ? { ...prev, ...finalReport, _supabase_updated_at: serverUpdatedAt } : prev);
+                  openedReportBackupRef.current[finalReport.id] = JSON.parse(JSON.stringify({ ...finalReport, _supabase_updated_at: serverUpdatedAt }));
+                  setUnsavedReports(prev => {
+                    if (!prev[finalReport.id]) return prev;
+                    const next = { ...prev };
+                    delete next[finalReport.id];
+                    safeSetItem('qservice_unsaved_reports', JSON.stringify(next));
+                    return next;
+                  });
+                  showToast('✅ Projekt und Foto erfolgreich gespeichert!', 'success');
+                } else {
+                  console.warn('[Sync-Konflikt] Neuere Version in Supabase – abgebrochen:', finalReport.id);
+                  showToast('⚠️ Neuere Version auf anderem Gerät! Seite neu laden.', 'warning');
+                  saveToUnsavedReports(finalReport, true);
+                }
               } else {
                 const serverUpdatedAt = updateResult[0].updated_at || now;
                 setReports(prev => prev.map(r => r.id === finalReport.id ? { ...r, ...finalReport, _supabase_updated_at: serverUpdatedAt } : r));
@@ -2230,16 +2341,32 @@ function App() {
       
       const shouldSaveInstantly = !silent || hasImageChanges || (typeof navigator !== 'undefined' && navigator.webdriver);
 
+      const enqueueCloudSave = () => {
+        const reportId = finalReport.id;
+        const previous = cloudSaveChainsRef.current.get(reportId) || Promise.resolve();
+        const current = previous
+          .catch(() => undefined)
+          .then(() => performCloudSave());
+
+        cloudSaveChainsRef.current.set(reportId, current);
+        current.finally(() => {
+          if (cloudSaveChainsRef.current.get(reportId) === current) {
+            cloudSaveChainsRef.current.delete(reportId);
+          }
+        });
+        return current;
+      };
+
       if (shouldSaveInstantly) {
         if (silentSaveDebounceTimers.current[finalReport.id]) {
           clearTimeout(silentSaveDebounceTimers.current[finalReport.id]);
           delete silentSaveDebounceTimers.current[finalReport.id];
         }
-        await performCloudSave();
+        await enqueueCloudSave();
       } else if (silent) {
         // Fast debounced cloud autosave (2 seconds) so changes save smoothly in background
         silentSaveDebounceTimers.current[finalReport.id] = setTimeout(() => {
-          performCloudSave();
+          enqueueCloudSave();
           delete silentSaveDebounceTimers.current[finalReport.id];
         }, 2000);
       }

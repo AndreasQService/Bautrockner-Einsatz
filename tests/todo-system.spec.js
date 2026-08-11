@@ -157,15 +157,15 @@ test.describe('Todo System End-to-End Workflows', () => {
 
         // Verify Fast Standalone Task B is completed (gone from active list)
         await expect(page.getByText('Fast Standalone Task B')).toHaveCount(0);
-        // Verify Rolling Follow Up Task C is now active
-        await expect(page.getByText('Rolling Follow Up Task C')).toBeVisible({ timeout: 10000 });
+        // Exactly one follow-up is active; rapid/double submission must not duplicate it.
+        await expect(page.getByText('Rolling Follow Up Task C')).toHaveCount(1, { timeout: 10000 });
 
         // --- STEP 6: HISTORY VIEW ---
         const historyBtn = page.getByText('History anzeigen').first();
         await historyBtn.click();
 
         // Verify Fast Standalone Task B is visible in history
-        await expect(page.getByText('Fast Standalone Task B')).toBeVisible({ timeout: 5000 });
+        await expect(page.getByText('Fast Standalone Task B')).toHaveCount(1, { timeout: 5000 });
 
         // Hide history
         await page.getByText('History ausblenden').first().click();

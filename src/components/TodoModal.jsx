@@ -29,6 +29,7 @@ const TodoModal = ({
     const [dateWarning, setDateWarning] = useState('');
 
     const isInitializedRef = useRef(false);
+    const saveInFlightRef = useRef(false);
 
     // Load initial values if editing or in follow-up mode
     useEffect(() => {
@@ -168,7 +169,7 @@ const TodoModal = ({
     const handleSave = async (e) => {
         if (e) e.preventDefault();
         console.log('[TodoModal] handleSave function entered.');
-        if (saving) {
+        if (saving || saveInFlightRef.current) {
             console.log('[TodoModal] handleSave blocked because saving is true');
             return;
         }
@@ -208,6 +209,7 @@ const TodoModal = ({
             return;
         }
 
+        saveInFlightRef.current = true;
         setSaving(true);
 
         try {
@@ -225,9 +227,13 @@ const TodoModal = ({
             console.log('[TodoModal] handleSave saving todo. isFollowUpMode:', isFollowUpMode, 'todo:', todo, 'dataToSave:', dataToSave);
 
             if (isFollowUpMode && todo) {
-                // Since the old todo is already completed when clicking "Erledigt",
-                // we just create the new follow-up todo!
-                await createTodo(dataToSave);
+                // One atomic operation: archive the old To-do and create exactly
+                // one linked follow-up To-do. Both dashboard views use this path.
+                await completeAndCreateTodoRpc(
+                    todo.id,
+                    currentUser?.name || 'System',
+                    dataToSave
+                );
             } else if (todo) {
                 // Edit mode
                 await updateTodo(todo.id, dataToSave, todo.updated_at);
@@ -248,6 +254,7 @@ const TodoModal = ({
             setError(err.message || 'Fehler beim Speichern des To-dos.');
         } finally {
             console.log('[TodoModal] handleSave finally block.');
+            saveInFlightRef.current = false;
             setSaving(false);
         }
     };

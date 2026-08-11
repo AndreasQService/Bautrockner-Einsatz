@@ -10,7 +10,7 @@ export default defineConfig({
     tailwindcss(),
     react(),
     VitePWA({
-      registerType: 'prompt',
+      registerType: 'autoUpdate',
       includeAssets: ['vite.svg', 'logo.png'],
       manifest: {
         name: 'QTool – Q-Service (Test)',

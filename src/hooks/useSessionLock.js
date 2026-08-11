@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 
 const POLL_INTERVAL = 5000; // poll every 5s
+const HEARTBEAT_INTERVAL = 30 * 1000; // keep ownership alive while project stays open
 const SESSION_TIMEOUT = 20 * 60 * 1000; // 20 minutes
 
 export function startSessionLockLifecycle({
   enabledRef,
+  isSessionActiveRef,
   tokenRef,
   reportIdRef,
   viewRef,
@@ -23,7 +25,17 @@ export function startSessionLockLifecycle({
   pollSessions();
 
   // Poll lock status every 5 seconds (no write heartbeat)
-  const pollTimer = setIntervalFn(() => enabledRef.current && pollSessions(), POLL_INTERVAL);
+  let lastHeartbeatAt = Date.now();
+  const pollTimer = setIntervalFn(() => {
+    if (!enabledRef.current) return;
+    pollSessions();
+    const inProject = viewRef?.current === 'details' || viewRef?.current === 'new-report';
+    const now = Date.now();
+    if (inProject && reportIdRef?.current && isSessionActiveRef?.current && now - lastHeartbeatAt >= HEARTBEAT_INTERVAL) {
+      lastHeartbeatAt = now;
+      upsertSession();
+    }
+  }, POLL_INTERVAL);
 
   const handleUnload = () => {
     // Keep lock on page reload / tab close (will naturally expire in 20 mins)
@@ -310,6 +322,7 @@ export function useSessionLock(
   useEffect(() => {
     return startSessionLockLifecycle({
       enabledRef,
+      isSessionActiveRef,
       tokenRef,
       reportIdRef,
       viewRef,
