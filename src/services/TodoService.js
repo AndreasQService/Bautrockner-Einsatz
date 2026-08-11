@@ -1341,7 +1341,52 @@ export function syncCompletedAutoTodos(reports, combined) {
             }
         }
 
-        // 4. If drying is completed, automatically create the open, editable follow-up To-do for the office (Innendienst)
+        // 4. If drying is NOT completed, ensure the open follow-up To-do for the next measurement control exists
+        if (!isDryingCompleted && dates.length > 0) {
+            const latestMDateStr = dates[dates.length - 1];
+            const latestDueDateStr = getDueDateAfter7Days(latestMDateStr);
+            const latestAutoUuid = getDeterministicAutoTodoUuid(projectId, latestDueDateStr);
+            const existsLatestOpen = combined.some(t => t.id === latestAutoUuid);
+
+            if (!existsLatestOpen) {
+                const nextDueLabel = new Date(latestDueDateStr).toLocaleDateString('de-CH');
+                let parentUuid = null;
+                if (dates.length > 1) {
+                    const prevDueDateStr = getDueDateAfter7Days(dates[dates.length - 2]);
+                    parentUuid = getDeterministicAutoTodoUuid(projectId, prevDueDateStr);
+                }
+
+                const openAutoTodo = {
+                    id: latestAutoUuid,
+                    project_id: projectId,
+                    parent_todo_id: parentUuid,
+                    root_todo_id: rootUuid,
+                    task: `Nächste Feuchtekontrolle durchführen (fällig ${nextDueLabel})`,
+                    due_date: latestDueDateStr,
+                    assigned_user_id: 'technician',
+                    assigned_user_name: 'Techniker',
+                    note: 'Kategorie: auto',
+                    closes_project: false,
+                    status: 'open',
+                    created_by: 'system:measurement_followup',
+                    updated_by: 'system:measurement_followup',
+                    created_at: new Date(latestMDateStr).toISOString(),
+                    updated_at: new Date().toISOString()
+                };
+
+                combined.push(openAutoTodo);
+
+                supabase
+                    .from('project_todos')
+                    .insert(openAutoTodo)
+                    .then(({ error }) => {
+                        if (error) console.warn('[TodoService] Failed to persist open measurement auto-todo:', error.message);
+                    })
+                    .catch(() => {});
+            }
+        }
+
+        // 5. If drying is completed, automatically create the open, editable follow-up To-do for the office (Innendienst)
         if (isDryingCompleted) {
             const followUpUuid = getDeterministicAutoTodoUuid(projectId, "drying_completed_followup");
             const existsFollowUp = combined.some(t => t.id === followUpUuid);
