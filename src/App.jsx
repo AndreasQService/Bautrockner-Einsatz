@@ -422,6 +422,9 @@ function App() {
           delete parsed[id];
           changed = true;
           console.log(`[Quarantine] Moved legacy/false entry to quarantine: ${id}`);
+        } else if (entry._sync_conflict && navigator.onLine) {
+          delete entry._sync_conflict;
+          changed = true;
         }
       }
 
@@ -513,7 +516,7 @@ function App() {
         clientId: getOrCreateClientId(),
         userId: currentUser || 'unknown',
         schemaVersion: 'v1',
-        _sync_conflict: isConflict || !!existingEntry._sync_conflict,
+        _sync_conflict: isConflict,
         _db_updated_at: dbUpdatedAt || existingEntry._db_updated_at || null,
         projectTitle: finalReport.projectTitle || 'Unbenanntes Projekt',
         _offline_saved_at: existingEntry._offline_saved_at || new Date().toISOString()
