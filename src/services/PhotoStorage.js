@@ -363,3 +363,46 @@ export async function getPendingCount() {
         }
     });
 }
+
+/**
+ * Automatischer Selbstheilungs-Scan:
+ * Repariert fehlerhafte Namen in IndexedDB und markiert beschädigte 0-Byte-Blobs
+ * als dauerhaft fehlerhaft (retryCount = 99), damit keine Logs verstopft werden.
+ */
+export async function sanitizeCorruptPhotosInDb() {
+    try {
+        const db = await openDB();
+        if (!db.objectStoreNames.contains(STORE_PHOTOS)) return 0;
+        return new Promise((resolve) => {
+            const tx = db.transaction(STORE_PHOTOS, 'readwrite');
+            const store = tx.objectStore(STORE_PHOTOS);
+            const req = store.getAll();
+            req.onsuccess = () => {
+                const all = req.result || [];
+                let fixedCount = 0;
+                all.forEach(p => {
+                    const targetBlob = p.blob || p.original?.blob;
+                    const isCorrupt = !targetBlob || (targetBlob instanceof Blob && targetBlob.size === 0);
+                    const isInvalidName = !p.name || p.name === 'undefined' || p.name === 'null';
+
+                    if (isCorrupt && p.syncStatus !== 'error') {
+                        p.syncStatus = 'error';
+                        p.errorMessage = 'Automatisch bereinigter ungültiger Foto-Blob';
+                        p.retryCount = 99;
+                        store.put(p);
+                        fixedCount++;
+                    } else if (isInvalidName) {
+                        p.name = `photo_${p.id || Date.now()}.jpg`;
+                        store.put(p);
+                        fixedCount++;
+                    }
+                });
+                resolve(fixedCount);
+            };
+            req.onerror = () => resolve(0);
+        });
+    } catch (e) {
+        return 0;
+    }
+}
+

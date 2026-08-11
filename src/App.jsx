@@ -21,7 +21,7 @@ import DisponentMockup from './components/mockups/DisponentMockup'
 import i18n from './i18n'
 import { buildProjectFolderName, uploadProjectJson } from "./services/OneDriveService";
 import { syncPendingToSupabase } from './lib/sync/supabaseSyncWorker.js';
-import { markUploadedPhotosAsVerified } from './services/PhotoStorage';
+import { markUploadedPhotosAsVerified, sanitizeCorruptPhotosInDb } from './services/PhotoStorage';
 import { isVisibleProjectRow } from './utils/projectVisibility.js';
 const IS_TEST_ENV = !!(typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_EXPECTED_SUPABASE_PROJECT_ID === 'aoxduqspiezzyqeqyzzl');
 const PROJECT_ID = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_EXPECTED_SUPABASE_PROJECT_ID) || 'prod';
@@ -1113,7 +1113,7 @@ function App() {
       req.onupgradeneeded = () => resolve(0);
     });
 
-    markUploadedPhotosAsVerified().then(() => countPending().then(setSyncPending)).catch(() => {});
+    sanitizeCorruptPhotosInDb().then(() => markUploadedPhotosAsVerified()).then(() => countPending().then(setSyncPending)).catch(() => {});
     syncPendingToSupabase().catch(() => {});
     const interval = setInterval(() => {
       syncPendingToSupabase().catch(() => {});
