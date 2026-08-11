@@ -207,7 +207,9 @@ export async function fetchAllTodos(reports = [], forceRefresh = false) {
                         updated_by: todo.updated_by || 'System'
                     };
                     const { error } = await supabase.from('project_todos').insert(payload);
-                    if (!error) syncedIds.push(todo.id);
+                    if (!error || error.code === '23503' || String(error?.message).includes('foreign key')) {
+                        syncedIds.push(todo.id);
+                    }
                 }
                 if (syncedIds.length > 0) {
                     const remaining = local.filter(t => !syncedIds.includes(t.id));
@@ -232,7 +234,9 @@ export async function fetchAllTodos(reports = [], forceRefresh = false) {
                         updated_by: todo.sender || 'Eingang'
                     };
                     const { error } = await supabase.from('project_todos').insert(payload);
-                    if (!error) syncedInboxIds.push(todo.id);
+                    if (!error || error.code === '23503' || String(error?.message).includes('foreign key')) {
+                        syncedInboxIds.push(todo.id);
+                    }
                 }
                 if (syncedInboxIds.length > 0) {
                     const remaining = inboxTodosRaw.filter(t => !syncedInboxIds.includes(t.id));
