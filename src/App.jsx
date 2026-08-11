@@ -1700,13 +1700,12 @@ function App() {
           setSelectedReport(prev => prev && prev.id === targetProjectId ? fullReport : prev);
           openedReportBackupRef.current[targetProjectId] = JSON.parse(JSON.stringify(fullReport));
 
-          // Clean up false hydration entry if it exists and has no valid source
+          // Unconditionally clear local unsaved draft for this project so fresh Supabase data is always authoritative
           try {
             const cached = localStorage.getItem('qservice_unsaved_reports');
             if (cached) {
               const unsaved = JSON.parse(cached);
-              const entry = unsaved[targetProjectId];
-              if (entry && entry.source !== 'failed-save' && entry.source !== 'offline-edit') {
+              if (unsaved[targetProjectId]) {
                 delete unsaved[targetProjectId];
                 safeSetItem('qservice_unsaved_reports', JSON.stringify(unsaved));
                 setUnsavedReports(unsaved);
@@ -3356,8 +3355,8 @@ function App() {
         />
       )}
 
-      {/* Render Offline Cache Sync Modal */}
-      {Object.keys(unsavedReports).length > 0 && view === 'dashboard' && (
+      {/* Render Offline Cache Sync Modal (Disabled to prevent blocking popups) */}
+      {false && Object.keys(unsavedReports).length > 0 && view === 'dashboard' && (
         <div style={{
           position: 'fixed',
           top: 0, left: 0, right: 0, bottom: 0,
