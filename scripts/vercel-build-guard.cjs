@@ -6,13 +6,14 @@ console.log('[BUILD GUARD] 🛡️ Starting pre-build security checks...');
 // Helper to parse .env files
 function loadEnv() {
     const env = {};
-    const paths = ['.env', '.env.local', '.env.production', '.env.development'];
     const isVercel = !!process.env.VERCEL || !!process.env.VERCEL_ENV;
     const isLiveProduction = process.env.VERCEL_ENV === 'production'
         && ['bautrockner-einsatz-by7w', 'bautrockner-einsatz'].includes(process.env.VERCEL_PROJECT_NAME);
 
-    // Preview defaults belong only to test/preview targets. Loading them for the
-    // live production project can make safety diagnostics report test settings.
+    const paths = ['.env'];
+    if (!isVercel || !isLiveProduction) {
+        paths.push('.env.local', '.env.production', '.env.development');
+    }
     if (isVercel && !isLiveProduction) {
         paths.push('.env.vercel-preview');
     }

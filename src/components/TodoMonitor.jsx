@@ -149,15 +149,39 @@ const TodoMonitor = ({
             });
         }
 
+        // Helper: Strict Phase 3 Canonical user assignment matching logic
+        const isTodoAssignedToUser = (t, user) => {
+            if (!t || !user) return false;
+
+            const targetUserId = String(user.id || '').trim();
+            const targetUserEmail = String(user.email || '').trim().toLowerCase();
+            const targetUserName = String(user.name || '').trim().toLowerCase();
+
+            const todoUserId = String(t.assigned_user_id || '').trim();
+            const todoUserName = String(t.assigned_user_name || '').trim().toLowerCase();
+
+            // 1. Valid assigned_user_id is decisive
+            if (todoUserId && todoUserId !== 'null' && todoUserId !== 'undefined' && todoUserId !== 'office') {
+                return targetUserId ? todoUserId === targetUserId : false;
+            }
+
+            // 2. Exact normalized email match if ID missing
+            if (targetUserEmail && todoUserName === targetUserEmail) {
+                return true;
+            }
+
+            // 3. Exact normalized full name match ONLY if ID and email missing
+            if (targetUserName && todoUserName && todoUserName === targetUserName) {
+                return true;
+            }
+
+            // 4. Strict rejection of partial / substring / first-name-only matches
+            return false;
+        };
+
         // 3. Filter by Active Tab Filter
         if (activeFilter === 'mine' && currentUser) {
-            const myName = (currentUser.name || '').toLowerCase();
-            const myId = String(currentUser.id || '');
-            list = list.filter(t => 
-                String(t.assigned_user_id) === myId ||
-                (t.assigned_user_name && t.assigned_user_name.toLowerCase().includes(myName)) ||
-                (myName && t.assigned_user_name && myName.includes(t.assigned_user_name.toLowerCase()))
-            );
+            list = list.filter(t => isTodoAssignedToUser(t, currentUser));
         } else if (activeFilter === 'overdue') {
             list = list.filter(t => t.due_date < todayStr);
         } else if (activeFilter === 'today') {
@@ -178,7 +202,11 @@ const TodoMonitor = ({
                 if (assigneeFilter === 'office') {
                     return !t.assigned_user_id || t.assigned_user_id === 'office' || t.assigned_user_name === 'Innendienst';
                 }
-                return String(t.assigned_user_id) === String(assigneeFilter);
+                const targetUser = Array.isArray(users) ? users.find(u => String(u.id) === String(assigneeFilter)) : null;
+                if (targetUser) {
+                    return isTodoAssignedToUser(t, targetUser);
+                }
+                return String(t.assigned_user_id) === String(assigneeFilter) || String(t.assigned_user_name) === String(assigneeFilter);
             });
         }
 
@@ -189,10 +217,10 @@ const TodoMonitor = ({
             }
             // Secondary sorting by project title
             const projA = reports.find(r => r.id === a.project_id || (r.projectNumber && String(r.projectNumber) === String(a.project_id)))?.projectTitle || '';
-            const projB = reports.find(r => r.id === b.project_id || (r.projectNumber && String(r.projectNumber) === String(b.project_id)))?.projectTitle || '';
+            const projB = reports.find(r => r.id === b.project_id || (r.projectNumber && String(r.projectNumber) === String(a.project_id)))?.projectTitle || '';
             return projA.localeCompare(projB);
         });
-    }, [todos, reports, activeProjects, activeFilter, searchTerm, currentUser, assigneeFilter]);
+    }, [todos, reports, activeProjects, activeFilter, searchTerm, currentUser, assigneeFilter, users]);
     // Historical completed todos
     const processedHistoryTodos = useMemo(() => {
         let list = todos.filter(t => t.status === 'done');
@@ -236,15 +264,46 @@ const TodoMonitor = ({
     const counters = useMemo(() => {
         const todayStr = getLocalTodayDateString();
         const openTodos = todos.filter(t => t.status === 'open');
+
+        // Helper for user assignment check in counter (Strict Phase 3 rules)
+        const isTodoAssignedToUser = (t, user) => {
+            if (!t || !user) return false;
+
+            const targetUserId = String(user.id || '').trim();
+            const targetUserEmail = String(user.email || '').trim().toLowerCase();
+            const targetUserName = String(user.name || '').trim().toLowerCase();
+
+            const todoUserId = String(t.assigned_user_id || '').trim();
+            const todoUserName = String(t.assigned_user_name || '').trim().toLowerCase();
+
+            // 1. Valid assigned_user_id is decisive
+            if (todoUserId && todoUserId !== 'null' && todoUserId !== 'undefined' && todoUserId !== 'office') {
+                return targetUserId ? todoUserId === targetUserId : false;
+            }
+
+            // 2. Exact normalized email match if ID missing
+            if (targetUserEmail && todoUserName === targetUserEmail) {
+                return true;
+            }
+
+            // 3. Exact normalized full name match ONLY if ID and email missing
+            if (targetUserName && todoUserName && todoUserName === targetUserName) {
+                return true;
+            }
+
+            // 4. Strict rejection of partial / substring / first-name-only matches
+            return false;
+        };
+
         const activeProjIds = new Set(activeProjects.map(p => p.id));
-        const activeOpenTodos = openTodos.filter(t => activeProjIds.has(t.project_id));
+        const activeOpenTodos = openTodos.filter(t => !t.project_id || activeProjIds.has(t.project_id));
 
         return {
             allOpen: activeOpenTodos.length,
             overdue: activeOpenTodos.filter(t => t.due_date < todayStr).length,
             today: activeOpenTodos.filter(t => t.due_date === todayStr).length,
             future: activeOpenTodos.filter(t => t.due_date > todayStr).length,
-            mine: currentUser ? activeOpenTodos.filter(t => String(t.assigned_user_id) === String(currentUser.id)).length : 0,
+            mine: currentUser ? activeOpenTodos.filter(t => isTodoAssignedToUser(t, currentUser)).length : 0,
             noTodos: projectsWithoutTodos.length
         };
     }, [todos, activeProjects, projectsWithoutTodos, currentUser]);

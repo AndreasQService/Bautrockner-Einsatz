@@ -1,0 +1,440 @@
+{
+  "generatedAt": "2026-08-13T00:04:51.740Z",
+  "totalImages": 36,
+  "images": [
+    {
+      "filename": "test_damage_image_01.jpg",
+      "path": "C:\\QTool\\tests\\stress_suite\\fixtures\\images\\test_damage_image_01.jpg",
+      "sizeBytes": 1088,
+      "sha256": "9F8C75AE0E4E451C20F5812C6255E6D3E5D4A135DC32968D4BABC4D7899F0B67",
+      "resolution": "900x700",
+      "expectedDamageSpot": {
+        "x": 110,
+        "y": 155
+      },
+      "assignedRoom": "Badezimmer"
+    },
+    {
+      "filename": "test_damage_image_02.jpg",
+      "path": "C:\\QTool\\tests\\stress_suite\\fixtures\\images\\test_damage_image_02.jpg",
+      "sizeBytes": 1152,
+      "sha256": "31E2790A4B98E0745F7B79C09E148E3C1D1839014BCD3216D0AC73AAC12995CC",
+      "resolution": "1000x800",
+      "expectedDamageSpot": {
+        "x": 120,
+        "y": 160
+      },
+      "assignedRoom": "Wohnzimmer"
+    },
+    {
+      "filename": "test_damage_image_03.jpg",
+      "path": "C:\\QTool\\tests\\stress_suite\\fixtures\\images\\test_damage_image_03.jpg",
+      "sizeBytes": 1216,
+      "sha256": "6B25875BDF406845865735CEFC78D4CD512D93D11EB3EAF0B9F6CFB3467D6569",
+      "resolution": "1100x600",
+      "expectedDamageSpot": {
+        "x": 130,
+        "y": 165
+      },
+      "assignedRoom": "Badezimmer"
+    },
+    {
+      "filename": "test_damage_image_04.jpg",
+      "path": "C:\\QTool\\tests\\stress_suite\\fixtures\\images\\test_damage_image_04.jpg",
+      "sizeBytes": 1280,
+      "sha256": "4E49A66B7A21A1DCAD3861FD5DF9A499B2DB53F1308613D99E41E6D8B558D810",
+      "resolution": "1200x700",
+      "expectedDamageSpot": {
+        "x": 140,
+        "y": 170
+      },
+      "assignedRoom": "Wohnzimmer"
+    },
+    {
+      "filename": "test_damage_image_05.jpg",
+      "path": "C:\\QTool\\tests\\stress_suite\\fixtures\\images\\test_damage_image_05.jpg",
+      "sizeBytes": 1344,
+      "sha256": "58501169318181BFB755D93CF58DF9535647A03B2EE1F8526AC472D567E00531",
+      "resolution": "800x800",
+      "expectedDamageSpot": {
+        "x": 150,
+        "y": 175
+      },
+      "assignedRoom": "Badezimmer"
+    },
+    {
+      "filename": "test_damage_image_06.jpg",
+      "path": "C:\\QTool\\tests\\stress_suite\\fixtures\\images\\test_damage_image_06.jpg",
+      "sizeBytes": 1408,
+      "sha256": "FCD8F7F7ECDC57E04267747740D78112440150CD12C10839748D0E30ECED5B07",
+      "resolution": "900x600",
+      "expectedDamageSpot": {
+        "x": 160,
+        "y": 180
+      },
+      "assignedRoom": "Wohnzimmer"
+    },
+    {
+      "filename": "test_damage_image_07.jpg",
+      "path": "C:\\QTool\\tests\\stress_suite\\fixtures\\images\\test_damage_image_07.jpg",
+      "sizeBytes": 1472,
+      "sha256": "0D11AB55745A4E8E51E0639CBDCD7029C51BBE648BD0555A24A86688E2AD9F73",
+      "resolution": "1000x700",
+      "expectedDamageSpot": {
+        "x": 170,
+        "y": 185
+      },
+      "assignedRoom": "Badezimmer"
+    },
+    {
+      "filename": "test_damage_image_08.jpg",
+      "path": "C:\\QTool\\tests\\stress_suite\\fixtures\\images\\test_damage_image_08.jpg",
+      "sizeBytes": 1536,
+      "sha256": "17B2C3B8D37BC9791B5CD6FA7E6E5530633F02C56CE46B4E8607DE5A8EE5B2E2",
+      "resolution": "1100x800",
+      "expectedDamageSpot": {
+        "x": 180,
+        "y": 190
+      },
+      "assignedRoom": "Wohnzimmer"
+    },
+    {
+      "filename": "test_damage_image_09.jpg",
+      "path": "C:\\QTool\\tests\\stress_suite\\fixtures\\images\\test_damage_image_09.jpg",
+      "sizeBytes": 1600,
+      "sha256": "B3E238B8812E31B067A1B56257C90274A94BE41DDCE257C2A92B504A8757D7F7",
+      "resolution": "1200x600",
+      "expectedDamageSpot": {
+        "x": 190,
+        "y": 195
+      },
+      "assignedRoom": "Badezimmer"
+    },
+    {
+      "filename": "test_damage_image_10.jpg",
+      "path": "C:\\QTool\\tests\\stress_suite\\fixtures\\images\\test_damage_image_10.jpg",
+      "sizeBytes": 1664,
+      "sha256": "79E6B995AA48B4375B98E8F56448483C2E972D3990AD7F85E04C890B8BCA1B26",
+      "resolution": "800x700",
+      "expectedDamageSpot": {
+        "x": 200,
+        "y": 200
+      },
+      "assignedRoom": "Wohnzimmer"
+    },
+    {
+      "filename": "test_damage_image_11.jpg",
+      "path": "C:\\QTool\\tests\\stress_suite\\fixtures\\images\\test_damage_image_11.jpg",
+      "sizeBytes": 1728,
+      "sha256": "2FB3A81415B02F7601F9D698AC443A20557870FBF28D0A547B2F3163CADF76E2",
+      "resolution": "900x800",
+      "expectedDamageSpot": {
+        "x": 210,
+        "y": 205
+      },
+      "assignedRoom": "Badezimmer"
+    },
+    {
+      "filename": "test_damage_image_12.jpg",
+      "path": "C:\\QTool\\tests\\stress_suite\\fixtures\\images\\test_damage_image_12.jpg",
+      "sizeBytes": 1792,
+      "sha256": "E89C03E2255D923DE282C315AEB1722010A7B33B2D7DD875F0F06F36F06F0C37",
+      "resolution": "1000x600",
+      "expectedDamageSpot": {
+        "x": 220,
+        "y": 210
+      },
+      "assignedRoom": "Wohnzimmer"
+    },
+    {
+      "filename": "test_damage_image_13.jpg",
+      "path": "C:\\QTool\\tests\\stress_suite\\fixtures\\images\\test_damage_image_13.jpg",
+      "sizeBytes": 1856,
+      "sha256": "AE57B447749619885E8D8545DBC3EDE4B05593B4D7221DB7DC0660DB08BDFE90",
+      "resolution": "1100x700",
+      "expectedDamageSpot": {
+        "x": 230,
+        "y": 215
+      },
+      "assignedRoom": "Badezimmer"
+    },
+    {
+      "filename": "test_damage_image_14.jpg",
+      "path": "C:\\QTool\\tests\\stress_suite\\fixtures\\images\\test_damage_image_14.jpg",
+      "sizeBytes": 1920,
+      "sha256": "2D6DCFEA4A27F81D2CA7A6C7614AE50B5324209183AC84D4D8152966C5C65F0C",
+      "resolution": "1200x800",
+      "expectedDamageSpot": {
+        "x": 240,
+        "y": 220
+      },
+      "assignedRoom": "Wohnzimmer"
+    },
+    {
+      "filename": "test_damage_image_15.jpg",
+      "path": "C:\\QTool\\tests\\stress_suite\\fixtures\\images\\test_damage_image_15.jpg",
+      "sizeBytes": 1984,
+      "sha256": "51E667B841B91FEEB1919143BBEEBEBFEC1AFC87736D66A4AFBBB76F7E27AE66",
+      "resolution": "800x600",
+      "expectedDamageSpot": {
+        "x": 250,
+        "y": 225
+      },
+      "assignedRoom": "Badezimmer"
+    },
+    {
+      "filename": "test_damage_image_16.jpg",
+      "path": "C:\\QTool\\tests\\stress_suite\\fixtures\\images\\test_damage_image_16.jpg",
+      "sizeBytes": 2048,
+      "sha256": "0B46DFB9937B31F4B8A9109B9BEB69AAC6791E3288F62127139E16E73A11843C",
+      "resolution": "900x700",
+      "expectedDamageSpot": {
+        "x": 260,
+        "y": 230
+      },
+      "assignedRoom": "Wohnzimmer"
+    },
+    {
+      "filename": "test_damage_image_17.jpg",
+      "path": "C:\\QTool\\tests\\stress_suite\\fixtures\\images\\test_damage_image_17.jpg",
+      "sizeBytes": 2112,
+      "sha256": "D76327111202CB817560CB06F80A6700B493AA244B355248E64764EF2E18B80D",
+      "resolution": "1000x800",
+      "expectedDamageSpot": {
+        "x": 270,
+        "y": 235
+      },
+      "assignedRoom": "Badezimmer"
+    },
+    {
+      "filename": "test_damage_image_18.jpg",
+      "path": "C:\\QTool\\tests\\stress_suite\\fixtures\\images\\test_damage_image_18.jpg",
+      "sizeBytes": 2176,
+      "sha256": "D9CE9A796EDF9A06987ADA94FAD125E9D03FE8F11BE27FB4EB73D3AF14337EE7",
+      "resolution": "1100x600",
+      "expectedDamageSpot": {
+        "x": 280,
+        "y": 240
+      },
+      "assignedRoom": "Wohnzimmer"
+    },
+    {
+      "filename": "test_damage_image_19.jpg",
+      "path": "C:\\QTool\\tests\\stress_suite\\fixtures\\images\\test_damage_image_19.jpg",
+      "sizeBytes": 2240,
+      "sha256": "AC007B1A46F6BB12B2609DA68A8775B66BED4423AC1977776C22869C330E942E",
+      "resolution": "1200x700",
+      "expectedDamageSpot": {
+        "x": 290,
+        "y": 245
+      },
+      "assignedRoom": "Badezimmer"
+    },
+    {
+      "filename": "test_damage_image_20.jpg",
+      "path": "C:\\QTool\\tests\\stress_suite\\fixtures\\images\\test_damage_image_20.jpg",
+      "sizeBytes": 2304,
+      "sha256": "2E156AB6867FCEB67C4723B2AE76603DB3201ABA88F1D47BA9CFCFD52C6CDC66",
+      "resolution": "800x800",
+      "expectedDamageSpot": {
+        "x": 300,
+        "y": 250
+      },
+      "assignedRoom": "Wohnzimmer"
+    },
+    {
+      "filename": "test_damage_image_21.jpg",
+      "path": "C:\\QTool\\tests\\stress_suite\\fixtures\\images\\test_damage_image_21.jpg",
+      "sizeBytes": 2368,
+      "sha256": "F8F37FBC2F90F0C5AD404BA29DD330AAE7FD186039AE3ADD548F7D220583194F",
+      "resolution": "900x600",
+      "expectedDamageSpot": {
+        "x": 310,
+        "y": 255
+      },
+      "assignedRoom": "Badezimmer"
+    },
+    {
+      "filename": "test_damage_image_22.jpg",
+      "path": "C:\\QTool\\tests\\stress_suite\\fixtures\\images\\test_damage_image_22.jpg",
+      "sizeBytes": 2432,
+      "sha256": "011B392BC356FFB459B3AC49D26686ACF4A41E58391EAB78643A09784C83116B",
+      "resolution": "1000x700",
+      "expectedDamageSpot": {
+        "x": 320,
+        "y": 260
+      },
+      "assignedRoom": "Wohnzimmer"
+    },
+    {
+      "filename": "test_damage_image_23.jpg",
+      "path": "C:\\QTool\\tests\\stress_suite\\fixtures\\images\\test_damage_image_23.jpg",
+      "sizeBytes": 2496,
+      "sha256": "B7E8E12716FD2F751608BA5666ADE37BA599628DE74DF9D09FC69499722C8F3E",
+      "resolution": "1100x800",
+      "expectedDamageSpot": {
+        "x": 330,
+        "y": 265
+      },
+      "assignedRoom": "Badezimmer"
+    },
+    {
+      "filename": "test_damage_image_24.jpg",
+      "path": "C:\\QTool\\tests\\stress_suite\\fixtures\\images\\test_damage_image_24.jpg",
+      "sizeBytes": 2560,
+      "sha256": "AB8FCEAED41D84CED87604E33C643DFFBE68ED2CFD3E0325F1ADE17D212B84E3",
+      "resolution": "1200x600",
+      "expectedDamageSpot": {
+        "x": 340,
+        "y": 270
+      },
+      "assignedRoom": "Wohnzimmer"
+    },
+    {
+      "filename": "test_damage_image_25.jpg",
+      "path": "C:\\QTool\\tests\\stress_suite\\fixtures\\images\\test_damage_image_25.jpg",
+      "sizeBytes": 2624,
+      "sha256": "C809469798B9B91B4E3E1AAF5F264F7C8A9A97D2C29D4BD42718D1AFDE720B3B",
+      "resolution": "800x700",
+      "expectedDamageSpot": {
+        "x": 350,
+        "y": 275
+      },
+      "assignedRoom": "Badezimmer"
+    },
+    {
+      "filename": "test_damage_image_26.jpg",
+      "path": "C:\\QTool\\tests\\stress_suite\\fixtures\\images\\test_damage_image_26.jpg",
+      "sizeBytes": 2688,
+      "sha256": "4916C3A57FFC93CE7CD8588CA5353A33EB55FEB80550B189B7DA9A481775447A",
+      "resolution": "900x800",
+      "expectedDamageSpot": {
+        "x": 360,
+        "y": 280
+      },
+      "assignedRoom": "Wohnzimmer"
+    },
+    {
+      "filename": "test_damage_image_27.jpg",
+      "path": "C:\\QTool\\tests\\stress_suite\\fixtures\\images\\test_damage_image_27.jpg",
+      "sizeBytes": 2752,
+      "sha256": "A63B92BF8243453A8E1688163FA7B7D5CDD63E763D32064243DA28779B6CBBB7",
+      "resolution": "1000x600",
+      "expectedDamageSpot": {
+        "x": 370,
+        "y": 285
+      },
+      "assignedRoom": "Badezimmer"
+    },
+    {
+      "filename": "test_damage_image_28.jpg",
+      "path": "C:\\QTool\\tests\\stress_suite\\fixtures\\images\\test_damage_image_28.jpg",
+      "sizeBytes": 2816,
+      "sha256": "BB36EB27D4D220A8DC0DA48596B94E773642C9D78B83225CEB3EBA112C51421B",
+      "resolution": "1100x700",
+      "expectedDamageSpot": {
+        "x": 380,
+        "y": 290
+      },
+      "assignedRoom": "Wohnzimmer"
+    },
+    {
+      "filename": "test_damage_image_29.jpg",
+      "path": "C:\\QTool\\tests\\stress_suite\\fixtures\\images\\test_damage_image_29.jpg",
+      "sizeBytes": 2880,
+      "sha256": "199FBA1B57C13CB141A42E32F7E3D07540B5171CF0B0ACF9EE3AF6EEBF0BF94A",
+      "resolution": "1200x800",
+      "expectedDamageSpot": {
+        "x": 390,
+        "y": 295
+      },
+      "assignedRoom": "Badezimmer"
+    },
+    {
+      "filename": "test_damage_image_30.jpg",
+      "path": "C:\\QTool\\tests\\stress_suite\\fixtures\\images\\test_damage_image_30.jpg",
+      "sizeBytes": 2944,
+      "sha256": "35A5AC0A41D81EF22F7E4B255954E546F9A9D53C6C01D8A677AC0BCFF7689088",
+      "resolution": "800x600",
+      "expectedDamageSpot": {
+        "x": 400,
+        "y": 300
+      },
+      "assignedRoom": "Wohnzimmer"
+    },
+    {
+      "filename": "test_damage_image_31.jpg",
+      "path": "C:\\QTool\\tests\\stress_suite\\fixtures\\images\\test_damage_image_31.jpg",
+      "sizeBytes": 3008,
+      "sha256": "6B4473402C95B59FAC52AD6E835435C2AE8A36286EE8AE25FE910C1E50FE6C6A",
+      "resolution": "900x700",
+      "expectedDamageSpot": {
+        "x": 410,
+        "y": 305
+      },
+      "assignedRoom": "Badezimmer"
+    },
+    {
+      "filename": "test_damage_image_32.jpg",
+      "path": "C:\\QTool\\tests\\stress_suite\\fixtures\\images\\test_damage_image_32.jpg",
+      "sizeBytes": 3072,
+      "sha256": "C655319F9D92F9C13CB9857C5F40321700637BD27805B538CF23AA0A018D3116",
+      "resolution": "1000x800",
+      "expectedDamageSpot": {
+        "x": 420,
+        "y": 310
+      },
+      "assignedRoom": "Wohnzimmer"
+    },
+    {
+      "filename": "test_damage_image_33.jpg",
+      "path": "C:\\QTool\\tests\\stress_suite\\fixtures\\images\\test_damage_image_33.jpg",
+      "sizeBytes": 3136,
+      "sha256": "574A50F27C13016B5169FB64B05B11294C554F0ECE7C162CCF45793678A10651",
+      "resolution": "1100x600",
+      "expectedDamageSpot": {
+        "x": 430,
+        "y": 315
+      },
+      "assignedRoom": "Badezimmer"
+    },
+    {
+      "filename": "test_damage_image_34.jpg",
+      "path": "C:\\QTool\\tests\\stress_suite\\fixtures\\images\\test_damage_image_34.jpg",
+      "sizeBytes": 3200,
+      "sha256": "4CB7158BB4FD973C2B8C58BF28E57AAA25CA0E0CCC31D18B042513B73455F67D",
+      "resolution": "1200x700",
+      "expectedDamageSpot": {
+        "x": 440,
+        "y": 320
+      },
+      "assignedRoom": "Wohnzimmer"
+    },
+    {
+      "filename": "test_damage_image_35.jpg",
+      "path": "C:\\QTool\\tests\\stress_suite\\fixtures\\images\\test_damage_image_35.jpg",
+      "sizeBytes": 3264,
+      "sha256": "96DC7CA938EF186C90550605E3CE56ABFE15B04A84E89D4ED12D0CBF475DBA15",
+      "resolution": "800x800",
+      "expectedDamageSpot": {
+        "x": 450,
+        "y": 325
+      },
+      "assignedRoom": "Badezimmer"
+    },
+    {
+      "filename": "test_damage_image_36.jpg",
+      "path": "C:\\QTool\\tests\\stress_suite\\fixtures\\images\\test_damage_image_36.jpg",
+      "sizeBytes": 3328,
+      "sha256": "5FE5D483C60B47491E7EF6302A39D5C970EAE67A438A60C3FB7F7A8823CE984B",
+      "resolution": "900x600",
+      "expectedDamageSpot": {
+        "x": 460,
+        "y": 330
+      },
+      "assignedRoom": "Wohnzimmer"
+    }
+  ],
+  "corruptedFixture": "corrupted_test_image.jpg",
+  "invalidTypeFixture": "invalid_type_document.pdf"
+}

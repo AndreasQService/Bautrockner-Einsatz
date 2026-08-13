@@ -16,7 +16,10 @@
     "test:onedrive-safety": "node --test tests/*.test.js",
     "test:ui": "playwright test --ui",
     "test:debug": "playwright test --debug",
-    "test:report": "playwright show-report"
+    "test:report": "playwright show-report",
+    "qa:fast": "node scripts/qa-runner.cjs --mode=fast",
+    "qa:deep": "node scripts/qa-runner.cjs --mode=deep",
+    "qa:release": "node scripts/qa-runner.cjs --mode=release"
   },
   "dependencies": {
     "@azure/msal-browser": "^5.8.0",

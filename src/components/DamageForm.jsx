@@ -42,6 +42,8 @@ import { generateMeasurementExcel } from '../utils/MeasurementExcelExporter';
 import { PDFService } from '../services/PDFService';
 import { RoomService } from '../services/RoomService';
 import { statusColors, ROOM_OPTIONS } from '../config/damageFormConfig';
+import * as DeviceLocalStore from '../services/DeviceLocalStore';
+import SyncStatusBanner from './SyncStatusBanner';
 
 /* Custom PDF Icon */
 const PdfIcon = ({ size = 24, style = {} }) => (
@@ -329,7 +331,7 @@ export function hasSemanticChanges(base, current) {
 }
 
 
-export default function DamageForm({ onCancel, initialData, onSave, mode = 'desktop', isDarkMode = true, isSyncPending, fetchReports, readOnly, currentUser, isActuallyOffline, supabase, onDeleteProject }) {
+export default function DamageForm({ onCancel, initialData, onSave, mode = 'desktop', isDarkMode = true, isSyncPending, fetchReports, readOnly, currentUser, isActuallyOffline, supabase, onDeleteProject, syncStatus, syncMessage, onRetrySave, onSyncLater, onRetryLocalAndDb, hasUnsyncedDraft }) {
     // Helper to parse address string if editing
     const parseAddress = (addr) => {
         if (!addr) return { street: '', zip: '', city: '' };
@@ -826,7 +828,10 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
             setIsSaving(true);
             try {
                 if (onDeleteProject) {
-                    await onDeleteProject(formData.id);
+                    const res = await onDeleteProject(formData.id);
+                    if (res && res.success === false) {
+                        return;
+                    }
                 } else if (supabase) {
                     const now = new Date().toISOString();
                     const userEmail = currentUser?.email || currentUser?.name || 'Unbekannt';
@@ -4185,6 +4190,15 @@ END:VCARD`;
                     </div>
                 )}
                 {/* REMOVED DUPLICATE EmailImportModal FROM HERE */}
+
+                <SyncStatusBanner
+                    status={syncStatus}
+                    message={syncMessage}
+                    onRetrySave={onRetrySave}
+                    onSyncLater={onSyncLater}
+                    onRetryLocalAndDb={onRetryLocalAndDb}
+                    hasUnsyncedDraft={hasUnsyncedDraft}
+                />
 
                 {/* Project & Order Numbers Row */}
 
