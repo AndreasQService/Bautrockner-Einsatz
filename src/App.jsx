@@ -1932,6 +1932,8 @@ function App() {
       Number(existingRecord?.report_data?.version || existingRecord?.version || 1),
       loadedProjectVersionIdRef.current === finalReport.id ? Number(loadedProjectVersionRef.current || 1) : 1
     );
+    const deleteRequested = updatedReport?.exteriorPhotoDeleted === true;
+    const incomingExteriorPhoto = updatedReport?.exteriorPhoto || null;
     const existingExteriorPhoto = existingRecord?.exteriorPhoto || existingRecord?.report_data?.exteriorPhoto || null;
 
     let safeExteriorPhoto;
