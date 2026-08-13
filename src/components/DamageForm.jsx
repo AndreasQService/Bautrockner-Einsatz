@@ -328,6 +328,24 @@ export function hasSemanticChanges(base, current) {
     return false;
 }
 
+function isImageStoredInCloud(image) {
+    if (!image) return false;
+    const cloudUrl = [image.url, image.preview, image.supabaseUrl].find(value =>
+        typeof value === 'string' && value.includes('/storage/v1/object/public/case-files/')
+    );
+    return !!(
+        image.storagePath ||
+        image.supabasePath ||
+        image.supabaseBackedUpAt ||
+        image.oneDriveItemId ||
+        image.syncStatus === 'uploaded_to_backend' ||
+        image.syncStatus === 'queued_for_remote' ||
+        image.syncStatus === 'remote_verified' ||
+        image.syncStatus === 'synced' ||
+        cloudUrl
+    );
+}
+
 
 export default function DamageForm({ onCancel, initialData, onSave, mode = 'desktop', isDarkMode = true, isSyncPending, fetchReports, readOnly, currentUser, isActuallyOffline, supabase, onDeleteProject }) {
     // Helper to parse address string if editing
@@ -5418,14 +5436,14 @@ END:VCARD`;
                                                     padding: '2px 6px',
                                                     borderRadius: '4px',
                                                     backgroundColor: img.oneDriveItemId ? 'rgba(5,150,105,0.15)' :
-                                                                     (img.syncStatus === 'uploaded_to_backend' || img.storagePath || img.supabasePath || img.supabaseBackedUpAt) ? 'rgba(16,185,129,0.15)' :
+                                                                     isImageStoredInCloud(img) ? 'rgba(16,185,129,0.15)' :
                                                                      img.syncStatus === 'error' ? 'rgba(239,68,68,0.15)' : 'rgba(59,130,246,0.15)',
                                                     color: img.oneDriveItemId ? '#059669' :
-                                                           (img.syncStatus === 'uploaded_to_backend' || img.storagePath || img.supabasePath || img.supabaseBackedUpAt) ? '#10B981' :
+                                                           isImageStoredInCloud(img) ? '#10B981' :
                                                            img.syncStatus === 'error' ? '#EF4444' : '#3B82F6'
                                                 }}>
                                                     {img.oneDriveItemId ? '✅ Vollständig verifiziert' :
-                                                     (img.syncStatus === 'uploaded_to_backend' || img.storagePath || img.supabasePath || img.supabaseBackedUpAt) ? '✅ In Supabase gespeichert' :
+                                                     isImageStoredInCloud(img) ? '✅ In Supabase gespeichert' :
                                                      img.syncStatus === 'error' ? '❌ Fehler – erneut versuchen' : '💾 Lokal gesichert'}
                                                 </span>
                                             </div>
@@ -5486,10 +5504,18 @@ END:VCARD`;
                                                     setFormData(prev => ({
                                                         ...prev,
                                                         images: [...(prev.images || []), {
+                                                            id: `mail_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
                                                             preview: publicUrl,
+                                                            url: publicUrl,
                                                             name: file.name,
                                                             description: 'Initialbild (Mail)',
                                                             date: new Date().toISOString(),
+                                                            storagePath: filePath,
+                                                            supabasePath: filePath,
+                                                            supabaseBackedUpAt: new Date().toISOString(),
+                                                            syncStatus: 'uploaded_to_backend',
+                                                            uploading: false,
+                                                            error: false,
                                                             roomId: null // Global / Initial
                                                         }]
                                                     }));
@@ -6831,14 +6857,14 @@ END:VCARD`;
                                                                                 padding: '2px 6px',
                                                                                 borderRadius: '4px',
                                                                                 backgroundColor: img.oneDriveItemId ? 'rgba(5,150,105,0.15)' :
-                                                                                                 (img.syncStatus === 'uploaded_to_backend' || img.storagePath || img.supabasePath || img.supabaseBackedUpAt) ? 'rgba(16,185,129,0.15)' :
+                                                                                                 isImageStoredInCloud(img) ? 'rgba(16,185,129,0.15)' :
                                                                                                  img.syncStatus === 'error' ? 'rgba(239,68,68,0.15)' : 'rgba(59,130,246,0.15)',
                                                                                 color: img.oneDriveItemId ? '#059669' :
-                                                                                       (img.syncStatus === 'uploaded_to_backend' || img.storagePath || img.supabasePath || img.supabaseBackedUpAt) ? '#10B981' :
+                                                                                       isImageStoredInCloud(img) ? '#10B981' :
                                                                                        img.syncStatus === 'error' ? '#EF4444' : '#3B82F6'
                                                                              }}>
                                                                                 {img.oneDriveItemId ? '✅ Vollständig verifiziert' :
-                                                                                 (img.syncStatus === 'uploaded_to_backend' || img.storagePath || img.supabasePath || img.supabaseBackedUpAt) ? '✅ In Supabase gespeichert' :
+                                                                                 isImageStoredInCloud(img) ? '✅ In Supabase gespeichert' :
                                                                                  img.syncStatus === 'error' ? '❌ Fehler – erneut versuchen' : '💾 Lokal gesichert'}
                                                                             </span>
                                                                         </div>
@@ -7295,14 +7321,14 @@ END:VCARD`;
                                                         padding: '2px 6px',
                                                         borderRadius: '4px',
                                                         backgroundColor: item.oneDriveItemId ? 'rgba(5,150,105,0.15)' :
-                                                                         (item.syncStatus === 'uploaded_to_backend' || item.storagePath || item.supabasePath || item.supabaseBackedUpAt) ? 'rgba(16,185,129,0.15)' :
+                                                                         isImageStoredInCloud(item) ? 'rgba(16,185,129,0.15)' :
                                                                          item.syncStatus === 'error' ? 'rgba(239,68,68,0.15)' : 'rgba(59,130,246,0.15)',
                                                         color: item.oneDriveItemId ? '#059669' :
-                                                               (item.syncStatus === 'uploaded_to_backend' || item.storagePath || item.supabasePath || item.supabaseBackedUpAt) ? '#10B981' :
+                                                               isImageStoredInCloud(item) ? '#10B981' :
                                                                item.syncStatus === 'error' ? '#EF4444' : '#3B82F6'
                                                     }}>
                                                         {item.oneDriveItemId ? '✅ Vollständig verifiziert' :
-                                                         (item.syncStatus === 'uploaded_to_backend' || item.storagePath || item.supabasePath || item.supabaseBackedUpAt) ? '✅ In Supabase gespeichert' :
+                                                         isImageStoredInCloud(item) ? '✅ In Supabase gespeichert' :
                                                          item.syncStatus === 'error' ? '❌ Fehler – erneut versuchen' : '💾 Lokal gesichert'}
                                                     </span>
                                                 </div>
@@ -10190,14 +10216,7 @@ END:VCARD`;
                                                 />
                                                 {/* DB Sync Status Badge */}
                                                 {(() => {
-                                                    const isCloudSaved = !!(
-                                                        img.supabasePath ||
-                                                        img.oneDriveItemId ||
-                                                        img.supabaseUrl ||
-                                                        img.syncStatus === 'uploaded_to_backend' ||
-                                                        (typeof img.url === 'string' && img.url.startsWith('http')) ||
-                                                        (typeof img.preview === 'string' && img.preview.startsWith('http'))
-                                                    );
+                                                    const isCloudSaved = isImageStoredInCloud(img);
                                                     const hasOneDrive = !!img.oneDriveItemId;
                                                     return (
                                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', position: 'absolute', top: '6px', left: '6px', zIndex: 2 }}>
