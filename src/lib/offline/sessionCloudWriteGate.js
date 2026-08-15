@@ -3,7 +3,7 @@ let explicitFinalSync = null;
 const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 const TECHNICAL_LOCK_RPCS = new Set([
   'acquire_project_lock', 'release_project_lock', 'renew_project_lock',
-  'create_project_and_acquire_lock',
+  'create_project_and_acquire_lock', 'get_project_lock_status',
 ]);
 
 function requestUrl(input) {
