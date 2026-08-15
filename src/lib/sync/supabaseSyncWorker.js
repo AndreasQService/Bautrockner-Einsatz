@@ -12,7 +12,15 @@ let isSyncRunning = false;
 /**
  * Run background sync for all local photos
  */
-export async function syncPendingToSupabase() {
+export async function syncPendingToSupabase({ allowLegacyMigration = false } = {}) {
+    // P0 fail-closed: this pre-offline-first worker owns a second IndexedDB and
+    // performs a read/modify/write of damage_reports.report_data. Running it in
+    // normal runtime can overwrite a newer central snapshot with stale image
+    // metadata. Legacy rows stay durable and visible for an explicit migration;
+    // they are never uploaded or marked synced implicitly.
+    if (allowLegacyMigration !== true) {
+        return { synced: 0, failed: 0, skipped: 'legacy_migration_not_explicit' };
+    }
     if (isSyncRunning) return { synced: 0, failed: 0 };
     if (!supabase) return { synced: 0, failed: 0 };
 
@@ -59,7 +67,7 @@ export async function syncPendingToSupabase() {
                         try {
                             const str = JSON.stringify(err);
                             errMsg = (str && str !== '{}') ? str : String(err);
-                        } catch (e) {
+                        } catch {
                             errMsg = String(err);
                         }
                     }
@@ -148,13 +156,15 @@ async function syncOnePhoto(photo) {
         if (!(targetBlob instanceof File)) {
             try {
                 fileToCompress = new File([targetBlob], safeName, { type: targetBlob.type || 'image/jpeg' });
-            } catch (e) {
+            } catch {
                 fileToCompress = targetBlob;
                 try {
                     if (!fileToCompress.name || fileToCompress.name === 'undefined') {
                         Object.defineProperty(fileToCompress, 'name', { value: safeName, writable: true, configurable: true });
                     }
-                } catch (e2) {}
+                } catch {
+                    // Some Blob implementations do not allow a synthetic name.
+                }
             }
         }
         const result = await queueImageCompression(fileToCompress, photo.meta?.isSketch);
@@ -268,14 +278,8 @@ async function syncOnePhoto(photo) {
         photo.syncStatus = 'queued_for_remote';
 
         // Trigger Edge function upload
-        fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/onedrive-upload-worker`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({}),
-        }).catch(() => {});
+        const { error: invokeError } = await supabase.functions.invoke('onedrive-upload-worker', { body: {} });
+        if (invokeError) throw invokeError;
 
         // Since the backend Edge function runs asynchronously, we check the project_image_uploads status in Supabase DB 
         // to verify when it gets marked as remote_verified or uploaded.
@@ -286,25 +290,37 @@ async function syncOnePhoto(photo) {
             await new Promise(r => setTimeout(r, 1000));
             const { data: journalRow, error: checkErr } = await supabase
                 .from('project_image_uploads')
-                .select('storage_status, remote_path, remote_item_id')
+                .select('project_id,storage_status,remote_path,remote_drive_id,remote_item_id,remote_etag,remote_size_bytes,remote_sha256,verified_at')
                 .eq('local_image_id', photo.id)
                 .single();
 
             if (!checkErr && journalRow) {
-                if (journalRow.storage_status === 'remote_verified' || journalRow.remote_item_id) {
+                const exactProof = journalRow.storage_status === 'remote_verified'
+                    && String(journalRow.project_id || '') === String(projectId)
+                    && journalRow.remote_drive_id
+                    && journalRow.remote_item_id
+                    && journalRow.remote_etag
+                    && journalRow.verified_at
+                    && Number(journalRow.remote_size_bytes) === Number(compressedBlob.size)
+                    && String(journalRow.remote_sha256 || '').toLowerCase() === String(sha256 || '').toLowerCase();
+                if (exactProof) {
                     console.log(`[SyncWorker] ☁️ OneDrive Verified for photo ${photo.id}!`);
                     await updatePhotoSyncStatus(photo.id, {
                         syncStatus: 'remote_verified',
                         oneDriveItemId: journalRow.remote_item_id,
-                        oneDrivePath: journalRow.remote_path
+                        oneDrivePath: journalRow.remote_path,
+                        oneDriveDriveId: journalRow.remote_drive_id,
+                        oneDriveETag: journalRow.remote_etag,
+                        oneDriveSha256: journalRow.remote_sha256,
+                        oneDriveVerifiedAt: journalRow.verified_at
                     });
-                    break;
+                    return;
                 }
             }
             checkAttempts++;
         }
-        await updatePhotoSyncStatus(photo.id, {
-            syncStatus: 'remote_verified'
-        }).catch(() => {});
+        // Never manufacture a success state. The durable legacy row remains
+        // queued and is retried only by an explicit migration run.
+        throw Object.assign(new Error('OneDrive-Endbestätigung mit exaktem Drive-/SHA-Nachweis steht noch aus'), { retryable: true });
     }
 }

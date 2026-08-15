@@ -21,8 +21,8 @@ import { Camera, Image, Trash, Trash2, Archive, X, Plus, Edit3, Save, Upload, Fi
 import { supabase } from '../supabaseClient';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
-import { buildProjectFolderName, uploadPhotoAndGetUrl, getPhotoDownloadUrl, uploadReport } from '../services/OneDriveService';
-import { savePhotoLocally, updatePhotoSyncStatus, deleteOldSyncedPhotos, getPendingCount, getPhotoBlob, getProjectPhotos } from '../services/PhotoStorage';
+import { getPhotoDownloadUrl } from '../services/OneDriveService';
+import { deleteOldSyncedPhotos, getPendingCount, getPhotoBlob, getProjectPhotos } from '../services/PhotoStorage';
 const IS_TEST_ENV = !!(typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_EXPECTED_SUPABASE_PROJECT_ID === 'aoxduqspiezzyqeqyzzl');
 import { swissPLZ } from '../data/swiss_plz';
 
@@ -44,6 +44,8 @@ import { RoomService } from '../services/RoomService';
 import { statusColors, ROOM_OPTIONS } from '../config/damageFormConfig';
 import * as DeviceLocalStore from '../services/DeviceLocalStore';
 import SyncStatusBanner from './SyncStatusBanner';
+import { registerMediaLocally, registerMeasurementLocally, runCloudAfterLocal } from '../lib/offline/formMediaAdapter';
+import { registerDomainMutation } from '../lib/offline/domainMutationAdapter';
 
 /* Custom PDF Icon */
 const PdfIcon = ({ size = 24, style = {} }) => (
@@ -331,7 +333,8 @@ export function hasSemanticChanges(base, current) {
 }
 
 
-export default function DamageForm({ onCancel, initialData, onSave, mode = 'desktop', isDarkMode = true, isSyncPending, fetchReports, readOnly, currentUser, isActuallyOffline, supabase, onDeleteProject, syncStatus, syncMessage, onRetrySave, onSyncLater, onRetryLocalAndDb, hasUnsyncedDraft }) {
+export default function DamageForm({ onCancel, initialData, onSave, mode = 'desktop', isDarkMode = true, isSyncPending, fetchReports, readOnly, currentUser, isActuallyOffline, supabase, onDeleteProject, syncStatus, syncMessage, onRetrySave, onSyncLater, onRetryLocalAndDb, hasUnsyncedDraft, onPersistenceStateChange }) {
+    const offlineProjectIdRef = useRef(initialData?.id || `TMP-${crypto.randomUUID()}`);
     // Helper to parse address string if editing
     const parseAddress = (addr) => {
         if (!addr) return { street: '', zip: '', city: '' };
@@ -488,7 +491,11 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         })(),
         measurementRooms: Array.isArray(initialData.measurementRooms) ? initialData.measurementRooms : []
     } : {
-        id: null,
+        // A stable ID exists before the first keystroke so the offline outbox,
+        // later autosaves and navigation guard all address the same project.
+        id: (typeof crypto !== 'undefined' && crypto.randomUUID)
+            ? crypto.randomUUID()
+            : `TMP-${Date.now()}-${Math.random().toString(36).slice(2)}`,
         projectTitle: '',
         projectNumber: '',
         orderNumber: '',
@@ -982,9 +989,8 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                             const { data: blobData, error: dlErr } = await supabase.storage.from('case-files').download(storagePath);
                             if (!dlErr && blobData) {
                                 freshBlobUrl = trackObjectURL(URL.createObjectURL(blobData));
-                                if (img.id) {
-                                    savePhotoLocally(img.id, formData.id || 'temp', blobData, { description: img.description }).catch(() => {});
-                                }
+                                // Remote Bilder werden nur zur Anzeige geladen. Neue dauerhafte
+                                // Medien liegen ausschliesslich in der zentralen Offline-Outbox.
                             }
                         } catch (e) {}
                     }
@@ -1020,7 +1026,11 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
 
         try {
             if (IS_TEST_ENV || isCloudFirstEnabled) {
-                const { syncPendingToSupabase } = await import('../lib/sync/supabaseSyncWorker');
+                const [{ syncPendingToSupabase }, { hasActiveProjectSession }] = await Promise.all([
+                    import('../lib/sync/supabaseSyncWorker'),
+                    import('../lib/offline/projectSessionStore.js'),
+                ]);
+                if (await hasActiveProjectSession()) return;
                 const { synced, failed } = await syncPendingToSupabase();
                 console.log(`[Sync] Cloud-first sync done. Synced: ${synced}, Failed: ${failed}`);
                 try {
@@ -1042,54 +1052,10 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                     }));
                 } catch (e) {}
             } else {
-                // Legacy sync loop
-                const { getPendingPhotos } = await import('../services/PhotoStorage');
-                const pending = await getPendingPhotos(formData.id || 'temp');
-
-                if (pending.length === 0) {
-                    setPendingSyncCount(0);
-                    return;
-                }
-
-                let synced = 0;
-                for (const photo of pending) {
-                    try {
-                        const meta = photo.meta || {};
-                        const subFolder = meta.subFolder || 'Sonstiges';
-                        const odFolder = meta.odFolder || buildProjectFolderName(formData.projectNumber || formData.id || 'Unbekannt', formData);
-
-                        // Supabase Upload
-                        let supabasePath = photo.supabasePath;
-                        if (!supabasePath && supabase) {
-                            const ext = photo.name.split('.').pop();
-                            const fileName = `cases/${formData.id || 'temp'}/images/${Date.now()}_${photo.id}.${ext}`;
-                            const { error } = await supabase.storage.from('case-files').upload(fileName, photo.blob);
-                            if (!error) supabasePath = fileName;
-                        }
-
-                        // OneDrive Upload
-                        let oneDriveItemId = photo.oneDriveItemId;
-                        let oneDrivePath = photo.oneDrivePath;
-                        if (!oneDriveItemId) {
-                            const odResult = await uploadPhotoAndGetUrl(odFolder, subFolder, new File([photo.blob], photo.name, { type: photo.type }));
-                            if (odResult) {
-                                oneDriveItemId = odResult.itemId;
-                                oneDrivePath = odResult.odPath;
-                            }
-                        }
-
-                        await updatePhotoSyncStatus(photo.id, {
-                            supabasePath,
-                            oneDriveItemId,
-                            oneDrivePath,
-                            syncStatus: oneDriveItemId ? 'synced' : (supabasePath ? 'synced' : 'error'),
-                        });
-
-                        synced++;
-                    } catch (photoErr) {
-                        console.warn(`[Sync] Foto ${photo.id} fehlgeschlagen:`, photoErr.message);
-                    }
-                }
+                // Der persönliche OneDrive-/PhotoStorage-Legacy-Worker ist
+                // endgültig stillgelegt. Ohne aktivierte zentrale Pipeline
+                // bleiben Daten lokal und werden niemals direkt hochgeladen.
+                console.warn('[Sync] Zentraler Offline-Outbox-/Worker ist nicht aktiviert; kein Legacy-Cloudwrite ausgeführt.');
             }
             const count = await getPendingCount();
             setPendingSyncCount(count);
@@ -1098,7 +1064,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         } finally {
             setIsSyncing(false);
         }
-    }, [formData.id, formData.projectNumber, isSyncing, supabase]);
+    }, [formData.id, isSyncing]);
 
     // ── Auto-Sync: Pending Fotos hochladen wenn Netz zurückkommt ─────────────
     useEffect(() => {
@@ -1137,69 +1103,6 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
             window.removeEventListener('offline', handleOffline);
         };
     }, [formData.id, syncPendingPhotos]);
-
-    // ── OneDrive-Backfill: Supabase-Fotos → persönliches OneDrive ─────────────
-    // Läuft einmal beim Öffnen eines Projekts. Findet alle Fotos die in Supabase
-    // gesichert sind (storagePath vorhanden) aber noch nicht auf OneDrive sind
-    // (oneDriveItemId fehlt). Download via Supabase Storage → Upload via User-Token.
-    // Funktioniert auf jedem Gerät, da Blobs per HTTP aus Supabase geladen werden.
-    useEffect(() => {
-        if (IS_TEST_ENV || !formData.id || !supabase) return;
-
-        const backfill = async () => {
-            const odFolder = buildProjectFolderName(
-                formData.projectNumber || formData.id || 'Unbekannt',
-                formData
-            );
-
-            // Alle Bilder die in Supabase sind aber nicht in OneDrive
-            const missing = (formData.images || []).filter(
-                img => img.storagePath && !img.oneDriveItemId && !img.uploading
-            );
-
-            if (missing.length === 0) return;
-            console.log(`[OneDrive-Backfill] 🔄 ${missing.length} Fotos ohne OneDrive-Link – starte Backfill...`);
-
-            for (const img of missing) {
-                try {
-                    // Blob von Supabase Storage laden
-                    const { data: blob, error: dlErr } = await supabase.storage
-                        .from('case-files')
-                        .download(img.storagePath);
-
-                    if (dlErr || !blob) {
-                        console.warn(`[OneDrive-Backfill] ⚠️ Download fehlgeschlagen: ${img.storagePath}`);
-                        continue;
-                    }
-
-                    // Upload ins persönliche OneDrive
-                    const subFolder = img.roomName || img.assignedTo || 'Sonstiges';
-                    const file = new File([blob], img.name || 'foto.jpg', { type: blob.type || 'image/jpeg' });
-                    const odResult = await uploadPhotoAndGetUrl(odFolder, subFolder, file);
-
-                    if (odResult?.itemId || odResult?.odPath) {
-                        setFormData(prev => ({
-                            ...prev,
-                            images: prev.images.map(i =>
-                                i.id === img.id ? {
-                                    ...i,
-                                    oneDriveItemId: odResult.itemId || null,
-                                    oneDrivePath: odResult.odPath || null,
-                                } : i
-                            )
-                        }));
-                        console.log(`[OneDrive-Backfill] ✅ ${img.name} → OneDrive`);
-                    }
-                } catch (err) {
-                    console.warn(`[OneDrive-Backfill] ⚠️ Fehler bei ${img.name}:`, err.message);
-                }
-            }
-        };
-
-        // 3s warten bis formData vollständig geladen ist
-        const timer = setTimeout(backfill, 3000);
-        return () => clearTimeout(timer);
-    }, [formData.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // Primary Auto-Save Effect (Handled in unified effect below)
 
@@ -1926,17 +1829,8 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         const energyFileName = `Energieprotokoll_${formData.projectTitle || 'Export'}.pdf`;
         doc.save(energyFileName);
 
-        // OneDrive Upload (silent)
-        try {
-            const energyBlob = doc.output('blob');
-            const odFolder = buildProjectFolderName(
-                formData.projectNumber || formData.id || 'Unbekannt',
-                formData
-            );
-            await uploadReport(odFolder, 'Energieprotokoll', energyBlob);
-        } catch (odErr) {
-            console.warn('[OneDrive] Energieprotokoll-Upload fehlgeschlagen:', odErr.message);
-        }
+        // Lokaler Export. Ein Cloud-Projektartefakt muss zuerst lokal registriert
+        // und erst im expliziten Projektabschluss verifiziert synchronisiert werden.
     };
 
     const handleDownloadICS = () => {
@@ -2002,13 +1896,14 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
 
     // Track user edit status:
     useEffect(() => {
-        if (!initialData || initialData.isLightweight) {
+        if (initialData?.isLightweight) {
             isHydratedRef.current = false;
             hasUserEditedRef.current = false;
             return;
         }
 
-        // Initialize baseline if not present, changed ID, or was not yet hydrated
+        // Initialize a baseline for both existing and brand-new projects. A new
+        // project must also become dirty as soon as its blank form is edited.
         if (!lastSavedData.current || lastSavedData.current.id !== formData.id || !isHydratedRef.current) {
             lastSavedData.current = JSON.parse(JSON.stringify(formData));
             isHydratedRef.current = true;
@@ -2028,6 +1923,18 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
     useEffect(() => {
         latestFormData.current = formData;
     }, [formData]);
+
+    // App-level navigation guard: always expose the latest complete form payload,
+    // including the two-second interval before autosave starts. This lets App
+    // persist and verify the exact current state before dashboard/project/logout.
+    useEffect(() => {
+        if (!onPersistenceStateChange || !isHydratedRef.current) return;
+        const dirty = hasSemanticChanges(lastSavedData.current, formData);
+        onPersistenceStateChange({
+            dirty,
+            data: formData.id ? formData : { ...formData, id: offlineProjectIdRef.current }
+        });
+    }, [formData, onPersistenceStateChange]);
 
     useEffect(() => {
         // Condition checks for starting the autosave timer:
@@ -2058,6 +1965,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                 if (savedReport) {
                     lastSavedData.current = JSON.parse(JSON.stringify(reportData));
                     hasUserEditedRef.current = false;
+                    onPersistenceStateChange?.({ dirty: false, data: savedReport, localConfirmed: true });
                     // If the report was new (no ID) and the save generated one, update local state
                     if (savedReport.id && !formData.id) {
                         setFormData(prev => ({ ...prev, id: savedReport.id }));
@@ -2141,6 +2049,18 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         // If manual entry (no selected device) and we have a device number, add or link to global inventory
         if (!selectedDevice && newDevice.deviceNumber && supabase) {
             const trimmedNumber = newDevice.deviceNumber.trim();
+            const inventoryPayload = {
+                number: trimmedNumber, type: newDevice.type || 'Unbekannt', model: '', status: 'Aktiv',
+                current_project: formData.projectTitle || formData.client || 'Unbekannt',
+                current_report_id: formData.id || offlineProjectIdRef.current,
+                is_rental: !!(newDevice.isRental || trimmedNumber.toUpperCase().startsWith('M'))
+            };
+            await registerDomainMutation({
+                projectId: formData.id || offlineProjectIdRef.current,
+                type: 'device.inventory.upsert', entityId: trimmedNumber, payload: inventoryPayload,
+                snapshot: { ...formData, id: formData.id || offlineProjectIdRef.current, pendingInventoryDevice: inventoryPayload },
+                actor: currentUser?.id || currentUser?.email || null, baseVersion: formData.version || null
+            });
 
             // Check if device number already exists in database
             const { data: existingDev, error: checkError } = await supabase
@@ -2210,6 +2130,13 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
             dbId: deviceDbId
         };
 
+        const nextDeviceSnapshot = { ...formData, id: formData.id || offlineProjectIdRef.current, equipment: [...(formData.equipment || []), deviceToAdd] };
+        await registerDomainMutation({
+            projectId: nextDeviceSnapshot.id, type: 'device.assign', entityId: deviceToAdd.dbId || deviceToAdd.id,
+            payload: { device: deviceToAdd, projectId: nextDeviceSnapshot.id }, snapshot: nextDeviceSnapshot,
+            actor: currentUser?.id || currentUser?.email || null, baseVersion: formData.version || null
+        });
+
         setFormData(prev => {
             const nextEquipment = [...prev.equipment, deviceToAdd];
             return {
@@ -2224,6 +2151,14 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
     }
 
     const handleRemoveDevice = async (id, dbId) => {
+        const removedDevice = (formData.equipment || []).find(item => item.id === id) || { id, dbId };
+        const nextDeviceSnapshot = { ...formData, equipment: (formData.equipment || []).filter(item => item.id !== id) };
+        await registerDomainMutation({
+            projectId: formData.id || offlineProjectIdRef.current, type: 'device.unassign', entityId: dbId || id,
+            payload: { device: removedDevice, projectId: formData.id || offlineProjectIdRef.current },
+            snapshot: nextDeviceSnapshot, actor: currentUser?.id || currentUser?.email || null,
+            baseVersion: formData.version || null, tombstone: true
+        });
         // If it's a linked device, free it up in Supabase
         if (dbId && supabase) {
             const { error } = await supabase
@@ -2301,6 +2236,8 @@ END:VCARD`;
 
     const handleImageUpload = async (files, contextData = {}) => {
         if (!files || files.length === 0) return;
+        const durableProjectId = contextData.projectId || formData.id || offlineProjectIdRef.current;
+        if (!formData.id) setFormData(prev => ({ ...prev, id: durableProjectId }));
 
         const isCloudFirstEnabled = import.meta.env.VITE_CLOUD_FIRST_IMAGES === 'true' || import.meta.env.VITE_CLOUD_FIRST_IMAGES === true;
 
@@ -2311,24 +2248,18 @@ END:VCARD`;
                 const imageId = 'img_' + Math.random().toString(36).substring(2, 15) + '_' + Date.now();
 
                 try {
-                    // 1. Immediately and durably save the original blob in IndexedDB (Step 0)
-                    let localPreviewUrl = null;
-                    if (!isDoc) {
-                        const subFolder = contextData.assignedTo || contextData.roomName || 'Sonstiges';
-                        const odFolder = buildProjectFolderName(
-                            formData.projectNumber || formData.id || 'Unbekannt',
-                            formData
-                        );
-                        localPreviewUrl = await savePhotoLocally(imageId, formData.id || 'temp', file, {
-                            ...contextData,
-                            subFolder,
-                            odFolder,
-                            isSketch: contextData.assignedTo === 'Messprotokolle' || (file.name && file.name.includes('sketch'))
-                        });
-                        trackObjectURL(localPreviewUrl);
-                    } else {
-                        localPreviewUrl = trackObjectURL(URL.createObjectURL(file));
-                    }
+                    const pendingImage = { id: imageId, name: file.name, ...contextData, syncStatus: 'local_only' };
+                    const localManifest = await registerMediaLocally({
+                        projectId: durableProjectId,
+                        projectSnapshot: { ...formData, id: durableProjectId, images: [...(formData.images || []), pendingImage] },
+                        entityId: imageId,
+                        kind: isDoc ? 'document' : 'damage_image',
+                        file,
+                        payload: { ...contextData, name: file.name, fileType: fileExt },
+                        actor: currentUser?.id || currentUser?.email || null,
+                        baseVersion: formData.version || null
+                    });
+                    const localPreviewUrl = trackObjectURL(URL.createObjectURL(localManifest.localFile));
 
                     // 2. Add to React state only after confirmed local IndexedDB save
                     const imageEntry = {
@@ -2342,36 +2273,13 @@ END:VCARD`;
                         error: false,
                         type: isDoc ? 'document' : 'image',
                         fileType: fileExt,
-                        syncStatus: 'local_only'
+                        syncStatus: 'local_only',
+                        offlineTransactionId: localManifest.transactionId
                     };
 
                     setFormData(prev => ({ ...prev, images: [...prev.images, imageEntry] }));
 
-                    // 3. Immediately trigger background sync worker without blocking UI
-                    import('../lib/sync/supabaseSyncWorker.js').then(({ syncPendingToSupabase }) => {
-                        syncPendingToSupabase().then(() => {
-                            getProjectPhotos(formData.id || 'temp').then(localPhotos => {
-                                    setFormData(prev => ({
-                                        ...prev,
-                                        images: (prev.images || []).map(img => {
-                                            const lp = localPhotos.find(p => p.id === img.id);
-                                            return lp && lp.syncStatus ? {
-                                                ...img,
-                                                syncStatus: lp.syncStatus,
-                                                supabasePath: lp.supabasePath || img.supabasePath,
-                                                oneDriveItemId: lp.oneDriveItemId || img.oneDriveItemId,
-                                                error: lp.syncStatus === 'error',
-                                                errorMessage: lp.errorMessage || null,
-                                                uploading: !lp.oneDriveItemId && lp.syncStatus !== 'error'
-                                            } : img;
-                                        })
-                                    }));
-                            }).catch(() => {});
-                            if (fetchReports) fetchReports().catch(() => {});
-                        }).catch(err => {
-                            console.warn('[handleImageUpload] Background sync failed:', err.message);
-                        });
-                    }).catch(() => {});
+                    // Der zentrale Offline-Outbox-Worker übernimmt die Übertragung.
 
                 } catch (error) {
                     console.error('[handleImageUpload] Failed to save image locally:', error);
@@ -2387,17 +2295,18 @@ END:VCARD`;
             const imageId = 'img_' + Math.random().toString(36).substring(2, 15) + '_' + Date.now();
 
             try {
-                // 1. Immediately and durably save the original blob in IndexedDB (Step 0)
-                let localPreviewUrl = null;
-                if (!isDoc) {
-                    localPreviewUrl = await savePhotoLocally(imageId, formData.id || 'temp', file, {
-                        ...contextData,
-                        isSketch: contextData.assignedTo === 'Messprotokolle' || (file.name && file.name.includes('sketch'))
-                    });
-                    trackObjectURL(localPreviewUrl);
-                } else {
-                    localPreviewUrl = trackObjectURL(URL.createObjectURL(file));
-                }
+                const pendingImage = { id: imageId, name: file.name, ...contextData, syncStatus: 'local_only' };
+                const localManifest = await registerMediaLocally({
+                    projectId: durableProjectId,
+                    projectSnapshot: { ...formData, id: durableProjectId, images: [...(formData.images || []), pendingImage] },
+                    entityId: imageId,
+                    kind: isDoc ? 'document' : 'damage_image',
+                    file,
+                    payload: { ...contextData, name: file.name, fileType: fileExt },
+                    actor: currentUser?.id || currentUser?.email || null,
+                    baseVersion: formData.version || null
+                });
+                const localPreviewUrl = trackObjectURL(URL.createObjectURL(localManifest.localFile));
 
                 // 2. Add to React state only after confirmed local IndexedDB save
                 const imageEntry = {
@@ -2411,36 +2320,13 @@ END:VCARD`;
                     error: false,
                     type: isDoc ? 'document' : 'image',
                     fileType: fileExt,
-                    syncStatus: 'local_only'
+                    syncStatus: 'local_only',
+                    offlineTransactionId: localManifest.transactionId
                 };
 
                 setFormData(prev => ({ ...prev, images: [...prev.images, imageEntry] }));
 
-                // 3. Immediately trigger background sync worker without blocking UI
-                import('../lib/sync/supabaseSyncWorker.js').then(({ syncPendingToSupabase }) => {
-                    syncPendingToSupabase().then(() => {
-                        getProjectPhotos(formData.id || 'temp').then(localPhotos => {
-                                setFormData(prev => ({
-                                    ...prev,
-                                    images: (prev.images || []).map(img => {
-                                        const lp = localPhotos.find(p => p.id === img.id);
-                                        return lp && lp.syncStatus ? {
-                                            ...img,
-                                            syncStatus: lp.syncStatus,
-                                            supabasePath: lp.supabasePath || img.supabasePath,
-                                            oneDriveItemId: lp.oneDriveItemId || img.oneDriveItemId,
-                                            error: lp.syncStatus === 'error',
-                                            errorMessage: lp.errorMessage || null,
-                                            uploading: !lp.oneDriveItemId && lp.syncStatus !== 'error'
-                                        } : img;
-                                    })
-                                }));
-                        }).catch(() => {});
-                        if (fetchReports) fetchReports().catch(() => {});
-                    }).catch(err => {
-                        console.warn('[handleImageUpload] Background sync failed:', err.message);
-                    });
-                }).catch(() => {});
+                // Der zentrale Offline-Outbox-Worker übernimmt die Übertragung.
 
             } catch (error) {
                 console.error('[handleImageUpload] Failed to save image locally:', error);
@@ -2820,10 +2706,11 @@ END:VCARD`;
             console.log("[PDF Master] Nutze zentralen PDFService für Export...");
             const result = await PDFService.generateCompleteDamageReport(dataToUse, {
                 supabase,
-                uploadToOneDrive: true,
+                // PDF zuerst lokal/Storage registrieren. OneDrive wird erst
+                // durch den zentralen exakten Firmen-Drive-Worker bestätigt.
+                uploadToOneDrive: false,
                 uploadToApp: true,
                 getPhotoDownloadUrl,
-                uploadReport,
                 handleImageUpload: (files, context) => {
                     const isNewVersionRequested = saveAsNewVersion || formData.status === 'Abgeschlossen';
                     if (!isNewVersionRequested) {
@@ -2834,7 +2721,6 @@ END:VCARD`;
                     }
                     return handleImageUpload(files, context);
                 },
-                buildProjectFolderName,
                 onProgress: (msg) => console.log(`[PDF Progress] ${msg}`)
             });
 
@@ -2940,24 +2826,38 @@ END:VCARD`;
         try {
             // Compress and resize the image first (typically down to 100-200KB)
             const compressedBase64 = await compressAndResizeImage(file);
+            const res = await fetch(compressedBase64);
+            const blob = await res.blob();
+            const exteriorId = `exterior_${Date.now()}`;
+            const durableProjectId = formData.id || offlineProjectIdRef.current;
+            const nextExteriorSnapshot = { ...formData, id: durableProjectId, exteriorPhoto: compressedBase64, exteriorPhotoDeleted: false };
+            const localManifest = await registerMediaLocally({
+                projectId: durableProjectId,
+                projectSnapshot: nextExteriorSnapshot,
+                entityId: exteriorId,
+                kind: 'exterior_image',
+                file: blob,
+                payload: { name: file.name, exteriorPhotoDeleted: false },
+                actor: currentUser?.id || currentUser?.email || null,
+                baseVersion: formData.version || null
+            });
             setFormData(prev => ({
                 ...prev,
                 exteriorPhoto: compressedBase64,
-                exteriorPhotoDeleted: false
+                exteriorPhotoDeleted: false,
+                exteriorPhotoOfflineTransactionId: localManifest.transactionId
             }));
             setExteriorPhotoDeleted(false);
 
             // Upload to Supabase Storage and replace with public URL
             if (supabase) {
                 try {
-                    // Convert base64 to Blob for Supabase Storage upload
-                    const res = await fetch(compressedBase64);
-                    const blob = await res.blob();
-                    const ext = 'jpg';
-                    const fileName = `cases/${formData.id || 'temp'}/images/exterior_${Date.now()}.${ext}`;
-                    const { error } = await supabase.storage.from('case-files').upload(fileName, blob);
-                    if (error) throw error;
-                    const { data: { publicUrl } } = supabase.storage.from('case-files').getPublicUrl(fileName);
+                    const fileName = localManifest.cloudTarget.path;
+                    const publicUrl = await runCloudAfterLocal(localManifest, async () => {
+                        const { error } = await supabase.storage.from('case-files').upload(fileName, blob);
+                        if (error) throw error;
+                        return supabase.storage.from('case-files').getPublicUrl(fileName).data.publicUrl;
+                    });
                     setFormData(prev => ({
                         ...prev,
                         exteriorPhoto: publicUrl,
@@ -3750,16 +3650,27 @@ END:VCARD`;
                           showMeasurementModal
                         });
                         const { file, measurements, globalSettings, canvasImage, galleryPhotos, measurementHistory: updatedHistoryFromModal } = data;
+                        const measurementId = `measurement_${activeRoomForMeasurement?.id || 'room'}_${globalSettings?.date || Date.now()}_${crypto.randomUUID()}`;
+                        const pendingMeasurement = { measurements, globalSettings, canvasImage, galleryPhotos, measurementHistory: updatedHistoryFromModal, isAutosave: !!data?.isAutosave };
+                        const measurementManifest = await registerMeasurementLocally({
+                            projectId: formData.id || offlineProjectIdRef.current,
+                            projectSnapshot: { ...formData, id: formData.id || offlineProjectIdRef.current, _pendingMeasurement: { id: measurementId, roomId: activeRoomForMeasurement?.id, ...pendingMeasurement } },
+                            roomId: activeRoomForMeasurement?.id,
+                            measurementId,
+                            measurement: pendingMeasurement,
+                            protocolFile: file,
+                            actor: currentUser?.id || currentUser?.email || null,
+                            baseVersion: formData.version || null
+                        });
                         let protocolUrl = null;
                         if (supabase && file) {
                             try {
-                                const fileExt = file.name.split('.').pop() || (file.type === 'application/pdf' ? 'pdf' : 'png');
-                                const fileName = `cases/${formData.id || 'temp'}/protocols/${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
-                                const { error } = await supabase.storage.from('case-files').upload(fileName, file);
-                                if (!error) {
-                                    const { data: { publicUrl } } = supabase.storage.from('case-files').getPublicUrl(fileName);
-                                    protocolUrl = publicUrl;
-                                }
+                                const fileName = measurementManifest.cloudTarget.path;
+                                protocolUrl = await runCloudAfterLocal(measurementManifest, async () => {
+                                    const { error } = await supabase.storage.from('case-files').upload(fileName, file);
+                                    if (error) throw error;
+                                    return supabase.storage.from('case-files').getPublicUrl(fileName).data.publicUrl;
+                                });
                             } catch (err) { console.error(err); }
                         }
                         if (activeRoomForMeasurement) {
@@ -4593,6 +4504,7 @@ END:VCARD`;
                     <div style={{ marginBottom: '1.5rem' }}>
                         <UploadPanel
                             caseId={formData.id}
+                            projectSnapshot={formData}
                             onCaseCreated={handleUploadPanelCaseCreated}
                             onExtractionComplete={handleUploadPanelExtraction}
                             onImagesUploaded={handleUploadPanelImages}
@@ -5237,14 +5149,15 @@ END:VCARD`;
                                             if (urls.length > 0) {
                                                 urls.forEach(async (url) => {
                                                     try {
-                                                        let dataUrl = url;
+                                                        let blob;
                                                         if (!url.startsWith('data:')) {
                                                             const resp = await fetch(url, { mode: 'cors' });
-                                                            const blob = await resp.blob();
-                                                            dataUrl = await new Promise(res => { const r = new FileReader(); r.onloadend = () => res(r.result); r.readAsDataURL(blob); });
+                                                            blob = await resp.blob();
+                                                        } else {
+                                                            blob = await (await fetch(url)).blob();
                                                         }
-                                                        const newImg = { id: Date.now() + Math.random(), preview: dataUrl, name: 'email-bild.jpg', description: '', assignedTo: 'Schadensbilder', includeInReport: true };
-                                                        setFormData(prev => ({ ...prev, images: [...(prev.images || []), newImg] }));
+                                                        const file = new File([blob], 'email-bild.jpg', { type: blob.type || 'image/jpeg' });
+                                                        await handleImageUpload([file], { assignedTo: 'Schadensbilder', includeInReport: true });
                                                     } catch (err) { console.warn('E-Mail Bild konnte nicht geladen werden (CORS):', url, err); }
                                                 });
                                                 return;
@@ -5260,9 +5173,8 @@ END:VCARD`;
                                                     const resp = await fetch(url, { mode: 'cors' });
                                                     const blob = await resp.blob();
                                                     if (blob.type.startsWith('image/')) {
-                                                        const dataUrl = await new Promise(res => { const r = new FileReader(); r.onloadend = () => res(r.result); r.readAsDataURL(blob); });
-                                                        const newImg = { id: Date.now() + Math.random(), preview: dataUrl, name: 'email-bild.jpg', description: '', assignedTo: 'Schadensbilder', includeInReport: true };
-                                                        setFormData(prev => ({ ...prev, images: [...(prev.images || []), newImg] }));
+                                                        const file = new File([blob], 'email-bild.jpg', { type: blob.type || 'image/jpeg' });
+                                                        await handleImageUpload([file], { assignedTo: 'Schadensbilder', includeInReport: true });
                                                     }
                                                 } catch (err) { console.warn('URI-Bild konnte nicht geladen werden:', url, err); }
                                             });
@@ -5478,40 +5390,14 @@ END:VCARD`;
                                                 currentId = "TMP-" + Date.now();
                                                 setFormData(prev => ({ ...prev, id: currentId }));
                                             }
-
-                                            for (const file of files) {
-                                                const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-                                                const filePath = `cases/${currentId}/images/${timestamp}_${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
-
-                                                try {
-                                                    // Upload
-                                                    const { error: uploadError } = await supabase.storage
-                                                        .from("case-files")
-                                                        .upload(filePath, file);
-
-                                                    if (uploadError) throw uploadError;
-
-                                                    // Get Public URL
-                                                    const { data: { publicUrl } } = supabase.storage
-                                                        .from("case-files")
-                                                        .getPublicUrl(filePath);
-
-                                                    // Add to formData
-                                                    setFormData(prev => ({
-                                                        ...prev,
-                                                        images: [...(prev.images || []), {
-                                                            preview: publicUrl,
-                                                            name: file.name,
-                                                            description: 'Initialbild (Mail)',
-                                                            date: new Date().toISOString(),
-                                                            roomId: null // Global / Initial
-                                                        }]
-                                                    }));
-                                                } catch (err) {
-                                                    console.error("Image upload failed", err);
-                                                    alert("Fehler beim Bilder-Upload: " + err.message);
-                                                }
-                                            }
+                                            await handleImageUpload(files, {
+                                                projectId: currentId,
+                                                assignedTo: 'Schadensbilder',
+                                                description: 'Initialbild (Mail)',
+                                                roomId: null,
+                                                includeInReport: true
+                                            });
+                                            e.target.value = '';
                                         }}
                                     />
                                 </div>
@@ -6387,7 +6273,7 @@ END:VCARD`;
                                         <button
                                             type="button"
                                             className="btn btn-primary"
-                                            onClick={() => {
+                                            onClick={async () => {
                                                 handleAddRoom();
                                                 setShowAddRoomForm(false); // Auto-close after add
                                             }}
@@ -8696,18 +8582,7 @@ END:VCARD`;
                                 onClick={async () => {
                                     try {
                                         const result = await generateMeasurementExcel(formData);
-                                        if (result?.blob) {
-                                            try {
-                                                const odFolder = buildProjectFolderName(
-                                                    formData.projectNumber || formData.id || 'Unbekannt',
-                                                    formData
-                                                );
-                                                const { uploadExcel } = await import('../services/OneDriveService');
-                                                await uploadExcel(odFolder, result.blob);
-                                            } catch (odErr) {
-                                                console.warn('[OneDrive] Excel-Upload fehlgeschlagen:', odErr.message);
-                                            }
-                                        }
+                                        // Excel bleibt ein lokaler Export. Kein Cloud-Write mitten in der Sitzung.
                                     } catch (error) {
                                         console.error("Excel Export failed:", error);
                                         alert("Fehler beim Erstellen des Excel-Protokolls.");
@@ -10038,7 +9913,7 @@ END:VCARD`;
                                             type="button"
                                             className="btn btn-primary"
                                             style={{ flex: 1, padding: '0.75rem', fontWeight: 600 }}
-                                            onClick={() => {
+                                            onClick={async () => {
                                                 const newEquipment = [...(formData.equipment || [])];
                                                 newEquipment[idx] = {
                                                     ...newEquipment[idx],
@@ -10047,6 +9922,13 @@ END:VCARD`;
                                                     hours: draft.hours || ''
                                                 };
                                                 const updatedForm = { ...formData, equipment: newEquipment };
+                                                await registerDomainMutation({
+                                                    projectId: formData.id || offlineProjectIdRef.current,
+                                                    type: 'device.checkout', entityId: device.dbId || device.id,
+                                                    payload: { device: newEquipment[idx], projectId: formData.id || offlineProjectIdRef.current },
+                                                    snapshot: updatedForm, actor: currentUser?.id || currentUser?.email || null,
+                                                    baseVersion: formData.version || null
+                                                });
                                                 setFormData(updatedForm);
                                                 if (onSave) onSave(updatedForm);
 
@@ -10513,14 +10395,29 @@ END:VCARD`;
                         <ImageEditor
                             image={editingImage}
                             caseId={formData.id}
-                            onSave={(newPreview, newDescription) => {
+                            onSave={async (newPreview, newDescription, { blob, photoId }) => {
+                                const kind = editingImage.isExterior ? 'exterior_image_edited' : (editingImage.isCustomMap ? 'map_image_edited' : 'damage_image_edited');
+                                const durableProjectId = formData.id || offlineProjectIdRef.current;
+                                const pendingEditedImage = { id: photoId, preview: newPreview, description: newDescription, syncStatus: 'local_only' };
+                                const localManifest = await registerMediaLocally({
+                                    projectId: durableProjectId,
+                                    projectSnapshot: { ...formData, id: durableProjectId, _pendingEditedImage: pendingEditedImage },
+                                    entityId: photoId,
+                                    kind,
+                                    file: blob,
+                                    payload: { description: newDescription, sourceImageId: editingImage.id || null },
+                                    actor: currentUser?.id || currentUser?.email || null,
+                                    baseVersion: formData.version || null
+                                });
+                                const persistentPreview = URL.createObjectURL(localManifest.localFile);
+                                trackObjectURL(persistentPreview);
                                 setFormData(prev => {
                                     // 1. Check if it's the Aussenaufnahme (Special case)
                                     if (editingImage.isExterior) {
-                                        return { ...prev, exteriorPhoto: newPreview };
+                                        return { ...prev, exteriorPhoto: persistentPreview, exteriorPhotoOfflineTransactionId: localManifest.transactionId };
                                     }
                                     if (editingImage.isCustomMap) {
-                                        return { ...prev, customMapImage: newPreview };
+                                        return { ...prev, customMapImage: persistentPreview, customMapImageOfflineTransactionId: localManifest.transactionId };
                                     }
 
                                     // 2. Standard Case: List of Images (Keep original AND add edited image side-by-side)
@@ -10537,13 +10434,14 @@ END:VCARD`;
                                             // 2. Add the EDITED photo with drawings right next to it
                                             nextImages.push({
                                                 ...img,
-                                                id: `edited_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+                                                id: photoId,
                                                 name: img.name ? `${img.name} (Bearbeitet)` : 'Bearbeitetes Bild',
-                                                preview: newPreview,
-                                                url: newPreview,
+                                                preview: persistentPreview,
+                                                url: persistentPreview,
                                                 description: newDescription || img.description || '',
                                                 includeInReport: true,
-                                                syncStatus: 'local_only'
+                                                syncStatus: 'local_only',
+                                                offlineTransactionId: localManifest.transactionId
                                             });
                                         } else {
                                             nextImages.push(img);
@@ -10694,16 +10592,27 @@ END:VCARD`;
                           showMeasurementModal
                         });
                         const { file, measurements, globalSettings, canvasImage, galleryPhotos, measurementHistory: updatedHistoryFromModal } = data;
+                        const measurementId = `measurement_${activeRoomForMeasurement?.id || 'room'}_${globalSettings?.date || Date.now()}_${crypto.randomUUID()}`;
+                        const pendingMeasurement = { measurements, globalSettings, canvasImage, galleryPhotos, measurementHistory: updatedHistoryFromModal, isAutosave: !!data?.isAutosave };
+                        const measurementManifest = await registerMeasurementLocally({
+                            projectId: formData.id || offlineProjectIdRef.current,
+                            projectSnapshot: { ...formData, id: formData.id || offlineProjectIdRef.current, _pendingMeasurement: { id: measurementId, roomId: activeRoomForMeasurement?.id, ...pendingMeasurement } },
+                            roomId: activeRoomForMeasurement?.id,
+                            measurementId,
+                            measurement: pendingMeasurement,
+                            protocolFile: file,
+                            actor: currentUser?.id || currentUser?.email || null,
+                            baseVersion: formData.version || null
+                        });
                         let protocolUrl = null;
                         if (supabase && file) {
                             try {
-                                const fileExt = file.name.split('.').pop() || (file.type === 'application/pdf' ? 'pdf' : 'png');
-                                const fileName = `cases/${formData.id || 'temp'}/protocols/${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
-                                const { error } = await supabase.storage.from('case-files').upload(fileName, file);
-                                if (!error) {
-                                    const { data: { publicUrl } } = supabase.storage.from('case-files').getPublicUrl(fileName);
-                                    protocolUrl = publicUrl;
-                                }
+                                const fileName = measurementManifest.cloudTarget.path;
+                                protocolUrl = await runCloudAfterLocal(measurementManifest, async () => {
+                                    const { error } = await supabase.storage.from('case-files').upload(fileName, file);
+                                    if (error) throw error;
+                                    return supabase.storage.from('case-files').getPublicUrl(fileName).data.publicUrl;
+                                });
                             } catch (err) { console.error(err); }
                         }
                         if (activeRoomForMeasurement) {

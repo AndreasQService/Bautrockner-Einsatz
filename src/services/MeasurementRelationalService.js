@@ -3,6 +3,7 @@
    PERMISSION FROM THE USER. THIS APPLIES TO CORE/CRITICAL LOGIC.
    ========================================================================== */
 import { supabase } from '../supabaseClient';
+import { registerDomainMutation } from '../lib/offline/domainMutationAdapter.js';
 
 export const MeasurementRelationalService = {
   async loadRelationalRoomsForReport(reportId) {
@@ -195,16 +196,23 @@ export const MeasurementRelationalService = {
     if (!reportId || !legacyRoom) return null;
 
     try {
+      const roomRow = {
+        report_id: reportId,
+        legacy_room_id: legacyRoom.id,
+        name: legacyRoom.name || '',
+        room_type: legacyRoom.apartment || '',
+      };
+      await registerDomainMutation({
+        projectId: reportId,
+        type: 'measurement.relational.room.upsert',
+        entityId: legacyRoom.id,
+        payload: { table: 'damage_report_rooms', rows: [roomRow] },
+        snapshot: { reportId, legacyRoom },
+      });
       // Upsert room based on report_id and legacy_room_id
       const { data, error } = await supabase
         .from('damage_report_rooms')
-        .upsert({
-          report_id: reportId,
-          legacy_room_id: legacyRoom.id,
-          name: legacyRoom.name || '',
-          room_type: legacyRoom.apartment || '',
-          // Don't set deleted_at here, keep it idempotent
-        }, {
+        .upsert(roomRow, {
           onConflict: 'report_id, legacy_room_id'
         })
         .select('id')
@@ -273,6 +281,11 @@ export const MeasurementRelationalService = {
 
       // Upsert measurements individually or as batch
       if (upsertPayload.length > 0) {
+          await registerDomainMutation({
+            projectId: reportId, type: 'measurement.relational.upsert',
+            entityId: `${legacyRoom.id}:${measuredAt}`, payload: { table: 'room_measurements', rows: upsertPayload, roomId, legacyRoomId: legacyRoom.id },
+            snapshot: { reportId, legacyRoom, measurements, globalSettings }
+          });
           const { data, error } = await supabase
             .from('room_measurements')
             .upsert(upsertPayload, {
@@ -307,19 +320,19 @@ export const MeasurementRelationalService = {
       if (!roomId) throw new Error('Could not ensure relational room for protocol');
 
       const legacyProtocolId = `${reportId}:${legacyRoom.id}:measurementData_protocol`;
+      const protocolRow = {
+        report_id: reportId, room_id: roomId, legacy_protocol_id: legacyProtocolId,
+        source: 'measurementData', protocol_type: 'pdf_protocol', file_url: protocolUrl,
+        upload_status: 'completed', created_by: 'dual_write_system'
+      };
+      await registerDomainMutation({
+        projectId: reportId, type: 'measurement.relational.protocol.upsert', entityId: legacyProtocolId,
+        payload: { table: 'measurement_protocols', rows: [protocolRow] }, snapshot: { reportId, legacyRoom, protocolUrl }
+      });
 
       const { data, error } = await supabase
         .from('measurement_protocols')
-        .upsert({
-          report_id: reportId,
-          room_id: roomId,
-          legacy_protocol_id: legacyProtocolId,
-          source: 'measurementData',
-          protocol_type: 'pdf_protocol',
-          file_url: protocolUrl,
-          upload_status: 'completed',
-          created_by: 'dual_write_system'
-        }, {
+        .upsert(protocolRow, {
           onConflict: 'report_id, room_id, legacy_protocol_id'
         })
         .select('id');
@@ -353,6 +366,10 @@ export const MeasurementRelationalService = {
 
       const relationalRoomId = roomData.id;
       const now = new Date().toISOString();
+      await registerDomainMutation({
+        projectId: reportId, type: 'measurement.relational.room.delete', entityId: legacyRoomId,
+        payload: { relationalRoomId, deletedAt: now }, snapshot: { reportId, legacyRoomId, tombstone: true }, tombstone: true
+      });
 
       await supabase
         .from('damage_report_rooms')
@@ -391,6 +408,11 @@ export const MeasurementRelationalService = {
       const relationalRoomId = roomData.id;
       const now = new Date().toISOString();
       const mpNumber = parseInt(mp, 10);
+      await registerDomainMutation({
+        projectId: reportId, type: 'measurement.relational.point.delete', entityId: `${legacyRoomId}:${mp}`,
+        payload: { relationalRoomId, mpNumber: isNaN(mpNumber) ? null : mpNumber, deletedAt: now },
+        snapshot: { reportId, legacyRoomId, mp, tombstone: true }, tombstone: true
+      });
 
       const { error } = await supabase
         .from('room_measurements')

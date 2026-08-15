@@ -13,6 +13,7 @@
  */
 
 import { createClient }  from 'https://esm.sh/@supabase/supabase-js@2';
+import { excludeLockedProjectItems } from '../_shared/lockedProjectFilter.js';
 
 const SUPABASE_URL        = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -28,7 +29,7 @@ const DRIVE_ID            = Deno.env.get('ONEDRIVE_DRIVE_ID')!;  // Drive ID der
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Authorization, Content-Type',
+  'Access-Control-Allow-Headers': 'Authorization, Content-Type, x-qtool-worker-secret, x-qtool-session-token, x-qtool-project-id',
 };
 
 const CHUNK_SIZE          = 4 * 1024 * 1024;  // 4 MB Chunks
@@ -91,7 +92,10 @@ async function createUploadSession(
     },
     body: JSON.stringify({
       item: {
-        '@microsoft.graph.conflictBehavior': 'rename',   // nie überschreiben
+        // remotePath is the journal's deterministic idempotency key. A retry
+        // after a lost final response must replace that exact target instead
+        // of creating "(1)" duplicates.
+        '@microsoft.graph.conflictBehavior': 'replace',
         name: filename,
       },
     }),
@@ -151,12 +155,59 @@ async function uploadChunks(
 
 // ─── Verifikation ─────────────────────────────────────────────────────────────
 
-async function verifyItem(token: string, itemId: string): Promise<boolean> {
-  const resp = await fetch(
-    `https://graph.microsoft.com/v1.0/drives/${DRIVE_ID}/items/${itemId}`,
-    { headers: { Authorization: `Bearer ${token}` } }
-  );
-  return resp.ok;
+type RemoteProof = {
+  remote_drive_id: string;
+  remote_item_id: string;
+  remote_etag: string;
+  remote_size_bytes: number;
+  remote_sha256: string;
+  verified_at: string;
+};
+
+async function sha256Hex(blob: Blob): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', await blob.arrayBuffer());
+  return [...new Uint8Array(digest)].map(value => value.toString(16).padStart(2, '0')).join('');
+}
+
+// Evidence is produced by the service-principal worker against the exact
+// configured company drive. The browser must never try to re-prove this via
+// /me/drive, which may resolve to an entirely different personal drive.
+async function verifyItemBytes(
+  token: string,
+  itemId: string,
+  expectedSize: number,
+  expectedSha256: string,
+): Promise<RemoteProof> {
+  if (!DRIVE_ID) throw new Error('ONEDRIVE_DRIVE_ID fehlt');
+  const base = `https://graph.microsoft.com/v1.0/drives/${encodeURIComponent(DRIVE_ID)}/items/${encodeURIComponent(itemId)}`;
+  const metadataResponse = await fetch(`${base}?$select=id,eTag,size,parentReference`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!metadataResponse.ok) throw new Error(`OneDrive-Metadatenprüfung fehlgeschlagen (${metadataResponse.status})`);
+  const metadata = await metadataResponse.json();
+  if (String(metadata?.id || '') !== itemId
+    || String(metadata?.parentReference?.driveId || '') !== DRIVE_ID
+    || !metadata?.eTag
+    || Number(metadata?.size) !== expectedSize) {
+    throw new Error('OneDrive Item-/Drive-/ETag-/Grössen-Evidenz stimmt nicht');
+  }
+  const contentResponse = await fetch(`${base}/content`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!contentResponse.ok) throw new Error(`OneDrive-Byte-Readback fehlgeschlagen (${contentResponse.status})`);
+  const remoteBlob = await contentResponse.blob();
+  const remoteSha256 = await sha256Hex(remoteBlob);
+  if (remoteBlob.size !== expectedSize || remoteSha256.toLowerCase() !== expectedSha256.toLowerCase()) {
+    throw new Error('OneDrive Byte-Grösse/SHA-256 stimmt nicht');
+  }
+  return {
+    remote_drive_id: DRIVE_ID,
+    remote_item_id: itemId,
+    remote_etag: metadata.eTag,
+    remote_size_bytes: remoteBlob.size,
+    remote_sha256: remoteSha256,
+    verified_at: new Date().toISOString(),
+  };
 }
 
 // ─── Edge Function Test Guard ────────────────────────────────────────────────
@@ -258,6 +309,11 @@ async function processItem(
   const remotePath  = (item.remote_path as string) || '';
   const filename    = item.filename as string;
   const fileSize    = (item.size_bytes as number) || 0;
+  const expectedSha = String(item.sha256 || '').toLowerCase();
+
+  if (!fileSize || !/^[a-f0-9]{64}$/.test(expectedSha)) {
+    throw new Error('Transferjournal enthält keine vertrauenswürdige Grösse/SHA-256');
+  }
 
   // Strikten Edge Guard vor JEDEM Schritt aufrufen!
   validateEdgeOneDrivePath(remotePath);
@@ -289,16 +345,26 @@ async function processItem(
   const itemId = await uploadChunks(sessionUrl, blobData);
 
   // Verifikation
-  const verified = await verifyItem(token, itemId);
-  if (!verified) throw new Error('Verifikation fehlgeschlagen – Item nicht gefunden');
+  const proof = await verifyItemBytes(token, itemId, fileSize, expectedSha);
 
   // Journal: verified
-  await sb.from('project_image_uploads').update({
+  const { data: persistedProof, error: proofError } = await sb.from('project_image_uploads').update({
     storage_status:  'remote_verified',
-    remote_item_id:  itemId,
-    verified_at:     new Date().toISOString(),
+    ...proof,
     last_error:      null,
-  }).eq('id', id);
+  }).eq('id', id)
+    .select('project_id,local_image_id,storage_status,remote_drive_id,remote_item_id,remote_etag,remote_size_bytes,remote_sha256,verified_at')
+    .single();
+  if (proofError
+    || persistedProof?.storage_status !== 'remote_verified'
+    || persistedProof?.remote_drive_id !== proof.remote_drive_id
+    || persistedProof?.remote_item_id !== proof.remote_item_id
+    || persistedProof?.remote_etag !== proof.remote_etag
+    || Number(persistedProof?.remote_size_bytes) !== proof.remote_size_bytes
+    || persistedProof?.remote_sha256 !== proof.remote_sha256
+    || persistedProof?.verified_at !== proof.verified_at) {
+    throw new Error(`OneDrive-Evidenz konnte nicht vollständig persistiert/rückgelesen werden: ${proofError?.message || 'Abweichung'}`);
+  }
 
   console.log(`[Worker] ✅ ${filename} → OneDrive (${itemId})`);
 }
@@ -311,20 +377,36 @@ Deno.serve(async (req: Request) => {
     return new Response(null, { status: 204, headers: CORS_HEADERS });
   }
 
-  // Auth-Check: nur Service Role oder Cron
+  // Background jobs require the configured worker secret. Browser final-sync
+  // calls require a valid JWT plus the exact owner session/project scope.
   const authHeader = req.headers.get('Authorization');
-  if (!authHeader?.startsWith('Bearer ')) {
-    return new Response('Unauthorized', { status: 401, headers: CORS_HEADERS });
+  const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+  const configuredWorkerSecret = Deno.env.get('QTOOL_WORKER_SECRET');
+  const isWorker = Boolean(configuredWorkerSecret && req.headers.get('x-qtool-worker-secret') === configuredWorkerSecret);
+  let scopedProjectId: string | null = null;
+  if (!isWorker) {
+    if (!authHeader?.startsWith('Bearer ')) return new Response('Unauthorized', { status: 401, headers: CORS_HEADERS });
+    const jwt = authHeader.slice('Bearer '.length).trim();
+    const { data: authData, error: authError } = await sb.auth.getUser(jwt);
+    const sessionToken = req.headers.get('x-qtool-session-token');
+    scopedProjectId = req.headers.get('x-qtool-project-id');
+    if (authError || !authData?.user || !scopedProjectId || !sessionToken || sessionToken.length < 20) {
+      return new Response('Owner session required', { status: 403, headers: CORS_HEADERS });
+    }
+    const { data: owner } = await sb.from('project_sessions').select('session_token')
+      .eq('open_project_id', scopedProjectId).eq('session_token', sessionToken)
+      .eq('owner_user_id', authData.user.id).maybeSingle();
+    if (!owner) return new Response('Project lock not owned', { status: 409, headers: CORS_HEADERS });
   }
 
-  const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
-
   // Pending Items laden (max. MAX_CONCURRENT)
-  const { data: items, error } = await sb
+  let pendingQuery = sb
     .from('project_image_uploads')
     .select('*')
     .in('storage_status', ['uploaded_to_backend', 'needs_repair'])
-    .lt('retry_count', MAX_RETRIES)
+    .lt('retry_count', MAX_RETRIES);
+  if (scopedProjectId) pendingQuery = pendingQuery.eq('project_id', scopedProjectId);
+  const { data: candidateItems, error } = await pendingQuery
     .order('created_at', { ascending: true })
     .limit(MAX_CONCURRENT);
 
@@ -334,7 +416,23 @@ Deno.serve(async (req: Request) => {
     });
   }
 
-  if (!items || items.length === 0) {
+  // A trusted background worker still may not write business data for any
+  // project currently open offline. Only the exact browser-owner final-sync
+  // path above may process its scoped project.
+  let items = candidateItems || [];
+  if (isWorker && items.length > 0) {
+    const projectIds = [...new Set(items.map(item => String(item.project_id || '')).filter(Boolean))];
+    if (projectIds.length > 0) {
+      const { data: activeLocks, error: lockError } = await sb.from('project_sessions')
+        .select('open_project_id').in('open_project_id', projectIds).not('open_project_id', 'is', null);
+      if (lockError) return new Response(JSON.stringify({ error: lockError.message }), {
+        status: 503, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+      });
+      items = excludeLockedProjectItems(items, activeLocks || []);
+    }
+  }
+
+  if (items.length === 0) {
     return new Response(JSON.stringify({ processed: 0, message: 'Keine ausstehenden Items' }), {
       headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
     });

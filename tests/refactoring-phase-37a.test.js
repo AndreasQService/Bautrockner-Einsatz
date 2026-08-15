@@ -241,8 +241,8 @@ const createMockSupabase = () => {
       select: (columns) => {
         requests.push({ method: 'select', table, columns });
         return {
-          gte: (col, val) => {
-            requests.push({ method: 'select.gte', table, col, val });
+          not: (col, operator, val) => {
+            requests.push({ method: 'select.not', table, col, operator, val });
             return Promise.resolve({ data: [], error: null });
           }
         };
@@ -355,7 +355,7 @@ test('7. kein POST vor bestätigter Auth', () => {
   assert.equal(locks.length, 0);
 });
 
-test('8. bestehende Lock-Logik nach Auth unverändert', () => {
+test('8. Lock-Status wird nach Auth über nicht-geheime RPC gepollt', () => {
   const supabase = createMockSupabase();
   const harness = new HookHarness(supabase, 'token123', 'report456', 'details', 'desktop', Date.now(), true);
   harness.run();
@@ -364,9 +364,15 @@ test('8. bestehende Lock-Logik nach Auth unverändert', () => {
   const pollTimer = harness.intervals.find(t => t.delay === 5000);
   assert.ok(pollTimer);
 
-  const prevSelectCount = supabase.requests.filter(r => r.method === 'select.gte').length;
+  const prevStatusCount = supabase.requests.filter(
+    r => r.method === 'rpc' && r.name === 'get_project_lock_status'
+  ).length;
   pollTimer.callback();
-  assert.equal(supabase.requests.filter(r => r.method === 'select.gte').length, prevSelectCount + 1);
+  assert.equal(
+    supabase.requests.filter(r => r.method === 'rpc' && r.name === 'get_project_lock_status').length,
+    prevStatusCount + 1
+  );
+  assert.equal(supabase.requests.filter(r => r.method === 'select.not').length, 0);
 });
 
 test('9. Logout stoppt weitere Requests', () => {
@@ -413,8 +419,8 @@ test('11. Konflikt blockiert gleichem Modus (Desktop vs Desktop)', async () => {
     select: (columns) => {
       supabase.requests.push({ method: 'select', table, columns });
       return {
-        gte: (col, val) => {
-          supabase.requests.push({ method: 'select.gte', table, col, val });
+        not: (col, operator, val) => {
+          supabase.requests.push({ method: 'select.not', table, col, operator, val });
           return Promise.resolve({
             data: [
               {

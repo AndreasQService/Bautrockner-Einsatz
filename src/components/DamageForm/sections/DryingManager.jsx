@@ -4,12 +4,12 @@ import {
     Database, RotateCcw, CheckCircle, Trash
 } from 'lucide-react';
 import { PdfIcon, ROOM_OPTIONS } from '../DamageForm.constants.jsx';
+import { registerDomainMutation } from '../../../lib/offline/domainMutationAdapter.js';
 
 const DryingManager = ({
     formData,
     setFormData,
     mode,
-    supabase,
     availableDevices,
     setAvailableDevices,
     deviceFetchError,
@@ -58,20 +58,17 @@ const DryingManager = ({
             dbId: selectedDevice ? selectedDevice.id : null
         };
 
-        if (selectedDevice && supabase) {
-            const { error } = await supabase
-                .from('devices')
-                .update({
-                    current_report_id: formData.id,
-                    current_project: formData.projectTitle || formData.client
-                })
-                .eq('id', selectedDevice.id);
+        const nextSnapshot = { ...formData, equipment: [...(formData.equipment || []), deviceToAdd] };
+        await registerDomainMutation({
+            projectId: formData.id,
+            type: 'device.assign',
+            entityId: deviceToAdd.dbId || deviceToAdd.id,
+            payload: { device: deviceToAdd, projectId: formData.id, project: { equipment: nextSnapshot.equipment } },
+            snapshot: nextSnapshot,
+            baseVersion: formData.version || formData.updated_at || null
+        });
 
-            if (error) {
-                console.error("Failed to update device status:", error);
-                alert("Fehler beim Aktualisieren des Gerätestatus: " + error.message);
-                return false;
-            }
+        if (selectedDevice) {
             setAvailableDevices(prev => prev.filter(d => d.id !== selectedDevice.id));
         }
 
@@ -378,13 +375,22 @@ const DryingManager = ({
                                                         border: '1px solid #10B981', borderRadius: '4px',
                                                         display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', cursor: 'pointer', textTransform: 'uppercase'
                                                     }}
-                                                    onClick={() => {
+                                                    onClick={async () => {
                                                         if (window.confirm("Abmeldung rückgängig machen?")) {
                                                             const newEquipment = [...formData.equipment];
                                                             newEquipment[idx].endDate = '';
                                                             newEquipment[idx].counterEnd = '';
                                                             newEquipment[idx].hours = '';
-                                                            setFormData(prev => ({ ...prev, equipment: newEquipment }));
+                                                            const updatedForm = { ...formData, equipment: newEquipment };
+                                                            await registerDomainMutation({
+                                                                projectId: formData.id,
+                                                                type: 'device.assign',
+                                                                entityId: newEquipment[idx].dbId || newEquipment[idx].id,
+                                                                payload: { device: newEquipment[idx], projectId: formData.id, project: { equipment: updatedForm.equipment } },
+                                                                snapshot: updatedForm,
+                                                                baseVersion: formData.version || formData.updated_at || null
+                                                            });
+                                                            setFormData(updatedForm);
                                                         }
                                                     }}
                                                 >
@@ -445,12 +451,21 @@ const DryingManager = ({
                                                         type="button"
                                                         className="btn btn-primary"
                                                         style={{ flex: 1 }}
-                                                        onClick={() => {
+                                                        onClick={async () => {
                                                             const newEquipment = [...formData.equipment];
                                                             newEquipment[idx].endDate = draft.endDate;
                                                             newEquipment[idx].counterEnd = draft.counterEnd;
                                                             newEquipment[idx].hours = draft.hours;
-                                                            setFormData(prev => ({ ...prev, equipment: newEquipment }));
+                                                            const updatedForm = { ...formData, equipment: newEquipment };
+                                                            await registerDomainMutation({
+                                                                projectId: formData.id,
+                                                                type: 'device.checkout',
+                                                                entityId: newEquipment[idx].dbId || newEquipment[idx].id,
+                                                                payload: { device: newEquipment[idx], projectId: formData.id, project: { equipment: updatedForm.equipment } },
+                                                                snapshot: updatedForm,
+                                                                baseVersion: formData.version || formData.updated_at || null
+                                                            });
+                                                            setFormData(updatedForm);
                                                             const newStates = { ...unsubscribeStates };
                                                             delete newStates[idx];
                                                             setUnsubscribeStates(newStates);
@@ -548,6 +563,7 @@ const DryingManager = ({
                         </table>
                     </div>
                 </div>
+            )}
         </>
     );
 };

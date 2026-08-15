@@ -14,6 +14,10 @@ import { getGraphAccessToken } from '../lib/onedrive/auth.js';
 const GRAPH_BASE = 'https://graph.microsoft.com/v1.0';
 const ROOT_FOLDER = 'QTool';
 
+function rejectDirectMutation(kind) {
+  throw new Error(`Direkter OneDrive-${kind} ist deaktiviert. Datei lokal registrieren und über den zentralen Storage-/Firmen-Drive-Worker synchronisieren.`);
+}
+
 // ─── Token ───────────────────────────────────────────────────────────────────
 
 /**
@@ -50,86 +54,14 @@ export function buildProjectFolderName(projectNumber, formData) {
   return parts.join('_');
 }
 
-/**
- * Dateidatum → YYYY-MM-DD
- */
-function todayStr() {
-  return new Date().toISOString().slice(0, 10);
-}
-
-// ─── Core API ────────────────────────────────────────────────────────────────
-
-async function graphFetch(path, options = {}) {
-  const token = await getAccessToken();
-  if (!token) throw new Error('Kein OneDrive-Token verfügbar.');
-
-  const res = await fetch(`${GRAPH_BASE}${path}`, {
-    ...options,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      ...(options.headers || {}),
-    },
-  });
-
-  if (!res.ok && res.status !== 409) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(`Graph-Fehler ${res.status}: ${err?.error?.message || res.statusText}`);
-  }
-  return res;
-}
-
-/**
- * Ordner erstellen (ignoriert "already exists"-Fehler)
- */
-async function ensureFolder(parentPath, folderName) {
-  const token = await getAccessToken();
-  if (!token) return;
-
-  await fetch(`${GRAPH_BASE}/me/drive/root:/${parentPath}:/children`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      name: folderName,
-      folder: {},
-      '@microsoft.graph.conflictBehavior': 'fail',
-    }),
-  });
-  // 409 = already exists → ok
-}
-
-/**
- * Datei hochladen (< 4 MB, einfacher Upload)
- * @param {string} driveFolder  z.B. "QTool/20260236_Muster_Zuerich/Fotos/Wohnzimmer"
- * @param {string} fileName     z.B. "20260236_Wohnzimmer_01.jpg"
- * @param {Blob|ArrayBuffer} content
- */
-async function uploadFile(driveFolder, fileName, content) {
-  const path = encodeURIComponent(`${driveFolder}/${fileName}`);
-  await graphFetch(`/me/drive/root:/${path}:/content`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/octet-stream' },
-    body: content,
-  });
-}
-
 // ─── Öffentliche API ─────────────────────────────────────────────────────────
 
 /**
  * Projektordner + Unterordner anlegen
  */
 export async function ensureProjectFolders(folderName) {
-  if (!(await getAccessToken())) return;
-
-  await ensureFolder(ROOT_FOLDER, folderName);
-  const base = `${ROOT_FOLDER}/${folderName}`;
-  await ensureFolder(base, 'Fotos');
-  await ensureFolder(base, 'Dokumente');
-  await ensureFolder(`${base}/Dokumente`, 'Plaene');
-  await ensureFolder(`${base}/Dokumente`, 'Lieferantenrechnungen');
-  await ensureFolder(`${base}/Dokumente`, 'Mails');
+  void folderName;
+  rejectDirectMutation('Ordner-Schreibzugriff');
 }
 
 /**
@@ -139,11 +71,10 @@ export async function ensureProjectFolders(folderName) {
  * @param {Blob}   blob
  */
 export async function uploadReport(folderName, reportType, blob) {
-  if (!(await getAccessToken())) return;
-  const fileName = `${reportType}_${todayStr()}.pdf`;
-  await ensureProjectFolders(folderName);
-  await uploadFile(`${ROOT_FOLDER}/${folderName}`, fileName, blob);
-  console.log(`[OneDrive] ✅ ${fileName} hochgeladen`);
+  void folderName;
+  void reportType;
+  void blob;
+  throw new Error('Direkter PDF-Upload zu OneDrive ist deaktiviert. Bericht zuerst lokal registrieren und über den zentralen Storage-/OneDrive-Worker synchronisieren.');
 }
 
 /**
@@ -156,15 +87,8 @@ export async function uploadReport(folderName, reportType, blob) {
  * @param {string} ext          'jpg' | 'png'
  */
 export async function uploadPhoto(folderName, projectNr, subFolder, index, blob, ext = 'jpg') {
-  if (!(await getAccessToken())) return;
-
-  const safe = (s) => s.replace(/[^a-zA-Z0-9]/g, '_').replace(/_+/g, '_');
-  const fileName = `${projectNr}_${safe(subFolder)}_${String(index).padStart(2, '0')}.${ext}`;
-  const folder = `${ROOT_FOLDER}/${folderName}/Fotos/${safe(subFolder)}`;
-
-  await ensureFolder(`${ROOT_FOLDER}/${folderName}/Fotos`, safe(subFolder));
-  await uploadFile(folder, fileName, blob);
-  console.log(`[OneDrive] ✅ Foto ${fileName} hochgeladen`);
+  void folderName; void projectNr; void subFolder; void index; void blob; void ext;
+  rejectDirectMutation('Foto-Upload');
 }
 
 /**
@@ -172,14 +96,8 @@ export async function uploadPhoto(folderName, projectNr, subFolder, index, blob,
  * Dateiname: [subFolder]_[timestamp].[ext]
  */
 export async function uploadPhotoFile(folderName, subFolder, file) {
-  if (!(await getAccessToken())) return;
-  const safe = (s) => (s || 'Sonstiges').replace(/[^a-zA-Z0-9]/g, '_').replace(/_+/g, '_');
-  const ext = file.name.split('.').pop().toLowerCase() || 'jpg';
-  const fileName = `${safe(subFolder)}_${Date.now()}.${ext}`;
-  const folder = `${ROOT_FOLDER}/${folderName}/Fotos/${safe(subFolder)}`;
-  await ensureFolder(`${ROOT_FOLDER}/${folderName}/Fotos`, safe(subFolder));
-  await uploadFile(folder, fileName, file);
-  console.log(`[OneDrive] ✅ Foto ${fileName} hochgeladen`);
+  void folderName; void subFolder; void file;
+  rejectDirectMutation('Foto-Upload');
 }
 
 /**
@@ -188,38 +106,8 @@ export async function uploadPhotoFile(folderName, subFolder, file) {
  * @returns {{ itemId, odPath, downloadUrl }} oder null bei Fehler
  */
 export async function uploadPhotoAndGetUrl(folderName, subFolder, file) {
-  const token = await getAccessToken();
-  if (!token) return null;
-
-  const safe = (s) => (s || 'Sonstiges').replace(/[^a-zA-Z0-9]/g, '_').replace(/_+/g, '_');
-  const ext = file.name.split('.').pop().toLowerCase() || 'jpg';
-  const fileName = `${safe(subFolder)}_${Date.now()}.${ext}`;
-  const folder = `${ROOT_FOLDER}/${folderName}/Fotos/${safe(subFolder)}`;
-  const odPath = `${folder}/${fileName}`;
-
-  // Unterordner sicherstellen
-  await ensureFolder(`${ROOT_FOLDER}/${folderName}/Fotos`, safe(subFolder));
-
-  // Upload – gleiche Methode wie bewährter PDF-Upload
-  await uploadFile(folder, fileName, file);
-
-  // Item-Details für downloadUrl und itemId
-  try {
-    const encodedItemPath = encodeURIComponent(odPath);
-    const res = await fetch(`${GRAPH_BASE}/me/drive/root:/${encodedItemPath}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (res.ok) {
-      const item = await res.json();
-      console.log(`[OneDrive] ✅ Foto hochgeladen: ${odPath}`);
-      return { itemId: item.id, odPath, downloadUrl: item['@microsoft.graph.downloadUrl'] || null };
-    }
-  } catch (e) {
-    console.warn('[OneDrive] Item-Details nicht abrufbar:', e.message);
-  }
-
-  console.log(`[OneDrive] ✅ Foto hochgeladen (ohne URL): ${odPath}`);
-  return { itemId: null, odPath, downloadUrl: null };
+  void folderName; void subFolder; void file;
+  rejectDirectMutation('Foto-Upload');
 }
 
 
@@ -249,23 +137,16 @@ export async function getPhotoDownloadUrl(itemId) {
  * Excel-Protokoll hochladen
  */
 export async function uploadExcel(folderName, blob) {
-  if (!(await getAccessToken())) return;
-  const fileName = `Messprotokoll_${todayStr()}.xlsx`;
-  await ensureProjectFolders(folderName);
-  await uploadFile(`${ROOT_FOLDER}/${folderName}`, fileName, blob);
-  console.log(`[OneDrive] ✅ ${fileName} hochgeladen`);
+  void folderName; void blob;
+  rejectDirectMutation('Excel-Upload');
 }
 
 /**
  * E-Mail-Text als .txt ablegen
  */
 export async function uploadMailText(folderName, text) {
-  if (!(await getAccessToken())) return;
-  const fileName = `Import_${todayStr()}.txt`;
-  const blob = new Blob([text], { type: 'text/plain' });
-  await ensureProjectFolders(folderName);
-  await uploadFile(`${ROOT_FOLDER}/${folderName}/Dokumente/Mails`, fileName, blob);
-  console.log(`[OneDrive] ✅ Mail ${fileName} abgelegt`);
+  void folderName; void text;
+  rejectDirectMutation('Mail-Upload');
 }
 
 /**
@@ -273,10 +154,8 @@ export async function uploadMailText(folderName, text) {
  * @param {string} subFolder  'Plaene' | 'Lieferantenrechnungen'
  */
 export async function uploadDocument(folderName, subFolder, fileName, blob) {
-  if (!(await getAccessToken())) return;
-  await ensureProjectFolders(folderName);
-  await uploadFile(`${ROOT_FOLDER}/${folderName}/Dokumente/${subFolder}`, fileName, blob);
-  console.log(`[OneDrive] ✅ Dokument ${fileName} abgelegt`);
+  void folderName; void subFolder; void fileName; void blob;
+  rejectDirectMutation('Dokument-Upload');
 }
 
 /**
@@ -284,24 +163,9 @@ export async function uploadDocument(folderName, subFolder, fileName, blob) {
  * Bilder-Blobs (base64/blob-URLs) werden herausgefiltert.
  */
 export async function uploadProjectJson(folderName, projectData) {
-  if (!(await getAccessToken())) return;
-
-  // Bilder-Blobs entfernen damit die Datei klein bleibt
-  const clean = {
-    ...projectData,
-    damageTypeImage: projectData.damageTypeImage?.startsWith('data:') ? null : projectData.damageTypeImage,
-    exteriorPhoto: projectData.exteriorPhoto?.startsWith('data:') ? null : projectData.exteriorPhoto,
-    images: (projectData.images || []).map(img => ({
-      ...img,
-      preview: (img.preview?.startsWith('blob:') || img.preview?.startsWith('data:')) ? null : img.preview,
-    })),
-    _backedUpAt: new Date().toISOString(),
-  };
-
-  const blob = new Blob([JSON.stringify(clean, null, 2)], { type: 'application/json' });
-  await ensureProjectFolders(folderName);
-  await uploadFile(`${ROOT_FOLDER}/${folderName}`, 'Projektdaten.json', blob);
-  console.log(`[OneDrive] ✅ Projektdaten.json gesichert`);
+  void folderName;
+  void projectData;
+  throw new Error('Direktes Projektdaten-JSON zu OneDrive ist deaktiviert. Supabase-Snapshot und Medien werden ausschließlich über den zentralen Offline-Outbox-/Worker-Nachweis bestätigt.');
 }
 
 /**

@@ -249,26 +249,12 @@ const ImageEditor = ({ image, caseId, onSave, onCancel }) => {
 
             const dataUrl = mergeCanvas.toDataURL('image/jpeg', 0.85);
 
-            // Convert base64 to Blob & save in IndexedDB so preview persists permanently across reloads
-            try {
-                const res = await fetch(dataUrl);
-                const blob = await res.blob();
-                const newPhotoId = 'img_edited_' + Math.random().toString(36).substring(2, 9) + '_' + Date.now();
-                const { savePhotoLocally } = await import('../services/PhotoStorage.js');
-                await savePhotoLocally(newPhotoId, caseId || 'temp', blob, {
-                    description: localDescription,
-                    isEdited: true
-                });
-
-                // Immediately trigger background sync for edited photo
-                import('../lib/sync/supabaseSyncWorker.js').then(({ syncPendingToSupabase }) => {
-                    syncPendingToSupabase().catch(() => {});
-                }).catch(() => {});
-            } catch (storageErr) {
-                console.warn('Failed to save edited photo locally:', storageErr);
-            }
-
-            onSave(dataUrl, localDescription);
+            const res = await fetch(dataUrl);
+            const blob = await res.blob();
+            const newPhotoId = 'img_edited_' + Math.random().toString(36).substring(2, 9) + '_' + Date.now();
+            // Der Besitzer des Formularzustands bestaetigt zuerst den zentralen
+            // Offline-Commit. Erst danach darf dessen Sync-Worker anlaufen.
+            await onSave(dataUrl, localDescription, { blob, photoId: newPhotoId });
         } catch (err) {
             console.error('Error saving edited image:', err);
             alert('Fehler beim Speichern des Bildes.');

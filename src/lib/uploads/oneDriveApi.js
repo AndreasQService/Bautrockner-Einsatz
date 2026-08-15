@@ -10,6 +10,7 @@
 
 import { getGraphAccessToken } from '../onedrive/auth.js';
 import { validateOneDrivePath } from './oneDriveTestGuard.js';
+import { assertOneDriveWriteAllowed } from '../offline/sessionCloudWriteGate.js';
 
 const GRAPH_BASE = 'https://graph.microsoft.com/v1.0';
 
@@ -37,6 +38,7 @@ function encodePath(path) {
  * @returns {Promise<Response>}
  */
 async function graphFetch(url, options = {}, allowedStatuses = []) {
+  await assertOneDriveWriteAllowed(options.method || 'GET');
   const token = await getGraphAccessToken();
 
   const res = await fetch(url, {
@@ -68,6 +70,7 @@ export async function ensureFolder(parentPath, folderName, testRunId) {
   const fullPath = `${parentPath}/${folderName}`;
   validateOneDrivePath(fullPath, testRunId);
 
+  await assertOneDriveWriteAllowed('POST');
   const token = await getGraphAccessToken();
   const encoded = encodePath(parentPath);
 
@@ -151,6 +154,9 @@ export async function uploadChunk(uploadUrl, chunk, start, endInclusive, total) 
     throw new Error('[SECURITY ABORT] Session uploadUrl muss ein valider HTTPS String sein.');
   }
 
+  // Upload-URLs sind selbst authentifiziert und umgehen den Graph-Wrapper;
+  // deshalb muss die Session-Barriere direkt vor jedem Chunk geprüft werden.
+  await assertOneDriveWriteAllowed('PUT');
   const res = await fetch(uploadUrl, {
     method: 'PUT',
     headers: {
@@ -251,6 +257,7 @@ export async function writeManifestFile(testRunId, jsonContent, matchETag) {
   const manifestPath = `QTool_TEST_ONLY/${testRunId}/TEST_MANIFEST.json`;
   validateOneDrivePath(manifestPath, testRunId);
 
+  await assertOneDriveWriteAllowed('PUT');
   const encoded = encodePath(manifestPath);
   const token = await getGraphAccessToken();
 

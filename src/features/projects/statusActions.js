@@ -20,6 +20,7 @@
 
 import { canTransitionTo, getTransitionLabel } from './statusTransitions.js';
 import { getAutoTasksForStatus } from './tasks.js';
+import { registerDomainMutation } from '../../lib/offline/domainMutationAdapter.js';
 
 /**
  * Maps canonical status IDs back to the legacy strings used in damage_reports.
@@ -111,6 +112,20 @@ export const updateProjectStatus = async (supabase, { projectId, newStatus, chan
     statusHistory:   [...(currentProject.statusHistory || []), historyEntry],
   };
 
+  await registerDomainMutation({
+    projectId,
+    type: 'project.status.update',
+    entityId: historyEntry.id,
+    payload: {
+      status: legacyStatus,
+      project: updatedProject,
+      updatedAt: now,
+      historyEntry,
+    },
+    snapshot: updatedProject,
+    actor: changedBy,
+  });
+
   // ── 5. Save to Supabase ────────────────────────────────────────────────────
   const { error: saveError } = await supabase
     .from('damage_reports')
@@ -163,11 +178,20 @@ export const completeTask = async (supabase, projectId, taskId) => {
   const updatedTasks = (project.officeTasks || []).map(t =>
     t.id === taskId ? { ...t, done: true, completedAt: new Date().toISOString() } : t
   );
+  const updatedProject = { ...project, officeTasks: updatedTasks, lastActivityAt: new Date().toISOString() };
+
+  await registerDomainMutation({
+    projectId,
+    type: 'project.task.complete',
+    entityId: taskId,
+    payload: { project: updatedProject },
+    snapshot: updatedProject,
+  });
 
   const { error } = await supabase
     .from('damage_reports')
     .update({
-      report_data: { ...project, officeTasks: updatedTasks, lastActivityAt: new Date().toISOString() },
+      report_data: updatedProject,
       updated_at:  new Date().toISOString(),
     })
     .eq('id', projectId);

@@ -2,7 +2,7 @@
  * SorbaSyncService.js
  * Direkter Datentransfer QTool ↔ Sorba via Microsoft Power Automate (Ohne Excel)
  */
-import { supabase } from '../supabaseClient';
+import { registerDomainMutation } from '../lib/offline/domainMutationAdapter.js';
 
 /**
  * 1. QTool ➔ Sorba: Bestimmte Projektdaten an Power Automate HTTP Webhook senden
@@ -52,36 +52,30 @@ export async function sendProjectToSorba(projectData, webhookUrl = null) {
 export async function updateSorbaProjectNumber(qtoolProjectId, sorbaProjectNumber) {
   if (!qtoolProjectId || !sorbaProjectNumber) return { success: false, error: 'Fehlende Parameter' };
 
-  if (!supabase) return { success: false, error: 'Supabase Client nicht verfügbar' };
-
   try {
-    const { data: current, error: readErr } = await supabase
-      .from('damage_reports')
-      .select('report_data')
-      .eq('id', qtoolProjectId)
-      .single();
+    const projectNumber = String(sorbaProjectNumber).trim();
+    const manifest = await registerDomainMutation({
+      projectId: String(qtoolProjectId),
+      type: 'sorba.project_number.update',
+      entityId: String(qtoolProjectId),
+      payload: { projectNumber },
+      snapshot: {
+        projectId: String(qtoolProjectId),
+        pendingSorbaProjectNumber: projectNumber,
+      },
+    });
 
-    if (readErr) throw readErr;
-
-    const updatedReportData = {
-      ...(current?.report_data || {}),
-      projectNumber: String(sorbaProjectNumber).trim()
+    // success bedeutet hier ausschliesslich: dauerhaft lokal gesichert.
+    // Erst der Outbox-Handler darf nach Cloud-Readback cloud_confirmed setzen.
+    return {
+      success: true,
+      localConfirmed: true,
+      cloudConfirmed: false,
+      transactionId: manifest.transactionId,
+      projectNumber,
     };
-
-    const { data, error } = await supabase
-      .from('damage_reports')
-      .update({
-        report_data: updatedReportData,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', qtoolProjectId)
-      .select();
-
-    if (error) throw error;
-
-    return { success: true, data };
   } catch (e) {
-    console.error('[SorbaSync] Fehler beim Aktualisieren der Sorba-Projektnummer:', e);
+    console.error('[SorbaSync] Sorba-Projektnummer konnte nicht lokal gesichert werden:', e);
     return { success: false, error: e.message };
   }
 }

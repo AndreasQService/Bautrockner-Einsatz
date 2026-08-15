@@ -1,7 +1,16 @@
 import { supabase } from '../supabaseClient';
 import { getAutoTasksForStatus } from '../features/projects/tasks';
+import { registerDomainMutation } from '../lib/offline/domainMutationAdapter.js';
 
 export let lastAuthError = null;
+
+const queueAutomaticTodo = (todo, source = 'automatic') => registerDomainMutation({
+    projectId: todo.project_id || 'standalone-todos',
+    type: 'todo.create',
+    entityId: todo.id || `${source}:${todo.project_id || 'standalone'}:${todo.due_date || 'undated'}:${todo.task}`,
+    payload: todo,
+    actor: todo.created_by || source
+});
 
 const isUuidVal = (id) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
 
@@ -206,6 +215,7 @@ export async function fetchAllTodos(reports = [], forceRefresh = false) {
                         created_by: todo.created_by || 'System',
                         updated_by: todo.updated_by || 'System'
                     };
+                    await queueAutomaticTodo({ ...payload, id: todo.id }, 'local-migration');
                     const { error } = await supabase.from('project_todos').insert(payload);
                     if (!error || error.code === '23503' || String(error?.message).includes('foreign key')) {
                         syncedIds.push(todo.id);
@@ -233,6 +243,7 @@ export async function fetchAllTodos(reports = [], forceRefresh = false) {
                         created_by: todo.sender || 'Eingang',
                         updated_by: todo.sender || 'Eingang'
                     };
+                    await queueAutomaticTodo({ ...payload, id: todo.id }, 'inbox-migration');
                     const { error } = await supabase.from('project_todos').insert(payload);
                     if (!error || error.code === '23503' || String(error?.message).includes('foreign key')) {
                         syncedInboxIds.push(todo.id);
@@ -568,6 +579,12 @@ export async function createTodo(todoData) {
         created_by: todoData.currentUser,
         updated_by: todoData.currentUser
     };
+    const localTodoId = todoData.id || `todo_${crypto.randomUUID()}`;
+    await registerDomainMutation({
+        projectId: todoData.projectId || `standalone-todos`,
+        type: 'todo.create', entityId: localTodoId, payload: { ...payload, id: localTodoId },
+        actor: todoData.currentUser
+    });
 
     try {
         const { data, error } = await supabase
@@ -619,6 +636,10 @@ export async function createTodo(todoData) {
 export async function deleteTodo(todoId) {
     invalidateTodoCache();
     if (!todoId) return false;
+    await registerDomainMutation({
+        projectId: 'todo-tombstones', type: 'todo.delete', entityId: todoId,
+        payload: { todoId }, tombstone: true
+    });
 
     // 1. Remove from local storage
     try {
@@ -662,6 +683,10 @@ export async function deleteTodo(todoId) {
 export async function completeTodo(todoId, completedBy) {
     invalidateTodoCache();
     if (!todoId) return false;
+    await registerDomainMutation({
+        projectId: 'standalone-todos', type: 'todo.complete', entityId: todoId,
+        payload: { todoId, completedBy, completedAt: new Date().toISOString() }, actor: completedBy
+    });
 
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(todoId);
 
@@ -780,6 +805,10 @@ export async function completeTodo(todoId, completedBy) {
  */
 export async function updateTodo(todoId, updateData, expectedUpdatedAt) {
     invalidateTodoCache();
+    await registerDomainMutation({
+        projectId: updateData.projectId || 'standalone-todos', type: 'todo.update', entityId: todoId,
+        payload: { ...updateData, expectedUpdatedAt }, actor: updateData.currentUser
+    });
     // ── FALLBACK FOR NON-UUID (EMBEDDED OR LOCAL) TODOS ──
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(todoId);
     if (!isUuid) {
@@ -931,6 +960,10 @@ export async function updateTodo(todoId, updateData, expectedUpdatedAt) {
  */
 export async function completeAndCreateTodoRpc(todoId, completedBy, newTodoData) {
     invalidateTodoCache();
+    await registerDomainMutation({
+        projectId: newTodoData?.projectId || 'standalone-todos', type: 'todo.complete_and_create', entityId: todoId,
+        payload: { todoId, completedBy, followUp: newTodoData }, actor: completedBy
+    });
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(todoId);
     if (!isUuid) {
         console.log('[TodoService] Non-UUID todo complete-and-create triggered. todoId:', todoId);
@@ -1099,6 +1132,10 @@ export async function completeAndCreateTodoRpc(todoId, completedBy, newTodoData)
  * Completes a To-do and archives the project in a single database transaction.
  */
 export async function completeTodoAndArchiveProjectRpc(todoId, completedBy) {
+    await registerDomainMutation({
+        projectId: 'standalone-todos', type: 'todo.complete_and_archive', entityId: todoId,
+        payload: { todoId, completedBy }, actor: completedBy
+    });
     invalidateTodoCache();
     await ensureAuthenticated();
     if (!supabase) throw new Error('Supabase client not initialized');
@@ -1330,9 +1367,8 @@ export function syncCompletedAutoTodos(reports, combined) {
 
                     combined.push(completedTodo);
 
-                    supabase
-                        .from('project_todos')
-                        .insert(completedTodo)
+                    queueAutomaticTodo(completedTodo, 'measurement-followup')
+                        .then(() => supabase.from('project_todos').insert(completedTodo))
                         .then(({ error }) => {
                             if (error) console.warn('[TodoService] Failed to persist completed auto-todo:', error.message);
                         })
@@ -1399,9 +1435,8 @@ export function syncCompletedAutoTodos(reports, combined) {
 
                 combined.push(openAutoTodo);
 
-                supabase
-                    .from('project_todos')
-                    .insert(openAutoTodo)
+                queueAutomaticTodo(openAutoTodo, 'measurement-followup')
+                    .then(() => supabase.from('project_todos').insert(openAutoTodo))
                     .then(({ error }) => {
                         if (error) console.warn('[TodoService] Failed to persist open measurement auto-todo:', error.message);
                     })
@@ -1446,9 +1481,8 @@ export function syncCompletedAutoTodos(reports, combined) {
 
                 combined.push(newOfficeTodo);
 
-                supabase
-                    .from('project_todos')
-                    .insert(newOfficeTodo)
+                queueAutomaticTodo(newOfficeTodo, 'drying-completed')
+                    .then(() => supabase.from('project_todos').insert(newOfficeTodo))
                     .then(({ error }) => {
                         if (error) console.warn('[TodoService] Failed to persist automatic follow-up todo:', error.message);
                     })
@@ -1489,6 +1523,7 @@ export async function createMeasurementAutoTodo(projectId, measurementDateStr) {
                 .eq('status', 'open');
 
             if (!existing || existing.length === 0) {
+                await queueAutomaticTodo(autoTodo, 'measurement-followup');
                 const { data, error } = await supabase
                     .from('project_todos')
                     .insert(autoTodo)

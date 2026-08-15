@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import generatedDevices from '../data/imported_devices.json';
 import { supabase } from '../supabaseClient';
+import { registerDomainMutation } from '../lib/offline/domainMutationAdapter';
 
 const DEVICE_TYPES = [
     'Kondenstrockner',
@@ -71,6 +72,10 @@ function parseModel(modelStr) {
 }
 
 export default function DeviceManager({ onBack, onNavigateToReport, reports = [] }) {
+    const queueDeviceMutation = (type, entityId, payload, tombstone = false) => registerDomainMutation({
+        projectId: payload?.projectId || 'device-inventory', type, entityId, payload,
+        snapshot: { inventoryMutation: { type, entityId, payload } }, tombstone
+    });
     const [activeTab, setActiveTab] = useState('inventar'); // 'inventar' oder 'typen'
     const [devices, setDevices] = useState([]);
     const [catalog, setCatalog] = useState([]);
@@ -186,6 +191,7 @@ export default function DeviceManager({ onBack, onNavigateToReport, reports = []
                 rental_start: currentDevice.is_rental ? (currentDevice.rental_start || null) : null,
                 rental_end_planned: currentDevice.is_rental ? (currentDevice.rental_end_planned || null) : null
             };
+            await queueDeviceMutation('device.inventory.upsert', currentDevice.id || trimmedNumber, row);
 
             if (currentDevice.id) {
                 const { error } = await supabase
@@ -237,6 +243,7 @@ export default function DeviceManager({ onBack, onNavigateToReport, reports = []
                 modell: currentModel.modell.trim(),
                 anschlusswert: currentModel.anschlusswert ? parseFloat(currentModel.anschlusswert) : 0
             };
+            await queueDeviceMutation('device.catalog.upsert', currentModel.id || `${row.hersteller}-${row.modell}`, row);
 
             if (currentModel.id) {
                 const { error } = await supabase
@@ -272,6 +279,7 @@ export default function DeviceManager({ onBack, onNavigateToReport, reports = []
         if (window.confirm(confirmMsg)) {
             setIsLoading(true);
             try {
+                await queueDeviceMutation('device.inventory.delete', id, { device: dev }, true);
                 const { error } = await supabase
                     .from('devices')
                     .delete()
@@ -289,6 +297,7 @@ export default function DeviceManager({ onBack, onNavigateToReport, reports = []
         if (window.confirm('Gerätetyp wirklich löschen? Hinweis: Physische Geräte, die diesen Typ verwenden, bleiben bestehen, sind jedoch nicht mehr korrekt verknüpft.')) {
             setIsLoading(true);
             try {
+                await queueDeviceMutation('device.catalog.delete', id, { catalogId: id }, true);
                 const { error } = await supabase
                     .from('device_catalog')
                     .delete()
@@ -306,6 +315,7 @@ export default function DeviceManager({ onBack, onNavigateToReport, reports = []
         if (window.confirm(`Möchten Sie das Gerät wirklich aus dem Projekt "${projectName}" freigeben?`)) {
             setIsLoading(true);
             try {
+                await queueDeviceMutation('device.unassign', id, { projectId: devices.find(d => d.id === id)?.current_report_id || null }, true);
                 const { error } = await supabase
                     .from('devices')
                     .update({ current_project: null, current_report_id: null })
@@ -325,6 +335,7 @@ export default function DeviceManager({ onBack, onNavigateToReport, reports = []
         if (window.confirm(confirmMsg)) {
             setIsLoading(true);
             try {
+                await queueDeviceMutation('device.inventory.delete', device.id, { device }, true);
                 const { error } = await supabase
                     .from('devices')
                     .delete()
@@ -343,6 +354,7 @@ export default function DeviceManager({ onBack, onNavigateToReport, reports = []
         if (window.confirm(`Möchten Sie das Mietgerät "${device.number}" wieder aktivieren?`)) {
             setIsLoading(true);
             try {
+                await queueDeviceMutation('device.inventory.upsert', device.id, { ...device, status: 'Aktiv' });
                 const { error } = await supabase
                     .from('devices')
                     .update({ status: 'Aktiv' })
@@ -381,6 +393,7 @@ export default function DeviceManager({ onBack, onNavigateToReport, reports = []
                     let catalogId = catalogMap.get(key);
                     if (!catalogId) {
                         // Create catalog item first
+                        await queueDeviceMutation('device.catalog.upsert', `${hersteller}-${modell}`, { geraetetyp: type, hersteller, modell, anschlusswert: 0.0 });
                         const { data: newCat, error: catErr } = await supabase
                             .from('device_catalog')
                             .insert([{ geraetetyp: type, hersteller, modell, anschlusswert: 0.0 }])
@@ -402,12 +415,16 @@ export default function DeviceManager({ onBack, onNavigateToReport, reports = []
                 if (devicesToImport.length === 0) {
                     alert('Keine neuen Geräte zum Importieren gefunden.');
                 } else {
+                    for (const device of devicesToImport) {
+                        await queueDeviceMutation('device.inventory.upsert', device.number, device);
+                    }
                     const { error } = await supabase.from('devices').insert(devicesToImport);
                     if (error) throw error;
                     alert(`${devicesToImport.length} Geräte erfolgreich importiert.`);
                     await fetchDevices();
                     await fetchCatalog();
                 }
+
             } catch (e) {
                 setError("Fehler beim Import: " + e.message);
             } finally {
@@ -447,6 +464,9 @@ export default function DeviceManager({ onBack, onNavigateToReport, reports = []
                 if (itemsToInsert.length === 0) {
                     alert('Keine neuen Gerätetypen zum Importieren gefunden.');
                 } else {
+                    for (const item of itemsToInsert) {
+                        await queueDeviceMutation('device.catalog.upsert', `${item.hersteller}-${item.modell}`, item);
+                    }
                     const { error } = await supabase.from('device_catalog').insert(itemsToInsert);
                     if (error) throw error;
                     alert(`${itemsToInsert.length} Gerätetypen erfolgreich in den Katalog importiert.`);

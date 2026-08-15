@@ -1,12 +1,8 @@
 import React, { useState, useCallback, useEffect, memo } from "react";
-import { supabase } from "../supabaseClient";
 import { Upload, FileText, X, Image as ImageIcon } from "lucide-react";
 import { createPortal } from 'react-dom';
 import { GoogleGenerativeAI } from "@google/generative-ai";
-
-function safeName(filename) {
-  return filename.replace(/[^\w.\-]+/g, "_");
-}
+import { registerCaseDocumentLocally, registerMediaLocally } from '../lib/offline/formMediaAdapter';
 
 /*
  * UploadPanel - "Smart Universal Dropzone"
@@ -14,7 +10,7 @@ function safeName(filename) {
  * - Verarbeitet alles automatisch (Client-Side AI Analysis)
  * - memo(): verhindert Re-renders wenn Props unverändert (SessionLock-Heartbeat)
  */
-function UploadPanel({ caseId, onCaseCreated, onExtractionComplete, onImagesUploaded, isNewOrder }) {
+function UploadPanel({ caseId, projectSnapshot, onCaseCreated, onExtractionComplete, onImagesUploaded, isNewOrder }) {
   const [files, setFiles] = useState([]);
   const [textInput, setTextInput] = useState("");
   const [status, setStatus] = useState("");
@@ -26,18 +22,8 @@ function UploadPanel({ caseId, onCaseCreated, onExtractionComplete, onImagesUplo
   async function ensureCaseId() {
     console.log("ensureCaseId called, current caseId:", caseId);
     if (caseId) return caseId;
-    const newId = "TMP-" + Date.now();
+    const newId = `TMP-${crypto.randomUUID()}`;
     console.log("Creating temporary caseId:", newId);
-
-    const { error } = await supabase
-      .from("damage_reports")
-      .insert({ id: newId, report_data: {} });
-
-    if (error) {
-      console.error("ensureCaseId insert error:", error);
-      throw error;
-    }
-
     onCaseCreated?.(newId);
     return newId;
   }
@@ -409,7 +395,6 @@ ${textContext}`;
       console.log("Using Case ID:", id);
       let newImages = [];
       let combinedClientText = "";
-      let extractionResults = [];
 
       for (const file of files) {
         const lowerName = file.name.toLowerCase();
@@ -418,18 +403,26 @@ ${textContext}`;
         // --- TYPE 1: BILDER ---
         if (lowerName.match(/\.(jpg|jpeg|png|gif|webp|heic|heif)$/)) {
           try {
-            const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-            const filePath = `cases/${id}/images/${timestamp}_${safeName(file.name)}`;
-            console.log("Uploading image:", filePath);
-            await supabase.storage.from("case-files").upload(filePath, file);
-            const { data: { publicUrl } } = supabase.storage.from("case-files").getPublicUrl(filePath);
+            const entityId = `upload_${crypto.randomUUID()}`;
+            const manifest = await registerMediaLocally({
+              projectId: id,
+              projectSnapshot: { ...(projectSnapshot || {}), id },
+              entityId,
+              kind: 'image',
+              file,
+              payload: { name: file.name, description: 'Anhang', assignedTo: 'Sonstiges' },
+            });
 
             newImages.push({
-              preview: publicUrl,
+              id: entityId,
+              preview: URL.createObjectURL(manifest.localFile),
               name: file.name,
               description: 'Anhang',
               date: new Date().toISOString(),
-              assignedTo: 'Sonstiges'
+              assignedTo: 'Sonstiges',
+              cloudTarget: manifest.cloudTarget,
+              pendingStoragePath: manifest.cloudTarget.path,
+              syncStatus: 'queued',
             });
           } catch (e) { console.error("Image upload failed", e); }
         }
@@ -443,54 +436,18 @@ ${textContext}`;
             const isTxt = lowerName.endsWith(".txt");
 
             const fileTypeLabel = isPdf ? "pdf" : (isMsg ? "msg" : "txt");
-            const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-            const filePath = `cases/${id}/original/${timestamp}_${safeName(file.name)}`;
+            await registerCaseDocumentLocally({
+              projectId: id,
+              projectSnapshot: { ...(projectSnapshot || {}), id },
+              file,
+              fileType: fileTypeLabel,
+            });
+            setStatus(`⏳ ${file.name} lokal gesichert; Cloud-Analyse eingereiht...`);
 
-            console.log("Uploading original to:", filePath);
-            const { error: uploadError } = await supabase.storage.from("case-files").upload(filePath, file, { upsert: true });
-            if (uploadError) throw uploadError;
-
-            // --- PFLICHT: DB Eintrag in case_documents ---
-            console.log("Creating DB record in case_documents...");
-            const { data: docRecord, error: dbError } = await supabase
-              .from("case_documents")
-              .insert({
-                case_id: id,
-                file_path: filePath,
-                file_type: isPdf ? 'pdf' : (isMsg ? 'msg' : 'txt'),
-                original_filename: file.name,
-                extraction_status: 'pending'
-              })
-              .select()
-              .single();
-
-            if (dbError) {
-              console.warn("Could not create case_documents record:", dbError);
-            }
-
-            // --- TRIGGER EXTRACTION ---
-            if ((isPdf || isMsg || isTxt) && docRecord) {
-              setStatus(`⏳ Analysiere ${file.name} (Edge Function)...`);
-              console.log("Invoking 'extract' function for doc:", docRecord.id);
-
-              const { data: extraction, error: funcError } = await supabase.functions.invoke("extract", {
-                body: { document_id: docRecord.id }
-              });
-
-              if (funcError) {
-                console.error("Edge Function Error:", funcError);
-                // Fallback to client-side if server fails
-                if (isPdf) combinedClientText += await processPdfFile(file) + "\n\n";
-              } else if (extraction?.success && extraction.data) {
-                console.log("Edge Function extraction success!");
-                extractionResults.push(extraction.data);
-              }
-            }
-            else if (isTxt) {
+            if (isTxt) {
               combinedClientText += await file.text() + "\n\n";
             }
-            else if (isPdf && !docRecord) {
-              // Fallback client-side PDF parsing if no DB record
+            else if (isPdf) {
               combinedClientText += await processPdfFile(file) + "\n\n";
             }
           } catch (e) { console.error("Doc processing failed", e); }
@@ -499,12 +456,6 @@ ${textContext}`;
 
       // --- AGGREGATE RESULTS ---
       let finalResult = null;
-
-      // If we have Edge Function results, use the first one (or merge if needed)
-      if (extractionResults.length > 0) {
-        finalResult = extractionResults[0]; // Simple approach: take first
-        // TODO: Implement smart merge if multiple docs
-      }
 
       // If we have additional text (pasted or fallback), augment with Gemini
       if (combinedClientText.trim()) {
@@ -524,7 +475,7 @@ ${textContext}`;
         setPreviewData(finalResult);
         setStatus("✅ Dokumente analysiert.");
       } else if (newImages.length > 0) {
-        setStatus("✅ Bilder hochgeladen.");
+        setStatus("✅ Bilder lokal gesichert; Cloud-Synchronisierung eingereiht.");
       } else {
         setStatus("ℹ️ Keine extrahierbaren Daten gefunden.");
       }

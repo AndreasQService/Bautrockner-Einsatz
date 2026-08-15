@@ -1,9 +1,9 @@
-import { createClient } = 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Authorization, Content-Type, apikey, x-client-info',
+  'Access-Control-Allow-Headers': 'Authorization, Content-Type, apikey, x-client-info, x-qtool-session-token, x-qtool-project-id, x-qtool-correlation-id',
 };
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || 'https://aoxduqspiezzyqeqyzzl.supabase.co';
@@ -81,9 +81,12 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // 5. Parse project_id from payload
+    // 5. Bind this destructive request to the exact active project owner.
     const body = await req.json().catch(() => ({}));
     const projectId = body.project_id;
+    const headerProjectId = req.headers.get('x-qtool-project-id');
+    const sessionToken = req.headers.get('x-qtool-session-token');
+    const correlationId = req.headers.get('x-qtool-correlation-id') || crypto.randomUUID();
 
     if (!projectId || typeof projectId !== 'string') {
       return new Response(JSON.stringify({
@@ -97,7 +100,39 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // 6. Invoke protected RPC delete_project_secure
+    if (headerProjectId !== projectId || !sessionToken || sessionToken.length < 20) {
+      return new Response(JSON.stringify({
+        success: false, code: 403, error: 'OWNER_SESSION_REQUIRED',
+        message: 'Projekt-ID und aktive Besitzersitzung müssen exakt bestätigt sein.'
+      }), { headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' }, status: 403 });
+    }
+
+    const { data: ownerSession, error: ownerError } = await serviceClient
+      .from('project_sessions')
+      .select('session_token,open_project_id,owner_user_id')
+      .eq('open_project_id', projectId)
+      .eq('session_token', sessionToken)
+      .eq('owner_user_id', actorUid)
+      .maybeSingle();
+    if (ownerError || !ownerSession) {
+      return new Response(JSON.stringify({
+        success: false, code: 409, error: 'PROJECT_LOCK_NOT_OWNED',
+        message: 'Das gesperrte Projekt gehört nicht dieser Benutzer-/Gerätesitzung.'
+      }), { headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' }, status: 409 });
+    }
+
+    const { error: auditError } = await serviceClient.from('qtool_privileged_mutation_audit').insert({
+      project_id: projectId,
+      actor_uid: actorUid,
+      actor_role: 'admin',
+      operation: 'delete_project_secure',
+      reason: 'explicit_owner_confirmed_project_delete',
+      correlation_id: correlationId,
+      details: { edge_function: 'delete-project', owner_session_verified: true },
+    });
+    if (auditError) throw new Error(`Lösch-Audit konnte nicht geschrieben werden: ${auditError.message}`);
+
+    // 6. Invoke protected RPC only after owner/session audit succeeded.
     const { data: rpcRes, error: rpcErr } = await serviceClient.rpc('delete_project_secure', {
       p_project_id: projectId,
       p_actor_uid: actorUid

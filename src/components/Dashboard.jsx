@@ -11,6 +11,7 @@ import { formatDate } from '../utils/formatUtils'
 import { isVisibleProjectRow } from '../utils/projectVisibility.js'
 import { formatActiveEquipmentRuntime, formatCompletedEquipmentRuntime, formatEquipmentDate, formatEquipmentLocation, formatEquipmentProjectAddress, formatEquipmentTypeModel, getDryingStartDate, getEquipmentStatus } from '../utils/dashboardUtils'
 import { DASHBOARD_STATUS_COLORS as statusColors } from '../config/dashboardConfig'
+import { registerDomainMutation } from '../lib/offline/domainMutationAdapter'
 
 // Helper to calculate days difference
 const getDaysDiff = (startDate) => {
@@ -977,13 +978,9 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
                                                             <td style={{ padding: '0.5rem 0.2rem', textAlign: 'right', width: '56px', whiteSpace: 'nowrap' }} onClick={e => e.stopPropagation()}>
                                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', justifyContent: 'flex-end' }}>
                                                                     <button
-                                                                        disabled={savingProjectIds.has(report.id) || isActuallyOffline}
+                                                                        disabled={savingProjectIds.has(report.id)}
                                                                         onClick={async (e) => {
                                                                             e.stopPropagation();
-                                                                            if (isActuallyOffline) {
-                                                                                alert('Offline – Änderungen derzeit nicht möglich');
-                                                                                return;
-                                                                            }
                                                                             const streetPart = report.street || (report.address ? report.address.split(',')[0] : 'Keine Strasse');
                                                                             const cityPart = report.city || (() => {
                                                                                 const parts = (report.address || '').split(',');
@@ -999,29 +996,16 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
                                                                                     return next;
                                                                                 });
                                                                                 try {
-                                                                                    let success = false;
-                                                                                    let errMsg = '';
-                                                                                    if (supabase) {
-                                                                                        const { error: updateError } = await supabase
-                                                                                            .from('damage_reports')
-                                                                                            .update({
-                                                                                                status: 'Abgeschlossen'
-                                                                                            })
-                                                                                            .eq('id', report.id);
-                                                                                        if (!updateError) {
-                                                                                            success = true;
-                                                                                        } else {
-                                                                                            errMsg = updateError.message;
-                                                                                        }
-                                                                                    } else {
-                                                                                        success = true; // Offline / Mock mode
-                                                                                    }
-                                                                                    if (success) {
-                                                                                        if (onReportsChanged) {
-                                                                                            await onReportsChanged(report.id, { status: 'Abgeschlossen' });
-                                                                                        }
-                                                                                    } else {
-                                                                                        alert('Fehler beim Archivieren: ' + errMsg);
+                                                                                    const previousStatus = report.status || report.report_data?.status || 'Eingang';
+                                                                                    const snapshot = { ...report, status: 'Abgeschlossen', archivePreviousStatus: previousStatus, report_data: report.report_data ? { ...report.report_data, status: 'Abgeschlossen', archivePreviousStatus: previousStatus } : report.report_data };
+                                                                                    await registerDomainMutation({
+                                                                                        projectId: report.id, type: 'project.archive', entityId: report.id,
+                                                                                        payload: { status: 'Abgeschlossen', previousStatus }, snapshot,
+                                                                                        actor: currentUser?.id || currentUser?.email || currentUser?.name || null,
+                                                                                        baseVersion: report.version || report.updated_at || null
+                                                                                    });
+                                                                                    if (onReportsChanged) {
+                                                                                        await onReportsChanged(report.id, { status: 'Abgeschlossen' });
                                                                                     }
                                                                                 } catch (err) {
                                                                                     console.error(err);
@@ -1035,21 +1019,21 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
                                                                                 }
                                                                             }
                                                                         }}
-                                                                        title={isActuallyOffline ? "Offline – Änderungen derzeit nicht möglich" : "Projekt archivieren (auf Abgeschlossen setzen)"}
+                                                                        title={isActuallyOffline ? "Projekt lokal archivieren – Cloud-Synchronisation folgt" : "Projekt archivieren (auf Abgeschlossen setzen)"}
                                                                         style={{
                                                                             background: 'none',
                                                                             border: 'none',
-                                                                            cursor: (savingProjectIds.has(report.id) || isActuallyOffline) ? 'not-allowed' : 'pointer',
+                                                                            cursor: savingProjectIds.has(report.id) ? 'not-allowed' : 'pointer',
                                                                             color: 'var(--text-main, #F1F5F9)',
                                                                             padding: '0.2rem',
                                                                             borderRadius: '4px',
                                                                             display: 'inline-flex',
                                                                             alignItems: 'center',
-                                                                            opacity: (savingProjectIds.has(report.id) || isActuallyOffline) ? 0.3 : 0.8,
+                                                                            opacity: savingProjectIds.has(report.id) ? 0.3 : 0.8,
                                                                             transition: 'all 0.15s'
                                                                         }}
-                                                                        onMouseEnter={e => { if (!savingProjectIds.has(report.id) && !isActuallyOffline) e.currentTarget.style.opacity = 1; }}
-                                                                        onMouseLeave={e => { if (!savingProjectIds.has(report.id) && !isActuallyOffline) e.currentTarget.style.opacity = 0.8; }}
+                                                                        onMouseEnter={e => { if (!savingProjectIds.has(report.id)) e.currentTarget.style.opacity = 1; }}
+                                                                        onMouseLeave={e => { if (!savingProjectIds.has(report.id)) e.currentTarget.style.opacity = 0.8; }}
                                                                     >
                                                                         <Archive size={14} />
                                                                     </button>
@@ -1084,6 +1068,11 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
                                                                                     const now = new Date().toISOString();
                                                                                     const userEmail = currentUser?.email || currentUser?.name || 'Unbekannt';
                                                                                     if (supabase) {
+                                                                                        await registerDomainMutation({
+                                                                                            projectId: report.id, type: 'project.delete', entityId: report.id,
+                                                                                            payload: { tombstone: true, deletedAt: now, deletedBy: userEmail },
+                                                                                            snapshot: { ...report, tombstone: true, deletedAt: now }, tombstone: true
+                                                                                        });
                                                                                         const { data: fullReport, error: fetchError } = await supabase
                                                                                             .from('damage_reports')
                                                                                             .select('report_data')
@@ -1265,7 +1254,7 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
                                                     <button
                                                         onClick={(e) => {
                                                             e.stopPropagation();
-                                                            handleDeleteProject(report);
+                                                            onDeleteReport?.(report.id);
                                                         }}
                                                         disabled={savingProjectIds.has(report.id)}
                                                         title="Projekt löschen"
@@ -1380,6 +1369,45 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
                                             </td>
                                             <td>
                                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.5rem' }}>
+                                                    <button
+                                                        onClick={async (e) => {
+                                                            e.stopPropagation();
+                                                            if (!window.confirm(`Projekt "${report.projectTitle || report.projectNumber || report.id}" wiederherstellen?`)) return;
+                                                            setSavingProjectIds(prev => new Set(prev).add(report.id));
+                                                            try {
+                                                                const restoreStatus = report.archivePreviousStatus || report.report_data?.archivePreviousStatus || 'Eingang';
+                                                                const restoredReportData = report.report_data ? { ...report.report_data, status: restoreStatus } : report.report_data;
+                                                                if (restoredReportData) delete restoredReportData.archivePreviousStatus;
+                                                                const snapshot = { ...report, status: restoreStatus, report_data: restoredReportData };
+                                                                delete snapshot.archivePreviousStatus;
+                                                                await registerDomainMutation({
+                                                                    projectId: report.id,
+                                                                    type: 'project.restore',
+                                                                    entityId: report.id,
+                                                                    payload: { status: restoreStatus },
+                                                                    snapshot,
+                                                                    actor: currentUser?.id || currentUser?.email || currentUser?.name || null,
+                                                                    baseVersion: report.version || report.updated_at || null
+                                                                });
+                                                                if (onReportsChanged) await onReportsChanged(report.id, { status: restoreStatus, archivePreviousStatus: undefined });
+                                                            } catch (err) {
+                                                                console.error(err);
+                                                                alert('Fehler beim Wiederherstellen: ' + err.message);
+                                                            } finally {
+                                                                setSavingProjectIds(prev => {
+                                                                    const next = new Set(prev);
+                                                                    next.delete(report.id);
+                                                                    return next;
+                                                                });
+                                                            }
+                                                        }}
+                                                        disabled={savingProjectIds.has(report.id)}
+                                                        className="btn btn-sm btn-ghost"
+                                                        style={{ color: '#22C55E', padding: '0.25rem' }}
+                                                        title={isActuallyOffline ? 'Projekt lokal wiederherstellen – Cloud-Synchronisation folgt' : 'Projekt wiederherstellen'}
+                                                    >
+                                                        <RotateCcw size={16} />
+                                                    </button>
                                                     <button
                                                         onClick={(e) => {
                                                             e.stopPropagation();

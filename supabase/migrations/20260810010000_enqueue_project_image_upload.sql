@@ -66,15 +66,34 @@ BEGIN
     storage_bucket = EXCLUDED.storage_bucket,
     storage_path = EXCLUDED.storage_path,
     remote_path = CASE
+      WHEN project_image_uploads.sha256 IS DISTINCT FROM EXCLUDED.sha256
+        OR project_image_uploads.size_bytes IS DISTINCT FROM EXCLUDED.size_bytes
+        OR project_image_uploads.storage_path IS DISTINCT FROM EXCLUDED.storage_path
+        OR project_image_uploads.remote_path IS DISTINCT FROM EXCLUDED.remote_path
+      THEN EXCLUDED.remote_path
       WHEN project_image_uploads.remote_item_id IS NULL THEN EXCLUDED.remote_path
       ELSE project_image_uploads.remote_path
     END,
     storage_status = CASE
-      WHEN project_image_uploads.remote_item_id IS NULL THEN 'uploaded_to_backend'
+      WHEN project_image_uploads.sha256 IS DISTINCT FROM EXCLUDED.sha256
+        OR project_image_uploads.size_bytes IS DISTINCT FROM EXCLUDED.size_bytes
+        OR project_image_uploads.storage_path IS DISTINCT FROM EXCLUDED.storage_path
+        OR project_image_uploads.remote_path IS DISTINCT FROM EXCLUDED.remote_path
+        OR project_image_uploads.remote_item_id IS NULL THEN 'uploaded_to_backend'
       ELSE project_image_uploads.storage_status
     END,
-    retry_count = CASE WHEN project_image_uploads.remote_item_id IS NULL THEN 0 ELSE project_image_uploads.retry_count END,
-    last_error = CASE WHEN project_image_uploads.remote_item_id IS NULL THEN NULL ELSE project_image_uploads.last_error END,
+    retry_count = CASE
+      WHEN project_image_uploads.sha256 IS DISTINCT FROM EXCLUDED.sha256
+        OR project_image_uploads.size_bytes IS DISTINCT FROM EXCLUDED.size_bytes
+        OR project_image_uploads.storage_path IS DISTINCT FROM EXCLUDED.storage_path
+        OR project_image_uploads.remote_path IS DISTINCT FROM EXCLUDED.remote_path
+        OR project_image_uploads.remote_item_id IS NULL THEN 0 ELSE project_image_uploads.retry_count END,
+    last_error = CASE
+      WHEN project_image_uploads.sha256 IS DISTINCT FROM EXCLUDED.sha256
+        OR project_image_uploads.size_bytes IS DISTINCT FROM EXCLUDED.size_bytes
+        OR project_image_uploads.storage_path IS DISTINCT FROM EXCLUDED.storage_path
+        OR project_image_uploads.remote_path IS DISTINCT FROM EXCLUDED.remote_path
+        OR project_image_uploads.remote_item_id IS NULL THEN NULL ELSE project_image_uploads.last_error END,
     updated_at = NOW();
 
   RETURN QUERY
@@ -89,4 +108,3 @@ GRANT EXECUTE ON FUNCTION public.enqueue_project_image_upload(TEXT,TEXT,TEXT,TEX
   TO anon, authenticated;
 
 NOTIFY pgrst, 'reload schema';
-

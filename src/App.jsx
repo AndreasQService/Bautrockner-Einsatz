@@ -19,19 +19,74 @@ import { ensureAuthenticated, lastAuthError } from './services/TodoService'
 import EmailImportModalV2 from './components/EmailImportModalV2'
 import DisponentMockup from './components/mockups/DisponentMockup'
 import i18n from './i18n'
-import { buildProjectFolderName, uploadProjectJson } from "./services/OneDriveService";
 import { syncPendingToSupabase } from './lib/sync/supabaseSyncWorker.js';
 import { markUploadedPhotosAsVerified, sanitizeCorruptPhotosInDb } from './services/PhotoStorage';
 import { isVisibleProjectRow } from './utils/projectVisibility.js';
 import * as DeviceLocalStore from './services/DeviceLocalStore';
 import SyncStatusBanner from './components/SyncStatusBanner';
+import ProjectSessionSyncPanel from './components/ProjectSessionSyncPanel.jsx';
+import {
+  confirmProjectOperations,
+  collectStrictExitCloudEvidence,
+  confirmProjectSession,
+  getPendingSummary,
+  registerLocalMutation,
+  registerOutboxHandler,
+  startOfflineOutboxWorker,
+  triggerOfflineOutboxSync,
+  createVerifiedProjectSession,
+  createLockedProjectSession,
+  getRecoverableProjectSessions,
+  restoreProjectOfflineMedia,
+  materializeProjectForOffline,
+  hasActiveProjectSession,
+  stageProjectSessionConfirmation,
+  updateProjectSessionSnapshot,
+  verifyProjectSession,
+} from './lib/offline/index.js';
+import { registerSupabaseMediaOutboxHandlers } from './lib/offline/supabaseMediaHandlers.js';
+import { registerSupabaseDomainOutboxHandlers } from './lib/offline/supabaseDomainHandlers.js';
+import { buildStrictExitReadiness } from './lib/offline/strictExitPolicy.js';
+import { compareProjectReportData, formatProjectSyncCounts } from './lib/offline/projectSyncSummary.js';
+import { beginExplicitProjectFinalSync, endExplicitProjectFinalSync } from './lib/offline/sessionCloudWriteGate.js';
 const IS_TEST_ENV = !!(typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_EXPECTED_SUPABASE_PROJECT_ID === 'aoxduqspiezzyqeqyzzl');
 const PROJECT_ID = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_EXPECTED_SUPABASE_PROJECT_ID) || 'prod';
 const KEY_CURRENT_USER = `qtool_current_user_${PROJECT_ID}`;
 const KEY_REPORTS = `qservice_reports_${PROJECT_ID}`;
 const KEY_SESSION_TOKEN = `qtool_session_token_${PROJECT_ID}`;
 
+export function createSecureSessionToken(cryptoApi = globalThis.crypto) {
+  if (typeof cryptoApi?.randomUUID === 'function') return cryptoApi.randomUUID();
+  if (typeof cryptoApi?.getRandomValues !== 'function') {
+    throw new Error('Sichere Projektsitzung nicht möglich: kryptografischer Zufall fehlt.');
+  }
+  const bytes = new Uint8Array(32);
+  cryptoApi.getRandomValues(bytes);
+  return Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
 let mockDbProjectsRef = null;
+
+function findUnverifiedOneDriveMedia(value, path = 'project', seen = new Set()) {
+  if (!value || typeof value !== 'object' || seen.has(value)) return [];
+  seen.add(value);
+  if (Array.isArray(value)) {
+    return value.flatMap((entry, index) => findUnverifiedOneDriveMedia(entry, `${path}[${index}]`, seen));
+  }
+  const mediaUrl = value.preview || value.url || value.storagePath || value.supabasePath || value.path || value.name || '';
+  const looksLikeRequiredFile = Boolean(
+    (value.id || value.entityId) && mediaUrl &&
+    (/^data:image\//i.test(mediaUrl) || /^blob:/i.test(mediaUrl) || /\.(jpe?g|png|webp|heic|pdf|xlsx?)(\?|$)/i.test(mediaUrl) || value.storagePath || value.supabasePath)
+  );
+  const ownFailure = looksLikeRequiredFile && !(
+    value.oneDriveItemId && value.oneDriveVerifiedAt && value.oneDriveSha256 &&
+    (!value.sha256 || String(value.oneDriveSha256).toLowerCase() === String(value.sha256).toLowerCase())
+  ) ? [path] : [];
+  return ownFailure.concat(Object.entries(value).flatMap(([key, entry]) =>
+    findUnverifiedOneDriveMedia(entry, `${path}.${key}`, seen)
+  ));
+}
+
 if (typeof window !== 'undefined' && supabase && !supabase._patched) {
   supabase._patched = true;
 
@@ -323,6 +378,20 @@ function diffReports(base, current) {
 }
 
 function App() {
+  useEffect(() => {
+    const unregisterMediaHandlers = supabase?.storage
+      ? registerSupabaseMediaOutboxHandlers(supabase)
+      : () => {};
+    const unregisterDomainHandlers = supabase?.from
+      ? registerSupabaseDomainOutboxHandlers(supabase)
+      : () => {};
+    const stopWorker = startOfflineOutboxWorker();
+    return () => {
+      stopWorker();
+      unregisterMediaHandlers();
+      unregisterDomainHandlers();
+    };
+  }, []);
   // Neuer Tab = neue sessionStorage → startet immer auf Dashboard
   // damit nicht alle Tabs dasselbe Projekt aus localStorage öffnen
   const _isNewTab = !sessionStorage.getItem('qtool_tab_init');
@@ -361,11 +430,153 @@ function App() {
   const selectedReportRef = useRef(null);
   const reportsRef = useRef([]);
   const openedReportBackupRef = useRef({});
+  // Blob URLs are ephemeral and belong to exactly one rendered project. Keep
+  // their lifetime explicit so reload recovery neither leaks them nor revokes
+  // them while the recovered snapshot is still displayed.
+  const projectOfflineObjectUrlsRef = useRef({ projectId: null, urls: [] });
+  const revokeProjectOfflineObjectUrls = useCallback((projectId = null) => {
+    const owned = projectOfflineObjectUrlsRef.current;
+    if (projectId != null && String(owned.projectId) !== String(projectId)) return;
+    for (const url of owned.urls) {
+      try {
+        if (typeof url === 'string' && url.startsWith('blob:')) URL.revokeObjectURL(url);
+      } catch (error) {
+        console.warn('[ProjectSession] Offline-Medien-URL konnte nicht freigegeben werden:', error);
+      }
+    }
+    projectOfflineObjectUrlsRef.current = { projectId: null, urls: [] };
+  }, []);
+  useEffect(() => {
+    const renderedProjectId = selectedReport?.id ?? null;
+    return () => {
+      if (renderedProjectId != null) revokeProjectOfflineObjectUrls(renderedProjectId);
+    };
+  }, [selectedReport?.id, revokeProjectOfflineObjectUrls]);
   const activeLoadRequestsRef = useRef({});
   const sessionStartedAtRef = useRef(Date.now());
   const silentSaveDebounceTimers = useRef({});
   const viewRef = useRef('dashboard');
+  const navigationGuardRef = useRef(async (action) => action());
+  const projectPersistenceRef = useRef({
+    dirty: false, data: null, status: 'idle', projectId: null,
+    dbConfirmed: false, oneDriveConfirmed: false, oneDriveEvidence: null,
+    deferredToCentralWorker: true,
+  });
+  const [, setProjectPersistenceState] = useState({ dirty: false, status: 'idle', projectId: null });
+  const [strictExitStatus, setStrictExitStatus] = useState(null);
+  const [projectSessionStatus, setProjectSessionStatus] = useState(null);
+  const [, setRecoverableProjectSessions] = useState([]);
+  const localSnapshotTimerRef = useRef(null);
+  const localSnapshotChainRef = useRef(Promise.resolve());
+  const localRevisionCounterRef = useRef(0);
+  const issueLocalRevision = useCallback(() => {
+    localRevisionCounterRef.current = (localRevisionCounterRef.current + 1) % 1000;
+    return (Date.now() * 1000) + localRevisionCounterRef.current;
+  }, []);
+  const projectExitSyncRef = useRef(false);
+  const [projectExitSyncing, setProjectExitSyncing] = useState(false);
+  const [offlinePendingSummary, setOfflinePendingSummary] = useState({ total: 0, byStatus: {} });
   useEffect(() => { viewRef.current = view; }, [view]);
+
+  const updateProjectPersistence = useCallback((next) => {
+    const merged = { ...projectPersistenceRef.current, ...next };
+    projectPersistenceRef.current = merged;
+    setProjectPersistenceState({ dirty: !!merged.dirty, status: merged.status || 'idle', projectId: merged.projectId || null });
+  }, []);
+
+  const refreshOfflinePendingSummary = useCallback(async () => {
+    try {
+      setOfflinePendingSummary(await getPendingSummary());
+    } catch (error) {
+      console.warn('[OfflineStatus] Pending summary unavailable:', error);
+    }
+  }, []);
+
+  const handleManualOfflineSync = useCallback(async () => {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      showToast('Keine Verbindung. Alle Änderungen bleiben lokal sicher gespeichert.', 'warning');
+      return;
+    }
+    setOfflinePendingSummary(prev => ({ ...prev, manualSyncRunning: true }));
+    try {
+      await triggerOfflineOutboxSync('manual');
+      await refreshOfflinePendingSummary();
+      showToast('Synchronisierung wurde ausgeführt.', 'success');
+    } catch (error) {
+      console.error('[OfflineSync] Manual sync failed:', error);
+      showToast('Synchronisierung nicht vollständig. Lokale Daten bleiben erhalten.', 'warning');
+    } finally {
+      setOfflinePendingSummary(prev => ({ ...prev, manualSyncRunning: false }));
+    }
+  }, [refreshOfflinePendingSummary]);
+
+  const handleFormPersistenceStateChange = useCallback(({ dirty, data, localConfirmed = false }) => {
+    const projectId = data?.id || selectedReportRef.current?.id || null;
+    const localRevision = dirty && data ? issueLocalRevision() : projectPersistenceRef.current.localRevision;
+    updateProjectPersistence({
+      dirty: !!dirty,
+      data: data || projectPersistenceRef.current.data,
+      projectId,
+      status: localConfirmed ? 'local_confirmed' : (dirty ? 'dirty' : 'idle'),
+      localRevision,
+      ...(dirty ? { dbConfirmed: false, oneDriveConfirmed: false, oneDriveEvidence: null } : {})
+    });
+
+    if (localSnapshotTimerRef.current) clearTimeout(localSnapshotTimerRef.current);
+    if (!dirty || !data || !projectId) return;
+    localSnapshotTimerRef.current = setTimeout(() => {
+      const snapshot = sanitizeMeasurementStorage({ ...data, id: projectId, isLightweight: false });
+      localSnapshotChainRef.current = localSnapshotChainRef.current
+        .catch(() => undefined)
+        .then(async () => {
+          // A newer edit may have superseded this timer before its serialized turn.
+          if (projectPersistenceRef.current.data !== data) return;
+          updateProjectPersistence({ status: 'local_saving' });
+          await registerLocalMutation({
+            projectId,
+            type: 'project.upsert',
+            entityId: projectId,
+            snapshot,
+            actor: currentUserRef.current?.name || currentUserRef.current?.email || 'Unbekannt',
+            device: /iPad|iPhone|Android/i.test(navigator.userAgent) ? 'Mobil' : 'Desktop',
+            baseVersion: Number(data.report_data?.version || data.version || loadedProjectVersionRef.current || 1)
+          });
+          // Die geöffnete Arbeitssitzung ist die kanonische lokale Arbeitskopie.
+          // Während sie aktiv ist, führt der Outbox-Worker keinerlei Business-Cloudwrites aus.
+          await updateProjectSessionSnapshot(projectId, snapshot, { localRevision });
+          await refreshOfflinePendingSummary();
+          // `dirty` remains true relative to cloud/baseline; local_confirmed means
+          // this exact edit may safely survive navigation or an app restart.
+          if (projectPersistenceRef.current.data === data) {
+            updateProjectPersistence({ dirty: true, status: 'local_confirmed', projectId });
+          }
+        })
+        .catch(error => {
+          console.error('[LocalSnapshot] Durable local commit failed:', error);
+          if (projectPersistenceRef.current.data === data) updateProjectPersistence({ status: 'failed' });
+        });
+    }, 350);
+  }, [issueLocalRevision, refreshOfflinePendingSummary, updateProjectPersistence]);
+
+  useEffect(() => {
+    void getRecoverableProjectSessions()
+      .then(setRecoverableProjectSessions)
+      .catch(error => console.warn('[ProjectSession] Wiederherstellbare Sitzung konnte nicht gelesen werden:', error));
+  }, []);
+
+  useEffect(() => () => {
+    if (localSnapshotTimerRef.current) clearTimeout(localSnapshotTimerRef.current);
+  }, []);
+
+  useEffect(() => {
+    refreshOfflinePendingSummary();
+    const timer = window.setInterval(refreshOfflinePendingSummary, 5000);
+    window.addEventListener('online', refreshOfflinePendingSummary);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener('online', refreshOfflinePendingSummary);
+    };
+  }, [refreshOfflinePendingSummary]);
 
   // Authentication / User Management State
   const [showUserModal, setShowUserModal] = useState(false);
@@ -402,7 +613,6 @@ function App() {
       console.error('[SW] Service Worker registration error:', error);
     }
   });
-
   const quarantineLegacyReports = useCallback(() => {
     try {
       const cached = localStorage.getItem('qservice_unsaved_reports');
@@ -654,33 +864,13 @@ function App() {
         const dbVersion = dbRecord.report_data?.version || 1;
         const localVersion = offlineEntry.reportData?.version || 1;
 
-        // 1. Lock check against sessions (iPad has priority)
-        const cutoff = new Date(Date.now() - 20 * 60 * 1000).toISOString();
-        const { data: sessions, error: sessionErr } = await supabase
-          .from('project_sessions')
-          .select('session_token, open_project_id, device, last_seen')
-          .eq('open_project_id', reportId)
-          .gte('last_seen', cutoff);
-
-        const isIPad = /iPad/i.test(navigator.userAgent) ||
-                       (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) ||
-                       (navigator.userAgent.includes('Macintosh') && 'ontouchend' in document);
-        const myDeviceName = isIPad ? 'iPad' : (/iPhone|Android/i.test(navigator.userAgent) ? 'Mobil' : 'Desktop');
-
-        if (!sessionErr && sessions && myDeviceName !== 'iPad') {
-          const otherSessions = sessions.filter(s => s.session_token !== mySessionToken);
-          const otherParsedSessions = otherSessions.map(s => {
-            const parts = (s.device || '').split(':');
-            return {
-              ...s,
-              deviceType: parts[0] || 'Desktop',
-              userEmail: parts[1] || 'Unbekannt'
-            };
-          });
-          const conflictingIPads = otherParsedSessions.filter(s => s.deviceType === 'iPad');
-          if (conflictingIPads.length > 0) {
-            isLockLost = true;
-          }
+        // Redacted RPC proves ownership without exposing another device's token.
+        const { data: lockStatus, error: sessionErr } = await supabase.rpc('get_project_lock_status', {
+          p_project_id: reportId,
+          p_session_token: mySessionToken,
+        });
+        if (sessionErr || !Array.isArray(lockStatus) || lockStatus.length !== 1 || lockStatus[0]?.is_owner !== true) {
+          isLockLost = true;
         }
 
         // 2. Version conflict check
@@ -833,28 +1023,11 @@ function App() {
         openedReportBackupRef.current[reportId] = JSON.parse(JSON.stringify(finalSyncedReport));
         logAudit('success');
 
-        // Clean up preserved session lock in Supabase if we have already navigated away from the project
-        if (selectedReportRef.current?.id !== reportId || (viewRef.current !== 'details' && viewRef.current !== 'new-report')) {
-          const query = supabase.from('project_sessions');
-          if (typeof query.delete === 'function') {
-            query
-              .delete()
-              .eq('open_project_id', reportId)
-              .eq('session_token', sessionTokenRef.current)
-              .then(() => console.log('[Sync] Released preserved session lock after background sync completion:', reportId))
-              .catch(e => console.warn('[Sync] Failed to release preserved lock:', e));
-          }
-        }
+        // Background work never releases a lease. Release is owned solely by
+        // the staged sync-navigation-release-confirm barrier.
 
-        try {
-          const odFolder = buildProjectFolderName(
-            finalSyncedReport.projectNumber || finalSyncedReport.id || 'Unbekannt',
-            finalSyncedReport
-          );
-          uploadProjectJson(odFolder, finalSyncedReport).catch(e =>
-            console.warn('[OneDrive] Sync JSON-Backup failed:', e.message)
-          );
-        } catch {}
+        // Personal-drive JSON backup retired. The central outbox worker is the
+        // only OneDrive writer and must persist exact-drive hash evidence.
       }
 
     } catch (err) {
@@ -1032,10 +1205,8 @@ function App() {
       }
       console.log('[Version] Loaded project version set to:', loadedProjectVersionRef.current, 'for:', selectedReport.id);
 
-      if (unsavedReports[selectedReport.id] && navigator.onLine) {
-        console.log('[Sync] Auto-triggering sync for pending draft on project open:', selectedReport.id);
-        syncUnsavedReport(selectedReport.id);
-      }
+      // An active offline-first project session must never start a background
+      // cloud write. Only the explicit sync-and-exit barrier may do that.
     } else {
       loadedProjectVersionIdRef.current = null;
       loadedProjectVersionRef.current = 1;
@@ -1046,7 +1217,7 @@ function App() {
   const [mySessionToken] = useState(() => {
     let t = localStorage.getItem(KEY_SESSION_TOKEN);
     if (!t) {
-      t = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      t = createSecureSessionToken();
       localStorage.setItem(KEY_SESSION_TOKEN, t);
     }
     sessionTokenRef.current = t;
@@ -1163,10 +1334,14 @@ function App() {
       req.onupgradeneeded = () => resolve(0);
     });
 
+    const syncLegacyIfNoActiveSession = async () => {
+      if (await hasActiveProjectSession()) return;
+      await syncPendingToSupabase();
+    };
     sanitizeCorruptPhotosInDb().then(() => markUploadedPhotosAsVerified()).then(() => countPending().then(setSyncPending)).catch(() => {});
-    syncPendingToSupabase().catch(() => {});
+    syncLegacyIfNoActiveSession().catch(() => {});
     const interval = setInterval(() => {
-      syncPendingToSupabase().catch(() => {});
+      syncLegacyIfNoActiveSession().catch(() => {});
       markUploadedPhotosAsVerified().then(() => countPending().then(setSyncPending)).catch(() => {});
     }, 10_000);
     return () => clearInterval(interval);
@@ -1192,7 +1367,8 @@ function App() {
     activeLockSince,
     activeLockDevice,
     activeLockActivity,
-    registerProjectActivity
+    registerProjectActivity,
+    releaseProjectLock,
   } = useSessionLock(
     supabase,
     mySessionToken,
@@ -1649,28 +1825,119 @@ function App() {
   }, [fetchReports]);
 
   const handleSelectReport = async (report) => {
-    // 1. Lokale ungespeicherte Änderungen einmischen falls vorhanden
     let activeReport = report;
-    const cached = localStorage.getItem('qservice_unsaved_reports');
-    if (cached) {
-      try {
-        const unsaved = JSON.parse(cached);
-        if (unsaved[report.id]?.reportData) {
-          activeReport = {
-            ...report,
-            ...unsaved[report.id].reportData,
-            isLightweight: false
-          };
-          console.log('[Offline] Loaded unsaved report data for:', report.id);
-        }
-      } catch (e) {}
+    let lockAcquired = false;
+    if (!navigator.onLine) {
+      showToast('Projekt kann nur mit Internetverbindung geöffnet werden.', 'error', 10000);
+      return;
     }
 
-    // Sofort in die Detailansicht wechseln und Ladezustand anzeigen
-    openedReportBackupRef.current[activeReport.id] = JSON.parse(JSON.stringify(activeReport));
-    setSelectedReport(activeReport);
-    setView('details');
-    setIsSessionActive(true);
+    // Fail closed: no form is rendered until the server lease and the complete,
+    // byte-verified local project copy have both been confirmed.
+    setProjectSessionStatus({ phase: 'preparing', projectId: report.id });
+    try {
+      const deviceType = /iPad/i.test(navigator.userAgent) ? 'iPad'
+        : (/iPhone|Android/i.test(navigator.userAgent) ? 'Mobil' : 'Desktop');
+      const device = `${deviceType}:${currentUserRef.current?.id || 'unknown'}:${currentUserRef.current?.name || 'Unbekannt'}:${currentUserRef.current?.email || 'Unbekannt'}`;
+      const { data: lockRows, error: lockError } = await supabase.rpc('acquire_project_lock', {
+        p_project_id: report.id,
+        p_session_token: mySessionToken,
+        p_user_id: String(currentUserRef.current?.id || 'unknown'),
+        p_user_name: currentUserRef.current?.name || 'Unbekannt',
+        p_device: device,
+        p_client_id: null,
+      });
+      if (lockError) throw lockError;
+      const lockResult = Array.isArray(lockRows) ? lockRows[0] : lockRows;
+      if (lockResult?.acquired !== true) {
+        throw new Error(`Projekt ist durch ${lockResult?.lock_owner || 'ein anderes Gerät'} gesperrt.`);
+      }
+      lockAcquired = true;
+
+      const materialized = await materializeProjectForOffline(supabase, report);
+      const baseVersion = Number(materialized.report_data?.version || materialized.version || 1);
+      const recoverable = (await getRecoverableProjectSessions()).find(row => row.projectId === report.id);
+      if (recoverable && Number(recoverable.baseVersion) !== baseVersion) {
+        const conflict = new Error('Lokale Daten bleiben erhalten: Der Cloudstand hat inzwischen eine andere Version.');
+        conflict.code = 'LOCAL_SESSION_CLOUD_VERSION_CONFLICT';
+        throw conflict;
+      }
+
+      let verifiedSession;
+      activeReport = materialized;
+      if (recoverable) {
+        verifiedSession = await verifyProjectSession(report.id, {
+          sessionId: recoverable.sessionId,
+          lockToken: mySessionToken,
+          expectedCounts: recoverable.counts,
+        });
+        const restoredMedia = await restoreProjectOfflineMedia(verifiedSession.snapshot);
+        revokeProjectOfflineObjectUrls();
+        projectOfflineObjectUrlsRef.current = { projectId: report.id, urls: restoredMedia.objectUrls };
+        activeReport = restoredMedia.snapshot;
+      } else {
+        verifiedSession = await createVerifiedProjectSession({
+          project: materialized,
+          lockToken: mySessionToken,
+          baseVersion,
+          actor: currentUserRef.current?.name || currentUserRef.current?.email || 'Unbekannt',
+          device: deviceType,
+          storageDownload: async (artifact) => {
+            if (!artifact?.bucket || !artifact?.path) {
+              throw new Error('Storage-Artefakt besitzt keinen eindeutigen Bucket/Pfad.');
+            }
+            const { data, error } = await supabase.storage.from(artifact.bucket).download(artifact.path);
+            if (error) throw error;
+            if (!(data instanceof Blob) || data.size === 0) {
+              throw new Error(`Storage lieferte keine gültigen Bytes: ${artifact.bucket}/${artifact.path}`);
+            }
+            return data;
+          },
+        });
+      }
+
+      activeReport = { ...activeReport, id: report.id, isLightweight: false };
+      openedReportBackupRef.current[report.id] = JSON.parse(JSON.stringify(activeReport));
+      updateProjectPersistence({
+        dirty: false, data: activeReport, projectId: report.id,
+        status: 'local_confirmed', localConfirmed: true,
+        dbConfirmed: false, oneDriveConfirmed: false, oneDriveEvidence: null,
+      });
+      setProjectSessionStatus({
+        phase: 'offline_available', projectId: report.id,
+        counts: verifiedSession.counts, localMaterializationVerified: true,
+      });
+      setSelectedReport(activeReport);
+      setView('details');
+      setIsSessionActive(true);
+    } catch (error) {
+      console.error('[ProjectSession] Open failed closed:', error);
+      let finalError = error;
+      if (lockAcquired) {
+        try {
+          // Exact owner token is held inside useSessionLock. A failed local
+          // admission must never leave the just-acquired server lock behind.
+          await releaseProjectLock(report.id);
+          lockAcquired = false;
+        } catch (releaseError) {
+          console.error('[ProjectSession] P0 lock cleanup failed:', releaseError);
+          finalError = new Error(`Projektöffnung abgebrochen, aber die Sperre konnte nicht sicher freigegeben werden: ${releaseError.message}`);
+          finalError.code = 'PROJECT_OPEN_LOCK_CLEANUP_FAILED';
+          finalError.cause = error;
+        }
+      }
+      setSelectedReport(null);
+      setView('dashboard');
+      setIsSessionActive(false);
+      setProjectSessionStatus({
+        phase: finalError.code === 'PROJECT_OPEN_LOCK_CLEANUP_FAILED' ? 'blocked_lock_cleanup' : 'blocked',
+        projectId: report.id,
+        error: finalError.message,
+        code: finalError.code,
+      });
+      showToast(finalError.message || 'Projekt konnte nicht sicher offline vorbereitet werden.', 'error', 15000);
+      return;
+    }
 
     // Registriere zuletzt geöffneten Zeitstempel
     try {
@@ -1681,8 +1948,8 @@ function App() {
       console.warn('Fehler beim Speichern von qservice_last_opened:', e);
     }
 
-    // 2. Falls leichtgewichtig, Details asynchron im Hintergrund laden
-    if (supabase && activeReport.isLightweight) {
+    // Legacy lightweight hydration is unreachable after verified materialization.
+    if (false && supabase && report.isLightweight) {
       const targetProjectId = report.id;
       const requestGen = (activeLoadRequestsRef.current[targetProjectId] || 0) + 1;
       activeLoadRequestsRef.current[targetProjectId] = requestGen;
@@ -1896,11 +2163,106 @@ function App() {
     }
   }, [selectedReport, supabase]);
 
-  const handleCancelEntry = () => {
+  const runStrictProjectExit = useCallback(async (action) => {
+    const projectId = selectedReportRef.current?.id;
+    if (!projectId) return action();
+    if (!navigator.onLine) {
+      showToast('Offline: Supabase und OneDrive können nicht bestätigt werden. Projekt bleibt geöffnet.', 'error', 12000);
+      return false;
+    }
+    if (projectExitSyncRef.current) return false;
+    projectExitSyncRef.current = true;
+    setProjectExitSyncing(true);
+    setStrictExitStatus({ status: 'syncing', reasons: [] });
+    let finalSyncContext = null;
+    try {
+      const latest = projectPersistenceRef.current;
+      const localSession = await verifyProjectSession(projectId, { lockToken: mySessionToken });
+      finalSyncContext = beginExplicitProjectFinalSync({ projectId, ownerSessionToken: mySessionToken });
+      await triggerOfflineOutboxSync('project_exit', { projectId });
+
+      const { data: verifiedProjectRow, error: readbackError } = await supabase
+        .from('damage_reports')
+        .select('id, report_data, updated_at')
+        .eq('id', projectId)
+        .single();
+      if (readbackError || !verifiedProjectRow) throw readbackError || new Error('Supabase-Rücklesung fehlt');
+      const expectedProject = localSession.snapshot;
+      const contentEvidence = compareProjectReportData(expectedProject, verifiedProjectRow.report_data);
+      const unverifiedOneDriveMedia = findUnverifiedOneDriveMedia(verifiedProjectRow.report_data);
+      latest.dbConfirmed = Boolean(contentEvidence.verified);
+      const dbEvidence = {
+        verified: Boolean(contentEvidence.verified), id: verifiedProjectRow.id,
+        version: Number(verifiedProjectRow.report_data?.version || 0), updatedAt: verifiedProjectRow.updated_at,
+      };
+      const providerEvidence = await collectStrictExitCloudEvidence(supabase, localSession);
+      const storageEvidence = providerEvidence.storage;
+      const oneDriveEvidence = providerEvidence.oneDrive;
+      latest.oneDriveEvidence = oneDriveEvidence;
+      await confirmProjectOperations(projectId, { verifiedVersion: dbEvidence.version });
+      const outboxSummary = await getPendingSummary(projectId);
+      const legacyUploadSummary = {
+        total: Number(syncPending || 0), pending: Number(syncPending || 0),
+        uploading: 0, uploaded: 0, failed: 0, needsRepair: 0, verified: 0,
+      };
+      const readiness = buildStrictExitReadiness({
+        localConfirmed: latest.status === 'local_confirmed' || localSession.state === 'offline_available',
+        dbEvidence,
+        storageEvidence,
+        oneDriveEvidence: latest.oneDriveEvidence,
+        outboxSummary,
+        legacyUploadSummary,
+        unverifiedOneDriveMedia,
+        contentEvidence,
+      });
+      setStrictExitStatus(readiness);
+      if (!readiness.verified) {
+        showToast(`Projekt bleibt geöffnet: ${readiness.reasons.join(', ')}`, 'error', 15000);
+        return false;
+      }
+
+      await stageProjectSessionConfirmation(projectId, readiness.evidence);
+      const actionResult = await action();
+      const projectStillOpen = selectedReportRef.current?.id === projectId && viewRef.current !== 'dashboard';
+      if (projectStillOpen) throw new Error('Navigation wurde nicht bestätigt; Sperre bleibt aktiv.');
+      await releaseProjectLock(projectId);
+      await confirmProjectSession(projectId, readiness.evidence);
+      setStrictExitStatus({ ...readiness, message: `Supabase: OK · OneDrive: OK · ${formatProjectSyncCounts(contentEvidence.expected || {}).join(' · ')}` });
+      return actionResult;
+    } catch (error) {
+      console.error('[StrictExit] Projekt bleibt sicher geöffnet:', error);
+      setStrictExitStatus({ status: 'blocked', reasons: [error.code || error.message] });
+      showToast(`Projekt kann nicht verlassen werden: ${error.message}`, 'error', 15000);
+      return false;
+    } finally {
+      endExplicitProjectFinalSync(finalSyncContext);
+      projectExitSyncRef.current = false;
+      setProjectExitSyncing(false);
+    }
+  }, [mySessionToken, releaseProjectLock, syncPending]);
+
+  navigationGuardRef.current = runStrictProjectExit;
+
+  useEffect(() => {
+    const preventUnsafeUnload = (event) => {
+      if (!selectedReportRef.current?.id) return;
+      // Browser unload cannot finish DB/Storage/OneDrive readbacks. Keep the
+      // recoverable local session and the server lease intact.
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', preventUnsafeUnload);
+    return () => window.removeEventListener('beforeunload', preventUnsafeUnload);
+  }, []);
+
+  const handleCancelEntry = () => navigationGuardRef.current(async () => {
     setView('dashboard');
+    viewRef.current = 'dashboard';
     setSelectedReport(null);
+    selectedReportRef.current = null;
     setIsSessionActive(true);
-  }
+    return true;
+  });
 
   const handleSaveReport = useCallback(async (updatedReport, silent = false) => {
     const isLocked = (projectMode === 'technician' || isTechnicianMode) ? false : !isSessionActiveRef.current;
@@ -1922,6 +2284,8 @@ function App() {
     if (isNewProject) {
       finalReport.isLightweight = false;
     }
+    const deleteRequested = finalReport.exteriorPhotoDeleted === true;
+    const incomingExteriorPhoto = finalReport.exteriorPhoto || null;
     // DamageForm intentionally omits technical fields in some save payloads.
     // Never let such a payload downgrade the already loaded server version.
     finalReport.version = Math.max(
@@ -1965,6 +2329,38 @@ function App() {
         : `TMP-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     }
     if (!finalReport.date) finalReport.date = new Date().toISOString();
+
+    if (isNewProject) {
+      try {
+        if (!navigator.onLine) throw new Error('Ein neues Projekt benötigt zum atomaren Erstellen eine Internetverbindung.');
+        const created = await createLockedProjectSession({
+          supabase,
+          project: finalReport,
+          sessionToken: mySessionToken,
+          device: /iPad/i.test(navigator.userAgent) ? 'iPad' : 'Desktop',
+          clientId: null,
+          actor: currentUserRef.current?.name || currentUserRef.current?.email || 'Unbekannt',
+        });
+        finalReport = { ...created.project, id: finalReport.id, isLightweight: false };
+        setReports(prev => [...prev.filter(item => item.id !== finalReport.id), finalReport]);
+        setSelectedReport(finalReport);
+        setView('details');
+        setProjectSessionStatus({
+          phase: 'offline_available', projectId: finalReport.id,
+          counts: created.session.counts, localMaterializationVerified: true,
+        });
+        updateProjectPersistence({
+          dirty: false, data: finalReport, projectId: finalReport.id,
+          status: 'local_confirmed', localConfirmed: true,
+        });
+        return finalReport;
+      } catch (error) {
+        setIsSessionActive(false);
+        setProjectSessionStatus({ phase: 'blocked', projectId: finalReport.id, error: error.message });
+        showToast(`Projekt wurde nicht erstellt: ${error.message}`, 'error', 15000);
+        return updatedReport;
+      }
+    }
 
     setReports(currentReports => {
       let newReports;
@@ -2033,6 +2429,28 @@ function App() {
     if (silentSaveDebounceTimers.current[finalReport.id]) {
       clearTimeout(silentSaveDebounceTimers.current[finalReport.id]);
       delete silentSaveDebounceTimers.current[finalReport.id];
+    }
+
+    if (await hasActiveProjectSession()) {
+      const localRevision = issueLocalRevision();
+      await registerLocalMutation({
+        projectId: finalReport.id,
+        type: 'project.upsert',
+        entityId: finalReport.id,
+        snapshot: finalReport,
+        actor: currentUserRef.current?.name || currentUserRef.current?.email || 'Unbekannt',
+        device: /iPad|iPhone|Android/i.test(navigator.userAgent) ? 'Mobil' : 'Desktop',
+        baseVersion: Number(finalReport.version || loadedProjectVersionRef.current || 1),
+      });
+      await updateProjectSessionSnapshot(finalReport.id, finalReport, { localRevision });
+      updateProjectPersistence({
+        dirty: true, data: finalReport, projectId: finalReport.id,
+        status: 'local_confirmed', localConfirmed: true,
+        localRevision, dbConfirmed: false, oneDriveConfirmed: false, oneDriveEvidence: null,
+      });
+      await refreshOfflinePendingSummary();
+      if (!silent) showToast('Lokal gespeichert. Cloud-Sync erfolgt beim sicheren Verlassen.', 'success');
+      return finalReport;
     }
 
     if (supabase) {
@@ -2132,39 +2550,14 @@ function App() {
               }
             }
 
-            // Lock-Sitzung in der DB prüfen
-            const cutoff = new Date(Date.now() - 20 * 60 * 1000).toISOString();
-            const { data: sessions, error: sessionErr } = await supabase
-              .from('project_sessions')
-              .select('session_token, open_project_id, device, last_seen')
-              .eq('open_project_id', finalReport.id)
-              .gte('last_seen', cutoff);
-
-            if (!sessionErr && sessions) {
-              const otherSessions = sessions.filter(s => s.session_token !== mySessionToken);
-              const otherParsedSessions = otherSessions.map(s => {
-                const parts = (s.device || '').split(':');
-                return {
-                  ...s,
-                  deviceType: parts[0] || 'Desktop',
-                  userEmail: parts[1] || 'Unbekannt'
-                };
-              });
-
-              const isIPad = /iPad/i.test(navigator.userAgent) ||
-                             (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) ||
-                             (navigator.userAgent.includes('Macintosh') && 'ontouchend' in document);
-              const myDeviceName = isIPad ? 'iPad' : (/iPhone|Android/i.test(navigator.userAgent) ? 'Mobil' : 'Desktop');
-
-              const conflictingIPads = otherParsedSessions.filter(s => s.deviceType === 'iPad');
-              if (myDeviceName !== 'iPad' && conflictingIPads.length > 0) {
-                const conflictMsg = 'Dieses Projekt wird aktuell auf dem iPad bearbeitet. Das iPad hat Vorrang. Deine Änderungen wurden nicht gespeichert.';
-                if (!silent) {
-                  alert(conflictMsg);
-                }
-                saveToUnsavedReports(finalReport, true);
-                throw new Error(conflictMsg);
-              }
+            const { data: lockStatus, error: sessionErr } = await supabase.rpc('get_project_lock_status', {
+              p_project_id: finalReport.id,
+              p_session_token: mySessionToken,
+            });
+            if (sessionErr || !Array.isArray(lockStatus) || lockStatus.length !== 1 || lockStatus[0]?.is_owner !== true) {
+              const conflictMsg = 'Schreiben blockiert: Diese Sitzung besitzt die atomare Projektsperre nicht.';
+              saveToUnsavedReports(finalReport, true);
+              throw new Error(conflictMsg);
             }
           } catch (e) {
             console.error('[CloudSave Check Error]', e);
@@ -2253,19 +2646,7 @@ function App() {
             .select('id, updated_at');
         };
 
-        const oneDriveBackup = () => {
-          try {
-            const odFolder = buildProjectFolderName(
-              finalReport.projectNumber || finalReport.id || 'Unbekannt',
-              finalReport
-            );
-            uploadProjectJson(odFolder, finalReport).catch(e =>
-              console.warn('[OneDrive] JSON-Backup failed:', e.message)
-            );
-          } catch (e) {
-            console.warn('[OneDrive] JSON-Backup failed:', e.message);
-          }
-        };
+        const oneDriveBackup = () => undefined;
 
         const handleSaveError = (err) => {
           console.error('[Supabase Save Error/Exception]', err);
@@ -2580,8 +2961,8 @@ function App() {
           const { error: todoErr } = await supabase.from('project_todos').delete().eq('project_id', reportId);
           if (todoErr) console.warn('[Delete] Todo cleanup warning:', todoErr);
 
-          const { error: sessErr } = await supabase.from('project_sessions').delete().eq('open_project_id', reportId);
-          if (sessErr) console.warn('[Delete] Session cleanup warning:', sessErr);
+          // Never delete lease rows directly; owner-token RPC is the only
+          // permitted release path and is executed by the strict exit barrier.
 
           const { data: deleteData, error: deleteErr } = await supabase
             .from('damage_reports')
@@ -3446,6 +3827,16 @@ function App() {
               </div>
             ) : (
               <div>
+                {selectedReport && projectSessionStatus?.projectId === selectedReport.id && (
+                  <ProjectSessionSyncPanel
+                    localConfirmed={projectPersistenceRef.current.status === 'local_confirmed'}
+                    localMaterializationVerified={projectSessionStatus.localMaterializationVerified === true}
+                    counts={projectSessionStatus.counts || {}}
+                    readiness={strictExitStatus}
+                    syncing={projectExitSyncing}
+                    onSyncAndExit={handleCancelEntry}
+                  />
+                )}
                 {/* ── Projekt-Sperrinformationen & Versionsschutz-Anzeige ── */}
                 {selectedReport && (
                   <div style={{

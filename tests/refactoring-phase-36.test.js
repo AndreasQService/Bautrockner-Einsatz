@@ -59,7 +59,7 @@ test('enabled false creates no requests, timers, listener, cleanup, or DELETE', 
   assert.equal(harness.listeners.size, 0);
 });
 
-test('enabled true preserves initial work, intervals, and beforeunload DELETE', () => {
+test('enabled true preserves the lock on beforeunload and lifecycle cleanup', () => {
   const harness = createHarness(true);
   const cleanup = startSessionLockLifecycle(harness.options);
 
@@ -80,7 +80,7 @@ test('enabled true preserves initial work, intervals, and beforeunload DELETE', 
   cleanup();
   assert.equal(harness.intervals.length, 0);
   assert.equal(harness.listeners.size, 0);
-  assert.equal(harness.calls.at(-1), 'delete');
+  assert.equal(harness.calls.includes('delete'), false);
 });
 
 test('false to true starts once without duplicate intervals', () => {
@@ -120,5 +120,14 @@ test('App always calls the hook and gates it with the visible QTool user', () =>
 
 test('the immediate project-change effect is also disabled before login', () => {
   const hookSource = readFileSync(new URL('../src/hooks/useSessionLock.js', import.meta.url), 'utf8');
-  assert.match(hookSource, /useEffect\(\(\) => \{\s*if \(!enabled\) return;\s*upsertSession\(\);\s*pollSessions\(\);/);
+  assert.match(hookSource, /useEffect\(\(\) => \{\s*if \(!enabled\) return;[\s\S]*queueMicrotask\([\s\S]*void upsertSession\(\);[\s\S]*void pollSessions\(\);/);
+});
+
+test('old open project locks remain visible until explicit release', () => {
+  const hookSource = readFileSync(new URL('../src/hooks/useSessionLock.js', import.meta.url), 'utf8');
+  assert.match(hookSource, /\.rpc\('get_project_lock_status'/);
+  assert.doesNotMatch(hookSource, /\.from\('project_sessions'\)/);
+  assert.doesNotMatch(hookSource, /\.gte\('last_seen'/);
+  assert.match(hookSource, /elapsed\s+time never hides or releases a lock/i);
+  assert.match(hookSource, /\.rpc\('release_project_lock',[\s\S]*p_session_token:\s*tokenRef\.current/);
 });

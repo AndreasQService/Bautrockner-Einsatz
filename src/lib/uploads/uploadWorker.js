@@ -23,6 +23,7 @@ import {
   getUploadSessionStatus,
   uploadChunk,
 } from './oneDriveApi.js';
+import { assertOneDriveWriteAllowed } from '../offline/sessionCloudWriteGate.js';
 
 // ─── Konstanten ───────────────────────────────────────────────────────────────
 
@@ -256,11 +257,22 @@ export async function processUploadItem(itemId, onStatusChange) {
  * @param {Function} [options.onItemChange]    Callback(item) bei Statusänderung
  * @returns {Promise<void>}
  */
-export async function runUploadWorker({ maxParallel = 2, onItemChange } = {}) {
+export async function runUploadWorker({ maxParallel = 2, onItemChange, projectId = null } = {}) {
+  // App-Start/online/addFiles dürfen während einer Projektsitzung nur lokal
+  // queueen. Erst der explizite Abschlusskontext darf diesen Worker öffnen.
+  try {
+    await assertOneDriveWriteAllowed('POST');
+  } catch (error) {
+    if (error?.code === 'ACTIVE_PROJECT_SESSION_ONEDRIVE_WRITE_BLOCKED') {
+      return { skipped: 'active_project_session', processed: 0 };
+    }
+    throw error;
+  }
   const pending = await getPendingItems();
 
   // Kandidaten filtern: nur was der Worker anfassen soll
   const candidates = pending.filter((i) => {
+    if (projectId && String(i.projectId) !== String(projectId)) return false;
     if (i.status === 'uploaded_unverified') return false; // → Reconcile
     if (i.status === 'failed' && i.retryCount >= MAX_RETRIES) return false;
     return true;

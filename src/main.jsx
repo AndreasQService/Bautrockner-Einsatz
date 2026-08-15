@@ -10,8 +10,12 @@ import ErrorBoundary from './ErrorBoundary.jsx'
 
 // ─── Variante C: Offline-Blobs → Supabase Storage synchen (kein MSAL) ───────
 // Startet beim App-Boot im Hintergrund, blockiert Render nicht.
-import('./lib/sync/supabaseSyncWorker.js')
-  .then(({ syncPendingToSupabase }) => syncPendingToSupabase())
+Promise.all([
+  import('./lib/sync/supabaseSyncWorker.js'),
+  import('./lib/offline/projectSessionStore.js'),
+])
+  .then(async ([{ syncPendingToSupabase }, { hasActiveProjectSession }]) =>
+    await hasActiveProjectSession() ? { synced: 0, skipped: 'active_project_session' } : syncPendingToSupabase())
   .then(({ synced }) => { if (synced > 0) console.info(`[Boot] ☁️ ${synced} Fotos zu Supabase synchronisiert`); })
   .catch((e) => console.warn('[Boot] Sync fehlgeschlagen:', e.message));
 

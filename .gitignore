@@ -91,3 +91,7 @@ test-results/
 room-edit-debug*.png
 tests/offline/*.png
 tests/offline/*.webm
+# Browser auth state contains bearer/refresh tokens. It must never be committed.
+tests/stress_suite/profiles/
+tests/real-ui/.auth/
+playwright-report-real-ui/
