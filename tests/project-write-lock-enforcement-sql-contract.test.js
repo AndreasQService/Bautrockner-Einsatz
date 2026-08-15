@@ -14,7 +14,8 @@ test('lease is bound to authenticated user plus unguessable request token', () =
   assert.match(sql, /s\.owner_user_id = auth\.uid\(\)/);
   assert.doesNotMatch(sql, /last_seen\s*[<>]=?\s*now\(\)\s*-\s*interval\s*'20 minutes'/i);
   assert.match(sql, /valid offline owner never expires/i);
-  assert.match(sql, /v_claimed_uid IS DISTINCT FROM v_request_uid/);
+  assert.match(sql, /Authorization and ownership always come from the verified JWT/);
+  assert.doesNotMatch(sql, /p_user_id::uuid|v_claimed_uid/);
 });
 
 test('browser roles cannot exfiltrate session tokens and receive only redacted owner status', () => {
