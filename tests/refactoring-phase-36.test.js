@@ -114,8 +114,11 @@ test('true to false removes timers and listener without further requests', () =>
 });
 test('App always calls the hook and gates it with the visible QTool user', () => {
   const appSource = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8');
+  const mainSource = readFileSync(new URL('../src/main.jsx', import.meta.url), 'utf8');
   assert.match(appSource, /useSessionLock\([\s\S]*sessionStartedAtRef\.current,\s*Boolean\(currentUser\)\s*&&\s*Boolean\(supabaseSession\?\.user\)\s*\)/);
-  assert.ok(appSource.indexOf('useSessionLock(') < appSource.indexOf('if (!currentUser)'));
+  assert.match(appSource, /const currentUser = authenticatedUser/);
+  assert.match(mainSource, /createElement\(AuthGate, null, \(authenticatedUser\) => createElement\(App, \{ authenticatedUser \}\)\)/);
+  assert.doesNotMatch(appSource, /if \(!currentUser\)\s*\{\s*return\s*\(/);
 });
 
 test('the immediate project-change effect is also disabled before login', () => {
