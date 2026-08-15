@@ -85,6 +85,8 @@ const VOLATILE_KEYS = new Set([
   '_supabase_updated_at', 'created_at', 'updated_at', 'createdAt', 'updatedAt',
   'uploading', 'syncStatus', 'error', 'errorMessage', 'retryCount',
   'isLightweight', 'localOnly', 'blob', 'file', 'objectUrl',
+  '_projectMode', '_last_local_mutation', 'offlineRecovered',
+  'offlineTransactionId', 'offlineOnly', '_is_offline_fallback',
 ]);
 const MEDIA_URL_KEYS = new Set(['preview', 'url', 'publicUrl', 'downloadUrl']);
 const MEDIA_PROVIDER_KEYS = new Set([
@@ -93,12 +95,13 @@ const MEDIA_PROVIDER_KEYS = new Set([
 ]);
 const REPORT_ENVELOPE_KEYS = new Set([
   'id', 'report_data', '_offlineMaterialization', '_supabase_updated_at',
-  'isLightweight', '_is_offline_fallback',
+  'isLightweight', '_is_offline_fallback', '_projectMode', '_last_local_mutation',
 ]);
 
 const isMediaLike = (value) => Boolean(value && typeof value === 'object' && (
   value.storagePath || value.supabasePath || value.oneDriveItemId || value.checksum ||
-  value.sha256 || /\.(jpe?g|png|webp|heic|pdf)(\?|$)/i.test(value.name || '') ||
+  value.sha256 || value.offlineTransactionId || value.preview || value.url ||
+  /\.(jpe?g|png|webp|heic|pdf)(\?|$)/i.test(value.name || '') ||
   /^data:image\//i.test(value.preview || value.url || '') || /^blob:/i.test(value.preview || value.url || '')
 ));
 

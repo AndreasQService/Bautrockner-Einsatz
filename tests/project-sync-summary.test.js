@@ -105,3 +105,28 @@ test('report_data comparison uses current merged local fields, not a stale neste
   assert.equal(compareProjectReportData(local, { text: 'neu' }).verified, true);
   assert.equal(compareProjectReportData(local, { text: 'alt' }).verified, false);
 });
+
+test('regression: same count with changed content must fail exact match', () => {
+  const local = project();
+  local.rooms[0].name = 'Badezimmer EG';
+  const cloud = structuredClone(local);
+  cloud.rooms[0].name = 'Badezimmer OG';
+
+  const result = compareProjectSyncContent(local, cloud);
+  assert.equal(result.expected.rooms, result.confirmed.rooms);
+  assert.equal(result.verified, false);
+  assert.ok(result.mismatches.some(m => m.includes('name')));
+});
+
+test('regression: volatile client envelope flags do not trigger false mismatches', () => {
+  const local = project();
+  local._projectMode = 'technician';
+  local._last_local_mutation = '2026-08-15T10:00:00.000Z';
+  local.offlineRecovered = true;
+  local.offlineTransactionId = 'tx-123';
+
+  const cloud = project();
+  const result = compareProjectReportData(local, cloud);
+  assert.equal(result.verified, true);
+  assert.equal(result.mismatches.length, 0);
+});

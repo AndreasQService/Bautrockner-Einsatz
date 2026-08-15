@@ -1,5 +1,6 @@
 import { registerOutboxHandler } from './index.js';
 import { queueOneDriveTransfer, sha256Hex, verifyOneDriveCopy } from './supabaseMediaHandlers.js';
+import { compareProjectReportData, projectReportDataProjection } from './projectSyncSummary.js';
 
 const fail = (message, retryable = true) => Object.assign(new Error(message), { retryable });
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -369,13 +370,25 @@ export function registerSupabaseDomainOutboxHandlers(supabase) {
       if (verifyError || !data?.report_data?.deletedAt) throw verifyError || fail('Projekt-Tombstone nicht bestätigt');
       return { verified: true, evidence: { deletedAt: data.report_data.deletedAt } };
     }
-    if (operation.type === 'project.status.update' || operation.type === 'project.task.complete') {
-      const expected = payload.project || payload.reportData;
-      if (!expected) throw fail('Projekt-Snapshot für Status-/Task-Änderung fehlt', false);
-      const patch = { report_data: expected, updated_at: payload.updatedAt || new Date().toISOString() };
-      if (payload.status || expected.status) patch.status = payload.status || expected.status;
+    if (operation.type === 'project.upsert' || operation.type === 'project.update' || operation.type === 'project.status.update' || operation.type === 'project.task.complete') {
+      const expected = snapshot || payload.project || payload.snapshot || payload.reportData;
+      if (!expected) throw fail('Projekt-Snapshot für Operation fehlt', false);
+      const reportData = projectReportDataProjection(expected);
+      const patch = {
+        report_data: reportData,
+        updated_at: payload.updatedAt || new Date().toISOString()
+      };
+      if (expected.projectTitle) patch.project_title = expected.projectTitle;
+      if (expected.client) patch.client = expected.client;
+      if (expected.address || expected.street) patch.address = expected.address || `${expected.street || ''}, ${expected.zip || ''} ${expected.city || ''}`;
+      if (expected.status || payload.status) patch.status = payload.status || expected.status;
+      if (expected.assignedTo) patch.assigned_to = expected.assignedTo;
+      if (expected.date) patch.date = expected.date;
+      if (expected.dryingStarted !== undefined) patch.drying_started = expected.dryingStarted;
+
       const { error } = await supabase.from('damage_reports').update(patch).eq('id', operation.projectId);
       if (error) throw error;
+
       if (payload.historyEntry) {
         const historyRow = {
           project_id: operation.projectId,
@@ -396,10 +409,20 @@ export function registerSupabaseDomainOutboxHandlers(supabase) {
           if (historyError && historyError.code !== '42P01') throw historyError;
         }
       }
-      const { data, error: readError } = await supabase.from('damage_reports').select('status,report_data').eq('id', operation.projectId).single();
-      if (readError) throw readError;
-      if (JSON.stringify(data.report_data) !== JSON.stringify(expected)) throw fail('Projekt-Readback für Status-/Task-Änderung stimmt nicht');
-      return { verified: true, evidence: { status: data.status, operation: operation.type } };
+
+      const { data: verified, error: readError } = await supabase
+        .from('damage_reports')
+        .select('id, status, report_data, updated_at')
+        .eq('id', operation.projectId)
+        .single();
+      if (readError || !verified) throw readError || fail('Cloud-Readback für Projekt-Update fehlgeschlagen');
+
+      const comparison = compareProjectReportData(expected, verified.report_data);
+      if (!comparison.verified) {
+        throw fail(`Projekt-Readback für ${operation.type} stimmt nicht exakt überein: ${comparison.mismatches.join(', ')}`);
+      }
+
+      return { verified: true, evidence: { id: verified.id, status: verified.status, version: verified.report_data?.version, updatedAt: verified.updated_at } };
     }
     throw fail(`Nicht unterstützte Projektoperation: ${operation.type}`, false);
   };
