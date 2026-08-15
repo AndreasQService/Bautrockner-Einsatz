@@ -61,8 +61,8 @@ AS $$
      )
 $$;
 
-REVOKE ALL ON FUNCTION public.qtool_request_session_token() FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.qtool_has_project_write_lock(TEXT) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.qtool_request_session_token() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.qtool_has_project_write_lock(TEXT) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.qtool_request_session_token() TO authenticated;
 GRANT EXECUTE ON FUNCTION public.qtool_has_project_write_lock(TEXT) TO authenticated;
 
@@ -74,11 +74,13 @@ SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
   SELECT auth.uid() IS NOT NULL AND EXISTS (
-    SELECT 1 FROM public.app_admin_users a
-     WHERE a.auth_user_id = auth.uid() AND a.active = true
+    SELECT 1 FROM public.user_profiles p
+     WHERE p.id = auth.uid()
+       AND p.is_active = true
+       AND p.role = 'admin'
   )
 $$;
-REVOKE ALL ON FUNCTION public.qtool_is_active_admin() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.qtool_is_active_admin() FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.qtool_is_active_admin() TO authenticated;
 
 -- Session tokens are bearer secrets. Browser roles may neither read nor mutate
@@ -117,7 +119,7 @@ AS $$
      AND s.open_project_id IS NOT NULL
      AND (p_project_id IS NULL OR s.open_project_id = p_project_id)
 $$;
-REVOKE ALL ON FUNCTION public.get_project_lock_status(TEXT,TEXT) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.get_project_lock_status(TEXT,TEXT) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.get_project_lock_status(TEXT,TEXT) TO authenticated;
 
 DROP FUNCTION IF EXISTS public.acquire_project_lock(TEXT, TEXT, TEXT, TEXT, TEXT);
@@ -238,9 +240,9 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.acquire_project_lock(TEXT,TEXT,TEXT,TEXT,TEXT,TEXT) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.renew_project_lock(TEXT,TEXT) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.release_project_lock(TEXT,TEXT) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.acquire_project_lock(TEXT,TEXT,TEXT,TEXT,TEXT,TEXT) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.renew_project_lock(TEXT,TEXT) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.release_project_lock(TEXT,TEXT) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.acquire_project_lock(TEXT,TEXT,TEXT,TEXT,TEXT,TEXT) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.renew_project_lock(TEXT,TEXT) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.release_project_lock(TEXT,TEXT) TO authenticated;
@@ -303,7 +305,7 @@ BEGIN
                             'offline_prepare_required', true);
 END;
 $$;
-REVOKE ALL ON FUNCTION public.create_project_and_acquire_lock(TEXT,JSONB,TEXT,TEXT,TEXT) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.create_project_and_acquire_lock(TEXT,JSONB,TEXT,TEXT,TEXT) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.create_project_and_acquire_lock(TEXT,JSONB,TEXT,TEXT,TEXT) TO authenticated;
 
 -- Replace permissive authenticated mutation policies on every project-scoped table.
