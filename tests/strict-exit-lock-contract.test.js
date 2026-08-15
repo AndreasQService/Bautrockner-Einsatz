@@ -37,9 +37,19 @@ test('release happens only after the actual guarded action', () => {
 
 test('inactivity and browser unload cannot release an unconfirmed project', () => {
   const inactivity = lock.slice(lock.indexOf('INACTIVITY_TIMEOUT'), lock.indexOf('// 2. Query other active sessions'));
+  assert.match(lock, /SESSION_TIMEOUT = 15 \* 60 \* 1000/);
+  assert.match(lock, /qtool:local-mutation-confirmed/);
+  assert.doesNotMatch(lock, /addEventListener\(['"](?:click|keydown|input|change)['"]/);
   assert.doesNotMatch(inactivity, /deleteSession\(/);
+  assert.match(app, /handleInactivityTimeout[\s\S]*navigationGuardRef\.current/);
   assert.match(app, /Browser unload cannot finish DB\/Storage\/OneDrive readbacks/);
   assert.match(app, /event\.returnValue = ''/);
+});
+
+test('foreign owner produces a sticky read-only banner instead of a blocking overlay', () => {
+  assert.match(app, /position: 'sticky'[\s\S]*🔒 Schreibgeschützt/);
+  assert.doesNotMatch(app, /Projekt wird bereits bearbeitet/);
+  assert.doesNotMatch(app, /Hier weiterarbeiten/);
 });
 
 test('personal-drive project backup is retired and exact worker evidence is mandatory', () => {
