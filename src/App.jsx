@@ -1271,11 +1271,19 @@ function App() {
   }, [isDarkMode]);
 
   const [showInactivityAlert, setShowInactivityAlert] = useState(false);
-  const handleInactivityTimeout = useCallback(() => {
-    setView('dashboard');
-    setSelectedReport(null);
-    setIsSessionActive(true);
-    setShowInactivityAlert(true);
+  const handleInactivityTimeout = useCallback(async () => {
+    // The active writer may leave only through the same verified barrier used
+    // by the Dashboard button. Failed cloud proof keeps project and lock open.
+    const exited = await navigationGuardRef.current(async () => {
+      setView('dashboard');
+      viewRef.current = 'dashboard';
+      setSelectedReport(null);
+      selectedReportRef.current = null;
+      setIsSessionActive(true);
+      return true;
+    });
+    if (exited === true) setShowInactivityAlert(true);
+    return exited;
   }, []);
 
   // Projektspezifischer Modus: 'desktop' | 'technician' (Mutex – nie beides gleichzeitig)
@@ -3753,7 +3761,7 @@ function App() {
         )}
         {(view === 'new-report' || view === 'details') && (
           <div style={{ position: 'relative' }}>
-            {/* ── Sitzungssperre: Overlay + UI gesperrt wenn anderer Modus aktiv ── */}
+            {/* Fremde Besitzer-Sitzung: Inhalt bleibt lesbar, Schreiben bleibt gesperrt. */}
             {isLockedByOtherMode && (() => {
               const formatTime = (isoString) => {
                 if (!isoString) return 'unbekannt';
@@ -3764,70 +3772,31 @@ function App() {
               };
               return (
                 <div style={{
-                  position: 'absolute',
-                  top: 0, left: 0, right: 0, bottom: 0,
+                  position: 'sticky',
+                  top: 0,
                   zIndex: 9000,
-                  backgroundColor: 'rgba(220, 38, 38, 0.08)',
-                  cursor: 'not-allowed',
-                  pointerEvents: 'all',
+                  backgroundColor: 'transparent',
+                  pointerEvents: 'none',
                   display: 'flex',
-                  alignItems: 'center',
                   justifyContent: 'center',
-                  minHeight: '60vh',
+                  padding: '0.5rem 1rem',
                 }}>
                   <div style={{
-                    background: 'rgba(220,38,38,0.95)',
+                    background: 'rgba(220,38,38,0.97)',
                     color: 'white',
-                    padding: '1.5rem 2.5rem',
-                    borderRadius: '16px',
+                    padding: '0.7rem 1rem',
+                    borderRadius: '9px',
                     fontWeight: 800,
-                    fontSize: '1.1rem',
+                    fontSize: '0.9rem',
                     textAlign: 'center',
-                    boxShadow: '0 8px 40px rgba(220,38,38,0.5)',
-                    maxWidth: '450px',
-                    lineHeight: 1.8,
-                    pointerEvents: 'all',
-                    cursor: 'default',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '1rem',
+                    boxShadow: '0 4px 16px rgba(220,38,38,0.35)',
+                    width: 'min(720px, 100%)',
+                    lineHeight: 1.4,
                   }}>
-                    <div style={{ textAlign: 'left', margin: '0.5rem 0' }}>
-                      <div style={{ fontSize: '1.25rem', fontWeight: 800, marginBottom: '0.75rem', textAlign: 'center' }}>
-                        🔒 Projekt wird bereits bearbeitet
-                      </div>
-                      <div style={{ fontSize: '0.95rem', fontWeight: 500, marginBottom: '1.25rem', textAlign: 'center' }}>
-                        Dieses Projekt ist aktuell durch <strong>{activeLockUser}</strong> gesperrt.
-                      </div>
-                      <div style={{ fontSize: '0.9rem', color: '#fca5a5', marginBottom: '0.3rem' }}>
-                        <strong>Seit:</strong> {formatTime(activeLockSince)}
-                      </div>
-                      <div style={{ fontSize: '0.9rem', color: '#fca5a5', marginBottom: '1.25rem' }}>
-                        <strong>Letzte Aktivität:</strong> {formatTime(activeLockActivity)}
-                      </div>
-                      <div style={{ fontSize: '0.9rem', fontWeight: 400, opacity: 0.95, marginBottom: '0.75rem', textAlign: 'center', lineHeight: '1.4' }}>
-                        Du kannst das Projekt ansehen, aber momentan nicht bearbeiten.
-                      </div>
-                      <div style={{ fontSize: '0.8rem', fontWeight: 400, opacity: 0.8, fontStyle: 'italic', textAlign: 'center', lineHeight: '1.4' }}>
-                        Die Sperre wird spätestens nach 20 Minuten Inaktivität des Bearbeiters automatisch aufgehoben.
-                      </div>
-                    </div>
-                    {!isLockedByIPad && (
-                      <button
-                        onClick={async () => {
-                          await takeOverLock();
-                        }}
-                        style={{
-                          background: 'white', color: '#dc2626',
-                          border: 'none', padding: '0.6rem 1.2rem',
-                          borderRadius: '8px', fontWeight: 800,
-                          fontSize: '0.95rem', cursor: 'pointer',
-                          width: '100%'
-                        }}
-                      >
-                        → Hier weiterarbeiten
-                      </button>
-                    )}
+                    🔒 Schreibgeschützt – wird durch {activeLockUser || 'einen anderen Benutzer'} bearbeitet
+                    <span style={{ display: 'block', fontWeight: 500, color: '#fecaca', fontSize: '0.78rem' }}>
+                      Seit {formatTime(activeLockSince)} · letzte Aktivität {formatTime(activeLockActivity)}
+                    </span>
                   </div>
                 </div>
               );
@@ -4180,7 +4149,7 @@ function App() {
           }}>
             <h3 style={{ margin: '0 0 1rem 0', color: '#ef4444' }}>Projekt wegen Inaktivität geschlossen</h3>
             <p style={{ margin: '0 0 1.5rem 0', fontSize: '0.95rem', lineHeight: '1.5' }}>
-              Du warst 20 Minuten inaktiv.<br />
+              Du warst 15 Minuten inaktiv.<br />
               Die Projektsperre wurde aufgehoben.<br /><br />
               Das Projekt wurde geschlossen und du befindest dich wieder auf dem Dashboard.
             </p>
