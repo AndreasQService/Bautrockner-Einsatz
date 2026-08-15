@@ -196,6 +196,13 @@ export async function registerLocalMutation({
     baseVersion,
     transactionId,
   });
+  // Inactivity is measured from a real, read-back-verified local business
+  // mutation—not from clicks, scrolling or merely viewing the project.
+  if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+    window.dispatchEvent(new CustomEvent('qtool:local-mutation-confirmed', {
+      detail: { projectId: String(projectId), type, transactionId: manifest.transactionId },
+    }));
+  }
   return {
     ...manifest,
     transactionId: manifest.transactionId,
