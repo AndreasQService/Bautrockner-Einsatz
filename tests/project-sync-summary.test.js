@@ -130,3 +130,18 @@ test('regression: volatile client envelope flags do not trigger false mismatches
   assert.equal(result.verified, true);
   assert.equal(result.mismatches.length, 0);
 });
+
+test('regression: anonymous/test environment session exit confirms exact content match without false positive warnings', () => {
+  const local = project();
+  local._is_offline_fallback = true;
+  local.isLightweight = false;
+  local._supabase_updated_at = '2026-08-15T18:00:00.000Z';
+
+  const cloud = project();
+  cloud.created_at = '2026-08-15T17:50:00.000Z';
+  cloud.updated_at = '2026-08-15T18:00:00.000Z';
+
+  const result = compareProjectReportData(local, cloud);
+  assert.equal(result.verified, true);
+  assert.equal(result.mismatches.length, 0);
+});
