@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 
 const POLL_INTERVAL = 5000; // poll every 5s
 const HEARTBEAT_INTERVAL = 30 * 1000; // keep ownership alive while project stays open
-const SESSION_TIMEOUT = 20 * 60 * 1000; // only prompts the owner to finish; never expires a lock
+const SESSION_TIMEOUT = 15 * 60 * 1000; // owner triggers the strict sync-and-exit flow
 
 export function startSessionLockLifecycle({
   enabledRef,
@@ -170,24 +170,20 @@ export function useSessionLock(
     }
   }, [supabase, upsertSession]);
 
-  // Activity listeners for window click, keydown, change, and input events
+  // Only a read-back-verified local project mutation resets inactivity.
+  // Reading, scrolling, tab changes and generic clicks intentionally do not.
   useEffect(() => {
     if (!enabled || !supabase) return;
 
-    const handleActivity = () => {
+    const handleActivity = (event) => {
+      if (String(event?.detail?.projectId || '') !== String(reportIdRef.current || '')) return;
       registerProjectActivity();
     };
 
-    window.addEventListener('click', handleActivity, { capture: true });
-    window.addEventListener('keydown', handleActivity, { capture: true });
-    window.addEventListener('change', handleActivity, { capture: true });
-    window.addEventListener('input', handleActivity, { capture: true });
+    window.addEventListener('qtool:local-mutation-confirmed', handleActivity);
 
     return () => {
-      window.removeEventListener('click', handleActivity, { capture: true });
-      window.removeEventListener('keydown', handleActivity, { capture: true });
-      window.removeEventListener('change', handleActivity, { capture: true });
-      window.removeEventListener('input', handleActivity, { capture: true });
+      window.removeEventListener('qtool:local-mutation-confirmed', handleActivity);
     };
   }, [enabled, supabase, registerProjectActivity]);
 
