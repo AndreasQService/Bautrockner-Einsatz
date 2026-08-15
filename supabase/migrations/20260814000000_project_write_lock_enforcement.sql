@@ -142,20 +142,13 @@ DECLARE
   v_owner public.project_sessions%ROWTYPE;
   v_request_session public.project_sessions%ROWTYPE;
   v_request_uid UUID := auth.uid();
-  v_claimed_uid UUID;
   v_request_is_ipad BOOLEAN := split_part(coalesce(p_device, ''), ':', 1) = 'iPad';
 BEGIN
   IF v_request_uid IS NULL OR p_session_token IS NULL OR length(p_session_token) < 20 THEN
     RAISE EXCEPTION 'LOCK_AUTH_REQUIRED' USING ERRCODE = '42501';
   END IF;
-  BEGIN
-    v_claimed_uid := p_user_id::uuid;
-  EXCEPTION WHEN invalid_text_representation THEN
-    RAISE EXCEPTION 'LOCK_USER_MISMATCH' USING ERRCODE = '42501';
-  END;
-  IF v_claimed_uid IS DISTINCT FROM v_request_uid THEN
-    RAISE EXCEPTION 'LOCK_USER_MISMATCH' USING ERRCODE = '42501';
-  END IF;
+  -- p_user_id is retained only for backwards-compatible display metadata.
+  -- Authorization and ownership always come from the verified JWT.
   IF NOT EXISTS (SELECT 1 FROM public.damage_reports WHERE id = p_project_id) THEN
     RAISE EXCEPTION 'UNKNOWN_PROJECT' USING ERRCODE = '23503';
   END IF;
@@ -282,6 +275,18 @@ BEGIN
       USING ERRCODE='55000';
   END IF;
   IF EXISTS (SELECT 1 FROM public.damage_reports WHERE id=p_project_id) THEN
+    -- Retried saves from the exact same authenticated device session are
+    -- idempotent. A different token or identity must never adopt the project.
+    IF EXISTS (
+      SELECT 1 FROM public.project_sessions
+       WHERE session_token=p_session_token
+         AND open_project_id=p_project_id
+         AND owner_user_id=v_uid
+    ) THEN
+      RETURN jsonb_build_object('created', true, 'already_existed', true,
+                                'project_id', p_project_id,
+                                'offline_prepare_required', true);
+    END IF;
     RAISE EXCEPTION 'PROJECT_ALREADY_EXISTS' USING ERRCODE='23505';
   END IF;
   INSERT INTO public.damage_reports
@@ -301,7 +306,8 @@ BEGIN
     open_project_id=excluded.open_project_id, mode=excluded.mode, device=excluded.device,
     last_seen=excluded.last_seen, created_at=now(), owner_user_id=excluded.owner_user_id,
     client_id=excluded.client_id;
-  RETURN jsonb_build_object('created', true, 'project_id', p_project_id,
+  RETURN jsonb_build_object('created', true, 'already_existed', false,
+                            'project_id', p_project_id,
                             'offline_prepare_required', true);
 END;
 $$;
