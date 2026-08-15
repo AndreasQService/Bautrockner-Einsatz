@@ -2322,7 +2322,7 @@ function App() {
         names: finalReport.measurementRooms?.map(r => r.name)
     });
 
-    if (!finalReport.id) {
+    if (!finalReport.id || finalReport.id === 'temp' || finalReport.id.startsWith('TMP-')) {
       // Immer UUID verwenden — verhindert ID-Kollisionen die zu Datenverlust führen
       finalReport.id = (typeof crypto !== 'undefined' && crypto.randomUUID)
         ? crypto.randomUUID()
