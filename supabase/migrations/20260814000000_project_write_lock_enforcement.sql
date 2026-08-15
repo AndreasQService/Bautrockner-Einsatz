@@ -363,13 +363,13 @@ BEGIN
       EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', v_policy.policyname, v_table);
     END LOOP;
     EXECUTE format(
-      'CREATE POLICY qtool_owner_insert ON public.%I FOR INSERT TO authenticated WITH CHECK (public.qtool_has_project_write_lock(%I::text))',
+      'CREATE POLICY qtool_owner_insert ON public.%I FOR INSERT TO authenticated, anon WITH CHECK (public.qtool_has_project_write_lock(%I::text))',
       v_table, v_project_expr);
     EXECUTE format(
-      'CREATE POLICY qtool_owner_update ON public.%I FOR UPDATE TO authenticated USING (public.qtool_has_project_write_lock(%I::text)) WITH CHECK (public.qtool_has_project_write_lock(%I::text))',
+      'CREATE POLICY qtool_owner_update ON public.%I FOR UPDATE TO authenticated, anon USING (public.qtool_has_project_write_lock(%I::text)) WITH CHECK (public.qtool_has_project_write_lock(%I::text))',
       v_table, v_project_expr, v_project_expr);
     EXECUTE format(
-      'CREATE POLICY qtool_owner_delete ON public.%I FOR DELETE TO authenticated USING (public.qtool_has_project_write_lock(%I::text))',
+      'CREATE POLICY qtool_owner_delete ON public.%I FOR DELETE TO authenticated, anon USING (public.qtool_has_project_write_lock(%I::text))',
       v_table, v_project_expr);
   END LOOP;
 END
