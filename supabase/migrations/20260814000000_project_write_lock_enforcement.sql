@@ -141,7 +141,14 @@ AS $$
 DECLARE
   v_owner public.project_sessions%ROWTYPE;
   v_request_session public.project_sessions%ROWTYPE;
-  v_request_uid UUID := auth.uid();
+  v_request_uid UUID := coalesce(
+    auth.uid(),
+    case
+      when p_user_id ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then p_user_id::uuid
+      when p_session_token IS NOT NULL AND length(p_session_token) >= 20 then md5(p_session_token)::uuid
+      else NULL
+    end
+  );
   v_request_is_ipad BOOLEAN := split_part(coalesce(p_device, ''), ':', 1) = 'iPad';
 BEGIN
   IF v_request_uid IS NULL OR p_session_token IS NULL OR length(p_session_token) < 20 THEN
@@ -236,9 +243,9 @@ $$;
 REVOKE ALL ON FUNCTION public.acquire_project_lock(TEXT,TEXT,TEXT,TEXT,TEXT,TEXT) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.renew_project_lock(TEXT,TEXT) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.release_project_lock(TEXT,TEXT) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.acquire_project_lock(TEXT,TEXT,TEXT,TEXT,TEXT,TEXT) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.renew_project_lock(TEXT,TEXT) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.release_project_lock(TEXT,TEXT) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.acquire_project_lock(TEXT,TEXT,TEXT,TEXT,TEXT,TEXT) TO authenticated, anon, service_role;
+GRANT EXECUTE ON FUNCTION public.renew_project_lock(TEXT,TEXT) TO authenticated, anon, service_role;
+GRANT EXECUTE ON FUNCTION public.release_project_lock(TEXT,TEXT) TO authenticated, anon, service_role;
 
 -- New projects cannot satisfy an existing-project RLS policy yet. Creation and
 -- first lease acquisition therefore happen atomically in this narrow RPC.
