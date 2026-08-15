@@ -58,6 +58,11 @@ describe('strict session cloud-write gate', () => {
       { method: 'POST' },
       active,
     ));
+    await assert.doesNotReject(assertSupabaseRequestAllowed(
+      'https://test.supabase.co/rest/v1/rpc/get_project_lock_status',
+      { method: 'POST' },
+      active,
+    ));
     await assert.rejects(assertSupabaseRequestAllowed(
       'https://test.supabase.co/rest/v1/rpc/fn_complete_and_create_todo',
       { method: 'POST' },
