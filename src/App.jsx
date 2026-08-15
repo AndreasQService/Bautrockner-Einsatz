@@ -25,6 +25,7 @@ import { isVisibleProjectRow } from './utils/projectVisibility.js';
 import * as DeviceLocalStore from './services/DeviceLocalStore';
 import SyncStatusBanner from './components/SyncStatusBanner';
 import ProjectSessionSyncPanel from './components/ProjectSessionSyncPanel.jsx';
+import { buildProjectSessionStatusModel } from './lib/offline/projectSessionStatusModel.js';
 import {
   confirmProjectOperations,
   collectStrictExitCloudEvidence,
@@ -3268,6 +3269,26 @@ function App() {
     </div>
   );
 
+  const headerSyncModel = selectedReport && projectSessionStatus?.projectId === selectedReport.id
+    ? buildProjectSessionStatusModel({
+        localConfirmed: projectPersistenceRef.current.status === 'local_confirmed',
+        localMaterializationVerified: projectSessionStatus.localMaterializationVerified === true,
+        counts: projectSessionStatus.counts || {},
+        readiness: strictExitStatus,
+        syncing: projectExitSyncing,
+        online: isOnline,
+      })
+    : null;
+
+  const providerBadgeStyle = (ok) => ({
+    display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
+    padding: '0.3rem 0.65rem', borderRadius: '6px',
+    border: `1px solid ${ok ? '#10B981' : '#EF4444'}`,
+    backgroundColor: ok ? 'rgba(16,185,129,0.08)' : 'rgba(239,68,68,0.1)',
+    color: ok ? '#10B981' : '#EF4444', fontSize: '0.78rem',
+    fontWeight: 700, whiteSpace: 'nowrap', userSelect: 'none', flexShrink: 0,
+  });
+
   // --- AUTH INITIALIZATION CHECK ---
   let isAndreasStored = false;
   try {
@@ -3355,8 +3376,20 @@ function App() {
           </div>
 
           <nav style={{ flexGrow: 1, display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '0.5rem' }}>
+            {headerSyncModel && (
+              <>
+                <div id="project-supabase-sync-badge" style={providerBadgeStyle(headerSyncModel.supabaseOk)}>
+                  <span style={{ width: 7, height: 7, borderRadius: '50%', backgroundColor: 'currentColor' }} />
+                  {headerSyncModel.supabaseOk ? 'Supabase OK' : 'Supabase ausstehend'}
+                </div>
+                <div id="project-onedrive-sync-badge" style={providerBadgeStyle(headerSyncModel.oneDriveOk)}>
+                  <span style={{ width: 7, height: 7, borderRadius: '50%', backgroundColor: 'currentColor' }} />
+                  {headerSyncModel.oneDriveOk ? 'OneDrive OK' : 'OneDrive ausstehend'}
+                </div>
+              </>
+            )}
             {/* Supabase Datenbank-Status Badge */}
-            {supabaseStatus && (
+            {!headerSyncModel && supabaseStatus && (
               <div
                 id="supabase-status-badge"
                 title={
