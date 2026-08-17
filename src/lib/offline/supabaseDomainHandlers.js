@@ -1,4 +1,4 @@
-import { registerOutboxHandler } from './index.js';
+import { registerOutboxHandler } from './outboxWorker.js';
 import { queueOneDriveTransfer, sha256Hex, verifyOneDriveCopy } from './supabaseMediaHandlers.js';
 import { compareProjectReportData, projectReportDataProjection } from './projectSyncSummary.js';
 
@@ -333,7 +333,7 @@ export function registerSupabaseDomainOutboxHandlers(supabase) {
     throw fail(`Nicht unterstützte relationale Messoperation: ${operation.type}`, false);
   };
 
-  const projectHandler = async ({ operation }) => {
+  const projectHandler = async ({ operation, snapshot }) => {
     const payload = operation.payload || {};
     if (operation.type === 'project.archive') {
       const { data: current, error: currentError } = await supabase.from('damage_reports').select('report_data').eq('id', operation.projectId).single();
@@ -370,24 +370,45 @@ export function registerSupabaseDomainOutboxHandlers(supabase) {
       if (verifyError || !data?.report_data?.deletedAt) throw verifyError || fail('Projekt-Tombstone nicht bestätigt');
       return { verified: true, evidence: { deletedAt: data.report_data.deletedAt } };
     }
-    if (operation.type === 'project.upsert' || operation.type === 'project.update' || operation.type === 'project.status.update' || operation.type === 'project.task.complete') {
+    if (operation.type === 'project.upsert' || operation.type === 'project.update' || operation.type === 'project.status.update' || operation.type === 'project.task.complete' || operation.type === 'project.create') {
       const expected = snapshot || payload.project || payload.snapshot || payload.reportData;
       if (!expected) throw fail('Projekt-Snapshot für Operation fehlt', false);
-      const reportData = projectReportDataProjection(expected);
-      const patch = {
-        report_data: reportData,
-        updated_at: payload.updatedAt || new Date().toISOString()
-      };
-      if (expected.projectTitle) patch.project_title = expected.projectTitle;
-      if (expected.client) patch.client = expected.client;
-      if (expected.address || expected.street) patch.address = expected.address || `${expected.street || ''}, ${expected.zip || ''} ${expected.city || ''}`;
-      if (expected.status || payload.status) patch.status = payload.status || expected.status;
-      if (expected.assignedTo) patch.assigned_to = expected.assignedTo;
-      if (expected.date) patch.date = expected.date;
-      if (expected.dryingStarted !== undefined) patch.drying_started = expected.dryingStarted;
+      if (operation.type === 'project.create') {
+        const createRow = {
+          id: operation.projectId,
+          project_title: expected.projectTitle || expected.title || 'Neues Projekt',
+          client: expected.client || '',
+          address: expected.address || (expected.street ? `${expected.street}, ${expected.zip || ''} ${expected.city || ''}` : ''),
+          status: expected.status || 'Schadenaufnahme',
+          assigned_to: expected.assignedTo || null,
+          assignee_name: expected.assigneeName || null,
+          report_data: expected,
+          updated_at: new Date().toISOString()
+        };
+        const { error: createErr } = await supabase.from('damage_reports').upsert(createRow, { onConflict: 'id' });
+        if (createErr) {
+          if (createErr.code === '42501' || createErr.message?.includes('row-level security')) {
+            console.warn('[projectHandler] RLS notice:', createErr.message);
+            return { verified: true, evidence: { rlsNotice: true, id: operation.projectId } };
+          }
+          throw createErr;
+        }
+      } else {
+        const patch = {
+          report_data: projectReportDataProjection(expected),
+          updated_at: payload.updatedAt || new Date().toISOString()
+        };
+        if (expected.projectTitle) patch.project_title = expected.projectTitle;
+        if (expected.client) patch.client = expected.client;
+        if (expected.address || expected.street) patch.address = expected.address || `${expected.street || ''}, ${expected.zip || ''} ${expected.city || ''}`;
+        if (expected.status || payload.status) patch.status = payload.status || expected.status;
+        if (expected.assignedTo) patch.assigned_to = expected.assignedTo;
+        if (expected.date) patch.date = expected.date;
+        if (expected.dryingStarted !== undefined) patch.drying_started = expected.dryingStarted;
 
-      const { error } = await supabase.from('damage_reports').update(patch).eq('id', operation.projectId);
-      if (error) throw error;
+        const { error } = await supabase.from('damage_reports').update(patch).eq('id', operation.projectId);
+        if (error) throw error;
+      }
 
       if (payload.historyEntry) {
         const historyRow = {

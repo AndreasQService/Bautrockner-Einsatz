@@ -1,14 +1,5 @@
 import React from 'react';
-import { AlertTriangle, CheckCircle2, Cloud, HardDrive, Loader2, LogOut, WifiOff } from 'lucide-react';
 import { buildProjectSessionStatusModel } from '../lib/offline/projectSessionStatusModel.js';
-
-const badgeStyle = (ok) => ({
-  display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.45rem 0.7rem',
-  borderRadius: 999, fontSize: '0.82rem', fontWeight: 800,
-  color: ok ? '#14532d' : '#92400e',
-  background: ok ? '#dcfce7' : '#fef3c7',
-  border: `1px solid ${ok ? '#86efac' : '#fcd34d'}`,
-});
 
 export default function ProjectSessionSyncPanel({
   localConfirmed,
@@ -18,77 +9,72 @@ export default function ProjectSessionSyncPanel({
   syncing = false,
   online = typeof navigator === 'undefined' ? true : navigator.onLine,
   onSyncAndExit,
+  onDashboard,
+  onReturnToDashboard,
 }) {
   const model = buildProjectSessionStatusModel({
-    localConfirmed, localMaterializationVerified, counts, readiness, syncing, online,
+    localConfirmed,
+    localMaterializationVerified,
+    counts,
+    readiness,
+    syncing,
+    online,
   });
 
+  const isSupabaseSynced = model.supabaseOk;
+  const isOneDriveSynced = model.oneDriveOk;
+  const handleReturnToDashboard = onReturnToDashboard || onDashboard || onSyncAndExit;
+
   return (
-    <section aria-label="Projekt-Synchronisationsstatus" style={{
-      padding: '1rem', borderRadius: 10, border: '1px solid #334155',
-      background: '#0f172a', color: '#e2e8f0', display: 'grid', gap: '0.8rem',
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', fontWeight: 800 }}>
-        {model.localAvailable
-          ? <CheckCircle2 size={20} color="#22c55e" />
-          : <HardDrive size={20} color="#f59e0b" />}
-        <span>{model.localAvailable ? 'Projekt offline verfügbar' : 'Projekt wird lokal vollständig vorbereitet'}</span>
+    <div
+      aria-label="Projekt-Synchronisationsstatus"
+      title={model.localAvailable ? 'Projekt offline verfügbar' : 'Projekt wird lokal vollständig vorbereitet'}
+      className="flex items-center justify-between gap-4 py-2 px-4 bg-slate-900 text-white rounded-lg mb-4 shadow-md"
+    >
+      {/* Status Pills */}
+      <div className="flex items-center gap-2">
+        {/* Supabase Status */}
+        <span
+          id="project-supabase-sync-badge"
+          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${
+            isSupabaseSynced
+              ? 'bg-emerald-950/60 text-emerald-300 border-emerald-500/50'
+              : 'bg-rose-950/60 text-rose-300 border-rose-500/50'
+          }`}
+        >
+          <span className={`w-2 h-2 rounded-full ${isSupabaseSynced ? 'bg-emerald-400' : 'bg-rose-500 animate-pulse'}`} />
+          {isSupabaseSynced ? 'Supabase OK' : 'Supabase ausstehend'}
+        </span>
+
+        {/* OneDrive Status */}
+        <span
+          id="project-onedrive-sync-badge"
+          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${
+            isOneDriveSynced
+              ? 'bg-emerald-950/60 text-emerald-300 border-emerald-500/50'
+              : 'bg-rose-950/60 text-rose-300 border-rose-500/50'
+          }`}
+        >
+          <span className={`w-2 h-2 rounded-full ${isOneDriveSynced ? 'bg-emerald-400' : 'bg-rose-500 animate-pulse'}`} />
+          {isOneDriveSynced ? 'OneDrive OK' : 'OneDrive ausstehend'}
+        </span>
       </div>
 
-      {model.counts.length > 0 && (
-        <div aria-label="Lokaler Projektumfang" style={{ fontSize: '0.86rem', color: '#cbd5e1' }}>
-          {model.counts.join(' · ')}
-        </div>
-      )}
-
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.55rem' }}>
-        <span style={badgeStyle(model.supabaseOk)}>
-          <Cloud size={15} /> {model.supabaseOk ? 'Supabase OK' : 'Supabase ausstehend'}
-        </span>
-        <span style={badgeStyle(model.oneDriveOk)}>
-          <Cloud size={15} /> {model.oneDriveOk ? 'OneDrive OK' : 'OneDrive ausstehend'}
-        </span>
-      </div>
-
-      {!model.online && (
-        <div role="status" style={{ display: 'flex', gap: '0.45rem', alignItems: 'center', color: '#fbbf24' }}>
-          <WifiOff size={17} /> Offline – alle Änderungen bleiben lokal gesichert.
-        </div>
-      )}
-
-      {!model.fullyConfirmed && model.blockers.length > 0 && (
-        <div role="alert" style={{ color: '#fbbf24', fontSize: '0.84rem' }}>
-          <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', fontWeight: 800 }}>
-            <AlertTriangle size={16} /> Projekt kann noch nicht verlassen werden
-          </div>
-          <ul style={{ margin: '0.4rem 0 0 1.2rem', padding: 0 }}>
-            {model.blockers.map((blocker) => <li key={blocker.code}>{blocker.label}</li>)}
-          </ul>
-        </div>
-      )}
-
-      {model.fullyConfirmed && (
-        <div role="status" style={{ color: '#86efac', fontWeight: 800 }}>
-          Vollständig synchronisiert und zurückgelesen. Projekt kann sicher verlassen werden.
-        </div>
-      )}
-
+      {/* Standard Dashboard Button */}
       <button
         type="button"
-        onClick={onSyncAndExit}
-        disabled={!model.canStartSync && !model.canExit}
-        aria-disabled={!model.canStartSync && !model.canExit}
-        style={{
-          justifySelf: 'start', display: 'inline-flex', alignItems: 'center', gap: '0.5rem',
-          padding: '0.65rem 0.9rem', border: 0, borderRadius: 7, fontWeight: 800,
-          cursor: model.canStartSync || model.canExit ? 'pointer' : 'not-allowed',
-          background: model.fullyConfirmed ? '#16a34a' : '#2563eb', color: '#fff',
-          opacity: model.canStartSync || model.canExit ? 1 : 0.55,
-        }}
+        onClick={handleReturnToDashboard}
+        aria-label="Dashboard"
+        className="inline-flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 active:bg-slate-600 text-white text-sm font-medium rounded-md border border-slate-700 transition-colors shadow-sm cursor-pointer"
       >
-        {model.syncing ? <Loader2 size={17} className="animate-spin" /> : <LogOut size={17} />}
-        {model.syncing ? 'Synchronisierung und Prüfung läuft …' : 'Synchronisieren und Projekt verlassen'}
+        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <rect x="3" y="3" width="7" height="7" />
+          <rect x="14" y="3" width="7" height="7" />
+          <rect x="14" y="14" width="7" height="7" />
+          <rect x="3" y="14" width="7" height="7" />
+        </svg>
+        Dashboard
       </button>
-    </section>
+    </div>
   );
 }

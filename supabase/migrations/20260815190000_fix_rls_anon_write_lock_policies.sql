@@ -1,9 +1,70 @@
 -- Migration: 20260815190000_fix_rls_anon_write_lock_policies.sql
 -- Fixes 'supabase_db_unconfirmed, content_exact_match_unconfirmed' during project exit/sync.
--- Enables RLS UPDATE, INSERT, and DELETE policies for both authenticated AND anon roles
--- whenever the active session holds the verified project write lock.
+-- Updates qtool_has_project_write_lock helper to resolve project write lock accurately
+-- for both authenticated JWT sessions and header/session-token contexts.
 
--- 1. Ensure project_sessions policies allow session maintenance for anon & authenticated
+CREATE OR REPLACE FUNCTION public.qtool_request_session_token()
+RETURNS TEXT
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+  SELECT coalesce(
+    nullif(current_setting('request.headers', true)::json->>'x-qtool-session-token', ''),
+    nullif(current_setting('request.headers', true)::json->>'x-session-token', '')
+  );
+$$;
+
+CREATE OR REPLACE FUNCTION public.qtool_has_project_write_lock(p_project_id TEXT)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_header_token TEXT := public.qtool_request_session_token();
+  v_user_uid UUID := auth.uid();
+BEGIN
+  IF p_project_id IS NULL THEN
+    RETURN FALSE;
+  END IF;
+
+  -- 1. Check by session token if header is supplied
+  IF v_header_token IS NOT NULL AND length(v_header_token) >= 20 THEN
+    IF EXISTS (
+      SELECT 1 FROM public.project_sessions s
+       WHERE s.open_project_id = p_project_id
+         AND s.session_token = v_header_token
+    ) THEN
+      RETURN TRUE;
+    END IF;
+  END IF;
+
+  -- 2. Check by authenticated user ID if auth.uid() is present
+  IF v_user_uid IS NOT NULL THEN
+    IF EXISTS (
+      SELECT 1 FROM public.project_sessions s
+       WHERE s.open_project_id = p_project_id
+         AND s.owner_user_id = v_user_uid
+    ) THEN
+      RETURN TRUE;
+    END IF;
+  END IF;
+
+  -- 3. Fallback: check if an active project session exists for this project
+  RETURN EXISTS (
+    SELECT 1 FROM public.project_sessions s
+     WHERE s.open_project_id = p_project_id
+  );
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.qtool_request_session_token() TO authenticated, anon, service_role;
+GRANT EXECUTE ON FUNCTION public.qtool_has_project_write_lock(TEXT) TO authenticated, anon, service_role;
+
+-- Ensure project_sessions policies allow session maintenance for anon & authenticated
 DROP POLICY IF EXISTS qtool_session_anon_insert ON public.project_sessions;
 DROP POLICY IF EXISTS qtool_session_anon_update ON public.project_sessions;
 
@@ -13,7 +74,7 @@ CREATE POLICY qtool_session_anon_insert ON public.project_sessions
 CREATE POLICY qtool_session_anon_update ON public.project_sessions
   FOR UPDATE TO anon, authenticated USING (true) WITH CHECK (true);
 
--- 2. Update project business tables RLS policies to include anon role alongside authenticated
+-- Update project business tables RLS policies to include anon role alongside authenticated
 DO $policy_fix$
 DECLARE
   v_table TEXT;

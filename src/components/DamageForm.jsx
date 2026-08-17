@@ -4386,10 +4386,12 @@ END:VCARD`;
                             <button
                                 onClick={mode === 'technician' ? () => setTechTab(null) : onCancel}
                                 className="btn-glass"
+                                title="Dashboard"
+                                aria-label="Dashboard"
                                 style={{
                                     height: '42px',
-                                    padding: mode === 'technician' ? '0 1rem' : '0',
-                                    width: mode === 'technician' ? 'auto' : '42px',
+                                    padding: '0 0.8rem',
+                                    width: 'auto',
                                     borderRadius: '12px',
                                     color: mode === 'technician' ? '#1E6DB7' : 'var(--text-main)',
                                     cursor: 'pointer',
@@ -4404,7 +4406,7 @@ END:VCARD`;
                                 }}
                             >
                                 <ArrowLeft size={22} />
-                                {mode === 'technician' && <span>Kacheln</span>}
+                                <span>Dashboard</span>
                             </button>
                             <input
                                 type="text"

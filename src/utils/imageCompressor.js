@@ -195,8 +195,8 @@ export function queueImageCompression(file, isSketch = false) {
                 pdfBlob = await compressSingleImage(originalBlob, 1600, 1.0, 'image/png');
                 previewBlob = await compressSingleImage(originalBlob, 480, 0.8, 'image/png');
             } else if (needsRecompression || isHeic) {
-                // Compress main photo (JPEG quality 82%)
-                compressedBlob = await compressSingleImage(originalBlob, 2048, 0.82, 'image/jpeg');
+                // Compress main photo (Max 1920px, JPEG quality 80% -> ~300-500 KB)
+                compressedBlob = await compressSingleImage(originalBlob, 1920, 0.80, 'image/jpeg');
                 // PDF version (1600px quality 78%)
                 pdfBlob = await compressSingleImage(originalBlob, 1600, 0.78, 'image/jpeg');
                 // UI preview version (480px quality 70%)

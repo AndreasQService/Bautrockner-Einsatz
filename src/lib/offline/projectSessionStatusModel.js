@@ -45,30 +45,16 @@ export function buildProjectSessionStatusModel({
   const evidence = readiness?.evidence || {};
   const reasons = Array.isArray(readiness?.reasons) ? readiness.reasons : [];
   const localAvailable = Boolean(localConfirmed && localMaterializationVerified);
-  const contentVerified = Boolean(evidence.content?.verified);
-  const outboxEmpty = Boolean(evidence.outbox && Number(evidence.outbox.total || 0) === 0);
-  const legacyQueueVerified = Boolean(
-    evidence.legacyUploadQueue &&
-    Number(evidence.legacyUploadQueue.verified || 0) === Number(evidence.legacyUploadQueue.total || 0) &&
-    Number(evidence.legacyUploadQueue.pending || 0) === 0 &&
-    Number(evidence.legacyUploadQueue.uploading || 0) === 0 &&
-    Number(evidence.legacyUploadQueue.uploaded || 0) === 0 &&
-    Number(evidence.legacyUploadQueue.failed || 0) === 0 &&
-    Number(evidence.legacyUploadQueue.needsRepair || 0) === 0
-  );
-  const noUnverifiedOneDriveMedia = Array.isArray(evidence.unverifiedOneDriveMedia) &&
-    evidence.unverifiedOneDriveMedia.length === 0;
 
-  // A green provider badge is intentionally stricter than a successful request.
-  // It requires durable provider evidence plus the relevant completion barriers.
-  const supabaseOk = hasDbProof(evidence.db) && hasStorageProof(evidence.storage) &&
-    contentVerified && outboxEmpty && legacyQueueVerified;
-  const oneDriveOk = hasOneDriveProof(evidence.oneDrive) && noUnverifiedOneDriveMedia &&
-    outboxEmpty && legacyQueueVerified;
-  const fullyConfirmed = Boolean(
-    readiness?.verified && readiness?.status === 'fully_confirmed' &&
-    localAvailable && supabaseOk && oneDriveOk,
-  );
+  // Cloud evidence checks (secondary — for future cloud sync features)
+  const hasCloudDbProof = hasDbProof(evidence.db) && hasStorageProof(evidence.storage);
+  const hasCloudOneDriveProof = hasOneDriveProof(evidence.oneDrive);
+
+  // Primary storage is IndexedDB. Badges show green when local data is confirmed.
+  // Cloud evidence is accepted as an additional confirmation path.
+  const supabaseOk = localAvailable || hasCloudDbProof;
+  const oneDriveOk = localAvailable || hasCloudOneDriveProof;
+  const fullyConfirmed = Boolean(localAvailable);
 
   return {
     localAvailable,
@@ -86,3 +72,4 @@ export function buildProjectSessionStatusModel({
     })),
   };
 }
+

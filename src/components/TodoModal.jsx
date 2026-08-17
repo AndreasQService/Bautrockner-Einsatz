@@ -201,12 +201,21 @@ const TodoModal = ({
             return;
         }
 
-        const assignedUser = users.find(u => String(u.id) === String(assignedUserId));
+        let assignedUser = users.find(u => String(u.id) === String(assignedUserId));
+        if (!assignedUser && assignedUserId) {
+            const norm = String(assignedUserId).toLowerCase().trim();
+            assignedUser = users.find(u => 
+                String(u.name).toLowerCase().trim() === norm ||
+                String(u.name).toLowerCase().trim().startsWith(norm) ||
+                norm.includes(String(u.name).toLowerCase().trim().split(' ')[0])
+            );
+        }
         if (!assignedUser) {
-            const validationErr = `Zuständiger Mitarbeiter ist ungültig. (assignedUserId: "${assignedUserId}", users: ${JSON.stringify(users.map(u => u.id))})`;
-            console.warn('[TodoModal] Validation failed:', validationErr);
-            setError('Zuständiger Mitarbeiter ist ungültig.');
-            return;
+            if (!assignedUserId || assignedUserId === 'office' || String(assignedUserId).toLowerCase() === 'innendienst') {
+                assignedUser = { id: 'office', name: 'Innendienst' };
+            } else {
+                assignedUser = { id: assignedUserId, name: assignedUserId };
+            }
         }
 
         saveInFlightRef.current = true;

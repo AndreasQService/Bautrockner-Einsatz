@@ -179,7 +179,11 @@ const DryingMonitor = ({ reports, onSelectReport, onDeleteReport, workflowStore 
 
                                 <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
                                     <MapPin size={12} />
-                                    {report.address ? report.address.split(',')[0] : 'Keine Adresse'}
+                                    {(() => {
+                                        const streetPart = report.street || (report.address ? report.address.split(',')[0] : 'Keine Adresse');
+                                        const locationParts = [report.zip, report.city].filter(Boolean).join(' ').trim();
+                                        return locationParts ? `${streetPart}, ${locationParts}` : streetPart;
+                                    })()}
                                 </div>
 
                                 <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
@@ -659,9 +663,14 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
         const lower = casesSearchTerm.toLowerCase();
         return filteredReports.filter(r => 
             String(r.projectNumber || '').toLowerCase().includes(lower) ||
+            String(r.report_data?.projectNumber || '').toLowerCase().includes(lower) ||
+            String(r.report_data?.sorba_number || '').toLowerCase().includes(lower) ||
             String(r.projectTitle || '').toLowerCase().includes(lower) ||
             String(r.client || '').toLowerCase().includes(lower) ||
-            String(r.address || '').toLowerCase().includes(lower)
+            String(r.address || '').toLowerCase().includes(lower) ||
+            String(r.street || '').toLowerCase().includes(lower) ||
+            String(r.zip || '').toLowerCase().includes(lower) ||
+            String(r.city || '').toLowerCase().includes(lower)
         );
     }, [filteredReports, casesSearchTerm]);
 
@@ -956,19 +965,13 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
                                                                     </span>
                                                                     <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }} title={(() => {
                                                                         const streetPart = report.street || (report.address ? report.address.split(',')[0] : 'Keine Strasse');
-                                                                        const cityPart = report.city || (() => {
-                                                                            const parts = (report.address || '').split(',');
-                                                                            return parts.length > 1 ? parts[1].trim().replace(/^\d+\s*/, '') : '';
-                                                                        })();
-                                                                        return cityPart ? `${streetPart}, ${cityPart}` : streetPart;
+                                                                        const locationParts = [report.zip, report.city].filter(Boolean).join(' ').trim();
+                                                                        return locationParts ? `${streetPart}, ${locationParts}` : streetPart;
                                                                     })()}>
                                                                         {(() => {
                                                                             const streetPart = report.street || (report.address ? report.address.split(',')[0] : 'Keine Strasse');
-                                                                            const cityPart = report.city || (() => {
-                                                                                const parts = (report.address || '').split(',');
-                                                                                return parts.length > 1 ? parts[1].trim().replace(/^\d+\s*/, '') : '';
-                                                                            })();
-                                                                            return cityPart ? `${streetPart}, ${cityPart}` : streetPart;
+                                                                            const locationParts = [report.zip, report.city].filter(Boolean).join(' ').trim();
+                                                                            return locationParts ? `${streetPart}, ${locationParts}` : streetPart;
                                                                         })()}
                                                                     </span>
                                                                 </div>

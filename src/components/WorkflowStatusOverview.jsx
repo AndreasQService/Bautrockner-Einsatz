@@ -625,8 +625,31 @@ export default function WorkflowStatusOverview({ reports, onSelectReport, curren
   const handleOpen = useCallback((rid, sid, rect) => { setPopover(prev => prev?.rid === rid && prev?.sid === sid ? null : { rid, sid, rect }) }, [])
   const handleClose = useCallback(() => setPopover(null), [])
 
+  // Resilient user matching: handles name-vs-ID, case variations, and partial matches
+  const matchesUserFilter = useCallback((report, filter) => {
+    if (!filter || filter === 'alle') return true;
+    const assignee = String(report.assignedTo || report.assigned_to || '').trim();
+    const filterLower = filter.toLowerCase();
+    // Direct match (name or ID)
+    if (assignee === filter) return true;
+    if (assignee.toLowerCase() === filterLower) return true;
+    // Match user ID -> name: if report stores an ID, resolve it via users list
+    const matchedUser = users.find(u =>
+      String(u.name).toLowerCase() === filterLower ||
+      String(u.id) === filter
+    );
+    if (matchedUser) {
+      if (assignee === String(matchedUser.id)) return true;
+      if (assignee.toLowerCase() === String(matchedUser.name).toLowerCase()) return true;
+      // Partial first-name match
+      const firstName = String(matchedUser.name).split(' ')[0].toLowerCase();
+      if (firstName && assignee.toLowerCase().includes(firstName)) return true;
+    }
+    return false;
+  }, [users]);
+
   const allActive = useMemo(() => {
-    const list = reports.filter(r => r.status !== "Abgeschlossen" && (!userFilter || userFilter === "alle" || r.assignedTo === userFilter));
+    const list = reports.filter(r => r.status !== "Abgeschlossen" && matchesUserFilter(r, userFilter));
     return [...list].sort((a, b) => {
       const counterA = a.version !== undefined ? a.version : (a.editCount !== undefined ? a.editCount : null);
       const counterB = b.version !== undefined ? b.version : (b.editCount !== undefined ? b.editCount : null);
@@ -637,7 +660,7 @@ export default function WorkflowStatusOverview({ reports, onSelectReport, curren
       const timeB = new Date(b._supabase_updated_at || b.updatedAt || b.updated_at || b.modifiedAt || b.lastModified || b.savedAt || b.date || 0).getTime();
       return timeB - timeA;
     });
-  }, [reports, userFilter])
+  }, [reports, userFilter, matchesUserFilter])
   
   // Calculate due reports (rooms overdue by 7 days or more), sorted by oldest measurement (highest daysOverdue first)
   const dueReports = useMemo(() => {
@@ -657,7 +680,7 @@ export default function WorkflowStatusOverview({ reports, onSelectReport, curren
   }, [allActive]);
 
   const archived = useMemo(() => {
-    const list = reports.filter(r => r.status === "Abgeschlossen" && (!userFilter || userFilter === "alle" || r.assignedTo === userFilter));
+    const list = reports.filter(r => r.status === "Abgeschlossen" && matchesUserFilter(r, userFilter));
     return [...list].sort((a, b) => {
       const counterA = a.version !== undefined ? a.version : (a.editCount !== undefined ? a.editCount : null);
       const counterB = b.version !== undefined ? b.version : (b.editCount !== undefined ? b.editCount : null);
@@ -668,7 +691,7 @@ export default function WorkflowStatusOverview({ reports, onSelectReport, curren
       const timeB = new Date(b._supabase_updated_at || b.updatedAt || b.updated_at || b.modifiedAt || b.lastModified || b.savedAt || b.date || 0).getTime();
       return timeB - timeA;
     });
-  }, [reports, userFilter])
+  }, [reports, userFilter, matchesUserFilter])
   const overdue = useMemo(() => allActive.filter(r => getPriority(r, store) === "red"), [allActive, store])
   const trocknungList = useMemo(() => allActive.filter(r => { const ai = getActiveIdx(r, store); return STEPS[ai]?.id === "trocknung" }), [allActive, store])
   const aktiv = useMemo(() => allActive.filter(r => getPriority(r, store) !== "red"), [allActive, store])

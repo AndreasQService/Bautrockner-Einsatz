@@ -82,14 +82,14 @@ async function executeClaimed(operation) {
   }
 }
 
-export async function runOfflineOutboxOnce({ limit = 10, allowDuringProjectSession = false, projectId = null } = {}) {
+export async function runOfflineOutboxOnce({ limit = 10, allowDuringProjectSession = false, projectId = null, forceLeaseReset = false } = {}) {
   if (typeof navigator !== 'undefined' && navigator.onLine === false) {
     return { claimed: 0, results: [], skipped: 'offline' };
   }
   if (!allowDuringProjectSession && await hasActiveProjectSession()) {
     return { claimed: 0, results: [], skipped: 'active_project_session' };
   }
-  const claimed = await claimPendingOperations({ limit, projectId });
+  const claimed = await claimPendingOperations({ limit, projectId, forceLeaseReset: true });
   const results = [];
   for (const operation of claimed) results.push(await executeClaimed(operation));
   return { claimed: claimed.length, results };
@@ -103,20 +103,39 @@ export function triggerOfflineOutboxSync(reason = 'manual', { projectId = null }
   return runningPromise;
 }
 
+/** Explicit immediate drain attempt for manual "Sync Now" or iOS Standby Wakeup */
+export async function drainOutboxImmediately(reason = 'manual_sync_now', options = {}) {
+  return triggerOfflineOutboxSync(reason, options);
+}
+
 export function startOfflineOutboxWorker({ intervalMs = 30_000 } = {}) {
   if (lifecycleCleanup || typeof window === 'undefined') return lifecycleCleanup || (() => {});
   const trigger = (reason) => void triggerOfflineOutboxSync(reason).catch((error) => {
     console.warn('[OfflineOutbox] Worker-Durchlauf fehlgeschlagen:', error);
   });
-  const onOnline = () => trigger('online');
-  const onVisibility = () => { if (document.visibilityState === 'visible') trigger('foreground'); };
+  const onOnline = () => trigger('online_wakeup');
+  const onVisibility = () => {
+    if (document.visibilityState === 'visible') {
+      trigger('ios_visibility_wakeup');
+    }
+  };
+  const onPageshow = (e) => {
+    if (e.persisted) {
+      trigger('ios_bfcache_wakeup');
+    }
+  };
+
   window.addEventListener('online', onOnline);
   document.addEventListener('visibilitychange', onVisibility);
+  window.addEventListener('pageshow', onPageshow);
+
   retryTimer = window.setInterval(() => trigger('interval'), intervalMs);
   trigger('app_start');
+
   lifecycleCleanup = () => {
     window.removeEventListener('online', onOnline);
     document.removeEventListener('visibilitychange', onVisibility);
+    window.removeEventListener('pageshow', onPageshow);
     if (retryTimer) window.clearInterval(retryTimer);
     retryTimer = null;
     lifecycleCleanup = null;

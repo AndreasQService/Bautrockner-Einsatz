@@ -4,8 +4,14 @@
  * @returns {string}
  */
 export const buildDisplayName = (project) => {
-  if (project.street) return `${project.street}${project.city ? ', ' + project.city : ''}`;
-  if (project.address) return project.address.split(',')[0];
+  if (project.street) {
+    const locationParts = [project.zip, project.city].filter(Boolean).join(' ').trim();
+    return locationParts ? `${project.street}, ${locationParts}` : project.street;
+  }
+  if (project.address) {
+    // If address already contains comma-separated parts, use as-is
+    return project.address;
+  }
   return project.projectTitle || project.id || '—';
 };
 

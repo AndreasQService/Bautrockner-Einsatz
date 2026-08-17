@@ -47,6 +47,7 @@ export {
   updateProjectSessionSnapshot,
   verifyProjectSession,
 } from './projectSessionStore.js';
-export { createLockedProjectSession } from './createLockedProject.js';
+export { createProjectSession, initializeInstantProject, checkSorbaDuplicateWarning } from './createProject.js';
 export { materializeProjectForOffline } from './projectMaterializer.js';
 export { collectStrictExitCloudEvidence } from './exitCloudEvidence.js';
+export { ensurePersistentStorage, getStorageQuota } from './storagePersistence.js';

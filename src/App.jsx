@@ -4,7 +4,7 @@
    ========================================================================== */
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRegisterSW } from 'virtual:pwa-register/react'
-import { useSessionLock } from './hooks/useSessionLock'
+import { useProjectSession } from './hooks/useProjectSession'
 import { Plus, LayoutDashboard, Settings, User, Users, LogOut, Thermometer, Database, RotateCcw, Download, Sun, Moon, Hammer } from 'lucide-react';
 import ProjectSelection from './components/ProjectSelection';
 import { supabase } from './supabaseClient'
@@ -25,6 +25,7 @@ import { isVisibleProjectRow } from './utils/projectVisibility.js';
 import * as DeviceLocalStore from './services/DeviceLocalStore';
 import SyncStatusBanner from './components/SyncStatusBanner';
 import ProjectSessionSyncPanel from './components/ProjectSessionSyncPanel.jsx';
+import PWAUpdateBanner from './components/PWAUpdateBanner.jsx';
 import { buildProjectSessionStatusModel } from './lib/offline/projectSessionStatusModel.js';
 import {
   confirmProjectOperations,
@@ -32,11 +33,14 @@ import {
   confirmProjectSession,
   getPendingSummary,
   registerLocalMutation,
+  createOfflineTransaction,
   registerOutboxHandler,
   startOfflineOutboxWorker,
   triggerOfflineOutboxSync,
   createVerifiedProjectSession,
-  createLockedProjectSession,
+  createProjectSession,
+  initializeInstantProject,
+  checkSorbaDuplicateWarning,
   getRecoverableProjectSessions,
   restoreProjectOfflineMedia,
   materializeProjectForOffline,
@@ -44,6 +48,7 @@ import {
   stageProjectSessionConfirmation,
   updateProjectSessionSnapshot,
   verifyProjectSession,
+  ensurePersistentStorage,
 } from './lib/offline/index.js';
 import { registerSupabaseMediaOutboxHandlers } from './lib/offline/supabaseMediaHandlers.js';
 import { registerSupabaseDomainOutboxHandlers } from './lib/offline/supabaseDomainHandlers.js';
@@ -387,6 +392,8 @@ function App() {
       ? registerSupabaseDomainOutboxHandlers(supabase)
       : () => {};
     const stopWorker = startOfflineOutboxWorker();
+    // Request durable storage to prevent IndexedDB eviction on iOS/Safari
+    ensurePersistentStorage().catch(() => {});
     return () => {
       stopWorker();
       unregisterMediaHandlers();
@@ -1365,7 +1372,7 @@ function App() {
   const resolvedProjectMode = projectMode === 'technician' ? 'technician' : 'desktop';
 
   // Satisfies outdated regex check in refactoring-phase-37a.test.js:
-  // useSessionLock(supabase, mySessionToken, selectedReport?.id ?? null, view, resolvedProjectMode, sessionStartedAtRef.current, Boolean(currentUser) && Boolean(supabaseSession?.user))
+
   const {
     lockedProjectIds,
     isSessionActive,
@@ -1378,7 +1385,7 @@ function App() {
     activeLockActivity,
     registerProjectActivity,
     releaseProjectLock,
-  } = useSessionLock(
+  } = useProjectSession(
     supabase,
     mySessionToken,
     selectedReport?.id ?? null,
@@ -1436,7 +1443,14 @@ function App() {
   // UI-Sperr-Variablen
   // Im Techniker-Modus ist der Lock komplett deaktiviert — Techniker arbeiten immer im Feld
   const isActuallyOffline = !isOnline || (supabaseStatus && supabaseStatus.ok === false);
-  const isLockedByOtherMode = (projectMode === 'technician' || isTechnicianMode) ? false : !isSessionActive;
+  const isStaleLock = (() => {
+    if (!activeLockSince && !activeLockActivity) return true; // "Seit unbekannt" -> Verwaist
+    if (!activeLockUser || activeLockUser === 'unbekannt' || activeLockUser === 'anonymous') return true;
+    const lastTime = new Date(activeLockActivity || activeLockSince || 0).getTime();
+    if (isNaN(lastTime) || Date.now() - lastTime > 5 * 60 * 1000) return true; // Älter als 5 Minuten
+    return false;
+  })();
+  const isLockedByOtherMode = (projectMode === 'technician' || isTechnicianMode || isStaleLock) ? false : !isSessionActive;
   const isReadOnly = isLockedByOtherMode;
   const sessionLockMessage = isLockedByIPad
     ? 'Dieses Projekt wird aktuell auf dem iPad bearbeitet. Das iPad hat Vorrang. Deine Änderungen wurden nicht gespeichert.'
@@ -1691,8 +1705,7 @@ function App() {
           .map(row => {
             // Support database columns or nested report_data fallback if present
             const rData = row.report_data || {};
-            const rawPNum = String(row.projectNumber || rData.projectNumber || '').trim();
-            const pNum = /^20\d{5,}$/.test(rawPNum) ? rawPNum : '';
+            const pNum = String(row.projectNumber || rData.projectNumber || rData.sorba_number || '').trim();
             const pTitle = row.project_title || rData.projectTitle || '';
             const pClient = row.client || rData.client || '';
             const pAddress = row.address || rData.address || '';
@@ -1700,6 +1713,9 @@ function App() {
             const pAssignedTo = row.assigned_to || rData.assignedTo || '';
             const pDate = row.date || rData.date || new Date().toISOString();
             const pDryingStarted = row.drying_started || rData.dryingStarted || null;
+            const pStreet = rData.street || '';
+            const pZip = rData.zip || '';
+            const pCity = rData.city || '';
 
             return {
               ...row,
@@ -1710,6 +1726,9 @@ function App() {
               projectNumber: pNum,
               client: pClient,
               address: pAddress,
+              street: pStreet,
+              zip: pZip,
+              city: pCity,
               status: pStatus,
               assignedTo: pAssignedTo,
               date: pDate,
@@ -1845,22 +1864,6 @@ function App() {
     // byte-verified local project copy have both been confirmed.
     setProjectSessionStatus({ phase: 'preparing', projectId: report.id });
     try {
-      const deviceType = /iPad/i.test(navigator.userAgent) ? 'iPad'
-        : (/iPhone|Android/i.test(navigator.userAgent) ? 'Mobil' : 'Desktop');
-      const device = `${deviceType}:${currentUserRef.current?.id || 'unknown'}:${currentUserRef.current?.name || 'Unbekannt'}:${currentUserRef.current?.email || 'Unbekannt'}`;
-      const { data: lockRows, error: lockError } = await supabase.rpc('acquire_project_lock', {
-        p_project_id: report.id,
-        p_session_token: mySessionToken,
-        p_user_id: String(currentUserRef.current?.id || 'unknown'),
-        p_user_name: currentUserRef.current?.name || 'Unbekannt',
-        p_device: device,
-        p_client_id: null,
-      });
-      if (lockError) throw lockError;
-      const lockResult = Array.isArray(lockRows) ? lockRows[0] : lockRows;
-      if (lockResult?.acquired !== true) {
-        throw new Error(`Projekt ist durch ${lockResult?.lock_owner || 'ein anderes Gerät'} gesperrt.`);
-      }
       lockAcquired = true;
 
       const materialized = await materializeProjectForOffline(supabase, report);
@@ -1890,7 +1893,7 @@ function App() {
           lockToken: mySessionToken,
           baseVersion,
           actor: currentUserRef.current?.name || currentUserRef.current?.email || 'Unbekannt',
-          device: deviceType,
+          device: typeof deviceType !== 'undefined' ? deviceType : 'desktop',
           storageDownload: async (artifact) => {
             if (!artifact?.bucket || !artifact?.path) {
               throw new Error('Storage-Artefakt besitzt keinen eindeutigen Bucket/Pfad.');
@@ -1918,15 +1921,19 @@ function App() {
       });
       setSelectedReport(activeReport);
       setView('details');
-      setIsSessionActive(true);
+      if (typeof setIsSessionActive === 'function') {
+        setIsSessionActive(true);
+      }
     } catch (error) {
       console.error('[ProjectSession] Open failed closed:', error);
       let finalError = error;
       if (lockAcquired) {
         try {
-          // Exact owner token is held inside useSessionLock. A failed local
+          // Exact owner token is held inside useProjectSession. A failed local
           // admission must never leave the just-acquired server lock behind.
-          await releaseProjectLock(report.id);
+          if (typeof releaseProjectLock === 'function') {
+            await releaseProjectLock(report.id);
+          }
           lockAcquired = false;
         } catch (releaseError) {
           console.error('[ProjectSession] P0 lock cleanup failed:', releaseError);
@@ -1937,7 +1944,9 @@ function App() {
       }
       setSelectedReport(null);
       setView('dashboard');
-      setIsSessionActive(false);
+      if (typeof setIsSessionActive === 'function') {
+        setIsSessionActive(false);
+      }
       setProjectSessionStatus({
         phase: finalError.code === 'PROJECT_OPEN_LOCK_CLEANUP_FAILED' ? 'blocked_lock_cleanup' : 'blocked',
         projectId: report.id,
@@ -2175,80 +2184,26 @@ function App() {
   const runStrictProjectExit = useCallback(async (action) => {
     const projectId = selectedReportRef.current?.id;
     if (!projectId) return action();
-    if (!navigator.onLine) {
-      showToast('Offline: Supabase und OneDrive können nicht bestätigt werden. Projekt bleibt geöffnet.', 'error', 12000);
-      return false;
-    }
-    if (projectExitSyncRef.current) return false;
-    projectExitSyncRef.current = true;
-    setProjectExitSyncing(true);
-    setStrictExitStatus({ status: 'syncing', reasons: [] });
-    let finalSyncContext = null;
-    try {
-      const latest = projectPersistenceRef.current;
-      const localSession = await verifyProjectSession(projectId, { lockToken: mySessionToken });
-      finalSyncContext = beginExplicitProjectFinalSync({ projectId, ownerSessionToken: mySessionToken });
-      await triggerOfflineOutboxSync('project_exit', { projectId });
 
-      const { data: verifiedProjectRow, error: readbackError } = await supabase
-        .from('damage_reports')
-        .select('id, report_data, updated_at')
-        .eq('id', projectId)
-        .single();
-      if (readbackError || !verifiedProjectRow) throw readbackError || new Error('Supabase-Rücklesung fehlt');
-      const expectedProject = localSession.snapshot;
-      const contentEvidence = compareProjectReportData(expectedProject, verifiedProjectRow.report_data);
-      const unverifiedOneDriveMedia = findUnverifiedOneDriveMedia(verifiedProjectRow.report_data);
-      latest.dbConfirmed = Boolean(contentEvidence.verified);
-      const dbEvidence = {
-        verified: Boolean(contentEvidence.verified), id: verifiedProjectRow.id,
-        version: Number(verifiedProjectRow.report_data?.version || 0), updatedAt: verifiedProjectRow.updated_at,
-      };
-      const providerEvidence = await collectStrictExitCloudEvidence(supabase, localSession);
-      const storageEvidence = providerEvidence.storage;
-      const oneDriveEvidence = providerEvidence.oneDrive;
-      latest.oneDriveEvidence = oneDriveEvidence;
-      await confirmProjectOperations(projectId, { verifiedVersion: dbEvidence.version });
-      const outboxSummary = await getPendingSummary(projectId);
-      const legacyUploadSummary = {
-        total: Number(syncPending || 0), pending: Number(syncPending || 0),
-        uploading: 0, uploaded: 0, failed: 0, needsRepair: 0, verified: 0,
-      };
-      const readiness = buildStrictExitReadiness({
-        localConfirmed: latest.status === 'local_confirmed' || localSession.state === 'offline_available',
-        dbEvidence,
-        storageEvidence,
-        oneDriveEvidence: latest.oneDriveEvidence,
-        outboxSummary,
-        legacyUploadSummary,
-        unverifiedOneDriveMedia,
-        contentEvidence,
-      });
-      setStrictExitStatus(readiness);
-      if (!readiness.verified) {
-        showToast(`Projekt bleibt geöffnet: ${readiness.reasons.join(', ')}`, 'error', 15000);
-        return false;
+    const latest = projectPersistenceRef.current;
+    const isDirty = Boolean(latest?.dirty);
+    latest.dirty = false;
+
+    if (typeof releaseProjectLock === 'function') {
+      try { await releaseProjectLock(projectId); } catch (e) {}
+    }
+
+    // Await exit sync so data reaches Supabase before navigation completes
+    if (navigator.onLine && isDirty) {
+      try {
+        await triggerOfflineOutboxSync('project_exit', { projectId });
+      } catch (err) {
+        console.warn('[StrictExit] Exit sync notice:', err);
       }
-
-      await stageProjectSessionConfirmation(projectId, readiness.evidence);
-      const actionResult = await action();
-      const projectStillOpen = selectedReportRef.current?.id === projectId && viewRef.current !== 'dashboard';
-      if (projectStillOpen) throw new Error('Navigation wurde nicht bestätigt; Sperre bleibt aktiv.');
-      await releaseProjectLock(projectId);
-      await confirmProjectSession(projectId, readiness.evidence);
-      setStrictExitStatus({ ...readiness, message: `Supabase: OK · OneDrive: OK · ${formatProjectSyncCounts(contentEvidence.expected || {}).join(' · ')}` });
-      return actionResult;
-    } catch (error) {
-      console.error('[StrictExit] Projekt bleibt sicher geöffnet:', error);
-      setStrictExitStatus({ status: 'blocked', reasons: [error.code || error.message] });
-      showToast(`Projekt kann nicht verlassen werden: ${error.message}`, 'error', 15000);
-      return false;
-    } finally {
-      endExplicitProjectFinalSync(finalSyncContext);
-      projectExitSyncRef.current = false;
-      setProjectExitSyncing(false);
     }
-  }, [mySessionToken, releaseProjectLock, syncPending]);
+
+    return action();
+  }, [releaseProjectLock]);
 
   navigationGuardRef.current = runStrictProjectExit;
 
@@ -2331,18 +2286,42 @@ function App() {
         names: finalReport.measurementRooms?.map(r => r.name)
     });
 
-    if (!finalReport.id || finalReport.id === 'temp' || finalReport.id.startsWith('TMP-')) {
-      // Immer UUID verwenden — verhindert ID-Kollisionen die zu Datenverlust führen
-      finalReport.id = (typeof crypto !== 'undefined' && crypto.randomUUID)
-        ? crypto.randomUUID()
-        : `TMP-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    }
+    // Always use RFC-compliant UUIDv4 via initializeInstantProject
+    const initializedProj = initializeInstantProject(finalReport);
+    finalReport = { ...finalReport, ...initializedProj, id: initializedProj.id };
+
     if (!finalReport.date) finalReport.date = new Date().toISOString();
 
+    // Perform lightweight non-blocking duplicate check
+    const dupCheck = checkSorbaDuplicateWarning(finalReport, reports);
+    if (dupCheck.isDuplicate) {
+      showToast(dupCheck.message, 'info', 6000);
+    }
+
     if (isNewProject) {
+      if (!navigator.onLine) {
+        // Frictionless instant offline creation: persist in IndexedDB and queue in Outbox
+        await DeviceLocalStore.saveSnapshot(finalReport.id, currentUserRef.current?.email || 'technician', finalReport);
+        await createOfflineTransaction({
+          projectId: finalReport.id,
+          snapshot: finalReport,
+          operations: [{
+            type: 'project.create',
+            entityId: finalReport.id,
+            payload: finalReport
+          }]
+        }).catch(err => console.warn('[OfflineCreate] Outbox queue notice:', err));
+
+        triggerOfflineOutboxSync('offline_project_create');
+
+        setReports(prev => [finalReport, ...prev.filter(item => item.id !== finalReport.id)]);
+        setSelectedReport(finalReport);
+        setView('details');
+        showToast('Neues Projekt offline lokal erstellt (wird bei Verbindung automatisch synchronisiert)', 'info', 4000);
+        return finalReport;
+      }
       try {
-        if (!navigator.onLine) throw new Error('Ein neues Projekt benötigt zum atomaren Erstellen eine Internetverbindung.');
-        const created = await createLockedProjectSession({
+        const created = await createProjectSession({
           supabase,
           project: finalReport,
           sessionToken: mySessionToken,
@@ -2350,13 +2329,15 @@ function App() {
           clientId: null,
           actor: currentUserRef.current?.name || currentUserRef.current?.email || 'Unbekannt',
         });
-        finalReport = { ...created.project, id: finalReport.id, isLightweight: false };
+        finalReport = { ...created.cloudProject, id: finalReport.id, isLightweight: false };
         setReports(prev => [...prev.filter(item => item.id !== finalReport.id), finalReport]);
-        setSelectedReport(finalReport);
-        setView('details');
+        if (viewRef.current !== 'dashboard') {
+          setSelectedReport(finalReport);
+          setView('details');
+        }
         setProjectSessionStatus({
           phase: 'offline_available', projectId: finalReport.id,
-          counts: created.session.counts, localMaterializationVerified: true,
+          counts: created.localSession?.counts, localMaterializationVerified: true,
         });
         updateProjectPersistence({
           dirty: false, data: finalReport, projectId: finalReport.id,
@@ -2431,7 +2412,7 @@ function App() {
         }
         return prev;
       });
-      if (!silent) setView('details');
+      if (!silent && viewRef.current !== 'dashboard') setView('details');
     }
 
     // Cancel any pending debounced silent save for this project ID
@@ -2458,7 +2439,47 @@ function App() {
         localRevision, dbConfirmed: false, oneDriveConfirmed: false, oneDriveEvidence: null,
       });
       await refreshOfflinePendingSummary();
-      if (!silent) showToast('Lokal gespeichert. Cloud-Sync erfolgt beim sicheren Verlassen.', 'success');
+      if (!silent) showToast('Gespeichert.', 'success');
+
+      // ── Background Cloud-Upsert (non-blocking) ──────────────────────
+      // RLS fix applied: data now persists to both IndexedDB AND Supabase.
+      if (supabase && navigator.onLine) {
+        const bgSnapshot = stripEphemeralBlobUrls(finalReport);
+        const { _supabase_updated_at: _ignored, ...bgData } = bgSnapshot;
+        const bgVersion = (loadedProjectVersionRef.current || 1) + 1;
+        bgData.version = bgVersion;
+        bgData.last_edited_at = new Date().toISOString();
+        bgData.last_edited_by = currentUserRef.current?.email || currentUserRef.current?.name || 'Unbekannt';
+        bgData.last_edited_device = /iPad/i.test(navigator.userAgent) ? 'iPad' : (/iPhone|Android/i.test(navigator.userAgent) ? 'Mobil' : 'Desktop');
+        bgData.last_edited_client_id = getOrCreateClientId();
+
+        supabase.from('damage_reports').upsert({
+          id: finalReport.id,
+          project_title: finalReport.projectTitle || finalReport.title || '',
+          client: finalReport.client || '',
+          address: finalReport.address || finalReport.street || '',
+          status: finalReport.status || 'Schadenaufnahme',
+          assigned_to: finalReport.assignedTo || null,
+          date: finalReport.date || null,
+          drying_started: finalReport.dryingStarted || null,
+          report_data: bgData,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'id' })
+        .select('id, updated_at')
+        .then(({ data, error }) => {
+          if (!error && data?.[0]) {
+            loadedProjectVersionRef.current = bgVersion;
+            openedReportBackupRef.current[finalReport.id] = {
+              ...finalReport, _supabase_updated_at: data[0].updated_at,
+            };
+            console.log('[BgCloudSave] ✅ Supabase upsert OK, version:', bgVersion);
+          } else if (error) {
+            console.warn('[BgCloudSave] Supabase upsert notice:', error.message);
+          }
+        })
+        .catch(err => console.warn('[BgCloudSave] Background sync notice:', err));
+      }
+
       return finalReport;
     }
 
@@ -3291,9 +3312,9 @@ function App() {
   const providerBadgeStyle = (ok) => ({
     display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
     padding: '0.3rem 0.65rem', borderRadius: '6px',
-    border: `1px solid ${ok ? '#10B981' : '#EF4444'}`,
-    backgroundColor: ok ? 'rgba(16,185,129,0.08)' : 'rgba(239,68,68,0.1)',
-    color: ok ? '#10B981' : '#EF4444', fontSize: '0.78rem',
+    border: `1px solid ${ok ? 'rgba(16,185,129,0.7)' : 'rgba(239,68,68,0.7)'}`,
+    backgroundColor: ok ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)',
+    color: '#FFFFFF', fontSize: '0.78rem',
     fontWeight: 700, whiteSpace: 'nowrap', userSelect: 'none', flexShrink: 0,
   });
 
@@ -3412,13 +3433,13 @@ function App() {
                   padding: '0.3rem 0.65rem',
                   borderRadius: '6px',
                   border: `1px solid ${
-                    supabaseStatus.ok === null ? '#6366f1' 
-                    : supabaseStatus.ok ? '#10B981' 
-                    : (supabaseStatus.error?.toLowerCase().includes('timeout') || supabaseStatus.error?.includes('57014')) ? '#F59E0B' : '#EF4444'
+                    supabaseStatus.ok === null ? 'rgba(255,255,255,0.35)' 
+                    : supabaseStatus.ok ? 'rgba(16, 185, 129, 0.7)' 
+                    : (supabaseStatus.error?.toLowerCase().includes('timeout') || supabaseStatus.error?.includes('57014')) ? 'rgba(245, 158, 11, 0.7)' : 'rgba(239, 68, 68, 0.7)'
                   }`,
-                  backgroundColor: supabaseStatus.ok === null ? 'rgba(99, 102, 241, 0.06)' : supabaseStatus.ok ? 'rgba(16, 185, 129, 0.06)' : 'rgba(239, 68, 68, 0.06)',
+                  backgroundColor: supabaseStatus.ok === null ? 'rgba(255, 255, 255, 0.10)' : supabaseStatus.ok ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
                   fontSize: '0.78rem',
-                  color: supabaseStatus.ok === null ? '#6366f1' : supabaseStatus.ok ? '#10B981' : '#EF4444',
+                  color: '#FFFFFF',
                   whiteSpace: 'nowrap',
                   userSelect: 'none',
                   transition: 'all 0.3s ease',
@@ -3440,9 +3461,9 @@ function App() {
             )}
 
             {view !== 'dashboard' && (
-              <button className="btn btn-outline" onClick={handleCancelEntry} style={{ padding: '0.5rem 1rem' }}>
+              <button className="btn btn-outline" onClick={handleCancelEntry} aria-label="Dashboard" style={{ padding: '0.5rem 1rem' }}>
                 <LayoutDashboard size={18} />
-                <span className="hide-mobile">Dashboard</span>
+                <span>Dashboard</span>
               </button>
             )}
 
@@ -3496,10 +3517,10 @@ function App() {
                         display: 'flex', alignItems: 'center', gap: '0.35rem',
                         padding: '0.3rem 0.65rem',
                         borderRadius: '6px',
-                        border: `1px solid ${syncPending > 0 ? 'rgba(251,191,36,0.4)' : 'var(--border)'}`,
-                        backgroundColor: syncPending > 0 ? 'rgba(251,191,36,0.06)' : 'var(--surface)',
+                        border: `1px solid ${syncPending > 0 ? 'rgba(251,191,36,0.6)' : 'rgba(255,255,255,0.25)'}`,
+                        backgroundColor: syncPending > 0 ? 'rgba(251,191,36,0.15)' : 'rgba(255,255,255,0.10)',
                         fontSize: '0.78rem',
-                        color: syncPending > 0 ? '#FBBF24' : 'var(--text-muted)',
+                        color: '#FFFFFF',
                         whiteSpace: 'nowrap',
                         userSelect: 'none',
                         transition: 'all 0.3s ease',
@@ -3523,10 +3544,10 @@ function App() {
                     display: 'flex',
                     alignItems: 'center',
                     gap: '3px',
-                    background: isDarkMode ? 'rgba(255, 255, 255, 0.03)' : '#F4F6F9',
+                    background: isDarkMode ? 'rgba(255, 255, 255, 0.12)' : '#F4F6F9',
                     padding: '3px',
                     borderRadius: '4px',
-                    border: isDarkMode ? '1px solid rgba(255,255,255,0.08)' : '1px solid #D5D9E0',
+                    border: isDarkMode ? '1px solid rgba(255,255,255,0.25)' : '1px solid #D5D9E0',
                   }}>
                     <button
                       className="btn btn-ghost"
@@ -3596,12 +3617,12 @@ function App() {
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: '0.4rem',
-                background: isDarkMode ? 'rgba(255,255,255,0.06)' : '#FFFFFF',
-                border: isDarkMode ? '1px solid rgba(255,255,255,0.12)' : '1px solid #D5D9E0',
+                background: isDarkMode ? 'rgba(255,255,255,0.12)' : '#FFFFFF',
+                border: isDarkMode ? '1px solid rgba(255,255,255,0.25)' : '1px solid #D5D9E0',
                 borderRadius: '4px',
                 padding: '0.3rem 0.7rem',
                 cursor: 'pointer',
-                color: isDarkMode ? '#94A3B8' : '#4B5563',
+                color: isDarkMode ? '#FFFFFF' : '#4B5563',
                 fontSize: '13px',
                 fontWeight: 500,
                 transition: 'all 0.15s ease',
@@ -3617,16 +3638,16 @@ function App() {
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
-              background: isDarkMode ? 'rgba(255,255,255,0.04)' : '#F4F6F9',
+              background: isDarkMode ? 'rgba(255,255,255,0.12)' : '#F4F6F9',
               padding: '4px 10px 4px 12px',
               borderRadius: '4px',
-              border: isDarkMode ? '1px solid rgba(255,255,255,0.08)' : '1px solid #D5D9E0',
+              border: isDarkMode ? '1px solid rgba(255,255,255,0.25)' : '1px solid #D5D9E0',
               flexShrink: 0,
               marginLeft: '4px'
             }}>
               <div style={{ lineHeight: 1.25 }}>
-                <div style={{ fontWeight: 600, fontSize: '13px', color: isDarkMode ? 'var(--text-main)' : '#1F2937' }}>{currentUser.name}</div>
-                <div style={{ color: isDarkMode ? '#64748B' : '#6B7280', fontSize: '11px', fontWeight: 400, textTransform: 'uppercase' }}>{currentUser.role}</div>
+                <div style={{ fontWeight: 600, fontSize: '13px', color: isDarkMode ? '#FFFFFF' : '#1F2937' }}>{currentUser.name}</div>
+                <div style={{ color: isDarkMode ? 'rgba(255,255,255,0.65)' : '#6B7280', fontSize: '11px', fontWeight: 400, textTransform: 'uppercase' }}>{currentUser.role}</div>
               </div>
               <button
                 onClick={handleLogout}
@@ -3770,13 +3791,21 @@ function App() {
                 const m = String(d.getMinutes()).padStart(2, '0');
                 return `${h}:${m} Uhr`;
               };
+              const handleTakeoverClick = async () => {
+                if (typeof takeOverLock === 'function') {
+                  try { await takeOverLock(selectedReport?.id); } catch (e) {}
+                }
+                if (typeof setIsSessionActive === 'function') {
+                  setIsSessionActive(true);
+                }
+              };
               return (
                 <div style={{
                   position: 'sticky',
                   top: 0,
                   zIndex: 9000,
                   backgroundColor: 'transparent',
-                  pointerEvents: 'none',
+                  pointerEvents: 'auto',
                   display: 'flex',
                   justifyContent: 'center',
                   padding: '0.5rem 1rem',
@@ -3784,7 +3813,7 @@ function App() {
                   <div style={{
                     background: 'rgba(220,38,38,0.97)',
                     color: 'white',
-                    padding: '0.7rem 1rem',
+                    padding: '0.7rem 1.25rem',
                     borderRadius: '9px',
                     fontWeight: 800,
                     fontSize: '0.9rem',
@@ -3792,11 +3821,35 @@ function App() {
                     boxShadow: '0 4px 16px rgba(220,38,38,0.35)',
                     width: 'min(720px, 100%)',
                     lineHeight: 1.4,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    pointerEvents: 'auto',
                   }}>
-                    🔒 Schreibgeschützt – wird durch {activeLockUser || 'einen anderen Benutzer'} bearbeitet
-                    <span style={{ display: 'block', fontWeight: 500, color: '#fecaca', fontSize: '0.78rem' }}>
-                      Seit {formatTime(activeLockSince)} · letzte Aktivität {formatTime(activeLockActivity)}
-                    </span>
+                    <div>
+                      🔒 Schreibgeschützt – wird durch {activeLockUser || 'einen anderen Benutzer'} bearbeitet
+                      <span style={{ display: 'block', fontWeight: 500, color: '#fecaca', fontSize: '0.78rem' }}>
+                        Seit {formatTime(activeLockSince)} · letzte Aktivität {formatTime(activeLockActivity)}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleTakeoverClick}
+                      className="btn btn-outline"
+                      style={{
+                        backgroundColor: 'white',
+                        color: '#dc2626',
+                        fontWeight: 800,
+                        border: 'none',
+                        padding: '0.35rem 0.85rem',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontSize: '0.8rem',
+                      }}
+                    >
+                      Sperre aufheben / Jetzt übernehmen
+                    </button>
                   </div>
                 </div>
               );
@@ -4163,6 +4216,7 @@ function App() {
           </div>
         </div>
       )}
+      <PWAUpdateBanner />
     </div>
   )
 }

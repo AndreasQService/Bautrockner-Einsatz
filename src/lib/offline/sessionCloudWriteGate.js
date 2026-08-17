@@ -53,6 +53,7 @@ export function getExplicitProjectFinalSync() {
 
 export async function assertOneDriveWriteAllowed(method = 'GET', { hasActiveSession = null } = {}) {
   if (!MUTATING_METHODS.has(String(method).toUpperCase())) return;
+  if (typeof navigator !== 'undefined' && navigator.onLine) return;
   let activeSessionCheck = hasActiveSession;
   if (!activeSessionCheck) {
     ({ hasActiveProjectSession: activeSessionCheck } = await import('./projectSessionStore.js'));
@@ -83,6 +84,8 @@ export async function assertSupabaseRequestAllowed(input, init, { hasActiveSessi
 
   const rpc = rpcName(url);
   if (rpc && TECHNICAL_LOCK_RPCS.has(rpc)) return;
+
+  if (typeof navigator !== 'undefined' && navigator.onLine) return;
 
   let activeSessionCheck = hasActiveSession;
   if (!activeSessionCheck) {

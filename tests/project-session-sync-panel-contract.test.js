@@ -5,13 +5,13 @@ import fs from 'node:fs';
 const source = fs.readFileSync(new URL('../src/components/ProjectSessionSyncPanel.jsx', import.meta.url), 'utf8');
 const appSource = fs.readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8');
 
-test('runtime panel exposes the required truthful session messages and single explicit exit action', () => {
-  assert.match(source, /Projekt offline verfügbar/);
-  assert.match(source, /Synchronisieren und Projekt verlassen/);
+test('runtime panel exposes status badges and dashboard return action', () => {
   assert.match(source, /Supabase OK/);
+  assert.match(source, /Supabase ausstehend/);
   assert.match(source, /OneDrive OK/);
-  assert.match(source, /Projekt kann noch nicht verlassen werden/);
-  assert.match(source, /disabled=\{!model\.canStartSync && !model\.canExit\}/);
+  assert.match(source, /OneDrive ausstehend/);
+  assert.match(source, /Dashboard/);
+  assert.doesNotMatch(source, /Synchronisieren und Projekt verlassen/);
 });
 
 test('runtime panel delegates every status decision to the fail-closed model', () => {

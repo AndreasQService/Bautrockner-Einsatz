@@ -118,19 +118,27 @@ export async function createOfflineTransaction({
   };
 
   const db = await openOfflineDatabase();
-  const tx = db.transaction(ALL_STORES, 'readwrite', { durability: 'strict' });
-  await tx.objectStore(OFFLINE_STORES.TRANSACTIONS).add(manifest);
-  await tx.objectStore(OFFLINE_STORES.SNAPSHOTS).add({
-    projectId,
-    transactionId,
-    data: snapshot,
-    baseVersion,
-    updatedAt: createdAt,
-  });
-  for (const row of blobRows) await tx.objectStore(OFFLINE_STORES.BLOBS).add(row);
-  for (const row of operationRows) await tx.objectStore(OFFLINE_STORES.OUTBOX).add(row);
+  try {
+    const tx = db.transaction(ALL_STORES, 'readwrite', { durability: 'strict' });
+    await tx.objectStore(OFFLINE_STORES.TRANSACTIONS).add(manifest);
+    await tx.objectStore(OFFLINE_STORES.SNAPSHOTS).add({
+      projectId,
+      transactionId,
+      data: snapshot,
+      baseVersion,
+      updatedAt: createdAt,
+    });
+    for (const row of blobRows) await tx.objectStore(OFFLINE_STORES.BLOBS).add(row);
+    for (const row of operationRows) await tx.objectStore(OFFLINE_STORES.OUTBOX).add(row);
 
-  await tx.done;
+    await tx.done;
+  } catch (err) {
+    if (err.name === 'AbortError' || (err instanceof DOMException && err.name === 'AbortError')) {
+      console.warn('[transactionStore] Transaction aborted gracefully (project exit):', err.message);
+      return manifest;
+    }
+    throw err;
+  }
 
   // Exact durable readback is the local commit boundary. Merely completing the
   // write transaction is insufficient evidence on interruption-prone iOS.
@@ -186,16 +194,25 @@ export async function registerLocalMutation({
 } = {}) {
   requireText(type, 'type');
   const allBlobs = blob ? [blob, ...blobs] : blobs;
-  const manifest = await createOfflineTransaction({
-    projectId,
-    snapshot: snapshot ?? { projectId, type, entityId, payload },
-    blobs: allBlobs,
-    operations: [{ type, entityId, payload, idempotencyKey }],
-    actor,
-    device,
-    baseVersion,
-    transactionId,
-  });
+  let manifest;
+  try {
+    manifest = await createOfflineTransaction({
+      projectId,
+      snapshot: snapshot ?? { projectId, type, entityId, payload },
+      blobs: allBlobs,
+      operations: [{ type, entityId, payload, idempotencyKey }],
+      actor,
+      device,
+      baseVersion,
+      transactionId,
+    });
+  } catch (err) {
+    if (err.name === 'AbortError' || (err instanceof DOMException && err.name === 'AbortError')) {
+      console.warn('[registerLocalMutation] Transaction aborted gracefully (project exit):', err.message);
+      return null;
+    }
+    throw err;
+  }
   // Inactivity is measured from a real, read-back-verified local business
   // mutation—not from clicks, scrolling or merely viewing the project.
   if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
@@ -251,7 +268,7 @@ export async function listPendingOperations({ projectId = null, limit = 100 } = 
 }
 
 /** Beansprucht fällige Aufträge atomar für genau einen Worker. */
-export async function claimPendingOperations({ limit = 10, leaseMs = 30_000, projectId = null } = {}) {
+export async function claimPendingOperations({ limit = 10, leaseMs = 30_000, projectId = null, forceLeaseReset = false } = {}) {
   const db = await openOfflineDatabase();
   const tx = db.transaction(OFFLINE_STORES.OUTBOX, 'readwrite', { durability: 'strict' });
   const store = tx.store;
@@ -261,6 +278,10 @@ export async function claimPendingOperations({ limit = 10, leaseMs = 30_000, pro
 
   for (const row of rows.sort((a, b) => a.createdAt.localeCompare(b.createdAt))) {
     if (projectId && String(row.projectId) !== String(projectId)) continue;
+    if (forceLeaseReset && row.status === OFFLINE_STATES.UPLOADING) {
+      row.status = OFFLINE_STATES.QUEUED;
+      row.leaseUntil = null;
+    }
     const leaseExpired = row.status === OFFLINE_STATES.UPLOADING && Date.parse(row.leaseUntil || 0) <= now;
     const due = Date.parse(row.nextAttemptAt || 0) <= now;
     if ((!leaseExpired && row.status !== OFFLINE_STATES.QUEUED) || !due) continue;

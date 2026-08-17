@@ -149,38 +149,97 @@ const TodoMonitor = ({
             });
         }
 
-        // Helper: Strict Phase 3 Canonical user assignment matching logic
+        // Standardized Assignee Resolution & Resilient Matching Logic
+        const getTodoAssigneeName = (t) => {
+            if (!t) return '';
+            return String(
+                t.assignedTo ||
+                t.assigned_user_name ||
+                t.assignee ||
+                t.technician ||
+                t.assignedUserName ||
+                ''
+            ).toLowerCase().trim();
+        };
+
+        const getTodoAssigneeId = (t) => {
+            if (!t) return '';
+            const val = String(t.assigned_user_id || t.assignedUserId || t.userId || t.user_id || '').trim();
+            if (!val || val === 'null' || val === 'undefined') return '';
+            return val;
+        };
+
         const isTodoAssignedToUser = (t, user) => {
             if (!t || !user) return false;
 
             const targetUserId = String(user.id || '').trim();
             const targetUserEmail = String(user.email || '').trim().toLowerCase();
             const targetUserName = String(user.name || '').trim().toLowerCase();
+            const targetFirstName = targetUserName.split(' ')[0];
 
-            const todoUserId = String(t.assigned_user_id || '').trim();
-            const todoUserName = String(t.assigned_user_name || '').trim().toLowerCase();
+            const todoUserId = getTodoAssigneeId(t);
+            const todoUserName = getTodoAssigneeName(t);
 
-            // 1. Valid assigned_user_id is decisive
-            if (todoUserId && todoUserId !== 'null' && todoUserId !== 'undefined' && todoUserId !== 'office') {
-                return targetUserId ? todoUserId === targetUserId : false;
+            if (targetUserId && todoUserId && (todoUserId === targetUserId || String(todoUserId) === targetUserId)) {
+                return true;
             }
-
-            // 2. Exact normalized email match if ID missing
             if (targetUserEmail && todoUserName === targetUserEmail) {
                 return true;
             }
+            if (targetUserName && todoUserName) {
+                if (todoUserName === targetUserName) return true;
+                if (todoUserName.includes(targetUserName) || targetUserName.includes(todoUserName)) return true;
+                if (targetFirstName && todoUserName.includes(targetFirstName)) return true;
+            }
+            return false;
+        };
 
-            // 3. Exact normalized full name match ONLY if ID and email missing
-            if (targetUserName && todoUserName && todoUserName === targetUserName) {
+        const matchesAssigneeFilter = (t, filterVal) => {
+            if (!filterVal || filterVal === 'all' || filterVal === 'Alle') return true;
+
+            if (filterVal === 'mine' || filterVal === 'Meine') {
+                if (!currentUser) return false;
+                return isTodoAssignedToUser(t, currentUser);
+            }
+
+            if (filterVal === 'office' || filterVal === 'unassigned' || filterVal === 'Unzugewiesen') {
+                const todoUserId = getTodoAssigneeId(t);
+                const todoUserName = getTodoAssigneeName(t);
+                if (todoUserId === 'office' || todoUserName === 'innendienst' || todoUserName === 'unzugewiesen') return true;
+                if (!todoUserId && !todoUserName) return true;
+                return false;
+            }
+
+            const target = String(filterVal).toLowerCase().trim();
+            const todoUserId = getTodoAssigneeId(t);
+            const todoUserName = getTodoAssigneeName(t);
+
+            if (todoUserId && (todoUserId === target || String(todoUserId) === target)) return true;
+
+            const targetUser = Array.isArray(users) ? users.find(u =>
+                String(u.id) === target ||
+                String(u.name).toLowerCase().trim() === target ||
+                String(u.name).toLowerCase().trim().startsWith(target)
+            ) : null;
+
+            if (targetUser && isTodoAssignedToUser(t, targetUser)) {
                 return true;
             }
 
-            // 4. Strict rejection of partial / substring / first-name-only matches
+            if (todoUserName) {
+                if (todoUserName.includes(target)) return true;
+                if (target.includes(todoUserName) && todoUserName.length > 0) return true;
+                const todoFirstName = todoUserName.split(' ')[0];
+                if (todoFirstName && (todoFirstName === target || target.includes(todoFirstName))) return true;
+            }
+
             return false;
         };
 
         // 3. Filter by Active Tab Filter
-        if (activeFilter === 'mine' && currentUser) {
+        // Skip 'mine' pre-filter when a specific assignee is selected via dropdown
+        const skipMinePreFilter = assigneeFilter && assigneeFilter !== 'all' && assigneeFilter !== 'mine';
+        if (activeFilter === 'mine' && currentUser && !skipMinePreFilter) {
             list = list.filter(t => isTodoAssignedToUser(t, currentUser));
         } else if (activeFilter === 'overdue') {
             list = list.filter(t => t.due_date < todayStr);
@@ -196,18 +255,9 @@ const TodoMonitor = ({
             list = list.filter(t => t.closes_project);
         }
 
-        // 3.5. Filter by Assignee Filter Dropdown
-        if (assigneeFilter !== 'all') {
-            list = list.filter(t => {
-                if (assigneeFilter === 'office') {
-                    return !t.assigned_user_id || t.assigned_user_id === 'office' || t.assigned_user_name === 'Innendienst';
-                }
-                const targetUser = Array.isArray(users) ? users.find(u => String(u.id) === String(assigneeFilter)) : null;
-                if (targetUser) {
-                    return isTodoAssignedToUser(t, targetUser);
-                }
-                return String(t.assigned_user_id) === String(assigneeFilter) || String(t.assigned_user_name) === String(assigneeFilter);
-            });
+        // 3.5. Filter by Assignee Filter (handles "all", "mine", "Adi", "Mensur", user IDs, etc.)
+        if (assigneeFilter && assigneeFilter !== 'all') {
+            list = list.filter(t => matchesAssigneeFilter(t, assigneeFilter));
         }
 
         // 4. Sort: Overdue (oldest first) -> Today -> Future (chronological, closest first)
@@ -232,7 +282,7 @@ const TodoMonitor = ({
                 const proj = reports.find(r => r.id === t.project_id);
                 return (
                     t.task?.toLowerCase().includes(q) ||
-                    t.assigned_user_name?.toLowerCase().includes(q) ||
+                    (t.assigned_user_name || t.assignedTo || '')?.toLowerCase().includes(q) ||
                     t.note?.toLowerCase().includes(q) ||
                     proj?.projectTitle?.toLowerCase().includes(q) ||
                     proj?.projectNumber?.toLowerCase().includes(q) ||
@@ -243,13 +293,55 @@ const TodoMonitor = ({
         }
 
         // Apply assignee filter
-        if (assigneeFilter !== 'all') {
-            list = list.filter(t => {
-                if (assigneeFilter === 'office') {
-                    return !t.assigned_user_id || t.assigned_user_id === 'office' || t.assigned_user_name === 'Innendienst';
+        if (assigneeFilter && assigneeFilter !== 'all') {
+            const getTodoAssigneeName = (t) => String(t.assignedTo || t.assigned_user_name || t.assignee || t.technician || '').toLowerCase().trim();
+            const getTodoAssigneeId = (t) => String(t.assigned_user_id || t.assignedUserId || t.userId || '').trim();
+
+            const isTodoAssignedToUser = (t, user) => {
+                if (!t || !user) return false;
+                const targetUserId = String(user.id || '').trim();
+                const targetUserEmail = String(user.email || '').trim().toLowerCase();
+                const targetUserName = String(user.name || '').trim().toLowerCase();
+                const targetFirstName = targetUserName.split(' ')[0];
+                const todoUserId = getTodoAssigneeId(t);
+                const todoUserName = getTodoAssigneeName(t);
+                if (targetUserId && todoUserId && (todoUserId === targetUserId || String(todoUserId) === targetUserId)) return true;
+                if (targetUserEmail && todoUserName === targetUserEmail) return true;
+                if (targetUserName && todoUserName) {
+                    if (todoUserName === targetUserName) return true;
+                    if (todoUserName.includes(targetUserName) || targetUserName.includes(todoUserName)) return true;
+                    if (targetFirstName && todoUserName.includes(targetFirstName)) return true;
                 }
-                return String(t.assigned_user_id) === String(assigneeFilter);
-            });
+                return false;
+            };
+
+            const matchesAssigneeFilter = (t, filterVal) => {
+                if (!filterVal || filterVal === 'all' || filterVal === 'Alle') return true;
+                if (filterVal === 'mine' || filterVal === 'Meine') {
+                    if (!currentUser) return false;
+                    return isTodoAssignedToUser(t, currentUser);
+                }
+                if (filterVal === 'office' || filterVal === 'unassigned' || filterVal === 'Unzugewiesen') {
+                    const todoUserId = getTodoAssigneeId(t);
+                    const todoUserName = getTodoAssigneeName(t);
+                    return !todoUserId || todoUserId === 'office' || !todoUserName || todoUserName === 'innendienst' || todoUserName === 'unzugewiesen';
+                }
+                const target = String(filterVal).toLowerCase().trim();
+                const todoUserId = getTodoAssigneeId(t);
+                const todoUserName = getTodoAssigneeName(t);
+                if (todoUserId && (todoUserId === target || String(todoUserId) === target)) return true;
+                const targetUser = Array.isArray(users) ? users.find(u => String(u.id) === target || String(u.name).toLowerCase().trim() === target || String(u.name).toLowerCase().trim().startsWith(target)) : null;
+                if (targetUser && isTodoAssignedToUser(t, targetUser)) return true;
+                if (todoUserName) {
+                    if (todoUserName.includes(target)) return true;
+                    if (target.includes(todoUserName) && todoUserName.length > 0) return true;
+                    const todoFirstName = todoUserName.split(' ')[0];
+                    if (todoFirstName && (todoFirstName === target || target.includes(todoFirstName))) return true;
+                }
+                return false;
+            };
+
+            list = list.filter(t => matchesAssigneeFilter(t, assigneeFilter));
         }
 
         // Sort: Newest completed_at first
@@ -258,40 +350,57 @@ const TodoMonitor = ({
             const timeB = new Date(b.completed_at || 0).getTime();
             return timeB - timeA;
         });
-    }, [todos, reports, searchTerm, assigneeFilter]);
+    }, [todos, reports, searchTerm, assigneeFilter, currentUser, users]);
 
     // Counters
     const counters = useMemo(() => {
         const todayStr = getLocalTodayDateString();
         const openTodos = todos.filter(t => t.status === 'open');
 
-        // Helper for user assignment check in counter (Strict Phase 3 rules)
+        const getTodoAssigneeName = (t) => String(t.assignedTo || t.assigned_user_name || t.assignee || t.technician || '').toLowerCase().trim();
+        const getTodoAssigneeId = (t) => String(t.assigned_user_id || t.assignedUserId || t.userId || '').trim();
+
         const isTodoAssignedToUser = (t, user) => {
             if (!t || !user) return false;
-
             const targetUserId = String(user.id || '').trim();
             const targetUserEmail = String(user.email || '').trim().toLowerCase();
             const targetUserName = String(user.name || '').trim().toLowerCase();
-
-            const todoUserId = String(t.assigned_user_id || '').trim();
-            const todoUserName = String(t.assigned_user_name || '').trim().toLowerCase();
-
-            // 1. Valid assigned_user_id is decisive
-            if (todoUserId && todoUserId !== 'null' && todoUserId !== 'undefined' && todoUserId !== 'office') {
-                return targetUserId ? todoUserId === targetUserId : false;
+            const targetFirstName = targetUserName.split(' ')[0];
+            const todoUserId = getTodoAssigneeId(t);
+            const todoUserName = getTodoAssigneeName(t);
+            if (targetUserId && todoUserId && (todoUserId === targetUserId || String(todoUserId) === targetUserId)) return true;
+            if (targetUserEmail && todoUserName === targetUserEmail) return true;
+            if (targetUserName && todoUserName) {
+                if (todoUserName === targetUserName) return true;
+                if (todoUserName.includes(targetUserName) || targetUserName.includes(todoUserName)) return true;
+                if (targetFirstName && todoUserName.includes(targetFirstName)) return true;
             }
+            return false;
+        };
 
-            // 2. Exact normalized email match if ID missing
-            if (targetUserEmail && todoUserName === targetUserEmail) {
-                return true;
+        const matchesAssigneeFilter = (t, filterVal) => {
+            if (!filterVal || filterVal === 'all' || filterVal === 'Alle') return true;
+            if (filterVal === 'mine' || filterVal === 'Meine') {
+                if (!currentUser) return false;
+                return isTodoAssignedToUser(t, currentUser);
             }
-
-            // 3. Exact normalized full name match ONLY if ID and email missing
-            if (targetUserName && todoUserName && todoUserName === targetUserName) {
-                return true;
+            if (filterVal === 'office' || filterVal === 'unassigned' || filterVal === 'Unzugewiesen') {
+                const todoUserId = getTodoAssigneeId(t);
+                const todoUserName = getTodoAssigneeName(t);
+                return !todoUserId || todoUserId === 'office' || !todoUserName || todoUserName === 'innendienst' || todoUserName === 'unzugewiesen';
             }
-
-            // 4. Strict rejection of partial / substring / first-name-only matches
+            const target = String(filterVal).toLowerCase().trim();
+            const todoUserId = getTodoAssigneeId(t);
+            const todoUserName = getTodoAssigneeName(t);
+            if (todoUserId && (todoUserId === target || String(todoUserId) === target)) return true;
+            const targetUser = Array.isArray(users) ? users.find(u => String(u.id) === target || String(u.name).toLowerCase().trim() === target || String(u.name).toLowerCase().trim().startsWith(target)) : null;
+            if (targetUser && isTodoAssignedToUser(t, targetUser)) return true;
+            if (todoUserName) {
+                if (todoUserName.includes(target)) return true;
+                if (target.includes(todoUserName) && todoUserName.length > 0) return true;
+                const todoFirstName = todoUserName.split(' ')[0];
+                if (todoFirstName && (todoFirstName === target || target.includes(todoFirstName))) return true;
+            }
             return false;
         };
 
@@ -304,9 +413,11 @@ const TodoMonitor = ({
             today: activeOpenTodos.filter(t => t.due_date === todayStr).length,
             future: activeOpenTodos.filter(t => t.due_date > todayStr).length,
             mine: currentUser ? activeOpenTodos.filter(t => isTodoAssignedToUser(t, currentUser)).length : 0,
+            adi: activeOpenTodos.filter(t => matchesAssigneeFilter(t, 'Adi')).length,
+            mensur: activeOpenTodos.filter(t => matchesAssigneeFilter(t, 'Mensur')).length,
             noTodos: projectsWithoutTodos.length
         };
-    }, [todos, activeProjects, projectsWithoutTodos, currentUser]);
+    }, [todos, activeProjects, projectsWithoutTodos, currentUser, users]);
 
     // Handle Checking "To-do erledigt"
     const handleToggleDone = async (todoItem, checked) => {
@@ -430,26 +541,48 @@ const TodoMonitor = ({
                 {/* Counter Tabs Widgets */}
                 <div style={{ display: 'flex', gap: '0.35rem', flexShrink: 0 }}>
                     <button
-                        onClick={() => { setActiveFilter('all'); setShowHistory(false); }}
+                        onClick={() => { setActiveFilter('all'); setAssigneeFilter('all'); setShowHistory(false); }}
                         style={{
                             padding: '0.3rem 0.6rem', borderRadius: '6px', border: '1px solid var(--border)',
-                            background: activeFilter === 'all' && !showHistory ? 'var(--q-primary, #1e6db7)' : 'var(--surface-hover, rgba(0,0,0,0.02))',
-                            color: activeFilter === 'all' && !showHistory ? '#fff' : 'var(--text-main)',
+                            background: activeFilter === 'all' && (assigneeFilter === 'all' || !assigneeFilter) && !showHistory ? 'var(--q-primary, #1e6db7)' : 'var(--surface-hover, rgba(0,0,0,0.02))',
+                            color: activeFilter === 'all' && (assigneeFilter === 'all' || !assigneeFilter) && !showHistory ? '#fff' : 'var(--text-main)',
                             fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s'
                         }}
                     >
-                        Alle offen ({counters.allOpen})
+                        Alle ({counters.allOpen})
                     </button>
                     <button
-                        onClick={() => { setActiveFilter('mine'); setShowHistory(false); }}
+                        onClick={() => { setActiveFilter('mine'); setAssigneeFilter('mine'); setShowHistory(false); }}
                         style={{
                             padding: '0.3rem 0.6rem', borderRadius: '6px', border: '1px solid var(--border)',
-                            background: activeFilter === 'mine' && !showHistory ? 'var(--q-primary, #1e6db7)' : 'var(--surface-hover, rgba(0,0,0,0.02))',
-                            color: activeFilter === 'mine' && !showHistory ? '#fff' : 'var(--text-main)',
+                            background: (activeFilter === 'mine' || assigneeFilter === 'mine') && !showHistory ? 'var(--q-primary, #1e6db7)' : 'var(--surface-hover, rgba(0,0,0,0.02))',
+                            color: (activeFilter === 'mine' || assigneeFilter === 'mine') && !showHistory ? '#fff' : 'var(--text-main)',
                             fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer'
                         }}
                     >
                         Meine ({counters.mine})
+                    </button>
+                    <button
+                        onClick={() => { setActiveFilter('all'); setAssigneeFilter('Adi'); setShowHistory(false); }}
+                        style={{
+                            padding: '0.3rem 0.6rem', borderRadius: '6px', border: '1px solid var(--border)',
+                            background: (assigneeFilter.toLowerCase() === 'adi' || assigneeFilter === '2') && !showHistory ? 'var(--q-primary, #1e6db7)' : 'var(--surface-hover, rgba(0,0,0,0.02))',
+                            color: (assigneeFilter.toLowerCase() === 'adi' || assigneeFilter === '2') && !showHistory ? '#fff' : 'var(--text-main)',
+                            fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer'
+                        }}
+                    >
+                        Adi ({counters.adi})
+                    </button>
+                    <button
+                        onClick={() => { setActiveFilter('all'); setAssigneeFilter('Mensur'); setShowHistory(false); }}
+                        style={{
+                            padding: '0.3rem 0.6rem', borderRadius: '6px', border: '1px solid var(--border)',
+                            background: (assigneeFilter.toLowerCase() === 'mensur' || assigneeFilter === '3') && !showHistory ? 'var(--q-primary, #1e6db7)' : 'var(--surface-hover, rgba(0,0,0,0.02))',
+                            color: (assigneeFilter.toLowerCase() === 'mensur' || assigneeFilter === '3') && !showHistory ? '#fff' : 'var(--text-main)',
+                            fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer'
+                        }}
+                    >
+                        Mensur ({counters.mensur})
                     </button>
                     <button
                         onClick={() => { setActiveFilter('overdue'); setShowHistory(false); }}
@@ -527,7 +660,17 @@ const TodoMonitor = ({
                     <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Wer:</span>
                     <select
                         value={assigneeFilter}
-                        onChange={(e) => setAssigneeFilter(e.target.value)}
+                        onChange={(e) => {
+                            const val = e.target.value;
+                            setAssigneeFilter(val);
+                            // Reset activeFilter when picking a specific person from dropdown
+                            // so the 'mine' pre-filter doesn't block the result
+                            if (val !== 'all' && val !== 'mine') {
+                                setActiveFilter('all');
+                            } else if (val === 'mine') {
+                                setActiveFilter('mine');
+                            }
+                        }}
                         className="select select-sm"
                         style={{
                             padding: '0.1rem 0.5rem',
@@ -542,6 +685,9 @@ const TodoMonitor = ({
                         }}
                     >
                         <option value="all">Alle Mitarbeiter</option>
+                        <option value="mine">Meine Aufgaben</option>
+                        <option value="Adi">Adi</option>
+                        <option value="Mensur">Mensur</option>
                         <option value="office">Innendienst</option>
                         {users.map(u => (
                             <option key={u.id} value={u.id}>{u.name}</option>
