@@ -1672,7 +1672,7 @@ function App() {
 
       let query = supabase
         .from('damage_reports')
-        .select('id, updated_at, created_at, project_title, client, address, status, assigned_to, date, drying_started, deleted_at, report_data, projectNumber:report_data->>projectNumber, equipment:report_data->equipment, devices:report_data->devices, dryingEquipment:report_data->dryingData->equipment');
+        .select('id, updated_at, created_at, project_title, client, address, status, assigned_to, date, drying_started, report_data, projectNumber:report_data->>projectNumber, equipment:report_data->equipment, devices:report_data->devices, dryingEquipment:report_data->dryingData->equipment');
 
       const cleanTerm = String(searchTerm || '').trim();
       if (cleanTerm.length >= 2) {
@@ -1699,7 +1699,7 @@ function App() {
         }
       } else if (data) {
         const loadedReports = data
-          .filter(row => !row.deleted_at && !row.report_data?.deletedAt)
+          .filter(row => !row.report_data?.deletedAt)
           // Sortierung auf dem Client um DB Statement Timeouts zu vermeiden
           .sort((a, b) => new Date(b.date || b.updated_at).getTime() - new Date(a.date || a.updated_at).getTime())
           .map(row => {
