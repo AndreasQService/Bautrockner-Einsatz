@@ -92,7 +92,7 @@ export async function registerMediaLocally({
     actor,
     device,
     baseVersion,
-    idempotencyKey: `${safeProjectId(projectId)}:${kind}:${id}`,
+    idempotencyKey: `${safeProjectId(projectId)}:${kind}:${id}:${crypto.randomUUID()}`,
   });
   const stored = await getOfflineBlob(manifest.blobIds[0]);
   if (!stored?.blob || stored.size !== prepared.size || stored.checksum !== prepared.checksum) {
@@ -178,7 +178,7 @@ export async function registerMeasurementLocally({
     actor,
     device,
     baseVersion,
-    idempotencyKey: `${safeProjectId(projectId)}:measurement:${entityId}:${measurement?.globalSettings?.date || 'draft'}`,
+    idempotencyKey: `${safeProjectId(projectId)}:measurement:${entityId}:${measurement?.globalSettings?.date || 'draft'}:${crypto.randomUUID()}`,
   });
   if (preparedProtocol) {
     const stored = await getOfflineBlob(manifest.blobIds[0]);

@@ -25,6 +25,6 @@ export async function registerDomainMutation({
     snapshot: snapshot || { projectId: stableProjectId, pendingMutation: { type, entityId, payload: operationPayload } },
     actor,
     baseVersion,
-    idempotencyKey: `${stableProjectId}:${type}:${entityId || crypto.randomUUID()}`,
+    idempotencyKey: `${stableProjectId}:${type}:${entityId || crypto.randomUUID()}:${crypto.randomUUID()}`,
   });
 }
