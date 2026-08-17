@@ -829,6 +829,9 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         const addressStr = cityPart ? `${streetPart}, ${cityPart}` : streetPart;
         const projectLabel = [formData.projectNumber, addressStr].filter(Boolean).join(' - ') || formData.projectTitle || formData.id;
 
+        if (!window.confirm(`Wollen Sie das Projekt wirklich löschen?\n\nProjekt: "${projectLabel}"`)) {
+            return;
+        }
         const promptText = `Projekt „${projectLabel}“ wirklich löschen?\n\nDas Projekt wird aus der Projektliste entfernt. Die gespeicherten Daten und Bilder werden nicht physisch gelöscht.\n\nBitte geben Sie zum Bestätigen das Wort LÖSCHEN ein:`;
         const confirmVal = window.prompt(promptText);
         if (confirmVal === 'LÖSCHEN') {
@@ -839,6 +842,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                     if (res && res.success === false) {
                         return;
                     }
+                    alert('Projekt erfolgreich gelöscht.');
                 } else if (supabase) {
                     const now = new Date().toISOString();
                     const userEmail = currentUser?.email || currentUser?.name || 'Unbekannt';
@@ -858,6 +862,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                             report_data: updatedReportData
                         })
                         .eq('id', formData.id);
+                    alert('Projekt erfolgreich gelöscht.');
                 }
                 if (fetchReports) {
                     await fetchReports().catch(() => {});
