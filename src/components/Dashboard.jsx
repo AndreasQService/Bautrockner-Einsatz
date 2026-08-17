@@ -149,9 +149,7 @@ const DryingMonitor = ({ reports, onSelectReport, onDeleteReport, workflowStore 
                                             <button
                                                 onClick={(e) => {
                                                     e.stopPropagation();
-                                                    if (window.confirm(`Projekt "${report.projectTitle || report.id}" wirklich löschen?`)) {
-                                                        onDeleteReport(report.id);
-                                                    }
+                                                    onDeleteReport(report);
                                                 }}
                                                 style={{
                                                     background: 'none', border: 'none', cursor: 'pointer',
@@ -537,6 +535,76 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
     const [currentPage, setCurrentPage] = useState(1);
     const [selectedSidebarReport, setSelectedSidebarReport] = useState(null);
     const [savingProjectIds, setSavingProjectIds] = useState(new Set());
+    const [projectToDelete, setProjectToDelete] = useState(null);
+
+    const executeDeleteProject = async (report) => {
+        if (!report) return;
+        setSavingProjectIds(prev => {
+            const next = new Set(prev);
+            next.add(report.id);
+            return next;
+        });
+        try {
+            let success = false;
+            let errMsg = '';
+            const now = new Date().toISOString();
+            const userEmail = currentUser?.email || currentUser?.name || 'Unbekannt';
+            if (supabase) {
+                await registerDomainMutation({
+                    projectId: report.id, type: 'project.delete', entityId: report.id,
+                    payload: { tombstone: true, deletedAt: now, deletedBy: userEmail },
+                    snapshot: { ...report, tombstone: true, deletedAt: now }, tombstone: true
+                });
+                const { data: fullReport, error: fetchError } = await supabase
+                    .from('damage_reports')
+                    .select('report_data')
+                    .eq('id', report.id)
+                    .single();
+                if (!fetchError && fullReport) {
+                    const updatedReportData = {
+                        ...(fullReport.report_data || {}),
+                        deletedAt: now,
+                        deletedBy: userEmail
+                    };
+                    const { error: updateError } = await supabase
+                        .from('damage_reports')
+                        .update({
+                            report_data: updatedReportData
+                        })
+                        .eq('id', report.id);
+                    if (!updateError) {
+                        success = true;
+                    } else {
+                        errMsg = updateError.message;
+                    }
+                } else {
+                    errMsg = fetchError?.message || 'Fehler beim Laden des Berichts';
+                }
+            } else {
+                success = true; // Offline / Mock mode
+            }
+            if (success) {
+                if (onReportsChanged) {
+                    await onReportsChanged(report.id, { deletedAt: now, deletedBy: userEmail });
+                }
+                alert('Projekt erfolgreich gelöscht.');
+            } else {
+                alert('Fehler beim Löschen: ' + errMsg);
+            }
+        } catch (err) {
+            console.error(err);
+            alert('Fehler beim Löschen: ' + err.message);
+        } finally {
+            setSavingProjectIds(prev => {
+                const next = new Set(prev);
+                next.delete(report.id);
+                return next;
+            });
+            if (fetchReports) {
+                await fetchReports().catch(() => {});
+            }
+        }
+    };
 
 
     const [workflowStore, setWorkflowStore] = useState(() => {
@@ -847,7 +915,7 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
                             <WorkflowStatusOverview reports={reports} onSelectReport={onSelectReport} currentUser={currentUser} users={users || []} searchTerm={searchTerm} store={workflowStore} onStoreChange={setWorkflowStore} />
                         )}
                         {showDrying && (
-                            <DryingMonitor reports={filteredReports} onSelectReport={onSelectReport} onDeleteReport={onDeleteReport} workflowStore={workflowStore} />
+                            <DryingMonitor reports={filteredReports} onSelectReport={onSelectReport} onDeleteReport={setProjectToDelete} workflowStore={workflowStore} />
                         )}
                     </div>
 
@@ -1050,83 +1118,13 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
                                                                                 return;
                                                                             }
                                                                             const streetPart = report.street || (report.address ? report.address.split(',')[0] : 'Keine Strasse');
-                                                                            const cityPart = report.city || (() => {
-                                                                                const parts = (report.address || '').split(',');
-                                                                                return parts.length > 1 ? parts[1].trim().replace(/^\d+\s*/, '') : '';
-                                                                            })();
-                                                                            const addressStr = cityPart ? `${streetPart}, ${cityPart}` : streetPart;
-                                                                            const projectLabel = [report.projectNumber, addressStr].filter(Boolean).join(' - ') || report.projectTitle || report.id;
-
-                                                                            if (!window.confirm(`Wollen Sie das Projekt wirklich löschen?\n\nProjekt: "${projectLabel}"`)) {
-                                                                                return;
-                                                                            }
-                                                                            const promptText = `Projekt „${projectLabel}“ wirklich löschen?\n\nDas Projekt wird aus der Projektliste entfernt. Die gespeicherten Daten und Bilder werden nicht physisch gelöscht.\n\nBitte geben Sie zum Bestätigen das Wort LÖSCHEN ein:`;
-                                                                            const confirmVal = window.prompt(promptText);
-                                                                            if (confirmVal === 'LÖSCHEN') {
-                                                                                setSavingProjectIds(prev => {
-                                                                                    const next = new Set(prev);
-                                                                                    next.add(report.id);
-                                                                                    return next;
-                                                                                });
-                                                                                try {
-                                                                                    let success = false;
-                                                                                    let errMsg = '';
-                                                                                    const now = new Date().toISOString();
-                                                                                    const userEmail = currentUser?.email || currentUser?.name || 'Unbekannt';
-                                                                                    if (supabase) {
-                                                                                        await registerDomainMutation({
-                                                                                            projectId: report.id, type: 'project.delete', entityId: report.id,
-                                                                                            payload: { tombstone: true, deletedAt: now, deletedBy: userEmail },
-                                                                                            snapshot: { ...report, tombstone: true, deletedAt: now }, tombstone: true
-                                                                                        });
-                                                                                        const { data: fullReport, error: fetchError } = await supabase
-                                                                                            .from('damage_reports')
-                                                                                            .select('report_data')
-                                                                                            .eq('id', report.id)
-                                                                                            .single();
-                                                                                        if (!fetchError && fullReport) {
-                                                                                            const updatedReportData = {
-                                                                                                ...(fullReport.report_data || {}),
-                                                                                                deletedAt: now,
-                                                                                                deletedBy: userEmail
-                                                                                            };
-                                                                                            const { error: updateError } = await supabase
-                                                                                                .from('damage_reports')
-                                                                                                .update({
-                                                                                                    report_data: updatedReportData
-                                                                                                })
-                                                                                                .eq('id', report.id);
-                                                                                            if (!updateError) {
-                                                                                                success = true;
-                                                                                            } else {
-                                                                                                errMsg = updateError.message;
-                                                                                            }
-                                                                                        } else {
-                                                                                            errMsg = fetchError?.message || 'Fehler beim Laden des Berichts';
-                                                                                        }
-                                                                                    } else {
-                                                                                        success = true; // Offline / Mock mode
-                                                                                    }
-                                                                                    if (success) {
-                                                                                        if (onReportsChanged) {
-                                                                                            await onReportsChanged(report.id, { deletedAt: now, deletedBy: userEmail });
-                                                                                        }
-                                                                                        alert('Projekt erfolgreich gelöscht.');
-                                                                                    } else {
-                                                                                        alert('Fehler beim Löschen: ' + errMsg);
-                                                                                    }
-                                                                                } catch (err) {
-                                                                                    console.error(err);
-                                                                                    alert('Fehler beim Löschen: ' + err.message);
-                                                                                } finally {
-                                                                                    setSavingProjectIds(prev => {
-                                                                                        const next = new Set(prev);
-                                                                                        next.delete(report.id);
-                                                                                        return next;
-                                                                                    });
-                                                                                }
-                                                                            }
-                                                                        }}
+                                                                             e.stopPropagation();
+                                                                             if (isActuallyOffline) {
+                                                                                 alert('Offline – Änderungen derzeit nicht möglich');
+                                                                                 return;
+                                                                             }
+                                                                             setProjectToDelete(report);
+                                                                         }}
                                                                         title={isActuallyOffline ? "Offline – Änderungen derzeit nicht möglich" : "Projekt löschen"}
                                                                         style={{
                                                                             background: 'none',
@@ -1261,7 +1259,7 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
                                                     <button
                                                         onClick={(e) => {
                                                             e.stopPropagation();
-                                                            onDeleteReport?.(report.id);
+                                                            setProjectToDelete(report);
                                                         }}
                                                         disabled={savingProjectIds.has(report.id)}
                                                         title="Projekt löschen"
@@ -1418,9 +1416,7 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
                                                     <button
                                                         onClick={(e) => {
                                                             e.stopPropagation();
-                                                            if (window.confirm(`Möchten Sie den Bericht "${report.projectTitle || report.id}" wirklich unwiderruflich löschen?`)) {
-                                                                onDeleteReport(report.id);
-                                                            }
+                                                            setProjectToDelete(report);
                                                         }}
                                                         className="btn btn-sm btn-ghost"
                                                         style={{ color: '#EF4444', padding: '0.25rem' }}
@@ -1515,6 +1511,101 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
                     </div>
                 </div>
             )
+        )}
+        
+        {projectToDelete && (
+            <div style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: '100%',
+                backgroundColor: 'rgba(0, 0, 0, 0.6)',
+                backdropFilter: 'blur(4px)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 9999,
+                animation: 'fadeIn 0.2s ease-out'
+            }} onClick={() => setProjectToDelete(null)}>
+                <div style={{
+                    background: 'var(--surface, #1E293B)',
+                    border: '1px solid var(--border, #334155)',
+                    borderRadius: '12px',
+                    padding: '1.75rem',
+                    maxWidth: '500px',
+                    width: '90%',
+                    boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2)',
+                    animation: 'slideUp 0.25s ease-out'
+                }} onClick={(e) => e.stopPropagation()}>
+                    <h3 style={{ margin: '0 0 0.75rem 0', fontSize: '1.2rem', fontWeight: 700, color: '#EF4444', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        ⚠️ Projekt löschen?
+                    </h3>
+                    <p style={{ margin: '0 0 1.25rem 0', fontSize: '0.9rem', color: 'var(--text-main, #F1F5F9)', lineHeight: 1.5 }}>
+                        Wollen Sie das Projekt wirklich löschen?
+                    </p>
+                    
+                    {/* Project Details Box */}
+                    <div style={{
+                        background: 'var(--hover-bg, rgba(0, 0, 0, 0.15))',
+                        border: '1px solid var(--border, #334155)',
+                        borderRadius: '8px',
+                        padding: '0.85rem',
+                        marginBottom: '1.5rem',
+                        fontSize: '0.85rem'
+                    }}>
+                        <div style={{ fontWeight: 700, color: 'var(--text-main)', marginBottom: '0.25rem' }}>
+                            Projekt-Nr: {projectToDelete.projectNumber || '---'}
+                        </div>
+                        <div style={{ color: 'var(--text-muted, #94A3B8)' }}>
+                            {(() => {
+                                const streetPart = projectToDelete.street || (projectToDelete.address ? projectToDelete.address.split(',')[0] : 'Keine Strasse');
+                                const locationParts = [projectToDelete.zip, projectToDelete.city].filter(Boolean).join(' ').trim();
+                                return locationParts ? `${streetPart}, ${locationParts}` : streetPart;
+                            })()}
+                        </div>
+                        {projectToDelete.projectTitle && (
+                            <div style={{ color: 'var(--text-muted, #94A3B8)', marginTop: '0.25rem', fontStyle: 'italic' }}>
+                                {projectToDelete.projectTitle}
+                            </div>
+                        )}
+                    </div>
+
+                    <p style={{ margin: '0 0 1.5rem 0', fontSize: '0.8rem', color: 'var(--text-muted, #94A3B8)', lineHeight: 1.4 }}>
+                        Das Projekt wird aus der Projektliste entfernt. Die gespeicherten Daten und Bilder werden nicht physisch gelöscht.
+                    </p>
+
+                    <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+                        <button
+                            className="btn btn-outline"
+                            onClick={() => setProjectToDelete(null)}
+                            style={{ padding: '0.5rem 1.25rem', borderRadius: '20px', fontSize: '0.85rem', cursor: 'pointer' }}
+                        >
+                            Abbrechen
+                        </button>
+                        <button
+                            onClick={async () => {
+                                const target = projectToDelete;
+                                setProjectToDelete(null);
+                                await executeDeleteProject(target);
+                            }}
+                            style={{
+                                padding: '0.5rem 1.25rem',
+                                borderRadius: '20px',
+                                fontSize: '0.85rem',
+                                cursor: 'pointer',
+                                background: '#EF4444',
+                                color: '#FFFFFF',
+                                border: 'none',
+                                fontWeight: 600,
+                                boxShadow: '0 2px 4px rgba(239, 68, 68, 0.2)'
+                            }}
+                        >
+                            Unwiderruflich löschen
+                        </button>
+                    </div>
+                </div>
+            </div>
         )}
     </div>
     )
