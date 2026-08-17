@@ -1111,6 +1111,7 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
                                                                                         if (onReportsChanged) {
                                                                                             await onReportsChanged(report.id, { deletedAt: now, deletedBy: userEmail });
                                                                                         }
+                                                                                        alert('Projekt erfolgreich gelöscht.');
                                                                                     } else {
                                                                                         alert('Fehler beim Löschen: ' + errMsg);
                                                                                     }
