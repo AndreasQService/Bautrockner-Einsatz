@@ -1057,6 +1057,9 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
                                                                             const addressStr = cityPart ? `${streetPart}, ${cityPart}` : streetPart;
                                                                             const projectLabel = [report.projectNumber, addressStr].filter(Boolean).join(' - ') || report.projectTitle || report.id;
 
+                                                                            if (!window.confirm(`Wollen Sie das Projekt wirklich löschen?\n\nProjekt: "${projectLabel}"`)) {
+                                                                                return;
+                                                                            }
                                                                             const promptText = `Projekt „${projectLabel}“ wirklich löschen?\n\nDas Projekt wird aus der Projektliste entfernt. Die gespeicherten Daten und Bilder werden nicht physisch gelöscht.\n\nBitte geben Sie zum Bestätigen das Wort LÖSCHEN ein:`;
                                                                             const confirmVal = window.prompt(promptText);
                                                                             if (confirmVal === 'LÖSCHEN') {
