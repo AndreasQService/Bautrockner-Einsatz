@@ -14,7 +14,7 @@ import ErrorBoundary from './ErrorBoundary.jsx'
 const APP_VERSION = '2.0.0-idb-only';
 
 function enforceLatestVersion() {
-  if (typeof window === 'undefined') return;
+  if (typeof window === 'undefined') return false;
 
   const savedVersion = localStorage.getItem('qtool_app_version');
   if (savedVersion !== APP_VERSION) {
@@ -38,6 +38,7 @@ function enforceLatestVersion() {
         const key = localStorage.key(i);
         if (key && (
           key.startsWith('sb-') ||
+          key.startsWith('supabase') ||
           key.startsWith('qtool_current_user_') ||
           key.startsWith('qtool_session_token_')
         )) {

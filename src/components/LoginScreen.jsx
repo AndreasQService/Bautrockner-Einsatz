@@ -37,7 +37,7 @@ const LoginScreen = ({ users, onLogin, supabase }) => {
                 });
 
                 if (authError) {
-                    setError(authError.message === 'Invalid login credentials' ? 'Ungültiger Benutzername oder Passwort.' : authError.message);
+                    setError(authError.message);
                     return;
                 }
 
