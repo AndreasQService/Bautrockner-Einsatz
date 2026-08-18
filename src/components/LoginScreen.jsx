@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { User, Lock, LogIn, ShieldAlert } from 'lucide-react';
+import { User, Lock, LogIn, ShieldAlert, Eye, EyeOff } from 'lucide-react';
 
 const LoginScreen = ({ users, onLogin, supabase }) => {
     const [name, setName] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
 
     const handleLogin = async (e) => {
         e.preventDefault();
@@ -35,57 +36,76 @@ const LoginScreen = ({ users, onLogin, supabase }) => {
                     password: trimmedPassword
                 });
 
-                if (!authError && data?.user) {
+                if (authError) {
+                    setError(authError.message === 'Invalid login credentials' ? 'Ungültiger Benutzername oder Passwort.' : authError.message);
+                    return;
+                }
+
+                if (data?.user) {
                     const userObj = users?.find(u => u.name.toLowerCase() === 'andreas strehler') || {
                         id: 4,
-                        name: 'Andreas Strehler',
-                        email: 'a.strehler@q-service.ch',
+                        name: 'Admin User',
+                        email: 'admin@q-service.ch',
                         role: 'admin'
                     };
                     onLogin({ ...userObj, role: 'admin' });
                     return;
                 }
             } catch (err) {
-                console.warn('[LoginScreen] Supabase Auth attempt failed, falling back to local Dev Auth:', err);
+                console.warn('[LoginScreen] Supabase Auth attempt failed:', err);
+                setError(err.message || 'Verbindung zum Authentifizierungsserver fehlgeschlagen.');
+                return;
             }
         }
 
-        // 2. Dev / Test Fallback Authentication (Bypass for all test accounts & test passwords)
+        // 2. Find user in mock users array (by name or email) first
+        const matchedUser = users?.find(u => 
+            u.name.toLowerCase() === nameLower || 
+            (u.email && u.email.toLowerCase() === nameLower)
+        );
+
+        if (matchedUser) {
+            if (matchedUser.password === trimmedPassword || isUniversalTestPassword) {
+                onLogin(matchedUser);
+            } else {
+                setError('Ungültiger Benutzername oder Passwort.');
+            }
+            return;
+        }
+
+        // 3. Dev / Test Fallback Authentication (Bypass for unregistered test accounts or test passwords)
         if (isAndreas || isUniversalTestPassword || isAdminUser) {
+            // Check password correctness for mock accounts if not using universal bypass password
+            if (!isUniversalTestPassword) {
+                if (isAdminUser && trimmedPassword !== 'admin') {
+                    setError('Ungültiger Benutzername oder Passwort.');
+                    return;
+                }
+                if (isAndreas && trimmedPassword !== 'admin') {
+                    setError('Ungültiger Benutzername oder Passwort.');
+                    return;
+                }
+            }
+
             const adminObj = {
                 id: 4,
-                name: 'Andreas Strehler',
-                email: 'a.strehler@q-service.ch',
+                name: 'Admin User',
+                email: 'admin@q-service.ch',
                 role: 'admin'
             };
             onLogin(adminObj);
             return;
         }
 
-        // 3. Find user in mock users array (by name or email)
-        const matchedUser = users?.find(u => 
-            u.name.toLowerCase() === nameLower || 
-            (u.email && u.email.toLowerCase() === nameLower)
-        );
-
-        if (matchedUser && (matchedUser.password === trimmedPassword || isUniversalTestPassword)) {
-            onLogin(matchedUser);
-        } else {
-            // Dev environment fallback: Log in as Admin rather than blocking the user
-            console.log('[LoginScreen] Unknown credentials in test env, applying dev admin bypass.');
-            onLogin({
-                id: 1,
-                name: matchedUser?.name || 'Admin User',
-                role: 'admin'
-            });
-        }
+        // Unregistered and no bypass triggered
+        setError('Ungültiger Benutzername oder Passwort.');
     };
 
     const handleQuickAdminLogin = () => {
         onLogin({
             id: 4,
-            name: 'Andreas Strehler',
-            email: 'a.strehler@q-service.ch',
+            name: 'Admin User',
+            email: 'admin@q-service.ch',
             role: 'admin'
         });
     };
@@ -107,7 +127,7 @@ const LoginScreen = ({ users, onLogin, supabase }) => {
                 input.login-input[type="password"] {
                     width: 100% !important;
                     height: 48px !important;
-                    padding: 0.75rem 1rem 0.75rem 2.5rem !important;
+                    padding: 0.75rem 2.5rem 0.75rem 2.5rem !important;
                     background-color: #131929 !important;
                     background: #131929 !important;
                     border: 1px solid #2a324a !important;
@@ -191,12 +211,34 @@ const LoginScreen = ({ users, onLogin, supabase }) => {
                         <div style={{ position: 'relative' }}>
                             <Lock size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#64748b', zIndex: 10 }} />
                             <input
-                                type="password"
+                                type={showPassword ? 'text' : 'password'}
                                 value={password}
                                 onChange={(e) => { setPassword(e.target.value); setError(''); }}
                                 placeholder="Passwort..."
                                 className="login-input"
                             />
+                            <button
+                                type="button"
+                                onClick={() => setShowPassword(!showPassword)}
+                                style={{
+                                    position: 'absolute',
+                                    right: '10px',
+                                    top: '50%',
+                                    transform: 'translateY(-50%)',
+                                    background: 'none',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    color: '#64748b',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    padding: '0.2rem',
+                                    zIndex: 10
+                                }}
+                                title={showPassword ? "Passwort verbergen" : "Passwort anzeigen"}
+                            >
+                                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                            </button>
                         </div>
                     </div>
 
