@@ -217,7 +217,7 @@ const UserManagementModal = ({ onClose, users, setUsers }) => {
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', backgroundColor: 'var(--surface)', padding: '0.3rem 0.6rem', borderRadius: '6px', border: '1px solid var(--border)' }}>
                                             <Key size={14} style={{ color: 'var(--text-muted)' }} />
                                             <span style={{ fontFamily: 'monospace', fontSize: '0.88rem', fontWeight: 600 }}>
-                                                {visiblePasswords[user.id] ? user.password : '••••••••'}
+                                                {visiblePasswords[user.id] ? user.password : '●●●●●●●●'}
                                             </span>
                                             <button
                                                 type="button"
