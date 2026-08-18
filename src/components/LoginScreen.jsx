@@ -101,13 +101,35 @@ const LoginScreen = ({ users, onLogin, supabase }) => {
         setError('Ungültiger Benutzername oder Passwort.');
     };
 
-    const handleQuickAdminLogin = () => {
-        onLogin({
-            id: 4,
-            name: 'Admin User',
-            email: 'admin@q-service.ch',
-            role: 'admin'
-        });
+    const handleQuickAdminLogin = async () => {
+        setError('');
+        if (supabase) {
+            try {
+                const { data, error: authError } = await supabase.auth.signInWithPassword({
+                    email: 'a.strehler@q-service.ch',
+                    password: 'admin'
+                });
+                if (authError) {
+                    setError('Quick-Login fehlgeschlagen: ' + authError.message);
+                    return;
+                }
+                onLogin({
+                    id: 4,
+                    name: 'Admin User',
+                    email: 'admin@q-service.ch',
+                    role: 'admin'
+                });
+            } catch (err) {
+                setError('Quick-Login Fehler: ' + err.message);
+            }
+        } else {
+            onLogin({
+                id: 4,
+                name: 'Admin User',
+                email: 'admin@q-service.ch',
+                role: 'admin'
+            });
+        }
     };
 
     return (
@@ -136,6 +158,9 @@ const LoginScreen = ({ users, onLogin, supabase }) => {
                     font-size: 0.95rem !important;
                     outline: none !important;
                     box-sizing: border-box !important;
+                }
+                input.login-input.password-input {
+                    padding-right: 6.5rem !important;
                 }
                 input.login-input[type="text"]:focus,
                 input.login-input[type="password"]:focus {
@@ -215,29 +240,31 @@ const LoginScreen = ({ users, onLogin, supabase }) => {
                                 value={password}
                                 onChange={(e) => { setPassword(e.target.value); setError(''); }}
                                 placeholder="Passwort..."
-                                className="login-input"
+                                className="login-input password-input"
                             />
                             <button
                                 type="button"
                                 onClick={() => setShowPassword(!showPassword)}
                                 style={{
                                     position: 'absolute',
-                                    right: '10px',
+                                    right: '8px',
                                     top: '50%',
                                     transform: 'translateY(-50%)',
-                                    background: 'none',
-                                    border: 'none',
+                                    backgroundColor: '#1e293b',
+                                    border: '1px solid #334155',
+                                    borderRadius: '4px',
                                     cursor: 'pointer',
-                                    color: '#64748b',
+                                    color: '#f8fafc',
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
-                                    padding: '0.2rem',
+                                    padding: '0.25rem 0.6rem',
+                                    fontSize: '0.75rem',
                                     zIndex: 10
                                 }}
                                 title={showPassword ? "Passwort verbergen" : "Passwort anzeigen"}
                             >
-                                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                {showPassword ? '🙈 Verbergen' : '👁️ Anzeigen'}
                             </button>
                         </div>
                     </div>
@@ -309,7 +336,7 @@ const LoginScreen = ({ users, onLogin, supabase }) => {
                         onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#334155'}
                         onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#1e293b'}
                     >
-                        ⚡ <span>Schnell-Login als Admin (Dev Bypass)</span>
+                        ⚡ <span>Als Admin einloggen</span>
                     </button>
                 </form>
             </div>
