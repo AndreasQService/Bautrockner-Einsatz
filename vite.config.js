@@ -11,6 +11,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      injectRegister: false,
       includeAssets: ['vite.svg', 'logo.png'],
       manifest: {
         name: 'QTool – Q-Service (Test)',
@@ -36,6 +37,14 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2,ttf}'],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         runtimeCaching: [
+          {
+            urlPattern: ({ request }) => request.mode === 'navigate',
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'qtool-navigation',
+              networkTimeoutSeconds: 3,
+            }
+          },
           {
             // Do not cache any API requests or database calls
             urlPattern: /supabase\.co/i,

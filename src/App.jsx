@@ -1312,6 +1312,57 @@ function App() {
   const [syncStatus, setSyncStatus] = useState('idle'); // 'idle' | 'syncing' | 'error'
   const [syncPending, setSyncPending] = useState(0);
 
+  // PWA Service Worker Auto-Update, Standby Wake Check, & SessionStorage Auto-Eviction
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    // 1. Auto-Eviction: Clear sessionStorage on boot to discard stale UI/modal states
+    try {
+      sessionStorage.clear();
+      console.log('[PWA SafeBoot] sessionStorage cleared successfully (Auto-Eviction)');
+    } catch (e) {
+      console.warn('[PWA SafeBoot] Failed to clear sessionStorage:', e);
+    }
+
+    // 2. Register Service Worker with instant auto-update and auto-refresh
+    if ('serviceWorker' in navigator) {
+      import('virtual:pwa-register')
+        .then(({ registerSW }) => {
+          const updateSW = registerSW({
+            onNeedRefresh() {
+              console.log('[PWA SafeBoot] 🔄 New App version detected. Performing automatic safe-boot reload...');
+              updateSW(true);
+            },
+            onOfflineReady() {
+              console.log('[PWA SafeBoot] 📶 App is fully configured and offline-ready.');
+            }
+          });
+        })
+        .catch((err) => {
+          console.warn('[PWA SafeBoot] Failed to import virtual:pwa-register:', err);
+        });
+
+      // 3. Standby Wake: Check for updates when iPad is woke up / screen unlocked
+      const handleVisibilityChange = () => {
+        if (document.visibilityState === 'visible') {
+          console.log('[PWA SafeBoot] 📱 App became visible (woke from standby). Checking for updates...');
+          if (navigator.onLine) {
+            navigator.serviceWorker.ready.then(reg => {
+              reg.update()
+                .then(() => console.log('[PWA SafeBoot] Standby update check completed successfully'))
+                .catch(err => console.warn('[PWA SafeBoot] Standby update check failed:', err));
+            });
+          }
+        }
+      };
+
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+      return () => {
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+      };
+    }
+  }, []);
+
   // Ausstehende lokale Bilder zählen – alle 10s aktualisieren
   // Fällt automatisch auf 0 nach erfolgreichem Supabase-Upload
   useEffect(() => {
