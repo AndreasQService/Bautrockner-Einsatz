@@ -67,36 +67,36 @@ function enforceLatestVersion() {
     // 4. Force immediate page reload with cache buster
     const busterUrl = window.location.origin + window.location.pathname + '?t=' + Date.now() + window.location.hash;
     window.location.replace(busterUrl);
-
-    // Stop execution of subsequent boot scripts
-    throw new Error('[VersionEnforcer] Reloading to apply update...');
+    return true; // Redirecting
   } else {
     console.log(`[VersionEnforcer] System running on target version: ${APP_VERSION}`);
+    return false; // Up to date
   }
 }
 
-enforceLatestVersion();
+const shouldRedirect = enforceLatestVersion();
 
+if (!shouldRedirect) {
+  // ─── Variante C: Offline-Blobs → Supabase Storage synchen (kein MSAL) ───────
+  // Startet beim App-Boot im Hintergrund, blockiert Render nicht.
+  Promise.all([
+    import('./lib/sync/supabaseSyncWorker.js'),
+    import('./lib/offline/projectSessionStore.js'),
+  ])
+    .then(async ([{ syncPendingToSupabase }, { hasActiveProjectSession }]) =>
+      await hasActiveProjectSession() ? { synced: 0, skipped: 'active_project_session' } : syncPendingToSupabase())
+    .then(({ synced }) => { if (synced > 0) console.info(`[Boot] ☁️ ${synced} Fotos zu Supabase synchronisiert`); })
+    .catch((e) => console.warn('[Boot] Sync fehlgeschlagen:', e.message));
 
-// ─── Variante C: Offline-Blobs → Supabase Storage synchen (kein MSAL) ───────
-// Startet beim App-Boot im Hintergrund, blockiert Render nicht.
-Promise.all([
-  import('./lib/sync/supabaseSyncWorker.js'),
-  import('./lib/offline/projectSessionStore.js'),
-])
-  .then(async ([{ syncPendingToSupabase }, { hasActiveProjectSession }]) =>
-    await hasActiveProjectSession() ? { synced: 0, skipped: 'active_project_session' } : syncPendingToSupabase())
-  .then(({ synced }) => { if (synced > 0) console.info(`[Boot] ☁️ ${synced} Fotos zu Supabase synchronisiert`); })
-  .catch((e) => console.warn('[Boot] Sync fehlgeschlagen:', e.message));
-
-// ─── App rendern (kein MSAL-Provider nötig) ──────────────────────────────────
-import('./App.jsx').then(({ default: App }) => {
-  const root = createRoot(document.getElementById('root'));
-  root.render(
-    <ErrorBoundary>
-      <App />
-    </ErrorBoundary>
-  );
-}).catch(err => {
-  console.error('[QTool] Ladefehler:', err);
-});
+  // ─── App rendern (kein MSAL-Provider nötig) ──────────────────────────────────
+  import('./App.jsx').then(({ default: App }) => {
+    const root = createRoot(document.getElementById('root'));
+    root.render(
+      <ErrorBoundary>
+        <App />
+      </ErrorBoundary>
+    );
+  }).catch(err => {
+    console.error('[QTool] Ladefehler:', err);
+  });
+}
