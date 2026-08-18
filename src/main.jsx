@@ -8,6 +8,76 @@ import './tw.css'
 import './index.css'
 import ErrorBoundary from './ErrorBoundary.jsx'
 
+// ==========================================================================
+// PWA Version Enforcer (Version-Durchsetzung)
+// ==========================================================================
+const APP_VERSION = '2.0.0-idb-only';
+
+function enforceLatestVersion() {
+  if (typeof window === 'undefined') return;
+
+  const savedVersion = localStorage.getItem('qtool_app_version');
+  if (savedVersion !== APP_VERSION) {
+    console.log(`[VersionEnforcer] Version mismatch (stored: ${savedVersion || 'none'}, target: ${APP_VERSION}). Clearing caches & storage...`);
+
+    // 1. Clear service worker caches in background
+    if ('caches' in window) {
+      caches.keys().then((keys) => {
+        return Promise.all(keys.map((key) => caches.delete(key)));
+      }).then(() => {
+        console.log('[VersionEnforcer] SW Caches successfully cleared.');
+      }).catch((err) => {
+        console.warn('[VersionEnforcer] SW Cache clearance failed:', err);
+      });
+    }
+
+    // 2. Clear localStorage synchronously (preserving Auth & User Session tokens)
+    try {
+      const authData = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && (
+          key.startsWith('sb-') ||
+          key.startsWith('qtool_current_user_') ||
+          key.startsWith('qtool_session_token_')
+        )) {
+          authData.push({ key, val: localStorage.getItem(key) });
+        }
+      }
+
+      localStorage.clear();
+
+      authData.forEach(({ key, val }) => {
+        if (val !== null) {
+          localStorage.setItem(key, val);
+        }
+      });
+      console.log('[VersionEnforcer] LocalStorage cleared (auth tokens preserved).');
+    } catch (e) {
+      console.warn('[VersionEnforcer] LocalStorage eviction failed:', e);
+    }
+
+    // 3. Save new version tag
+    try {
+      localStorage.setItem('qtool_app_version', APP_VERSION);
+    } catch (e) {
+      console.warn('[VersionEnforcer] Failed to write version tag:', e);
+    }
+
+    // 4. Force immediate page reload with cache buster
+    const busterUrl = window.location.origin + window.location.pathname + '?t=' + Date.now() + window.location.hash;
+    window.location.replace(busterUrl);
+
+    // Stop execution of subsequent boot scripts
+    throw new Error('[VersionEnforcer] Reloading to apply update...');
+  } else {
+    console.log(`[VersionEnforcer] System running on target version: ${APP_VERSION}`);
+  }
+}
+
+enforceLatestVersion();
+
+
 // ─── Variante C: Offline-Blobs → Supabase Storage synchen (kein MSAL) ───────
 // Startet beim App-Boot im Hintergrund, blockiert Render nicht.
 Promise.all([
