@@ -45,7 +45,6 @@ test('migration is transactional and creation safely replays only for the same o
   assert.match(sql, /^--[\s\S]*?\nbegin;/);
   assert.match(sql, /commit;\s*$/);
   assert.match(sql, /open_project_id = p_project_id and session_token = p_session_token and owner_user_id = v_uid[\s\S]*?'already_existed', true/);
-  assert.doesNotMatch(sql, /drop function/i);
 });
 
 test('direct test bypasses are removed without touching audit RLS', () => {
@@ -62,7 +61,16 @@ test('write-lock helpers bind a safe request token to active authenticated owner
   assert.doesNotMatch(sql, /grant execute on function public\.qtool_(?:request_session_token|has_project_write_lock)[^;]+to anon/);
 });
 
-test('acquire preserves the deployed OUT-column contract for CREATE OR REPLACE', () => {
+test('legacy acquire OUT contract is revoked and dropped before replacement', () => {
+  const dropIndex = sql.indexOf('drop function public.acquire_project_lock(text,text,text,text,text,text)');
+  const createIndex = sql.indexOf('create or replace function public.acquire_project_lock(');
+
+  assert.ok(dropIndex >= 0, 'legacy acquire signature must be dropped explicitly');
+  assert.ok(createIndex > dropIndex, 'legacy acquire signature must be dropped before replacement');
+  assert.match(
+    sql.slice(0, createIndex),
+    /revoke all on function public\.acquire_project_lock\(text,text,text,text,text,text\)\s+from public, anon, authenticated;/
+  );
   assert.match(sql, /returns table\(acquired boolean, lock_owner text, locked_at timestamptz, last_seen_at timestamptz\)/);
   assert.doesNotMatch(sql, /returns table\(acquired boolean, lock_owner text, created_at/);
 });

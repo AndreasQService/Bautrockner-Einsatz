@@ -189,6 +189,14 @@ begin
 end
 $owner_policies$;
 
+-- The deployed test function uses the legacy OUT column names
+-- (created_at, last_seen). PostgreSQL cannot change OUT row types with
+-- CREATE OR REPLACE, so remove this exact, dependency-free signature first.
+-- The surrounding migration transaction makes this fail closed.
+revoke all on function public.acquire_project_lock(text,text,text,text,text,text)
+  from public, anon, authenticated;
+drop function public.acquire_project_lock(text,text,text,text,text,text);
+
 create or replace function public.acquire_project_lock(
   p_project_id text,
   p_session_token text,
