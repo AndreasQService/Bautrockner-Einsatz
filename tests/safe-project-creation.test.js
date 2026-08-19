@@ -67,3 +67,14 @@ test('App keeps failed cloud creation outside project admission', () => {
   assert.doesNotMatch(failure, /setSelectedReport\(/);
   assert.match(creation, /await confirmProjectDraftWithReadback\(finalReport\.id\)/);
 });
+
+test('new DamageForm entries are eligible for the first autosave', () => {
+  const source = fs.readFileSync(new URL('../src/components/DamageForm.jsx', import.meta.url), 'utf8');
+  const autosave = source.slice(
+    source.indexOf('// Condition checks for starting the autosave timer:'),
+    source.indexOf('// Save on Unmount')
+  );
+  assert.doesNotMatch(autosave, /if \(!initialData\s*\|\|/);
+  assert.match(autosave, /if \(initialData\?\.isLightweight === true\) return;/);
+  assert.match(autosave, /await onSave\(reportData, true, 'user-edit'\)/);
+});

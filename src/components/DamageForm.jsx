@@ -2027,7 +2027,10 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
     useEffect(() => {
         // Condition checks for starting the autosave timer:
         if (!isHydratedRef.current) return;
-        if (!initialData || initialData.isLightweight === true) return;
+        // A brand-new report intentionally has no initialData. Blocking that
+        // state prevents the first durable draft/cloud admission entirely
+        // while the footer still misleadingly renders "Gespeichert".
+        if (initialData?.isLightweight === true) return;
         if (!formData.projectTitle && !formData.id) return;
         if (!hasUserEditedRef.current) return;
 
