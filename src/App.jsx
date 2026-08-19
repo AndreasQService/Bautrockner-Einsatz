@@ -2459,7 +2459,7 @@ function App() {
                     safeSetItem('qservice_unsaved_reports', JSON.stringify(next));
                     return next;
                   });
-                  showToast('✅ Projekt und Foto erfolgreich gespeichert!', 'success');
+                  if (!silent) showToast('✅ Projekt und Foto erfolgreich gespeichert!', 'success');
                 } else {
                   console.warn('[Sync-Konflikt] Neuere Version in Supabase – abgebrochen:', finalReport.id);
                   showToast('⚠️ Neuere Version auf anderem Gerät! Seite neu laden.', 'warning');
@@ -2480,7 +2480,7 @@ function App() {
                   safeSetItem('qservice_unsaved_reports', JSON.stringify(next));
                   return next;
                 });
-                showToast('✅ Projekt erfolgreich gespeichert!', 'success');
+                if (!silent) showToast('✅ Projekt erfolgreich gespeichert!', 'success');
               }
             }
           } else {
@@ -2532,7 +2532,7 @@ function App() {
                   safeSetItem('qservice_unsaved_reports', JSON.stringify(next));
                   return next;
                 });
-                showToast('✅ Projekt erfolgreich gespeichert!', 'success');
+                if (!silent) showToast('✅ Projekt erfolgreich gespeichert!', 'success');
               }
             }
           }
