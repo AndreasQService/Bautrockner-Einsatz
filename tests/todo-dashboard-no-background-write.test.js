@@ -14,3 +14,7 @@ test('dashboard todo loading never performs background cloud mutations', () => {
   assert.doesNotMatch(fetchBody, /from\(['"]project_todos['"]\)\s*\.delete\s*\(/);
   assert.match(fetchBody, /Keep the local evidence intact/);
 });
+
+test('dashboard todo loading has no undeclared test-environment branch', () => {
+  assert.doesNotMatch(fetchBody, /\bisTestEnv\b/);
+});
