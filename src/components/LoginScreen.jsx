@@ -57,7 +57,7 @@ const LoginScreen = ({ users, onLogin, supabase }) => {
             fontFamily: 'system-ui, -apple-system, sans-serif'
         }}>
             <style>{`
-                input.login-input[type="text"],
+                input.login-input[type="email"],
                 input.login-input[type="password"] {
                     width: 100% !important;
                     height: 48px !important;
@@ -71,26 +71,26 @@ const LoginScreen = ({ users, onLogin, supabase }) => {
                     outline: none !important;
                     box-sizing: border-box !important;
                 }
-                input.login-input[type="text"]:focus,
+                input.login-input[type="email"]:focus,
                 input.login-input[type="password"]:focus {
                     border-color: #2b96d9 !important;
                     box-shadow: 0 0 0 2px rgba(43, 150, 217, 0.2) !important;
                     background-color: #131929 !important;
                     background: #131929 !important;
                 }
-                input.login-input[type="text"]::placeholder,
+                input.login-input[type="email"]::placeholder,
                 input.login-input[type="password"]::placeholder {
                     color: #64748b !important;
                     opacity: 1 !important;
                 }
                 /* Webkit Autofill Override to prevent browser from forcing white/yellow backgrounds */
-                input.login-input[type="text"]:-webkit-autofill,
+                input.login-input[type="email"]:-webkit-autofill,
                 input.login-input[type="password"]:-webkit-autofill,
-                input.login-input[type="text"]:-webkit-autofill:hover,
+                input.login-input[type="email"]:-webkit-autofill:hover,
                 input.login-input[type="password"]:-webkit-autofill:hover,
-                input.login-input[type="text"]:-webkit-autofill:focus,
+                input.login-input[type="email"]:-webkit-autofill:focus,
                 input.login-input[type="password"]:-webkit-autofill:focus,
-                input.login-input[type="text"]:-webkit-autofill:active,
+                input.login-input[type="email"]:-webkit-autofill:active,
                 input.login-input[type="password"]:-webkit-autofill:active {
                     -webkit-box-shadow: 0 0 0 1000px #131929 inset !important;
                     -webkit-text-fill-color: #f8fafc !important;
@@ -128,7 +128,13 @@ const LoginScreen = ({ users, onLogin, supabase }) => {
                         <div style={{ position: 'relative' }}>
                             <User size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#64748b', zIndex: 10 }} />
                             <input
-                                type="text"
+                                type="email"
+                                id="qtool-login-email"
+                                name="username"
+                                autoComplete="username"
+                                inputMode="email"
+                                autoCapitalize="none"
+                                spellCheck="false"
                                 value={name}
                                 onChange={(e) => { setName(e.target.value); setError(''); }}
                                 placeholder="E-Mail eingeben..."
@@ -146,6 +152,9 @@ const LoginScreen = ({ users, onLogin, supabase }) => {
                             <Lock size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#64748b', zIndex: 10 }} />
                             <input
                                 type="password"
+                                id="qtool-login-password"
+                                name="password"
+                                autoComplete="current-password"
                                 value={password}
                                 onChange={(e) => { setPassword(e.target.value); setError(''); }}
                                 placeholder="Passwort..."

@@ -353,10 +353,24 @@ if (isWebDriver) {
 } else if (rawUrl && rawKey) {
   if (expectedProjectId === LIVE_PROJECT_ID || !expectedProjectId) {
     // Standard Supabase Client für Dev/Prod
-    supabaseInstance = createClient(rawUrl, rawKey, { global: { fetch: qtoolAuthenticatedFetch } });
+    supabaseInstance = createClient(rawUrl, rawKey, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+      },
+      global: { fetch: qtoolAuthenticatedFetch },
+    });
   } else {
     validatedUrl = validateSupabaseConfig(rawUrl, rawKey, expectedProjectId);
-    supabaseInstance = createClient(validatedUrl.href, rawKey, { global: { fetch: qtoolAuthenticatedFetch } });
+    supabaseInstance = createClient(validatedUrl.href, rawKey, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+      },
+      global: { fetch: qtoolAuthenticatedFetch },
+    });
   }
 }
 
