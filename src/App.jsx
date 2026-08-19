@@ -668,8 +668,17 @@ function App() {
         const lockStatus = Array.isArray(lockRows) ? lockRows[0] : lockRows;
         isLockLost = Boolean(sessionErr) || lockStatus?.is_owner !== true;
 
+        // Initial hydration/online recovery can run a few milliseconds before
+        // the project-lock hook has finished acquiring ownership.  That is a
+        // deferred sync, not evidence of a version conflict.  Keep the local
+        // entry intact and perform no cloud mutation until ownership is proven.
+        if (isLockLost && !forceOverwrite) {
+          console.info('[Sync] Deferred pending project-lock ownership:', reportId);
+          return;
+        }
+
         // 2. Version conflict check
-        if (((dbVersion > localVersion && !isOwnClientUpdate) || isLockLost) && !forceOverwrite) {
+        if ((dbVersion > localVersion && !isOwnClientUpdate) && !forceOverwrite) {
           isConflict = true;
         } else {
           const serverReportData = dbRecord.report_data || {};
@@ -1223,6 +1232,9 @@ function App() {
     if (isSessionActive && !lastActiveRef.current) {
       if (selectedReport) {
         reloadProjectData(selectedReport.id);
+        if (unsavedReportsRef.current[selectedReport.id]) {
+          syncUnsavedReport(selectedReport.id, false);
+        }
       }
     }
     lastActiveRef.current = isSessionActive;
