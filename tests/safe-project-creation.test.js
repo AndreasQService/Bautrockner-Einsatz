@@ -70,11 +70,20 @@ test('App keeps failed cloud creation outside project admission', () => {
 
 test('new DamageForm entries are eligible for the first autosave', () => {
   const source = fs.readFileSync(new URL('../src/components/DamageForm.jsx', import.meta.url), 'utf8');
+  const editTracking = source.slice(
+    source.indexOf('// Track user edit status:'),
+    source.indexOf('// Condition checks for starting the autosave timer:')
+  );
   const autosave = source.slice(
     source.indexOf('// Condition checks for starting the autosave timer:'),
     source.indexOf('// Save on Unmount')
   );
+  assert.doesNotMatch(editTracking, /if \(!initialData\s*\|\|/);
+  assert.match(editTracking, /if \(initialData\?\.isLightweight === true\)/);
   assert.doesNotMatch(autosave, /if \(!initialData\s*\|\|/);
   assert.match(autosave, /if \(initialData\?\.isLightweight === true\) return;/);
   assert.match(autosave, /await onSave\(reportData, true, 'user-edit'\)/);
+  assert.match(autosave, /if \(savedReport\)[\s\S]*setLastSaved\(new Date\(\)\)/);
+  assert.doesNotMatch(autosave, /finally \{[\s\S]*setLastSaved\(new Date\(\)\)/);
+  assert.match(source, /Noch nicht gespeichert/);
 });

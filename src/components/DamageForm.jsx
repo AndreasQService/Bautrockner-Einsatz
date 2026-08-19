@@ -1997,7 +1997,9 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
 
     // Track user edit status:
     useEffect(() => {
-        if (!initialData || initialData.isLightweight) {
+        // New reports have no initialData. They still need a baseline so the
+        // next user change can trigger the first durable autosave.
+        if (initialData?.isLightweight === true) {
             isHydratedRef.current = false;
             hasUserEditedRef.current = false;
             return;
@@ -2056,6 +2058,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                 if (savedReport) {
                     lastSavedData.current = JSON.parse(JSON.stringify(reportData));
                     hasUserEditedRef.current = false;
+                    setLastSaved(new Date());
                     // If the report was new (no ID) and the save generated one, update local state
                     if (savedReport.id && !formData.id) {
                         setFormData(prev => ({ ...prev, id: savedReport.id }));
@@ -2065,7 +2068,6 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                 console.error("Auto-save failed:", e);
             } finally {
                 setIsSaving(false);
-                setLastSaved(new Date());
             }
         }, 2000); // 2 second debounce
 
@@ -10431,6 +10433,10 @@ END:VCARD`;
                         {isSaving ? (
                             <>
                                 <RotateCcw size={12} className="spin" /> Speichert...
+                            </>
+                        ) : !lastSaved ? (
+                            <>
+                                <RotateCcw size={12} /> Noch nicht gespeichert
                             </>
                         ) : (
                             <>
