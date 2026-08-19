@@ -2960,8 +2960,7 @@ function App() {
           </div>
 
           <nav style={{ flexGrow: 1, display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '0.5rem' }}>
-            {/* Supabase Datenbank-Status Badge */}
-            {(
+            <div id="provider-status-group" style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexShrink: 0 }}>
               <div
                 id="supabase-status-badge"
                 role="status"
@@ -2996,10 +2995,44 @@ function App() {
                   flexShrink: 0,
                 }} />
                 <span>
-                  {isOnline && supabaseStatus?.ok === true ? 'Datenbank verbunden' : 'Datenbank ausstehend'}
+                  {isOnline && supabaseStatus?.ok === true ? 'Supabase verbunden' : 'Supabase ausstehend'}
                 </span>
               </div>
-            )}
+
+              {isOnline && oneDriveServiceStatus.ok === true ? <div
+                id="onedrive-status-badge"
+                role="status"
+                aria-live="polite"
+                title="Microsoft-Authentifizierung und OneDrive-Abfrage bestätigt"
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '0.35rem',
+                  padding: '0.3rem 0.65rem', borderRadius: '6px',
+                  border: '1px solid #10B981', backgroundColor: 'rgba(16,185,129,0.06)',
+                  fontSize: '0.78rem', color: '#10B981', whiteSpace: 'nowrap',
+                  userSelect: 'none', transition: 'all 0.3s ease', flexShrink: 0,
+                }}
+              >
+                <span aria-hidden="true" style={{ width: 7, height: 7, borderRadius: '50%', backgroundColor: 'currentColor', flexShrink: 0 }} />
+                <span className="hide-mobile">OneDrive verbunden</span>
+              </div> : <button
+                type="button"
+                id="onedrive-connect-button"
+                onClick={() => void handleConnectOneDrive()}
+                disabled={!isOnline || oneDriveServiceStatus.connecting === true}
+                aria-label="OneDrive verbinden"
+                title={oneDriveServiceStatus.error || 'Microsoft-Anmeldung öffnen und OneDrive-Verbindung prüfen'}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '0.35rem',
+                  padding: '0.3rem 0.65rem', borderRadius: '6px',
+                  border: '1px solid #EF4444', backgroundColor: 'rgba(239,68,68,0.06)',
+                  fontSize: '0.78rem', color: '#EF4444', whiteSpace: 'nowrap',
+                  cursor: !isOnline || oneDriveServiceStatus.connecting ? 'not-allowed' : 'pointer', flexShrink: 0,
+                }}
+              >
+                <span aria-hidden="true" style={{ width: 7, height: 7, borderRadius: '50%', backgroundColor: 'currentColor' }} />
+                <span className="hide-mobile">{oneDriveServiceStatus.connecting ? 'OneDrive wird verbunden…' : 'OneDrive verbinden'}</span>
+              </button>}
+            </div>
 
             {view !== 'dashboard' && (
               <button className="btn btn-outline" onClick={handleCancelEntry} style={{ padding: '0.5rem 1rem' }}>
@@ -3048,48 +3081,6 @@ function App() {
                       <span className="hide-mobile">Import</span>
                     </button>
 
-                    {isOnline && oneDriveServiceStatus.ok === true ? <div
-                      id="dashboard-onedrive-status-badge"
-                      role="status"
-                      aria-live="polite"
-                      title="Microsoft-Authentifizierung und OneDrive-Abfrage bestätigt"
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: '0.35rem',
-                        padding: '0.3rem 0.65rem',
-                        borderRadius: '6px',
-                        border: '1px solid #10B981',
-                        backgroundColor: 'rgba(16,185,129,0.06)',
-                        fontSize: '0.78rem',
-                        color: '#10B981',
-                        whiteSpace: 'nowrap',
-                        userSelect: 'none',
-                        transition: 'all 0.3s ease',
-                      }}
-                    >
-                      <span style={{
-                        width: '7px', height: '7px', borderRadius: '50%',
-                        backgroundColor: '#10B981',
-                        flexShrink: 0,
-                      }} />
-                      <span className="hide-mobile">OneDrive verbunden</span>
-                    </div> : <button
-                      type="button"
-                      id="dashboard-onedrive-connect-button"
-                      onClick={() => void handleConnectOneDrive()}
-                      disabled={!isOnline || oneDriveServiceStatus.connecting === true}
-                      aria-label="OneDrive verbinden"
-                      title={oneDriveServiceStatus.error || 'Microsoft-Anmeldung öffnen und OneDrive-Verbindung prüfen'}
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: '0.35rem',
-                        padding: '0.3rem 0.65rem', borderRadius: '6px',
-                        border: '1px solid #EF4444', backgroundColor: 'rgba(239,68,68,0.06)',
-                        fontSize: '0.78rem', color: '#EF4444', whiteSpace: 'nowrap',
-                        cursor: !isOnline || oneDriveServiceStatus.connecting ? 'not-allowed' : 'pointer',
-                      }}
-                    >
-                      <span aria-hidden="true" style={{ width: 7, height: 7, borderRadius: '50%', backgroundColor: 'currentColor' }} />
-                      <span className="hide-mobile">{oneDriveServiceStatus.connecting ? 'OneDrive wird verbunden…' : 'OneDrive verbinden'}</span>
-                    </button>}
                   </>
                 )}
 
