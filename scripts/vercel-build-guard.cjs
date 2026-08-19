@@ -43,6 +43,8 @@ const env = loadEnv();
 const testProjectId = 'aoxduqspiezzyqeqyzzl';
 const liveProjectId = 'yxdoecdqttgdncgbzyus';
 const expectedOneDriveRoot = 'QTool_TEST_ONLY';
+const expectedPreviewMsalClientId = '392ec3b0-d597-4fed-b9d7-1449dc7e8596';
+const expectedPreviewMsalTenantId = 'db82136a-909e-498c-ae53-4d2ad31fa7cd';
 
 const vercelEnv = env.VERCEL_ENV;
 const vercelProjectName = env.VERCEL_PROJECT_NAME;
@@ -51,6 +53,8 @@ const isVercel = !!env.VERCEL || !!vercelEnv;
 const currentProjectId = env.VITE_EXPECTED_SUPABASE_PROJECT_ID || env.EXPECTED_SUPABASE_PROJECT_ID;
 const supabaseUrl = env.VITE_SUPABASE_URL || '';
 const supabaseAnonKey = env.VITE_SUPABASE_ANON_KEY || '';
+const msalClientId = env.VITE_MSAL_CLIENT_ID || '';
+const msalTenantId = env.VITE_MSAL_TENANT_ID || '';
 
 function getSupabaseProjectId(url) {
     try {
@@ -71,6 +75,8 @@ console.log('[BUILD GUARD] Environment variables loaded:', {
     VITE_EXPECTED_SUPABASE_PROJECT_ID: currentProjectId,
     VITE_SUPABASE_PROJECT_FROM_URL: supabaseProjectIdFromUrl,
     VITE_SUPABASE_ANON_KEY_PRESENT: supabaseAnonKey.length > 0,
+    VITE_MSAL_CLIENT_ID_PRESENT: msalClientId.length > 0,
+    VITE_MSAL_TENANT_ID_PRESENT: msalTenantId.length > 0,
     VITE_ONEDRIVE_TEST_ROOT: env.VITE_ONEDRIVE_TEST_ROOT || env.ONEDRIVE_TEST_ROOT,
     QTOOL_ENVIRONMENT: env.QTOOL_ENVIRONMENT || env.VITE_QTOOL_ENVIRONMENT,
 });
@@ -157,6 +163,16 @@ if (expectedProjectIdForEnv === liveProjectId) {
     const qtoolEnv = env.QTOOL_ENVIRONMENT || env.VITE_QTOOL_ENVIRONMENT;
     if (qtoolEnv !== 'test') {
         console.error(`[BUILD GUARD] ❌ ABORT: QTOOL_ENVIRONMENT must be exactly "test". Found: "${qtoolEnv}"`);
+        process.exit(1);
+    }
+
+    if (isVercel && msalClientId !== expectedPreviewMsalClientId) {
+        console.error('[BUILD GUARD] ❌ ABORT: Vercel Preview requires the configured QTool test MSAL client ID.');
+        process.exit(1);
+    }
+
+    if (isVercel && msalTenantId !== expectedPreviewMsalTenantId) {
+        console.error('[BUILD GUARD] ❌ ABORT: Vercel Preview requires the Fast-Tool MSAL tenant ID.');
         process.exit(1);
     }
 }
