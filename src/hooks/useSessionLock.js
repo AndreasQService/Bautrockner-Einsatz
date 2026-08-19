@@ -72,11 +72,23 @@ export function useSessionLock(
   const [activeLockDevice, setActiveLockDevice]   = useState(null);
   const [isLockedByIPad, setIsLockedByIPad]       = useState(false);
   const [activeLockActivity, setActiveLockActivity] = useState(null);
+  // A locally inactive session is not automatically a foreign lock.  Keep the
+  // project id for which the database explicitly confirmed another owner so
+  // the UI cannot flash a false red lock dialog while acquisition is pending.
+  const [confirmedForeignLockProjectId, setConfirmedForeignLockProjectId] = useState(null);
 
   const isSessionActiveRef = useRef(!enabled || !selectedReportId);
   useEffect(() => {
     isSessionActiveRef.current = isSessionActive;
   }, [isSessionActive]);
+
+  useEffect(() => {
+    setConfirmedForeignLockProjectId(null);
+    setActiveLockUser(null);
+    setActiveLockSince(null);
+    setActiveLockDevice(null);
+    setActiveLockActivity(null);
+  }, [selectedReportId]);
 
   const isTestAgent = typeof navigator !== 'undefined' && navigator.userAgent.includes('QToolDeepTest');
   const isLockEnabled = enabled || isTestAgent;
@@ -153,6 +165,7 @@ export function useSessionLock(
       const result = data && data[0];
       if (result && result.acquired) {
         // Lock confirmed by DB
+        setConfirmedForeignLockProjectId(null);
         setIsSessionActive(true);
         console.log('[SessionLock] LOCK_ACQUIRED / DB confirmed lock.', { openProjectId });
       } else {
@@ -259,11 +272,14 @@ export function useSessionLock(
     setIsLockedByIPad(!amIOwner && status?.device_type === 'iPad');
 
     if (amIOwner) {
+      setConfirmedForeignLockProjectId(null);
       setActiveLockUser(username);
       setActiveLockSince(status?.locked_at || new Date().toISOString());
       setActiveLockDevice(myDevice);
       setActiveLockActivity(status?.last_seen_at || new Date().toISOString());
     } else {
+      const hasConfirmedForeignOwner = Boolean(status?.locked_at || status?.lock_owner || status?.device_type);
+      setConfirmedForeignLockProjectId(hasConfirmedForeignOwner ? myProjectId : null);
       setActiveLockUser(status?.lock_owner || 'Unbekannt');
       setActiveLockSince(status?.locked_at || null);
       setActiveLockDevice(status?.device_type || 'Gerät');
@@ -301,6 +317,7 @@ export function useSessionLock(
     activeLockSince,
     activeLockDevice,
     activeLockActivity,
+    confirmedForeignLockProjectId,
     registerProjectActivity,
     releaseProjectLock: deleteSession
   };

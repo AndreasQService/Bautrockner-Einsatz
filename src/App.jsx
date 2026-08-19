@@ -1173,6 +1173,7 @@ function App() {
     activeLockSince,
     activeLockDevice,
     activeLockActivity,
+    confirmedForeignLockProjectId,
     registerProjectActivity,
     releaseProjectLock
   } = useSessionLock(
@@ -1234,8 +1235,11 @@ function App() {
   // UI-Sperr-Variablen
   // Im Techniker-Modus ist der Lock komplett deaktiviert — Techniker arbeiten immer im Feld
   const isActuallyOffline = !isOnline || (supabaseStatus && supabaseStatus.ok === false);
-  const isLockedByOtherMode = (projectMode === 'technician' || isTechnicianMode) ? false : !isSessionActive;
-  const isReadOnly = isLockedByOtherMode;
+  const lockRequired = projectMode !== 'technician' && !isTechnicianMode && view === 'details' && Boolean(selectedReport?.id);
+  const isLockedByOtherMode = lockRequired && !isSessionActive && confirmedForeignLockProjectId === selectedReport?.id;
+  // Fail closed while the ownership check is pending or unavailable, without
+  // falsely claiming that another user owns the project.
+  const isReadOnly = lockRequired && !isSessionActive;
   const sessionLockMessage = isLockedByIPad
     ? 'Dieses Projekt wird aktuell auf dem iPad bearbeitet. Das iPad hat Vorrang. Deine Änderungen wurden nicht gespeichert.'
     : (isLockedByOtherMode
