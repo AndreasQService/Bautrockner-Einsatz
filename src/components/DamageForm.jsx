@@ -401,6 +401,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         damageTypeImage: initialData.damageTypeImage || null,
         status: initialData.status || 'Schadenaufnahme',
         cause: initialData.cause || '',
+        inspectionDate: initialData.inspectionDate || '',
         description: initialData.description || '',
         findings: initialData.findings || '',
         dryingStarted: initialData.dryingStarted || null,
@@ -525,6 +526,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         damageTypeImage: null,
         status: 'Schadenaufnahme',
         cause: '',
+        inspectionDate: '',
         description: '',
         findings: '',
         dryingStarted: null,
@@ -6146,6 +6148,17 @@ END:VCARD`;
                                     </div>
 
                                     <div style={{ marginBottom: '1.25rem' }}>
+                                        <label htmlFor="technician-inspection-date" style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 600, marginBottom: '0.5rem', display: 'block' }}>
+                                            Datum der Begehung
+                                        </label>
+                                        <input
+                                            id="technician-inspection-date"
+                                            type="date"
+                                            className="form-input"
+                                            value={formData.inspectionDate || ''}
+                                            onChange={(e) => setFormData(prev => ({ ...prev, inspectionDate: e.target.value }))}
+                                            style={{ width: '100%', maxWidth: '240px', marginBottom: '1rem' }}
+                                        />
                                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
                                             <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 600 }}>Beschreibung der Ursache</label>
                                             <button
@@ -7166,7 +7179,7 @@ END:VCARD`;
                                     <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-muted)', marginLeft: '0.5rem' }}>
                                         {formData.images?.filter(img => img.assignedTo === 'Schadenfotos').length > 0
                                             ? `(${formData.images.filter(img => img.assignedTo === 'Schadenfotos').length} Fotos)`
-                                            : formData.cause ? '(Ausgefüllt)' : ''}
+                                            : (formData.cause || formData.inspectionDate) ? '(Ausgefüllt)' : ''}
                                     </span>
                                 )}
                             </h3>
@@ -7179,6 +7192,16 @@ END:VCARD`;
                         {isCauseExpanded && (<>
 
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem', marginBottom: '2rem' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxWidth: '240px' }}>
+                                    <label htmlFor="desktop-inspection-date" style={{ fontWeight: 600, fontSize: '0.9rem' }}>Datum der Begehung</label>
+                                    <input
+                                        id="desktop-inspection-date"
+                                        type="date"
+                                        className="form-input"
+                                        value={formData.inspectionDate || ''}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, inspectionDate: e.target.value }))}
+                                    />
+                                </div>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                                         <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>Schadenursache</span>
@@ -11048,10 +11071,13 @@ END:VCARD`;
                                 <div style={{ whiteSpace: 'pre-wrap', fontSize: '11pt', lineHeight: 1.5 }}>{formData.description}</div>
                             </div>
 
-                            {formData.cause && (
+                            {(formData.cause || formData.inspectionDate) && (
                                 <div className="pdf-section" style={{ marginBottom: '2rem' }}>
                                     <h3 style={{ borderLeft: '4px solid #0F6EA3', paddingLeft: '1rem', fontSize: '14pt', fontWeight: 'bold', marginBottom: '1rem' }}>Schadenursache</h3>
-                                    <div style={{ whiteSpace: 'pre-wrap', fontSize: '11pt', lineHeight: 1.5, backgroundColor: 'var(--color-panel-bg)', padding: '1rem', borderRadius: '8px' }}>{formData.cause}</div>
+                                    <div style={{ whiteSpace: 'pre-wrap', fontSize: '11pt', lineHeight: 1.5, backgroundColor: 'var(--color-panel-bg)', padding: '1rem', borderRadius: '8px' }}>
+                                        {formData.inspectionDate && <div style={{ marginBottom: formData.cause ? '0.5rem' : 0 }}><strong>Datum der Begehung:</strong> {new Date(`${formData.inspectionDate}T00:00:00`).toLocaleDateString('de-CH')}</div>}
+                                        {formData.cause}
+                                    </div>
                                 </div>
                             )}
 
