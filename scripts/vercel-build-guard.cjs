@@ -50,13 +50,27 @@ const isVercel = !!env.VERCEL || !!vercelEnv;
 
 const currentProjectId = env.VITE_EXPECTED_SUPABASE_PROJECT_ID || env.EXPECTED_SUPABASE_PROJECT_ID;
 const supabaseUrl = env.VITE_SUPABASE_URL || '';
+const supabaseAnonKey = env.VITE_SUPABASE_ANON_KEY || '';
+
+function getSupabaseProjectId(url) {
+    try {
+        const parsed = new URL(url);
+        if (parsed.protocol !== 'https:' || !parsed.hostname.endsWith('.supabase.co')) return null;
+        return parsed.hostname.slice(0, -'.supabase.co'.length);
+    } catch {
+        return null;
+    }
+}
+
+const supabaseProjectIdFromUrl = getSupabaseProjectId(supabaseUrl);
 
 console.log('[BUILD GUARD] Environment variables loaded:', {
     VERCEL_ENV: vercelEnv,
     VERCEL_PROJECT_NAME: vercelProjectName,
     isVercel: isVercel,
     VITE_EXPECTED_SUPABASE_PROJECT_ID: currentProjectId,
-    VITE_SUPABASE_URL: supabaseUrl,
+    VITE_SUPABASE_PROJECT_FROM_URL: supabaseProjectIdFromUrl,
+    VITE_SUPABASE_ANON_KEY_PRESENT: supabaseAnonKey.length > 0,
     VITE_ONEDRIVE_TEST_ROOT: env.VITE_ONEDRIVE_TEST_ROOT || env.ONEDRIVE_TEST_ROOT,
     QTOOL_ENVIRONMENT: env.QTOOL_ENVIRONMENT || env.VITE_QTOOL_ENVIRONMENT,
 });
@@ -83,6 +97,16 @@ if (isVercel) {
 if (!expectedProjectIdForEnv) {
     console.log('[BUILD GUARD] ⚠️ Ambiguous environment, skipping strict checks.');
     process.exit(0);
+}
+
+if (isVercel && (!supabaseUrl || !supabaseAnonKey)) {
+    console.error('[BUILD GUARD] ❌ ABORT: Vercel build requires non-empty VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.');
+    process.exit(1);
+}
+
+if (isVercel && supabaseProjectIdFromUrl !== expectedProjectIdForEnv) {
+    console.error(`[BUILD GUARD] ❌ ABORT: Supabase URL project must be exactly "${expectedProjectIdForEnv}". Found: "${supabaseProjectIdFromUrl || 'invalid'}"`);
+    process.exit(1);
 }
 
 console.log(`[BUILD GUARD] Expected Supabase Project ID for this environment: "${expectedProjectIdForEnv}"`);
