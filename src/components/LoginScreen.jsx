@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { User, Lock, LogIn, ShieldAlert } from 'lucide-react';
+import { resolveAuthorizedUser } from '../lib/authorizedUser.js';
 
 const LoginScreen = ({ users, onLogin, supabase }) => {
     const [name, setName] = useState('');
@@ -16,49 +17,30 @@ const LoginScreen = ({ users, onLogin, supabase }) => {
             return;
         }
 
-        // Intercept login for Andreas Strehler to authenticate via Supabase
-        if (trimmedName.toLowerCase() === 'andreas strehler') {
-            if (!supabase) {
-                setError('Supabase-Client nicht initialisiert.');
-                return;
-            }
-            try {
-                const { data, error: authError } = await supabase.auth.signInWithPassword({
-                    email: 'a.strehler@q-service.ch',
-                    password: trimmedPassword
-                });
-
-                if (authError) {
-                    setError(`Anmeldung fehlgeschlagen: ${authError.message}`);
-                    return;
-                }
-
-                if (data && data.user) {
-                    const userObj = users.find(u => u.name.toLowerCase() === 'andreas strehler') || {
-                        id: 4,
-                        name: 'Andreas Strehler',
-                        role: 'admin'
-                    };
-                    onLogin({
-                        ...userObj,
-                        role: 'admin'
-                    });
-                } else {
-                    setError('Keine gültige Sitzung erhalten.');
-                }
-            } catch (err) {
-                setError(`Verbindungsfehler: ${err.message}`);
-            }
+        if (!trimmedName.includes('@') || !supabase?.auth?.signInWithPassword) {
+            setError('Bitte eine autorisierte Supabase-E-Mail verwenden.');
             return;
         }
-
-        // Find user case-insensitive
-        const user = users.find(u => u.name.toLowerCase() === trimmedName.toLowerCase());
-
-        if (user && user.password === trimmedPassword) {
-            onLogin(user);
-        } else {
-            setError('Ungültiger Benutzername oder Passwort.');
+        try {
+            const email = trimmedName.toLowerCase();
+            const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password: trimmedPassword });
+            if (authError) throw authError;
+            const sessionUser = data?.session?.user;
+            if (!data?.session?.access_token || !sessionUser?.id || data?.user?.id !== sessionUser.id) {
+                await supabase.auth.signOut();
+                setError('Supabase hat keine eindeutig bestätigte Sitzung geliefert.');
+                return;
+            }
+            const authorizedUser = resolveAuthorizedUser(sessionUser, users);
+            if (!authorizedUser) {
+                await supabase.auth.signOut();
+                setError('Dieses bestätigte Supabase-Konto ist QTool nicht zugeordnet.');
+                return;
+            }
+            onLogin(authorizedUser);
+        } catch (err) {
+            console.warn('[LoginScreen] Supabase Auth fehlgeschlagen:', err);
+            setError(err.message || 'Anmeldung fehlgeschlagen.');
         }
     };
 
@@ -141,7 +123,7 @@ const LoginScreen = ({ users, onLogin, supabase }) => {
                 <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
                     <div style={{ textAlign: 'left' }}>
                         <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500, fontSize: '0.85rem', color: '#94a3b8' }}>
-                            Name
+                            E-Mail
                         </label>
                         <div style={{ position: 'relative' }}>
                             <User size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#64748b', zIndex: 10 }} />
@@ -149,7 +131,7 @@ const LoginScreen = ({ users, onLogin, supabase }) => {
                                 type="text"
                                 value={name}
                                 onChange={(e) => { setName(e.target.value); setError(''); }}
-                                placeholder="Name eingeben..."
+                                placeholder="E-Mail eingeben..."
                                 className="login-input"
                                 autoFocus
                             />

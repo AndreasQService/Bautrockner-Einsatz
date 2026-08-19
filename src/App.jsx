@@ -25,6 +25,7 @@ import { syncPendingToSupabase } from './lib/sync/supabaseSyncWorker.js';
 import { markUploadedPhotosAsVerified, sanitizeCorruptPhotosInDb } from './services/PhotoStorage';
 import { isVisibleProjectRow } from './utils/projectVisibility.js';
 import { connectOneDrive, getGraphAccessTokenSilent, initOneDriveAuth } from './lib/onedrive/auth.js';
+import { readAuthorizedUsers, resolveAuthorizedUser } from './lib/authorizedUser.js';
 const canonicalJson = value => {
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
   if (value && typeof value === 'object') {
@@ -890,21 +891,8 @@ function App() {
     };
   }, []);
 
-  const [currentUser, setCurrentUser] = useState(() => {
-    const saved = localStorage.getItem(KEY_CURRENT_USER);
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (parsed && parsed.name && parsed.name.toLowerCase() === 'andreas strehler') {
-          return null;
-        }
-        return parsed;
-      } catch (e) {
-        return null;
-      }
-    }
-    return null;
-  });
+  // Local storage is a cache, never an authentication source.
+  const [currentUser, setCurrentUser] = useState(null);
   const [supabaseSession, setSupabaseSession] = useState(null);
   const [authReady, setAuthReady] = useState(false);
 
@@ -914,6 +902,31 @@ function App() {
       return;
     }
 
+    const clearUnauthorizedUser = () => {
+      setSupabaseSession(null);
+      setCurrentUser(null);
+      localStorage.removeItem(KEY_CURRENT_USER);
+    };
+    const acceptAuthorizedSession = async (session) => {
+      if (!session?.user) {
+        clearUnauthorizedUser();
+        return false;
+      }
+      const authorizedUser = resolveAuthorizedUser(session.user, readAuthorizedUsers());
+      if (!authorizedUser) {
+        clearUnauthorizedUser();
+        await supabase.auth.signOut();
+        return false;
+      }
+      setSupabaseSession(session);
+      setCurrentUser(authorizedUser);
+      setUserRole(authorizedUser.role);
+      setIsTechnicianMode(authorizedUser.role === 'technician');
+      setProjectMode(authorizedUser.role === 'technician' ? 'technician' : 'desktop');
+      localStorage.setItem(KEY_CURRENT_USER, JSON.stringify(authorizedUser));
+      return true;
+    };
+
     const syncSession = async () => {
       try {
         const getSessionPromise = supabase.auth.getSession();
@@ -921,42 +934,7 @@ function App() {
           setTimeout(() => reject(new Error('Session Timeout')), 3000)
         );
         const { data: { session } } = await Promise.race([getSessionPromise, timeoutPromise]);
-        setSupabaseSession(session);
-        if (session && session.user && session.user.email === 'a.strehler@q-service.ch') {
-          const saved = localStorage.getItem(KEY_CURRENT_USER);
-          let existingUserObj = null;
-          if (saved) {
-            try {
-              existingUserObj = JSON.parse(saved);
-            } catch {}
-          }
-          if (!existingUserObj || existingUserObj.name.toLowerCase() !== 'andreas strehler') {
-            existingUserObj = { id: 4, name: 'Andreas Strehler', role: 'admin' };
-          }
-          setCurrentUser(existingUserObj);
-          setUserRole('admin');
-          setIsTechnicianMode(false);
-          setProjectMode('desktop');
-          localStorage.setItem(KEY_CURRENT_USER, JSON.stringify(existingUserObj));
-        } else {
-          // If no session exists, only clear a stale Andreas Strehler state
-          setCurrentUser(prev => {
-            if (prev && prev.name && prev.name.toLowerCase() === 'andreas strehler') {
-              localStorage.removeItem(KEY_CURRENT_USER);
-              return null;
-            }
-            return prev;
-          });
-          const saved = localStorage.getItem(KEY_CURRENT_USER);
-          if (saved) {
-            try {
-              const parsed = JSON.parse(saved);
-              if (parsed && parsed.name && parsed.name.toLowerCase() === 'andreas strehler') {
-                localStorage.removeItem(KEY_CURRENT_USER);
-              }
-            } catch {}
-          }
-        }
+        await acceptAuthorizedSession(session);
       } catch (err) {
         console.error('[Supabase Auth] Fehler beim Abrufen der initialen Session:', err);
       } finally {
@@ -967,32 +945,8 @@ function App() {
     syncSession();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      setSupabaseSession(session);
-      if (session && session.user && session.user.email === 'a.strehler@q-service.ch') {
-        const saved = localStorage.getItem(KEY_CURRENT_USER);
-        let existingUserObj = null;
-        if (saved) {
-          try {
-            existingUserObj = JSON.parse(saved);
-          } catch {}
-        }
-        if (!existingUserObj || existingUserObj.name.toLowerCase() !== 'andreas strehler') {
-          existingUserObj = { id: 4, name: 'Andreas Strehler', role: 'admin' };
-        }
-        setCurrentUser(existingUserObj);
-        setUserRole('admin');
-        setIsTechnicianMode(false);
-        setProjectMode('desktop');
-        localStorage.setItem(KEY_CURRENT_USER, JSON.stringify(existingUserObj));
-      } else if (event === 'SIGNED_OUT') {
-        setCurrentUser(prev => {
-          if (prev && prev.name && prev.name.toLowerCase() === 'andreas strehler') {
-            localStorage.removeItem(KEY_CURRENT_USER);
-            return null;
-          }
-          return prev;
-        });
-      }
+      if (event === 'SIGNED_OUT') clearUnauthorizedUser();
+      else queueMicrotask(() => { void acceptAuthorizedSession(session); });
     });
 
     return () => {
@@ -2913,7 +2867,7 @@ function App() {
     }
   } catch {}
 
-  if (isAndreasStored && !authReady) {
+  if (!authReady) {
     return (
       <div style={{
         height: '100vh',
