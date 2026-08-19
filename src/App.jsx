@@ -5,9 +5,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRegisterSW } from 'virtual:pwa-register/react'
 import { useSessionLock } from './hooks/useSessionLock'
+import { confirmProjectDraftWithReadback, createProjectAtomically, saveProjectDraftWithReadback } from './lib/safeProjectCreation.js'
 import { Plus, LayoutDashboard, Settings, User, Users, LogOut, Thermometer, Database, RotateCcw, Download, Sun, Moon, Hammer } from 'lucide-react';
 import ProjectSelection from './components/ProjectSelection';
-import { supabase } from './supabaseClient'
+import { setQToolSessionToken, supabase } from './supabaseClient'
 import Dashboard from './components/Dashboard'
 import DamageForm from './components/DamageForm'
 import DeviceManager from './components/DeviceManager'
@@ -23,6 +24,13 @@ import { buildProjectFolderName, uploadProjectJson } from "./services/OneDriveSe
 import { syncPendingToSupabase } from './lib/sync/supabaseSyncWorker.js';
 import { markUploadedPhotosAsVerified, sanitizeCorruptPhotosInDb } from './services/PhotoStorage';
 import { isVisibleProjectRow } from './utils/projectVisibility.js';
+const canonicalJson = value => {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
+  if (value && typeof value === 'object') {
+    return `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(',')}}`;
+  }
+  return JSON.stringify(value);
+};
 const IS_TEST_ENV = !!(typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_EXPECTED_SUPABASE_PROJECT_ID === 'aoxduqspiezzyqeqyzzl');
 const PROJECT_ID = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_EXPECTED_SUPABASE_PROJECT_ID) || 'prod';
 const KEY_CURRENT_USER = `qtool_current_user_${PROJECT_ID}`;
@@ -355,6 +363,8 @@ function App() {
   // quick succession; without a queue, a later save can compare against the
   // timestamp from before our own preceding write and create a false conflict.
   const cloudSaveChainsRef = useRef(new Map());
+  const confirmedProjectPayloadRef = useRef(new Map());
+  const unsavedReportsRef = useRef({});
   const currentUserRef = useRef(null);
   const selectedReportRef = useRef(null);
   const reportsRef = useRef([]);
@@ -369,6 +379,7 @@ function App() {
   const [showUserModal, setShowUserModal] = useState(false);
   const [showMeasurementManager, setShowMeasurementManager] = useState(false);
   const [unsavedReports, setUnsavedReports] = useState({});
+  useEffect(() => { unsavedReportsRef.current = unsavedReports; }, [unsavedReports]);
 
   const [isOnline, setIsOnline] = useState(() => typeof navigator !== 'undefined' ? navigator.onLine : true);
 
@@ -648,34 +659,12 @@ function App() {
         const dbVersion = dbRecord.report_data?.version || 1;
         const localVersion = offlineEntry.reportData?.version || 1;
 
-        // 1. Lock check against sessions (iPad has priority)
-        const cutoff = new Date(Date.now() - 20 * 60 * 1000).toISOString();
-        const { data: sessions, error: sessionErr } = await supabase
-          .from('project_sessions')
-          .select('session_token, open_project_id, device, last_seen')
-          .eq('open_project_id', reportId)
-          .gte('last_seen', cutoff);
-
-        const isIPad = /iPad/i.test(navigator.userAgent) ||
-                       (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) ||
-                       (navigator.userAgent.includes('Macintosh') && 'ontouchend' in document);
-        const myDeviceName = isIPad ? 'iPad' : (/iPhone|Android/i.test(navigator.userAgent) ? 'Mobil' : 'Desktop');
-
-        if (!sessionErr && sessions && myDeviceName !== 'iPad') {
-          const otherSessions = sessions.filter(s => s.session_token !== mySessionToken);
-          const otherParsedSessions = otherSessions.map(s => {
-            const parts = (s.device || '').split(':');
-            return {
-              ...s,
-              deviceType: parts[0] || 'Desktop',
-              userEmail: parts[1] || 'Unbekannt'
-            };
-          });
-          const conflictingIPads = otherParsedSessions.filter(s => s.deviceType === 'iPad');
-          if (conflictingIPads.length > 0) {
-            isLockLost = true;
-          }
-        }
+        const { data: lockRows, error: sessionErr } = await supabase.rpc('get_project_lock_status', {
+          p_project_id: reportId,
+          p_session_token: mySessionToken,
+        });
+        const lockStatus = Array.isArray(lockRows) ? lockRows[0] : lockRows;
+        isLockLost = Boolean(sessionErr) || lockStatus?.is_owner !== true;
 
         // 2. Version conflict check
         if (((dbVersion > localVersion && !isOwnClientUpdate) || isLockLost) && !forceOverwrite) {
@@ -825,19 +814,18 @@ function App() {
         setReports(prev => prev.map(r => r.id === reportId ? finalSyncedReport : r));
         setSelectedReport(prev => prev && prev.id === reportId ? finalSyncedReport : prev);
         openedReportBackupRef.current[reportId] = JSON.parse(JSON.stringify(finalSyncedReport));
+        confirmedProjectPayloadRef.current.set(reportId, JSON.parse(JSON.stringify(mergedReportData)));
         logAudit('success');
 
         // Clean up preserved session lock in Supabase if we have already navigated away from the project
         if (selectedReportRef.current?.id !== reportId || (viewRef.current !== 'details' && viewRef.current !== 'new-report')) {
-          const query = supabase.from('project_sessions');
-          if (typeof query.delete === 'function') {
-            query
-              .delete()
-              .eq('open_project_id', reportId)
-              .eq('session_token', sessionTokenRef.current)
-              .then(() => console.log('[Sync] Released preserved session lock after background sync completion:', reportId))
-              .catch(e => console.warn('[Sync] Failed to release preserved lock:', e));
-          }
+          supabase.rpc('release_project_lock', {
+            p_project_id: reportId,
+            p_session_token: sessionTokenRef.current,
+          }).then(({ data, error }) => {
+            if (error || data !== true) throw error || new Error('Lock-Freigabe nicht bestätigt');
+            console.log('[Sync] Released preserved session lock after background sync completion:', reportId);
+          }).catch(e => console.warn('[Sync] Failed to release preserved lock:', e));
         }
 
         try {
@@ -1039,10 +1027,11 @@ function App() {
 
   const [mySessionToken] = useState(() => {
     let t = localStorage.getItem(KEY_SESSION_TOKEN);
-    if (!t) {
+    if (!t || t.length < 20) {
       t = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
       localStorage.setItem(KEY_SESSION_TOKEN, t);
     }
+    setQToolSessionToken(t);
     sessionTokenRef.current = t;
     return t;
   });
@@ -1094,9 +1083,7 @@ function App() {
 
   const [showInactivityAlert, setShowInactivityAlert] = useState(false);
   const handleInactivityTimeout = useCallback(() => {
-    setView('dashboard');
-    setSelectedReport(null);
-    setIsSessionActive(true);
+    setIsSessionActive(false);
     setShowInactivityAlert(true);
   }, []);
 
@@ -1170,13 +1157,13 @@ function App() {
     lockedProjectIds,
     isSessionActive,
     setIsSessionActive,
-    takeOverLock,
     isLockedByIPad,
     activeLockUser,
     activeLockSince,
     activeLockDevice,
     activeLockActivity,
-    registerProjectActivity
+    registerProjectActivity,
+    releaseProjectLock
   } = useSessionLock(
     supabase,
     mySessionToken,
@@ -1186,7 +1173,8 @@ function App() {
     sessionStartedAtRef.current,
     Boolean(currentUser) && Boolean(supabaseSession?.user),
     currentUser,
-    handleInactivityTimeout
+    handleInactivityTimeout,
+    supabaseSession?.user?.id ?? null
   );
 
   useEffect(() => { isSessionActiveRef.current = isSessionActive; }, [isSessionActive]);
@@ -1673,7 +1661,7 @@ function App() {
     openedReportBackupRef.current[activeReport.id] = JSON.parse(JSON.stringify(activeReport));
     setSelectedReport(activeReport);
     setView('details');
-    setIsSessionActive(true);
+    setIsSessionActive(false);
 
     // Registriere zuletzt geöffneten Zeitstempel
     try {
@@ -1737,6 +1725,7 @@ function App() {
           // Nur aktualisieren, wenn der Benutzer das Projekt in der Zwischenzeit nicht schon wieder geschlossen hat
           setSelectedReport(prev => prev && prev.id === targetProjectId ? fullReport : prev);
           openedReportBackupRef.current[targetProjectId] = JSON.parse(JSON.stringify(fullReport));
+          if (data.report_data) confirmedProjectPayloadRef.current.set(targetProjectId, JSON.parse(JSON.stringify(data.report_data)));
 
           // Unconditionally clear local unsaved draft for this project so fresh Supabase data is always authoritative
           try {
@@ -1819,6 +1808,7 @@ function App() {
             setReports(prev => prev.map(r => r.id === targetProjectId ? fullReport : r));
             setSelectedReport(prev => prev && prev.id === targetProjectId ? fullReport : prev);
             openedReportBackupRef.current[targetProjectId] = JSON.parse(JSON.stringify(fullReport));
+            if (data.report_data) confirmedProjectPayloadRef.current.set(targetProjectId, JSON.parse(JSON.stringify(data.report_data)));
 
             // Clean up false hydration entry if it exists and has no valid source
             try {
@@ -1899,14 +1889,71 @@ function App() {
     }
   }, [selectedReport, supabase]);
 
-  const handleCancelEntry = () => {
+  const handleCancelEntry = async () => {
+    const reportId = selectedReportRef.current?.id;
+    if (reportId) {
+      if (unsavedReports[reportId]) {
+        showToast('Projekt hat noch unbestätigte lokale Änderungen. Bitte zuerst speichern und synchronisieren.', 'error', 10000);
+        return;
+      }
+      if (silentSaveDebounceTimers.current[reportId]) {
+        showToast('Speicherung läuft noch. Bitte kurz warten und erneut versuchen.', 'error', 10000);
+        return;
+      }
+      const { data: lockRows, error: lockStatusError } = await supabase.rpc('get_project_lock_status', {
+        p_project_id: reportId,
+        p_session_token: mySessionToken,
+      });
+      if (lockStatusError) {
+        showToast('Sperrstatus konnte nicht bestätigt werden. Projekt bleibt geöffnet.', 'error', 10000);
+        return;
+      }
+      const lockStatus = Array.isArray(lockRows) ? lockRows[0] : lockRows;
+      const ownsDatabaseLock = lockStatus?.is_owner === true;
+      if (ownsDatabaseLock) {
+      const pendingWrite = cloudSaveChainsRef.current.get(reportId);
+      if (pendingWrite) {
+        try {
+          await pendingWrite;
+        } catch {
+          showToast('Cloud-Speicherung wurde nicht bestätigt. Projekt bleibt geöffnet.', 'error', 10000);
+          return;
+        }
+      }
+      try {
+        unsavedReportsRef.current = JSON.parse(localStorage.getItem('qservice_unsaved_reports') || '{}');
+      } catch {
+        showToast('Lokale Pending-Evidenz ist nicht lesbar. Projekt bleibt geöffnet.', 'error', 10000);
+        return;
+      }
+      if (unsavedReportsRef.current[reportId]) {
+        showToast('Projekt besitzt weiterhin unbestätigte lokale Änderungen. Projekt bleibt geöffnet.', 'error', 10000);
+        return;
+      }
+      const { data: readback, error: readbackError } = await supabase
+        .from('damage_reports').select('id, updated_at, report_data').eq('id', reportId).single();
+      if (readbackError || String(readback?.id) !== String(reportId)) {
+        showToast('Datenbank-Readback fehlgeschlagen. Projekt bleibt geöffnet und gesperrt.', 'error', 10000);
+        return;
+      }
+      const expectedPayload = confirmedProjectPayloadRef.current.get(reportId);
+      if (!expectedPayload || canonicalJson(readback.report_data) !== canonicalJson(expectedPayload)) {
+        showToast('Serverinhalt stimmt nicht exakt mit dem bestätigten Projektstand überein. Projekt bleibt geöffnet.', 'error', 10000);
+        return;
+      }
+      if (await releaseProjectLock() !== true) {
+        showToast('Sperrfreigabe wurde nicht bestätigt. Projekt bleibt geöffnet.', 'error', 10000);
+        return;
+      }
+      }
+    }
     setView('dashboard');
     setSelectedReport(null);
     setIsSessionActive(true);
   }
 
   const handleSaveReport = useCallback(async (updatedReport, silent = false) => {
-    const isLocked = (projectMode === 'technician' || isTechnicianMode) ? false : !isSessionActiveRef.current;
+    const isLocked = (projectMode === 'technician' || isTechnicianMode || view === 'new-report') ? false : !isSessionActiveRef.current;
     if (isLocked) {
       console.warn('[handleSaveReport] Aborted save because project is locked by another device/mode.');
       return updatedReport;
@@ -1970,6 +2017,48 @@ function App() {
         : `TMP-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     }
     if (!finalReport.date) finalReport.date = new Date().toISOString();
+
+    if (isNewProject) {
+      let verifiedDraft;
+      try {
+        verifiedDraft = await saveProjectDraftWithReadback(
+          finalReport,
+          currentUserRef.current?.email || currentUserRef.current?.name || 'Unbekannt'
+        );
+      } catch (error) {
+        showToast(`Projekt wurde nicht gespeichert: ${error.message}`, 'error', 15000);
+        return updatedReport;
+      }
+
+      try {
+        const creationPayload = JSON.parse(JSON.stringify(finalReport));
+        const isIPadDevice = /iPad/i.test(navigator.userAgent)
+          || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        const deviceType = isIPadDevice ? 'iPad' : (/iPhone|Android/i.test(navigator.userAgent) ? 'Mobil' : 'Desktop');
+        const actor = currentUserRef.current || {};
+        const deviceDescriptor = `${deviceType}:${actor.id || 'unknown'}:${actor.name || 'Unbekannt'}:${actor.email || 'keine-email'}`.replaceAll(':undefined', ':unknown');
+        finalReport = await createProjectAtomically({
+          supabase,
+          project: creationPayload,
+          sessionToken: mySessionToken,
+          device: deviceDescriptor,
+          clientId: getOrCreateClientId(),
+        });
+        await confirmProjectDraftWithReadback(finalReport.id);
+        confirmedProjectPayloadRef.current.set(finalReport.id, creationPayload);
+        setIsSessionActive(true);
+        setReports(current => [finalReport, ...current.filter(item => item.id !== finalReport.id)]);
+        setSelectedReport(finalReport);
+        setView('details');
+        showToast('Projekt erstellt und Datenbank-Sperrbesitz bestätigt.', 'success', 5000);
+        return finalReport;
+      } catch (error) {
+        // Admission stays closed: without RPC + DB + lock proof the draft must
+        // not enter reports/details or become editable as a cloud project.
+        showToast(`Entwurf lokal sicher gespeichert – Cloud ausstehend. Bitte erneut speichern: ${error.message}`, 'warning', 15000);
+        return { ...verifiedDraft.project, _cloudSyncStatus: 'pending', _is_local_draft: true };
+      }
+    }
 
     setReports(currentReports => {
       let newReports;
@@ -2086,6 +2175,7 @@ function App() {
 
       // ── Sitzungsschutz: Stummes Autosave nur ausführen wenn Sitzung aktiv ───────────
       const performCloudSave = async () => {
+        const awaitCloudConfirmation = true;
         const now = new Date().toISOString();
         // Zuerst iPad-Prioritäts- und Versionsprüfung durchführen
         const isTechSave = projectMode === 'technician' || isTechnicianMode;
@@ -2137,39 +2227,16 @@ function App() {
               }
             }
 
-            // Lock-Sitzung in der DB prüfen
-            const cutoff = new Date(Date.now() - 20 * 60 * 1000).toISOString();
-            const { data: sessions, error: sessionErr } = await supabase
-              .from('project_sessions')
-              .select('session_token, open_project_id, device, last_seen')
-              .eq('open_project_id', finalReport.id)
-              .gte('last_seen', cutoff);
-
-            if (!sessionErr && sessions) {
-              const otherSessions = sessions.filter(s => s.session_token !== mySessionToken);
-              const otherParsedSessions = otherSessions.map(s => {
-                const parts = (s.device || '').split(':');
-                return {
-                  ...s,
-                  deviceType: parts[0] || 'Desktop',
-                  userEmail: parts[1] || 'Unbekannt'
-                };
-              });
-
-              const isIPad = /iPad/i.test(navigator.userAgent) ||
-                             (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) ||
-                             (navigator.userAgent.includes('Macintosh') && 'ontouchend' in document);
-              const myDeviceName = isIPad ? 'iPad' : (/iPhone|Android/i.test(navigator.userAgent) ? 'Mobil' : 'Desktop');
-
-              const conflictingIPads = otherParsedSessions.filter(s => s.deviceType === 'iPad');
-              if (myDeviceName !== 'iPad' && conflictingIPads.length > 0) {
-                const conflictMsg = 'Dieses Projekt wird aktuell auf dem iPad bearbeitet. Das iPad hat Vorrang. Deine Änderungen wurden nicht gespeichert.';
-                if (!silent) {
-                  alert(conflictMsg);
-                }
-                saveToUnsavedReports(finalReport, true);
-                throw new Error(conflictMsg);
-              }
+            const { data: lockRows, error: sessionErr } = await supabase.rpc('get_project_lock_status', {
+              p_project_id: finalReport.id,
+              p_session_token: mySessionToken,
+            });
+            const lockStatus = Array.isArray(lockRows) ? lockRows[0] : lockRows;
+            if (sessionErr || lockStatus?.is_owner !== true) {
+              const conflictMsg = 'Projekt-Sperrbesitz konnte nicht bestätigt werden. Änderungen wurden nicht gespeichert.';
+              if (!silent) alert(conflictMsg);
+              saveToUnsavedReports(finalReport, true);
+              throw new Error(conflictMsg);
             }
           } catch (e) {
             console.error('[CloudSave Check Error]', e);
@@ -2292,7 +2359,7 @@ function App() {
 
           // ─── Konfliktschutz: Nur speichern wenn kein neueres Update existiert ───────
           if (loadedAt && finalReport.id && !finalReport.id.startsWith('TMP-')) {
-            if (silent) {
+            if (silent && !awaitCloudConfirmation) {
               let query = supabase.from('damage_reports').update(rowData);
               if (typeof query.eq === 'function') query = query.eq('id', finalReport.id);
               if (typeof query.lte === 'function') query = query.lte('updated_at', loadedAt);
@@ -2370,6 +2437,7 @@ function App() {
                   console.warn('[Sync-Konflikt] Neuere Version in Supabase – abgebrochen:', finalReport.id);
                   showToast('⚠️ Neuere Version auf anderem Gerät! Seite neu laden.', 'warning');
                   saveToUnsavedReports(finalReport, true);
+                  throw new Error('Cloud-Speicherung wegen Versionskonflikt nicht bestätigt');
                 }
               } else {
                 const serverUpdatedAt = updateResult[0].updated_at || now;
@@ -2389,7 +2457,7 @@ function App() {
               }
             }
           } else {
-            if (silent) {
+            if (silent && !awaitCloudConfirmation) {
               let query = supabase.from('damage_reports').upsert(rowData);
               if (typeof query.select === 'function') query = query.select('id, updated_at');
 
@@ -2443,7 +2511,13 @@ function App() {
           }
         } catch (err) {
           handleSaveError(err);
+          throw err;
         }
+        confirmedProjectPayloadRef.current.set(
+          finalReport.id,
+          JSON.parse(JSON.stringify(reportForStorage))
+        );
+        return { success: true, projectId: finalReport.id, reportData: reportForStorage };
       };
 
       const hasImageChanges = JSON.stringify(finalReport.images?.map(img => ({ id: img.id, uploading: img.uploading, preview: img.preview }))) !==
@@ -2483,7 +2557,7 @@ function App() {
     }
 
     return finalReport;
-  }, [supabase]);
+  }, [supabase, view]);
 
   const handleNavigateToReport = (identifier) => {
     if (!identifier) return;
@@ -2536,8 +2610,6 @@ function App() {
       try {
         // Clean up child tables first to avoid foreign key constraint errors
         await supabase.from('project_todos').delete().eq('project_id', reportId).catch(() => {});
-        await supabase.from('project_sessions').delete().eq('open_project_id', reportId).catch(() => {});
-
         const { error } = await supabase
           .from('damage_reports')
           .delete()
@@ -3282,25 +3354,9 @@ function App() {
                         Du kannst das Projekt ansehen, aber momentan nicht bearbeiten.
                       </div>
                       <div style={{ fontSize: '0.8rem', fontWeight: 400, opacity: 0.8, fontStyle: 'italic', textAlign: 'center', lineHeight: '1.4' }}>
-                        Die Sperre wird spätestens nach 20 Minuten Inaktivität des Bearbeiters automatisch aufgehoben.
+                        Die Sperre kann ausschließlich vom bestätigten Besitzer nach sicherem Abschluss freigegeben werden.
                       </div>
                     </div>
-                    {!isLockedByIPad && (
-                      <button
-                        onClick={async () => {
-                          await takeOverLock();
-                        }}
-                        style={{
-                          background: 'white', color: '#dc2626',
-                          border: 'none', padding: '0.6rem 1.2rem',
-                          borderRadius: '8px', fontWeight: 800,
-                          fontSize: '0.95rem', cursor: 'pointer',
-                          width: '100%'
-                        }}
-                      >
-                        → Hier weiterarbeiten
-                      </button>
-                    )}
                   </div>
                 </div>
               );

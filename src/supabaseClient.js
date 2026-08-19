@@ -1,5 +1,17 @@
 import { createClient } from '@supabase/supabase-js'
 
+let qtoolSessionToken = null;
+
+export function setQToolSessionToken(token) {
+  qtoolSessionToken = typeof token === 'string' && token.length >= 20 ? token : null;
+}
+
+export function qtoolAuthenticatedFetch(input, init = {}) {
+  const headers = new Headers(init.headers || {});
+  if (qtoolSessionToken) headers.set('x-qtool-session-token', qtoolSessionToken);
+  return fetch(input, { ...init, headers });
+}
+
 if (typeof window !== 'undefined' && (window.location.hash.includes('type=recovery') || window.location.href.includes('type=recovery'))) {
   try {
     sessionStorage.setItem('supabase_recovery_flow', 'true');
@@ -341,10 +353,10 @@ if (isWebDriver) {
 } else if (rawUrl && rawKey) {
   if (expectedProjectId === LIVE_PROJECT_ID || !expectedProjectId) {
     // Standard Supabase Client für Dev/Prod
-    supabaseInstance = createClient(rawUrl, rawKey);
+    supabaseInstance = createClient(rawUrl, rawKey, { global: { fetch: qtoolAuthenticatedFetch } });
   } else {
     validatedUrl = validateSupabaseConfig(rawUrl, rawKey, expectedProjectId);
-    supabaseInstance = createClient(validatedUrl.href, rawKey);
+    supabaseInstance = createClient(validatedUrl.href, rawKey, { global: { fetch: qtoolAuthenticatedFetch } });
   }
 }
 

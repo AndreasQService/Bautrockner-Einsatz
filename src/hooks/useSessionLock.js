@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 
 const POLL_INTERVAL = 5000; // poll every 5s
 const HEARTBEAT_INTERVAL = 30 * 1000; // keep ownership alive while project stays open
-const SESSION_TIMEOUT = 20 * 60 * 1000; // 20 minutes
+const AUTH_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export function startSessionLockLifecycle({
   enabledRef,
@@ -13,7 +13,6 @@ export function startSessionLockLifecycle({
   supabase,
   upsertSession,
   pollSessions,
-  deleteSession,
   eventTarget = window,
   setIntervalFn = setInterval,
   clearIntervalFn = clearInterval,
@@ -38,7 +37,7 @@ export function startSessionLockLifecycle({
   }, POLL_INTERVAL);
 
   const handleUnload = () => {
-    // Keep lock on page reload / tab close (will naturally expire in 20 mins)
+    // Keep lock on page reload / tab close. Locks never expire implicitly.
     console.log('[SessionLock] Preserving project lock session on unload.');
   };
 
@@ -48,12 +47,8 @@ export function startSessionLockLifecycle({
     clearIntervalFn(pollTimer);
     eventTarget.removeEventListener('beforeunload', handleUnload);
 
-    // If we left the project page (navigated to dashboard), release the lock immediately
-    const inProject = viewRef?.current === 'details' || viewRef?.current === 'new-report';
-    const hasProject = reportIdRef?.current;
-    if (enabledRef.current && (!inProject || !hasProject)) {
-      deleteSession();
-    }
+    // Never release from cleanup/unload. The caller releases only after its
+    // verified sync/navigation boundary has completed.
   };
 }
 
@@ -66,7 +61,8 @@ export function useSessionLock(
   sessionStartedAt,
   enabled = true,
   currentUser = null,
-  onInactivityTimeout = null
+  onInactivityTimeout = null,
+  authenticatedUserId = null
 ) {
   const [lockedProjectIds, setLockedProjectIds]   = useState(new Set());
   // Initialize to true if locking is disabled or no report is selected
@@ -117,7 +113,10 @@ export function useSessionLock(
 
   // ── Eigene Session upserten (Sperre setzen/verlängern) ───────────────────
   const upsertSession = useCallback(async () => {
-    if (!supabase) return;
+    if (!supabase || !AUTH_UUID.test(String(authenticatedUserId || ''))) {
+      setIsSessionActive(false);
+      return;
+    }
     if (!enabledRef.current) return;
     const openProjectId = (viewRef.current === 'details' || viewRef.current === 'new-report')
       ? (reportIdRef.current ?? null)
@@ -133,7 +132,7 @@ export function useSessionLock(
     const { data, error } = await supabase.rpc('acquire_project_lock', {
       p_project_id:    openProjectId,
       p_session_token: tokenRef.current,
-      p_user_id:       String(userId),
+      p_user_id:       String(authenticatedUserId),
       p_user_name:     username,
       p_device:        deviceValue,
     });
@@ -149,11 +148,7 @@ export function useSessionLock(
                              String(error.message).toLowerCase().includes('network') ||
                              String(error.message).toLowerCase().includes('timeout') ||
                              String(error.message).toLowerCase().includes('connection');
-      if (isNetworkError) {
-        setIsSessionActive(true);
-      } else {
-        setIsSessionActive(false);
-      }
+      setIsSessionActive(false);
     } else {
       const result = data && data[0];
       if (result && result.acquired) {
@@ -161,41 +156,11 @@ export function useSessionLock(
         setIsSessionActive(true);
         console.log('[SessionLock] LOCK_ACQUIRED / DB confirmed lock.', { openProjectId });
       } else {
-        // Lock blocked/denied!
-        if (isIPad) {
-          console.log('[SessionLock] iPad priority override – automatically taking over lock for project:', openProjectId);
-          try {
-            await supabase
-              .from('project_sessions')
-              .delete()
-              .eq('open_project_id', openProjectId)
-              .neq('session_token', tokenRef.current);
-
-            const { data: retryData } = await supabase.rpc('acquire_project_lock', {
-              p_project_id:    openProjectId,
-              p_session_token: tokenRef.current,
-              p_user_id:       String(userId),
-              p_user_name:     username,
-              p_device:        deviceValue,
-            });
-            const retryResult = retryData && retryData[0];
-            if (retryResult && retryResult.acquired) {
-              setIsSessionActive(true);
-              console.log('[SessionLock] iPad override succeeded – lock acquired for iPad.');
-            } else {
-              setIsSessionActive(true);
-            }
-          } catch (e) {
-            console.warn('[SessionLock] iPad override exception:', e);
-            setIsSessionActive(true);
-          }
-        } else {
-          setIsSessionActive(false);
-          console.log('[SessionLock] LOCK_DENIED / project locked by another session.', result);
-        }
+        setIsSessionActive(false);
+        console.log('[SessionLock] LOCK_DENIED / project locked by another session.', result);
       }
     }
-  }, [supabase, myDevice, userId, username, userEmail, isIPad]);
+  }, [supabase, myDevice, userId, username, userEmail, authenticatedUserId]);
 
   // ── Session bei Aktivität verlängern ───────────────────────────────────
   const registerProjectActivity = useCallback(() => {
@@ -242,12 +207,19 @@ export function useSessionLock(
 
   // ── Session löschen (Sperre freigeben) ─────────────────────────────────
   const deleteSession = useCallback(async () => {
-    if (!supabase) return;
-    await supabase
-      .from('project_sessions')
-      .delete()
-      .eq('session_token', tokenRef.current);
+    if (!supabase || !reportIdRef.current) return false;
+    const { data, error } = await supabase.rpc('release_project_lock', {
+      p_project_id: reportIdRef.current,
+      p_session_token: tokenRef.current,
+    });
+    if (error || data !== true) {
+      setIsSessionActive(false);
+      console.warn('[SessionLock] LOCK_RELEASE_FAILED', error?.message || data);
+      return false;
+    }
+    setIsSessionActive(false);
     console.log('[SessionLock] LOCK_RELEASED');
+    return true;
   }, [supabase]);
 
   // ── Andere Sessions abfragen und Locks berechnen ──────────────────────
@@ -260,54 +232,8 @@ export function useSessionLock(
     const myView      = viewRef.current;
     const inProject   = myView === 'details' || myView === 'new-report';
 
-    // 1. Check local inactivity timeout first
-    if (inProject && isSessionActiveRef.current) {
-      const inactiveMs = Date.now() - lastLocalActivityRef.current;
-      if (inactiveMs >= SESSION_TIMEOUT) {
-        console.warn('[SessionLock] INACTIVITY_TIMEOUT reached!');
-        await deleteSession();
-        setIsSessionActive(false);
-        if (onInactivityTimeout) {
-          onInactivityTimeout();
-        }
-        return;
-      }
-    }
-
-    // 2. Query other active sessions from database
-    const cutoff = new Date(Date.now() - SESSION_TIMEOUT).toISOString();
-    const { data, error } = await supabase
-      .from('project_sessions')
-      .select('session_token, open_project_id, mode, device, last_seen, created_at')
-      .gte('last_seen', cutoff);
-
-    if (error) {
-      console.warn('[SessionLock] poll failed:', error.message);
-      return;
-    }
-
-    // Parse device fields
-    const parsedSessions = (data || []).map(s => {
-      const parts = (s.device || '').split(':');
-      return {
-        ...s,
-        deviceType: parts[0] || 'Desktop',
-        userId: parts[1] || 'unknown',
-        username: parts[2] || 'Unbekannt',
-        userEmail: parts[3] || 'Unbekannt'
-      };
-    });
-
-    // Dashboard locked projects
-    const otherIds = new Set(
-      parsedSessions
-        .filter(s => s.session_token !== myToken && s.open_project_id)
-        .map(s => s.open_project_id)
-    );
-    setLockedProjectIds(otherIds);
-
     if (!inProject || !myProjectId) {
-      setIsSessionActive(true);
+      setLockedProjectIds(new Set());
       setIsLockedByIPad(false);
       setActiveLockUser(null);
       setActiveLockSince(null);
@@ -315,35 +241,33 @@ export function useSessionLock(
       return;
     }
 
-    // Concurrency conflict check
-    const projectSessions = parsedSessions.filter(s => s.open_project_id === myProjectId);
+    // 2. Read redacted lock status only through the authenticated RPC.
+    const { data, error } = await supabase.rpc('get_project_lock_status', {
+      p_project_id: myProjectId,
+      p_session_token: myToken,
+    });
 
-    // Oldest active session gets the lock
-    const oldestSession = projectSessions.reduce((min, s) => {
-      const timeS = new Date(s.created_at || s.last_seen).getTime();
-      const timeMin = new Date(min.created_at || min.last_seen).getTime();
-      if (timeS < timeMin) return s;
-      if (timeS > timeMin) return min;
-      return s.session_token < min.session_token ? s : min;
-    }, projectSessions[0]);
-
-    const amIOwner = oldestSession ? (oldestSession.session_token === myToken) : true;
-    const winningSession = amIOwner ? null : oldestSession;
+    if (error) {
+      console.warn('[SessionLock] poll failed:', error.message);
+      setIsSessionActive(false);
+      return;
+    }
+    const status = Array.isArray(data) ? data[0] : data;
+    const amIOwner = status?.is_owner === true;
 
     setIsSessionActive(amIOwner);
-    setIsLockedByIPad(!amIOwner && oldestSession?.deviceType === 'iPad');
+    setIsLockedByIPad(!amIOwner && status?.device_type === 'iPad');
 
     if (amIOwner) {
-      const mySession = parsedSessions.find(s => s.session_token === myToken);
       setActiveLockUser(username);
-      setActiveLockSince(mySession?.created_at || new Date().toISOString());
+      setActiveLockSince(status?.locked_at || new Date().toISOString());
       setActiveLockDevice(myDevice);
-      setActiveLockActivity(mySession?.last_seen || new Date().toISOString());
+      setActiveLockActivity(status?.last_seen_at || new Date().toISOString());
     } else {
-      setActiveLockUser(winningSession?.username || 'Unbekannt');
-      setActiveLockSince(winningSession?.created_at || winningSession?.last_seen || new Date().toISOString());
-      setActiveLockDevice(winningSession?.deviceType || 'Gerät');
-      setActiveLockActivity(winningSession?.last_seen || new Date().toISOString());
+      setActiveLockUser(status?.lock_owner || 'Unbekannt');
+      setActiveLockSince(status?.locked_at || null);
+      setActiveLockDevice(status?.device_type || 'Gerät');
+      setActiveLockActivity(status?.last_seen_at || null);
     }
   }, [supabase, myDevice, username, onInactivityTimeout, deleteSession]);
 
@@ -358,7 +282,6 @@ export function useSessionLock(
       supabase,
       upsertSession,
       pollSessions,
-      deleteSession,
     });
   }, [enabled, supabase, upsertSession, pollSessions, deleteSession, myDevice]);
 
@@ -369,36 +292,16 @@ export function useSessionLock(
     pollSessions();
   }, [enabled, view, selectedReportId, resolvedMode, upsertSession, pollSessions]);
 
-  // Force Lock Takeover
-  const takeOverLock = useCallback(async () => {
-    if (!enabledRef.current) return;
-    try {
-      if (!supabase || !reportIdRef.current) return;
-
-      // Delete conflicting sessions in DB
-      await supabase
-        .from('project_sessions')
-        .delete()
-        .eq('open_project_id', reportIdRef.current)
-        .neq('session_token', tokenRef.current);
-
-      await upsertSession();
-      setIsSessionActive(true);
-    } catch (e) {
-      console.error(e);
-    }
-  }, [supabase, upsertSession]);
-
   return {
     lockedProjectIds,
     isSessionActive,
     setIsSessionActive,
-    takeOverLock,
     isLockedByIPad,
     activeLockUser,
     activeLockSince,
     activeLockDevice,
     activeLockActivity,
-    registerProjectActivity
+    registerProjectActivity,
+    releaseProjectLock: deleteSession
   };
 }

@@ -3,6 +3,7 @@ import { ClipboardList, Plus, Search, Calendar, User, Check, Edit2, AlertTriangl
 import { fetchAllTodos, completeTodoAndArchiveProjectRpc, deleteTodo } from '../services/TodoService';
 import TodoModal from './TodoModal';
 import TodoHistoryModal from './TodoHistoryModal';
+import { compareTodosByDueDateAndProject, isTodoAssignedToUser, matchesTodoAssigneeFilter } from '../lib/todoAssignee.js';
 
 function getCleanProjectTitle(proj) {
     if (!proj) return 'Unbekanntes Projekt';
@@ -151,13 +152,7 @@ const TodoMonitor = ({
 
         // 3. Filter by Active Tab Filter
         if (activeFilter === 'mine' && currentUser) {
-            const myName = (currentUser.name || '').toLowerCase();
-            const myId = String(currentUser.id || '');
-            list = list.filter(t => 
-                String(t.assigned_user_id) === myId ||
-                (t.assigned_user_name && t.assigned_user_name.toLowerCase().includes(myName)) ||
-                (myName && t.assigned_user_name && myName.includes(t.assigned_user_name.toLowerCase()))
-            );
+            list = list.filter(t => isTodoAssignedToUser(t, currentUser));
         } else if (activeFilter === 'overdue') {
             list = list.filter(t => t.due_date < todayStr);
         } else if (activeFilter === 'today') {
@@ -174,25 +169,12 @@ const TodoMonitor = ({
 
         // 3.5. Filter by Assignee Filter Dropdown
         if (assigneeFilter !== 'all') {
-            list = list.filter(t => {
-                if (assigneeFilter === 'office') {
-                    return !t.assigned_user_id || t.assigned_user_id === 'office' || t.assigned_user_name === 'Innendienst';
-                }
-                return String(t.assigned_user_id) === String(assigneeFilter);
-            });
+            list = list.filter(t => matchesTodoAssigneeFilter(t, assigneeFilter, users));
         }
 
         // 4. Sort: Overdue (oldest first) -> Today -> Future (chronological, closest first)
-        return [...list].sort((a, b) => {
-            if (a.due_date !== b.due_date) {
-                return a.due_date < b.due_date ? -1 : 1;
-            }
-            // Secondary sorting by project title
-            const projA = reports.find(r => r.id === a.project_id || (r.projectNumber && String(r.projectNumber) === String(a.project_id)))?.projectTitle || '';
-            const projB = reports.find(r => r.id === b.project_id || (r.projectNumber && String(r.projectNumber) === String(b.project_id)))?.projectTitle || '';
-            return projA.localeCompare(projB);
-        });
-    }, [todos, reports, activeProjects, activeFilter, searchTerm, currentUser, assigneeFilter]);
+        return [...list].sort((a, b) => compareTodosByDueDateAndProject(a, b, reports));
+    }, [todos, reports, activeProjects, activeFilter, searchTerm, currentUser, assigneeFilter, users]);
     // Historical completed todos
     const processedHistoryTodos = useMemo(() => {
         let list = todos.filter(t => t.status === 'done');
@@ -216,12 +198,7 @@ const TodoMonitor = ({
 
         // Apply assignee filter
         if (assigneeFilter !== 'all') {
-            list = list.filter(t => {
-                if (assigneeFilter === 'office') {
-                    return !t.assigned_user_id || t.assigned_user_id === 'office' || t.assigned_user_name === 'Innendienst';
-                }
-                return String(t.assigned_user_id) === String(assigneeFilter);
-            });
+            list = list.filter(t => matchesTodoAssigneeFilter(t, assigneeFilter, users));
         }
 
         // Sort: Newest completed_at first
@@ -230,7 +207,7 @@ const TodoMonitor = ({
             const timeB = new Date(b.completed_at || 0).getTime();
             return timeB - timeA;
         });
-    }, [todos, reports, searchTerm, assigneeFilter]);
+    }, [todos, reports, searchTerm, assigneeFilter, users]);
 
     // Counters
     const counters = useMemo(() => {
@@ -244,7 +221,7 @@ const TodoMonitor = ({
             overdue: activeOpenTodos.filter(t => t.due_date < todayStr).length,
             today: activeOpenTodos.filter(t => t.due_date === todayStr).length,
             future: activeOpenTodos.filter(t => t.due_date > todayStr).length,
-            mine: currentUser ? activeOpenTodos.filter(t => String(t.assigned_user_id) === String(currentUser.id)).length : 0,
+            mine: currentUser ? activeOpenTodos.filter(t => isTodoAssignedToUser(t, currentUser)).length : 0,
             noTodos: projectsWithoutTodos.length
         };
     }, [todos, activeProjects, projectsWithoutTodos, currentUser]);
