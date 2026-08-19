@@ -181,72 +181,10 @@ export async function fetchAllTodos(reports = [], forceRefresh = false) {
         }
     }
 
-    // ── BACKGROUND SYNCHRONIZATION ──
-    const isTestEnv = typeof window !== 'undefined' && (window.navigator.webdriver || window.IS_TEST_ENV);
-    if (supabase && !isTestEnv && !dbTodosCache && !dbTodosPromise) {
-        try {
-            const local = JSON.parse(localStorage.getItem('qservice_local_todos') || '[]');
-            const inboxTodosRaw = JSON.parse(localStorage.getItem('qtool_inbox_todos') || '[]');
-
-            // 1. Sync local project todos
-            if (local.length > 0) {
-                const syncedIds = [];
-                for (const todo of local) {
-                    const payload = {
-                        project_id: todo.project_id,
-                        parent_todo_id: (todo.parent_todo_id && isUuidVal(todo.parent_todo_id)) ? todo.parent_todo_id : null,
-                        root_todo_id: (todo.root_todo_id && isUuidVal(todo.root_todo_id)) ? todo.root_todo_id : null,
-                        task: todo.task,
-                        due_date: todo.due_date,
-                        assigned_user_id: String(todo.assigned_user_id),
-                        assigned_user_name: todo.assigned_user_name,
-                        note: todo.note || null,
-                        closes_project: !!todo.closes_project,
-                        status: todo.status || 'open',
-                        created_by: todo.created_by || 'System',
-                        updated_by: todo.updated_by || 'System'
-                    };
-                    const { error } = await supabase.from('project_todos').insert(payload);
-                    if (!error || error.code === '23503' || String(error?.message).includes('foreign key')) {
-                        syncedIds.push(todo.id);
-                    }
-                }
-                if (syncedIds.length > 0) {
-                    const remaining = local.filter(t => !syncedIds.includes(t.id));
-                    localStorage.setItem('qservice_local_todos', JSON.stringify(remaining));
-                }
-            }
-
-            // 2. Sync local inbox/dashboard todos
-            if (inboxTodosRaw.length > 0) {
-                const syncedInboxIds = [];
-                for (const todo of inboxTodosRaw) {
-                    const payload = {
-                        project_id: todo.projectId || null,
-                        task: todo.text || todo.task,
-                        due_date: todo.date ? todo.date.split('T')[0] : new Date().toISOString().split('T')[0],
-                        assigned_user_id: 'office',
-                        assigned_user_name: todo.sender || 'Innendienst',
-                        note: todo.sender ? `Absender: ${todo.sender}` : null,
-                        closes_project: false,
-                        status: todo.done ? 'done' : 'open',
-                        created_by: todo.sender || 'Eingang',
-                        updated_by: todo.sender || 'Eingang'
-                    };
-                    const { error } = await supabase.from('project_todos').insert(payload);
-                    if (!error || error.code === '23503' || String(error?.message).includes('foreign key')) {
-                        syncedInboxIds.push(todo.id);
-                    }
-                }
-                if (syncedInboxIds.length > 0) {
-                    const remaining = inboxTodosRaw.filter(t => !syncedInboxIds.includes(t.id));
-                    localStorage.setItem('qtool_inbox_todos', JSON.stringify(remaining));
-                }
-            }
-        } catch (syncErr) {
-            console.warn('[TodoService] Auto-sync failed:', syncErr);
-        }
-    }
+    // Local todos are deliberately read-only at dashboard load. Uploading them
+    // here would run without a verified project lock and is rejected by the
+    // owner-only RLS boundary. Keep the local evidence intact until an explicit,
+    // project-scoped synchronization owns the corresponding lock.
 
     let dbTodos = [];
     if (dbTodosCache) {
