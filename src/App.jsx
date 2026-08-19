@@ -24,6 +24,7 @@ import { buildProjectFolderName, uploadProjectJson } from "./services/OneDriveSe
 import { syncPendingToSupabase } from './lib/sync/supabaseSyncWorker.js';
 import { markUploadedPhotosAsVerified, sanitizeCorruptPhotosInDb } from './services/PhotoStorage';
 import { isVisibleProjectRow } from './utils/projectVisibility.js';
+import { connectOneDrive, getGraphAccessTokenSilent, initOneDriveAuth } from './lib/onedrive/auth.js';
 const canonicalJson = value => {
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
   if (value && typeof value === 'object') {
@@ -1105,6 +1106,62 @@ function App() {
   // Zählt ausstehende lokale Fotos direkt aus IndexedDB (qtool-photos)
   const [syncStatus, setSyncStatus] = useState('idle'); // 'idle' | 'syncing' | 'error'
   const [syncPending, setSyncPending] = useState(0);
+  const [oneDriveServiceStatus, setOneDriveServiceStatus] = useState({ ok: null, error: null, driveId: null });
+
+  const verifyOneDriveServiceConnectivity = useCallback(async () => {
+    if (!navigator.onLine) {
+      setOneDriveServiceStatus({ ok: false, error: 'Offline', driveId: null });
+      return false;
+    }
+    try {
+      const account = await initOneDriveAuth();
+      if (!account) throw new Error('Microsoft-Anmeldung fehlt');
+      const token = await getGraphAccessTokenSilent();
+      if (!token) throw new Error('Microsoft-Anmeldung muss erneuert werden');
+      const response = await fetch('https://graph.microsoft.com/v1.0/me/drive?$select=id,driveType', {
+        method: 'GET', headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!response.ok) throw new Error(`Microsoft Graph ${response.status}`);
+      const drive = await response.json();
+      if (!drive?.id) throw new Error('OneDrive-ID fehlt');
+      setOneDriveServiceStatus({ ok: true, error: null, driveId: drive.id, checkedAt: new Date().toISOString() });
+      return true;
+    } catch (error) {
+      setOneDriveServiceStatus({ ok: false, error: error?.message || 'OneDrive nicht erreichbar', driveId: null });
+      return false;
+    }
+  }, []);
+
+  const handleConnectOneDrive = useCallback(async () => {
+    setOneDriveServiceStatus({ ok: null, error: null, driveId: null, connecting: true });
+    try {
+      const result = await connectOneDrive();
+      if (!result?.account) throw new Error('Microsoft-Anmeldung wurde nicht bestätigt');
+      await verifyOneDriveServiceConnectivity();
+    } catch (error) {
+      setOneDriveServiceStatus({ ok: false, error: error?.message || 'OneDrive-Anmeldung fehlgeschlagen', driveId: null });
+    }
+  }, [verifyOneDriveServiceConnectivity]);
+
+  useEffect(() => {
+    if (!currentUser) {
+      setOneDriveServiceStatus({ ok: null, error: null, driveId: null });
+      return undefined;
+    }
+    let cancelled = false;
+    void verifyOneDriveServiceConnectivity();
+    const onOnline = () => { if (!cancelled) void verifyOneDriveServiceConnectivity(); };
+    const onOffline = () => setOneDriveServiceStatus({ ok: false, error: 'Offline', driveId: null });
+    window.addEventListener('online', onOnline);
+    window.addEventListener('offline', onOffline);
+    const timer = window.setInterval(() => { if (!cancelled) void verifyOneDriveServiceConnectivity(); }, 60_000);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('online', onOnline);
+      window.removeEventListener('offline', onOffline);
+      window.clearInterval(timer);
+    };
+  }, [currentUser, verifyOneDriveServiceConnectivity]);
 
   // Ausstehende lokale Bilder zählen – alle 10s aktualisieren
   // Fällt automatisch auf 0 nach erfolgreichem Supabase-Upload
@@ -2934,13 +2991,15 @@ function App() {
 
           <nav style={{ flexGrow: 1, display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '0.5rem' }}>
             {/* Supabase Datenbank-Status Badge */}
-            {supabaseStatus && (
+            {(
               <div
                 id="supabase-status-badge"
+                role="status"
+                aria-live="polite"
                 title={
-                  supabaseStatus.ok === null ? 'Verbinde mit Supabase...'
-                  : supabaseStatus.ok ? `${supabaseStatus.count} Projekte geladen (Gesamte DB: ${supabaseStatus.total} Einträge)`
-                  : `Supabase Fehler: ${supabaseStatus.error}`
+                  !isOnline || supabaseStatus?.ok !== true
+                    ? `Datenbank ausstehend${supabaseStatus?.error ? `: ${supabaseStatus.error}` : ''}`
+                    : `${supabaseStatus.count} Projekte geladen (Gesamte DB: ${supabaseStatus.total} Einträge)`
                 }
                 style={{
                   display: 'inline-flex',
@@ -2949,13 +3008,11 @@ function App() {
                   padding: '0.3rem 0.65rem',
                   borderRadius: '6px',
                   border: `1px solid ${
-                    supabaseStatus.ok === null ? '#6366f1' 
-                    : supabaseStatus.ok ? '#10B981' 
-                    : (supabaseStatus.error?.toLowerCase().includes('timeout') || supabaseStatus.error?.includes('57014')) ? '#F59E0B' : '#EF4444'
+                    isOnline && supabaseStatus?.ok === true ? '#10B981' : '#EF4444'
                   }`,
-                  backgroundColor: supabaseStatus.ok === null ? 'rgba(99, 102, 241, 0.06)' : supabaseStatus.ok ? 'rgba(16, 185, 129, 0.06)' : 'rgba(239, 68, 68, 0.06)',
+                  backgroundColor: isOnline && supabaseStatus?.ok === true ? 'rgba(16, 185, 129, 0.06)' : 'rgba(239, 68, 68, 0.06)',
                   fontSize: '0.78rem',
-                  color: supabaseStatus.ok === null ? '#6366f1' : supabaseStatus.ok ? '#10B981' : '#EF4444',
+                  color: isOnline && supabaseStatus?.ok === true ? '#10B981' : '#EF4444',
                   whiteSpace: 'nowrap',
                   userSelect: 'none',
                   transition: 'all 0.3s ease',
@@ -2965,13 +3022,11 @@ function App() {
               >
                 <span style={{
                   width: '7px', height: '7px', borderRadius: '50%',
-                  backgroundColor: supabaseStatus.ok === null ? '#6366f1' : supabaseStatus.ok ? '#10B981' : '#EF4444',
+                  backgroundColor: isOnline && supabaseStatus?.ok === true ? '#10B981' : '#EF4444',
                   flexShrink: 0,
                 }} />
                 <span>
-                  {supabaseStatus.ok === null && '⏳ Verbinde...'}
-                  {supabaseStatus.ok === true && 'Datenbank'}
-                  {supabaseStatus.ok === false && 'Offline'}
+                  {isOnline && supabaseStatus?.ok === true ? 'Datenbank verbunden' : 'Datenbank ausstehend'}
                 </span>
               </div>
             )}
@@ -3023,20 +3078,19 @@ function App() {
                       <span className="hide-mobile">Import</span>
                     </button>
 
-                    {/* Sync-Status Badge (Variante C: kein OneDrive-Login) */}
-                    <div
-                      id="sync-status-badge"
-                      title={syncPending > 0
-                        ? `${syncPending} Fotos ausstehend – werden synchronisiert sobald Netz verfügbar`
-                        : 'Alle Daten synchronisiert'}
+                    {isOnline && oneDriveServiceStatus.ok === true ? <div
+                      id="dashboard-onedrive-status-badge"
+                      role="status"
+                      aria-live="polite"
+                      title="Microsoft-Authentifizierung und OneDrive-Abfrage bestätigt"
                       style={{
                         display: 'flex', alignItems: 'center', gap: '0.35rem',
                         padding: '0.3rem 0.65rem',
                         borderRadius: '6px',
-                        border: `1px solid ${syncPending > 0 ? 'rgba(251,191,36,0.4)' : 'var(--border)'}`,
-                        backgroundColor: syncPending > 0 ? 'rgba(251,191,36,0.06)' : 'var(--surface)',
+                        border: '1px solid #10B981',
+                        backgroundColor: 'rgba(16,185,129,0.06)',
                         fontSize: '0.78rem',
-                        color: syncPending > 0 ? '#FBBF24' : 'var(--text-muted)',
+                        color: '#10B981',
                         whiteSpace: 'nowrap',
                         userSelect: 'none',
                         transition: 'all 0.3s ease',
@@ -3044,13 +3098,28 @@ function App() {
                     >
                       <span style={{
                         width: '7px', height: '7px', borderRadius: '50%',
-                        backgroundColor: syncPending > 0 ? '#FBBF24' : '#10B981',
+                        backgroundColor: '#10B981',
                         flexShrink: 0,
                       }} />
-                      <span className="hide-mobile">
-                        {syncPending > 0 ? `${syncPending} ausstehend` : 'Synchronisiert'}
-                      </span>
-                    </div>
+                      <span className="hide-mobile">OneDrive verbunden</span>
+                    </div> : <button
+                      type="button"
+                      id="dashboard-onedrive-connect-button"
+                      onClick={() => void handleConnectOneDrive()}
+                      disabled={!isOnline || oneDriveServiceStatus.connecting === true}
+                      aria-label="OneDrive verbinden"
+                      title={oneDriveServiceStatus.error || 'Microsoft-Anmeldung öffnen und OneDrive-Verbindung prüfen'}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '0.35rem',
+                        padding: '0.3rem 0.65rem', borderRadius: '6px',
+                        border: '1px solid #EF4444', backgroundColor: 'rgba(239,68,68,0.06)',
+                        fontSize: '0.78rem', color: '#EF4444', whiteSpace: 'nowrap',
+                        cursor: !isOnline || oneDriveServiceStatus.connecting ? 'not-allowed' : 'pointer',
+                      }}
+                    >
+                      <span aria-hidden="true" style={{ width: 7, height: 7, borderRadius: '50%', backgroundColor: 'currentColor' }} />
+                      <span className="hide-mobile">{oneDriveServiceStatus.connecting ? 'OneDrive wird verbunden…' : 'OneDrive verbinden'}</span>
+                    </button>}
                   </>
                 )}
 

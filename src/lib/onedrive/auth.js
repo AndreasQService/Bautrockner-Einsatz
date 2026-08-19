@@ -140,15 +140,10 @@ export async function connectOneDrive() {
 export async function getGraphAccessToken() {
   const msal = getMsalInstance();
 
-  let account = getActiveAccount();
-  if (!account) {
-    // Kein Account → interaktiver Login
-    const result = await connectOneDrive();
-    account = result.account ?? null;
-    if (!account) {
-      throw new Error('[Auth] Kein Microsoft-Konto nach Login verfügbar.');
-    }
-  }
+  const account = getActiveAccount();
+  // Background workers must never open an authentication popup. Interactive
+  // login is restricted to the explicit dashboard connect button.
+  if (!account) return null;
 
   try {
     const result = await msal.acquireTokenSilent({
@@ -166,6 +161,20 @@ export async function getGraphAccessToken() {
     }
     // Andere Fehler → weiterschmeissen
     throw new Error(`[Auth] Token-Beschaffung fehlgeschlagen: ${error.message}`);
+  }
+}
+
+/** Silent-only connectivity check. Never opens a popup or redirect. */
+export async function getGraphAccessTokenSilent() {
+  const msal = getMsalInstance();
+  const account = getActiveAccount();
+  if (!account) return null;
+  try {
+    const result = await msal.acquireTokenSilent({ ...loginRequest, account });
+    return result?.accessToken || null;
+  } catch (error) {
+    if (error instanceof InteractionRequiredAuthError) return null;
+    throw new Error(`[Auth] Stille Token-Prüfung fehlgeschlagen: ${error.message}`);
   }
 }
 
