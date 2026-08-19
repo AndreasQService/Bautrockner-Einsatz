@@ -75,6 +75,14 @@ test('legacy acquire OUT contract is revoked and dropped before replacement', ()
   assert.doesNotMatch(sql, /returns table\(acquired boolean, lock_owner text, created_at/);
 });
 
+test('status RPC preserves both deployed parameter defaults', () => {
+  assert.match(
+    sql,
+    /function public\.get_project_lock_status\(\s*p_project_id text default null,\s*p_session_token text default null\s*\)/
+  );
+  assert.match(sql, /if p_project_id is null then raise exception 'INVALID_PROJECT_ID'/);
+});
+
 test('all fourteen project tables restore authenticated owner-only writes', () => {
   const expected = [
     ['damage_reports', 'id'],

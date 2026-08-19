@@ -280,7 +280,10 @@ begin
 end
 $function$;
 
-create or replace function public.get_project_lock_status(p_project_id text, p_session_token text default null)
+create or replace function public.get_project_lock_status(
+  p_project_id text default null,
+  p_session_token text default null
+)
 returns table(
   open_project_id text, mode text, device_type text, lock_owner text,
   locked_at timestamptz, last_seen_at timestamptz, is_owner boolean
