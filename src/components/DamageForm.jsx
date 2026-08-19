@@ -756,6 +756,9 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
 
     const [isSaving, setIsSaving] = useState(false);
     const [lastSaved, setLastSaved] = useState(null);
+    // Never infer a successful save from an id, a timer, or hydrated UI data.
+    // Only the real cloud-save result below may transition this state to saved.
+    const [saveState, setSaveState] = useState('pending');
     const [linkingImageId, setLinkingImageId] = useState(null);
     const [visibleRoomImages, setVisibleRoomImages] = useState({}); // Stores roomId -> boolean for toggle
     const [conflicts, setConflicts] = useState({}); // Stores { fieldPath: { original: '...', new: '...' } }
@@ -2018,6 +2021,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
             const hasChanges = hasSemanticChanges(lastSavedData.current, formData);
             if (hasChanges) {
                 hasUserEditedRef.current = true;
+                setSaveState('pending');
             }
         }
     }, [formData, initialData]);
@@ -2040,6 +2044,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         if (!hasChanges) return;
 
         setIsSaving(true);
+        setSaveState('pending');
         const timeoutId = setTimeout(async () => {
             if (!formData.projectTitle && !formData.id) return;
             setIsSaving(true);
@@ -2055,10 +2060,11 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
 
             try {
                 const savedReport = await onSave(reportData, true, 'user-edit');
-                if (savedReport) {
+                if (savedReport?.success === true) {
                     lastSavedData.current = JSON.parse(JSON.stringify(reportData));
                     hasUserEditedRef.current = false;
                     setLastSaved(new Date());
+                    setSaveState('saved');
                     // If the report was new (no ID) and the save generated one, update local state
                     if (savedReport.id && !formData.id) {
                         setFormData(prev => ({ ...prev, id: savedReport.id }));
@@ -2066,6 +2072,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                 }
             } catch (e) {
                 console.error("Auto-save failed:", e);
+                setSaveState('pending');
             } finally {
                 setIsSaving(false);
             }
@@ -10428,22 +10435,21 @@ END:VCARD`;
                     boxShadow: mode === 'technician' ? '0 -4px 12px rgba(0,0,0,0.05)' : '0 -4px 12px rgba(0, 0, 0, 0.5)',
                     pointerEvents: 'auto'
                 }}>
-                    {/* Status Indicator */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem', color: isSaving ? '#fbbf24' : '#1E6DB7', transition: 'color 0.3s' }}>
-                        {isSaving ? (
-                            <>
-                                <RotateCcw size={12} className="spin" /> Speichert...
-                            </>
-                        ) : !lastSaved ? (
-                            <>
-                                <RotateCcw size={12} /> Noch nicht gespeichert
-                            </>
-                        ) : (
-                            <>
-                                <CheckCircle size={12} /> Gespeichert
-                            </>
-                        )}
-                    </div>
+                    {/* Ruhiger, evidenzbasierter Speicherstatus: keine blinkenden Toasts. */}
+                    {(() => {
+                        const saveConfirmed = saveState === 'saved' && !isSaving && !isSyncPending;
+                        return (
+                            <div
+                                role="status"
+                                aria-live="polite"
+                                aria-label={saveConfirmed ? 'Projekt gespeichert' : 'Speicherung ausstehend'}
+                                style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.75rem', color: saveConfirmed ? '#10B981' : '#EF4444' }}
+                            >
+                                <span aria-hidden="true" style={{ width: '9px', height: '9px', borderRadius: '50%', backgroundColor: saveConfirmed ? '#10B981' : '#EF4444', flex: '0 0 9px' }} />
+                                {saveConfirmed ? 'Gespeichert' : 'Speicherung ausstehend'}
+                            </div>
+                        );
+                    })()}
 
                     <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                         {formData?.id && (

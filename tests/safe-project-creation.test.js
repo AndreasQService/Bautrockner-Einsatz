@@ -83,7 +83,7 @@ test('new DamageForm entries are eligible for the first autosave', () => {
   assert.doesNotMatch(autosave, /if \(!initialData\s*\|\|/);
   assert.match(autosave, /if \(initialData\?\.isLightweight === true\) return;/);
   assert.match(autosave, /await onSave\(reportData, true, 'user-edit'\)/);
-  assert.match(autosave, /if \(savedReport\)[\s\S]*setLastSaved\(new Date\(\)\)/);
+  assert.match(autosave, /if \(savedReport\?\.success === true\)[\s\S]*setLastSaved\(new Date\(\)\)/);
   assert.doesNotMatch(autosave, /finally \{[\s\S]*setLastSaved\(new Date\(\)\)/);
-  assert.match(source, /Noch nicht gespeichert/);
+  assert.match(source, /Speicherung ausstehend/);
 });
