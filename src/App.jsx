@@ -635,8 +635,6 @@ function App() {
       }
     };
 
-    showToast(`Synchronisiere "${offlineEntry.projectTitle || 'Unbenannt'}"...`, 'info', 0);
-
     try {
       if (!supabase) throw new Error('Supabase client ist nicht initialisiert.');
 
@@ -810,7 +808,6 @@ function App() {
         });
         logAudit('conditional_update_failed');
       } else {
-        showToast(`✅ "${offlineEntry.projectTitle || 'Unbenannt'}" erfolgreich synchronisiert!`, 'success', 3000);
         setUnsavedReports(prev => {
           const next = { ...prev };
           delete next[reportId];
