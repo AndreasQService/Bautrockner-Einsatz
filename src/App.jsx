@@ -1895,8 +1895,14 @@ function App() {
         return;
       }
       if (silentSaveDebounceTimers.current[reportId]) {
-        showToast('Speicherung läuft noch. Bitte kurz warten und erneut versuchen.', 'error', 10000);
-        return;
+        const debounceDeadline = Date.now() + 6000;
+        while (silentSaveDebounceTimers.current[reportId] && Date.now() < debounceDeadline) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+        if (silentSaveDebounceTimers.current[reportId]) {
+          showToast('Speicherung konnte nicht rechtzeitig bestätigt werden. Projekt bleibt geöffnet.', 'error', 10000);
+          return;
+        }
       }
       const { data: lockRows, error: lockStatusError } = await supabase.rpc('get_project_lock_status', {
         p_project_id: reportId,
