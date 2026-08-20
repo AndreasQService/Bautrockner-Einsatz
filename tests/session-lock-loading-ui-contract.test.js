@@ -16,3 +16,10 @@ test('foreign-lock evidence is project-scoped and reset on project change', () =
   assert.match(hook, /setConfirmedForeignLockProjectId\(null\);[\s\S]{0,220}\}, \[selectedReportId\]\)/);
   assert.match(hook, /hasConfirmedForeignOwner \? myProjectId : null/);
 });
+
+test('a confirmed foreign lock stays read-only without a blocking full-screen alarm', () => {
+  assert.doesNotMatch(app, /Projekt wird bereits bearbeitet/);
+  assert.match(app, /isReadOnly \? \(/);
+  assert.match(app, /Schreibgeschützt/);
+  assert.match(app, /Gesperrt von:/);
+});

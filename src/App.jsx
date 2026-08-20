@@ -3305,69 +3305,9 @@ function App() {
         )}
         {(view === 'new-report' || view === 'details') && (
           <div style={{ position: 'relative' }}>
-            {/* ── Sitzungssperre: Overlay + UI gesperrt wenn anderer Modus aktiv ── */}
-            {isLockedByOtherMode && (() => {
-              const formatTime = (isoString) => {
-                if (!isoString) return 'unbekannt';
-                const d = new Date(isoString);
-                const h = String(d.getHours()).padStart(2, '0');
-                const m = String(d.getMinutes()).padStart(2, '0');
-                return `${h}:${m} Uhr`;
-              };
-              return (
-                <div style={{
-                  position: 'absolute',
-                  top: 0, left: 0, right: 0, bottom: 0,
-                  zIndex: 9000,
-                  backgroundColor: 'rgba(220, 38, 38, 0.08)',
-                  cursor: 'not-allowed',
-                  pointerEvents: 'all',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  minHeight: '60vh',
-                }}>
-                  <div style={{
-                    background: 'rgba(220,38,38,0.95)',
-                    color: 'white',
-                    padding: '1.5rem 2.5rem',
-                    borderRadius: '16px',
-                    fontWeight: 800,
-                    fontSize: '1.1rem',
-                    textAlign: 'center',
-                    boxShadow: '0 8px 40px rgba(220,38,38,0.5)',
-                    maxWidth: '450px',
-                    lineHeight: 1.8,
-                    pointerEvents: 'all',
-                    cursor: 'default',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '1rem',
-                  }}>
-                    <div style={{ textAlign: 'left', margin: '0.5rem 0' }}>
-                      <div style={{ fontSize: '1.25rem', fontWeight: 800, marginBottom: '0.75rem', textAlign: 'center' }}>
-                        🔒 Projekt wird bereits bearbeitet
-                      </div>
-                      <div style={{ fontSize: '0.95rem', fontWeight: 500, marginBottom: '1.25rem', textAlign: 'center' }}>
-                        Dieses Projekt ist aktuell durch <strong>{activeLockUser}</strong> gesperrt.
-                      </div>
-                      <div style={{ fontSize: '0.9rem', color: '#fca5a5', marginBottom: '0.3rem' }}>
-                        <strong>Seit:</strong> {formatTime(activeLockSince)}
-                      </div>
-                      <div style={{ fontSize: '0.9rem', color: '#fca5a5', marginBottom: '1.25rem' }}>
-                        <strong>Letzte Aktivität:</strong> {formatTime(activeLockActivity)}
-                      </div>
-                      <div style={{ fontSize: '0.9rem', fontWeight: 400, opacity: 0.95, marginBottom: '0.75rem', textAlign: 'center', lineHeight: '1.4' }}>
-                        Du kannst das Projekt ansehen, aber momentan nicht bearbeiten.
-                      </div>
-                      <div style={{ fontSize: '0.8rem', fontWeight: 400, opacity: 0.8, fontStyle: 'italic', textAlign: 'center', lineHeight: '1.4' }}>
-                        Die Sperre kann ausschließlich vom bestätigten Besitzer nach sicherem Abschluss freigegeben werden.
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })()}
+            {/* Eine bestätigte Fremdsperre bleibt technisch schreibgeschützt.
+                Die ruhige Statusanzeige im Projektkopf ersetzt das frühere
+                blockierende rote Vollbildfenster. */}
             {selectedReport && selectedReport.isLightweight === true ? (
               <div style={{
                 display: 'flex',
