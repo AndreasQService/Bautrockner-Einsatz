@@ -1,265 +1,160 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { X, UserPlus, Trash, Shield, User, Wrench, Key, Eye, EyeOff, Edit2, Check, Save } from 'lucide-react';
+import { Edit2, Save, Trash2, UserPlus, X } from 'lucide-react';
+import { createDirectoryUser, deleteDirectoryUser, listDirectoryUsers, updateDirectoryUser } from '../services/AdminUserService.js';
 
-const UserManagementModal = ({ onClose, users, setUsers }) => {
-    const [newName, setNewName] = useState('');
-    const [newPassword, setNewPassword] = useState('');
-    const [newRole, setNewRole] = useState('technician');
+const EMPTY_FORM = Object.freeze({ email: '', displayName: '', password: '' });
 
-    // Password visibility state per user ID
-    const [visiblePasswords, setVisiblePasswords] = useState({});
-
-    // User editing state
+const UserManagementModal = ({ onClose, setUsers, currentAuthUserId }) => {
+    const [directoryUsers, setDirectoryUsers] = useState([]);
+    const [newUser, setNewUser] = useState(EMPTY_FORM);
     const [editingUserId, setEditingUserId] = useState(null);
-    const [editName, setEditName] = useState('');
-    const [editPassword, setEditPassword] = useState('');
-    const [editRole, setEditRole] = useState('technician');
+    const [editUser, setEditUser] = useState(EMPTY_FORM);
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState('');
 
-    const togglePasswordVisibility = (id) => {
-        setVisiblePasswords(prev => ({ ...prev, [id]: !prev[id] }));
-    };
+    const publishUsers = useCallback((nextUsers) => {
+        setDirectoryUsers(nextUsers);
+        setUsers(nextUsers);
+    }, [setUsers]);
 
-    const handleAddUser = (e) => {
-        e.preventDefault();
-        if (!newName.trim() || !newPassword.trim()) return;
+    const refreshUsers = useCallback(async () => {
+        setLoading(true);
+        setError('');
+        try {
+            publishUsers(await listDirectoryUsers());
+        } catch (err) {
+            setError(err.message || 'Benutzer konnten nicht geladen werden.');
+        } finally {
+            setLoading(false);
+        }
+    }, [publishUsers]);
 
-        const newUser = {
-            id: Date.now(),
-            name: newName.trim(),
-            password: newPassword.trim(),
-            role: newRole
-        };
+    useEffect(() => { void refreshUsers(); }, [refreshUsers]);
 
-        setUsers([...users, newUser]);
-        setNewName('');
-        setNewPassword('');
-        setNewRole('technician');
+    const updateField = (setter, key, value) => setter((current) => ({ ...current, [key]: value }));
+
+    const handleAddUser = async (event) => {
+        event.preventDefault();
+        setSaving(true);
+        setError('');
+        try {
+            publishUsers(await createDirectoryUser(newUser));
+            setNewUser(EMPTY_FORM);
+        } catch (err) {
+            setError(err.message || 'Benutzer konnte nicht angelegt werden.');
+        } finally {
+            setSaving(false);
+        }
     };
 
     const handleStartEdit = (user) => {
         setEditingUserId(user.id);
-        setEditName(user.name || '');
-        setEditPassword(user.password || '');
-        setEditRole(user.role || 'technician');
+        setEditUser({ email: user.email, displayName: user.displayName || user.name, password: '' });
+        setError('');
     };
 
-    const handleSaveEdit = (userId) => {
-        if (!editName.trim() || !editPassword.trim()) return;
-        const updated = users.map(u => u.id === userId ? {
-            ...u,
-            name: editName.trim(),
-            password: editPassword.trim(),
-            role: editRole
-        } : u);
-        setUsers(updated);
-        setEditingUserId(null);
+    const handleSaveEdit = async (event) => {
+        event.preventDefault();
+        setSaving(true);
+        setError('');
+        try {
+            publishUsers(await updateDirectoryUser(editingUserId, editUser));
+            setEditingUserId(null);
+            setEditUser(EMPTY_FORM);
+        } catch (err) {
+            setError(err.message || 'Benutzer konnte nicht gespeichert werden.');
+        } finally {
+            setSaving(false);
+        }
     };
 
-    const handleDeleteUser = (id) => {
-        if (confirm('Benutzer wirklich löschen?')) {
-            setUsers(users.filter(u => u.id !== id));
+    const handleDeleteUser = async (user) => {
+        if (String(user.id) === String(currentAuthUserId)) {
+            setError('Das aktuell angemeldete Administratorkonto kann nicht gelöscht werden.');
+            return;
+        }
+        if (!window.confirm(`Benutzer ${user.displayName || user.name} (${user.email}) wirklich löschen?`)) return;
+        setSaving(true);
+        setError('');
+        try {
+            publishUsers(await deleteDirectoryUser(user.id));
+        } catch (err) {
+            setError(err.message || 'Benutzer konnte nicht gelöscht werden.');
+        } finally {
+            setSaving(false);
         }
     };
 
     if (typeof document === 'undefined') return null;
 
-    return createPortal(
-        <div style={{
-            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-            backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 99999,
-            display: 'flex', alignItems: 'center', justifyContent: 'center'
-        }}>
-            <div style={{
-                backgroundColor: 'var(--surface)', padding: '2rem', borderRadius: '8px',
-                width: '720px', maxWidth: '95%', maxHeight: '90vh', display: 'flex', flexDirection: 'column',
-                boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5)',
-                border: '1px solid var(--border)',
-                color: 'var(--text-main)'
-            }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-                    <h3 style={{ margin: 0, fontSize: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <UserPlus size={24} />
-                        Benutzerverwaltung & Rechte (Supabase Cloud DB)
-                    </h3>
-                    <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
-                        <X size={24} />
-                    </button>
-                </div>
+    const field = (label, type, value, onChange, placeholder, required = true) => (
+        <label style={{ display: 'grid', gap: '0.4rem', minWidth: 0 }}>
+            <span style={{ fontSize: '0.82rem', fontWeight: 700 }}>{label}</span>
+            <input
+                className="form-input"
+                type={type}
+                value={value}
+                onChange={(event) => onChange(event.target.value)}
+                placeholder={placeholder}
+                required={required}
+                autoComplete={type === 'password' ? 'new-password' : type === 'email' ? 'email' : 'name'}
+                minLength={type === 'password' && required ? 8 : undefined}
+                style={{ width: '100%' }}
+            />
+        </label>
+    );
 
-                {/* Add User Form */}
-                <form onSubmit={handleAddUser} style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
-                    <div style={{ flex: 2, minWidth: '130px' }}>
-                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem', fontWeight: 600 }}>Name</label>
-                        <input
-                            type="text"
-                            value={newName}
-                            onChange={(e) => setNewName(e.target.value)}
-                            className="form-input"
-                            placeholder="Name..."
-                            style={{ width: '100%' }}
-                        />
+    return createPortal(
+        <div className="user-management-overlay" role="presentation">
+            <section className="user-management-modal" role="dialog" aria-modal="true" aria-labelledby="user-management-title">
+                <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem' }}>
+                    <div>
+                        <h3 id="user-management-title" style={{ margin: 0 }}>Benutzerverwaltung</h3>
+                        <p style={{ margin: '0.35rem 0 0', color: 'var(--text-muted)', fontSize: '0.85rem' }}>Supabase Auth · Passwörter sind niemals einsehbar</p>
                     </div>
-                    <div style={{ flex: 2, minWidth: '130px' }}>
-                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem', fontWeight: 600 }}>Passwort</label>
-                        <input
-                            type="text"
-                            value={newPassword}
-                            onChange={(e) => setNewPassword(e.target.value)}
-                            className="form-input"
-                            placeholder="Passwort..."
-                            style={{ width: '100%' }}
-                        />
-                    </div>
-                    <div style={{ flex: 1, minWidth: '110px' }}>
-                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem', fontWeight: 600 }}>Rolle</label>
-                        <select
-                            value={newRole}
-                            onChange={(e) => setNewRole(e.target.value)}
-                            className="form-input"
-                            style={{ width: '100%' }}
-                        >
-                            <option value="technician">Techniker</option>
-                            <option value="admin">Admin</option>
-                            <option value="user">Benutzer</option>
-                        </select>
-                    </div>
-                    <button type="submit" className="btn btn-primary" style={{ height: '38px', whiteSpace: 'nowrap' }}>
-                        <UserPlus size={18} style={{ marginRight: '0.5rem' }} /> Hinzufügen
-                    </button>
+                    <button type="button" onClick={onClose} className="btn btn-ghost" aria-label="Benutzerverwaltung schließen"><X size={22} /></button>
+                </header>
+
+                <form onSubmit={handleAddUser} className="user-management-grid" style={{ marginTop: '1.5rem' }}>
+                    {field('E-Mail', 'email', newUser.email, (value) => updateField(setNewUser, 'email', value), 'name@firma.ch')}
+                    {field('Anzeigename', 'text', newUser.displayName, (value) => updateField(setNewUser, 'displayName', value), 'Vorname Nachname')}
+                    {field('Passwort', 'password', newUser.password, (value) => updateField(setNewUser, 'password', value), 'Mindestens 8 Zeichen')}
+                    <button type="submit" className="btn btn-primary" disabled={saving} style={{ gridColumn: '1 / -1', justifySelf: 'end' }}><UserPlus size={18} /> {saving ? 'Wird angelegt…' : 'Benutzer anlegen'}</button>
                 </form>
 
-                {/* User List */}
-                <div style={{ flex: 1, overflowY: 'auto', borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>
-                    <h4 style={{ margin: '0 0 1rem 0', opacity: 0.7, fontSize: '0.9rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Vorhandene Benutzer</h4>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                        {users.map(user => (
-                            <div key={user.id} style={{
-                                padding: '0.85rem 1rem', backgroundColor: 'var(--background)',
-                                borderRadius: '8px', border: '1px solid var(--border)'
-                            }}>
-                                {editingUserId === user.id ? (
-                                    /* EDIT MODE */
-                                    <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                                        <div style={{ flex: 2, minWidth: '130px' }}>
-                                            <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>Name</label>
-                                            <input
-                                                type="text"
-                                                className="form-input"
-                                                value={editName}
-                                                onChange={(e) => setEditName(e.target.value)}
-                                                style={{ width: '100%', fontSize: '0.85rem' }}
-                                            />
-                                        </div>
-                                        <div style={{ flex: 2, minWidth: '130px' }}>
-                                            <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>Passwort</label>
-                                            <input
-                                                type="text"
-                                                className="form-input"
-                                                value={editPassword}
-                                                onChange={(e) => setEditPassword(e.target.value)}
-                                                style={{ width: '100%', fontSize: '0.85rem' }}
-                                            />
-                                        </div>
-                                        <div style={{ flex: 1, minWidth: '110px' }}>
-                                            <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>Rolle</label>
-                                            <select
-                                                className="form-input"
-                                                value={editRole}
-                                                onChange={(e) => setEditRole(e.target.value)}
-                                                style={{ width: '100%', fontSize: '0.85rem' }}
-                                            >
-                                                <option value="technician">Techniker</option>
-                                                <option value="admin">Admin</option>
-                                                <option value="user">Benutzer</option>
-                                            </select>
-                                        </div>
-                                        <div style={{ display: 'flex', gap: '0.35rem', marginTop: '1rem' }}>
-                                            <button
-                                                type="button"
-                                                onClick={() => handleSaveEdit(user.id)}
-                                                className="btn btn-primary"
-                                                style={{ padding: '0.35rem 0.65rem', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
-                                            >
-                                                <Save size={14} /> Speichern
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => setEditingUserId(null)}
-                                                className="btn btn-ghost"
-                                                style={{ padding: '0.35rem 0.65rem', fontSize: '0.82rem' }}
-                                            >
-                                                Abbrechen
-                                            </button>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    /* DISPLAY MODE */
-                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1 }}>
-                                            <div style={{
-                                                width: '38px', height: '38px', borderRadius: '50%', flexShrink: 0,
-                                                backgroundColor: user.role === 'admin' ? 'rgba(239, 68, 68, 0.1)' : (user.role === 'technician' ? 'rgba(56, 189, 248, 0.1)' : 'rgba(16, 185, 129, 0.1)'),
-                                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                                color: user.role === 'admin' ? '#EF4444' : (user.role === 'technician' ? '#38BDF8' : '#10B981')
-                                            }}>
-                                                {user.role === 'admin' ? <Shield size={20} /> : (user.role === 'technician' ? <Wrench size={20} /> : <User size={20} />)}
-                                            </div>
-                                            <div>
-                                                <div style={{ fontWeight: 600, fontSize: '0.92rem' }}>{user.name}</div>
-                                                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                                                    Rolle: <strong style={{ textTransform: 'capitalize' }}>{user.role === 'technician' ? 'Techniker' : (user.role === 'admin' ? 'Administrator' : 'Benutzer')}</strong>
-                                                </div>
-                                            </div>
-                                        </div>
+                {error && <div role="alert" style={{ marginTop: '1rem', color: '#EF4444' }}>{error}</div>}
 
-                                        {/* Password Display */}
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', backgroundColor: 'var(--surface)', padding: '0.3rem 0.6rem', borderRadius: '6px', border: '1px solid var(--border)' }}>
-                                            <Key size={14} style={{ color: 'var(--text-muted)' }} />
-                                            <span style={{ fontFamily: 'monospace', fontSize: '0.88rem', fontWeight: 600 }}>
-                                                {visiblePasswords[user.id] ? user.password : '••••••••'}
-                                            </span>
-                                            <button
-                                                type="button"
-                                                onClick={() => togglePasswordVisibility(user.id)}
-                                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '0.1rem' }}
-                                                title={visiblePasswords[user.id] ? "Passwort verbergen" : "Passwort anzeigen"}
-                                            >
-                                                {visiblePasswords[user.id] ? <EyeOff size={14} /> : <Eye size={14} />}
-                                            </button>
-                                        </div>
-
-                                        {/* Action buttons */}
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                            <button
-                                                onClick={() => handleStartEdit(user)}
-                                                className="btn btn-ghost"
-                                                style={{ padding: '0.35rem', color: 'var(--q-primary, #1e6db7)' }}
-                                                title="Benutzer bearbeiten"
-                                            >
-                                                <Edit2 size={16} />
-                                            </button>
-                                            <button
-                                                onClick={() => handleDeleteUser(user.id)}
-                                                className="btn btn-ghost"
-                                                style={{ color: '#EF4444', padding: '0.35rem' }}
-                                                title="Benutzer löschen"
-                                            >
-                                                <Trash size={16} />
-                                            </button>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        ))}
-                        {users.length === 0 && (
-                            <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
-                                Keine Benutzer vorhanden.
-                            </div>
-                        )}
+                <div style={{ marginTop: '1.5rem', overflow: 'auto' }}>
+                    <div className="user-management-grid user-management-heading" aria-hidden="true">
+                        <strong>E-Mail</strong><strong>Anzeigename</strong><strong>Passwort</strong><span />
                     </div>
+                    {loading ? <p>Benutzer werden geladen…</p> : directoryUsers.map((user) => (
+                        editingUserId === user.id ? (
+                            <form key={user.id} onSubmit={handleSaveEdit} className="user-management-grid user-management-row">
+                                {field('E-Mail', 'email', editUser.email, (value) => updateField(setEditUser, 'email', value), 'name@firma.ch')}
+                                {field('Anzeigename', 'text', editUser.displayName, (value) => updateField(setEditUser, 'displayName', value), 'Vorname Nachname')}
+                                {field('Neues Passwort', 'password', editUser.password, (value) => updateField(setEditUser, 'password', value), 'Leer = unverändert', false)}
+                                <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'end' }}>
+                                    <button type="submit" className="btn btn-primary" disabled={saving} aria-label={`${user.name} speichern`}><Save size={17} /></button>
+                                    <button type="button" className="btn btn-ghost" onClick={() => setEditingUserId(null)}>Abbrechen</button>
+                                </div>
+                            </form>
+                        ) : (
+                            <div key={user.id} className="user-management-grid user-management-row">
+                                <span>{user.email}</span>
+                                <span><strong>{user.displayName || user.name}</strong></span>
+                                <span aria-label="Passwort nicht einsehbar">••••••••</span>
+                                <div style={{ display: 'flex', gap: '0.4rem' }}>
+                                    <button type="button" className="btn btn-ghost" onClick={() => handleStartEdit(user)} aria-label={`${user.name} bearbeiten`}><Edit2 size={17} /></button>
+                                    <button type="button" className="btn btn-danger" disabled={saving || String(user.id) === String(currentAuthUserId)} onClick={() => void handleDeleteUser(user)} aria-label={`${user.name} löschen`}><Trash2 size={17} /></button>
+                                </div>
+                            </div>
+                        )
+                    ))}
                 </div>
-            </div>
+            </section>
         </div>,
         document.body
     );

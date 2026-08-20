@@ -26,6 +26,7 @@ import { markUploadedPhotosAsVerified, sanitizeCorruptPhotosInDb } from './servi
 import { isVisibleProjectRow } from './utils/projectVisibility.js';
 import { connectOneDrive, getGraphAccessTokenSilent, initOneDriveAuth } from './lib/onedrive/auth.js';
 import { readAuthorizedUsers, resolveAuthorizedUser } from './lib/authorizedUser.js';
+import { listDirectoryUsers, stripLegacyPasswords } from './services/AdminUserService.js';
 const canonicalJson = value => {
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
   if (value && typeof value === 'object') {
@@ -1337,59 +1338,32 @@ function App() {
   // Users List (Managed here to share with LoginScreen)
   const [users, setUsers] = useState(() => {
     const saved = localStorage.getItem('qtool_users_v2');
-    return saved ? JSON.parse(saved) : [
-      { id: 1, name: 'Admin User', role: 'admin', password: 'admin' },
-      { id: 2, name: 'Techniker 1', role: 'technician', password: '123' },
-      { id: 3, name: 'Mensur Sherifi', role: 'technician', password: '123' }
-    ];
+    return stripLegacyPasswords(saved ? JSON.parse(saved) : []);
   });
 
-  // Persist users and passwords changes to localStorage (Supabase save is handled explicitly on change)
+  // Directory cache only. Authentication credentials are owned by Supabase Auth.
   useEffect(() => {
-    localStorage.setItem('qtool_users_v2', JSON.stringify(users));
+    localStorage.setItem('qtool_users_v2', JSON.stringify(stripLegacyPasswords(users)));
   }, [users]);
 
-  // Load users from Supabase on mount
+  // Load the authenticated Supabase directory. Never hydrate credentials from SYSTEM_SETTINGS.
   useEffect(() => {
-    if (!supabase) return;
+    if (!supabaseSession?.user || !currentUser) return;
+    let cancelled = false;
     const loadUsersFromSupabase = async () => {
       try {
-        const { data, error } = await supabase
-          .from('damage_reports')
-          .select('report_data')
-          .eq('id', 'SYSTEM_SETTINGS')
-          .maybeSingle();
-        if (error && error.code !== 'PGRST116') {
-          console.warn("Failed to load users from Supabase:", error);
-        }
-        if (data && data.report_data && data.report_data.users) {
-          setUsers(data.report_data.users);
-        }
+        const directory = await listDirectoryUsers();
+        if (!cancelled) setUsers(directory);
       } catch (err) {
-        console.error("Failed to load users from Supabase:", err);
+        console.error('Failed to load authenticated user directory:', err);
       }
     };
-    loadUsersFromSupabase();
-  }, [supabase]);
-
-  // Save users to Supabase
-  const saveUsersToSupabase = async (newUsers) => {
-    if (!supabase) return;
-    try {
-      await supabase.from('damage_reports').upsert({
-        id: 'SYSTEM_SETTINGS',
-        project_title: 'System Settings',
-        report_data: { users: newUsers },
-        updated_at: new Date().toISOString()
-      });
-    } catch (err) {
-      console.error("Failed to save users to Supabase:", err);
-    }
-  };
+    void loadUsersFromSupabase();
+    return () => { cancelled = true; };
+  }, [currentUser, supabaseSession?.user?.id]);
 
   const handleSetUsers = (newUsers) => {
-    setUsers(newUsers);
-    saveUsersToSupabase(newUsers);
+    setUsers(stripLegacyPasswords(newUsers));
   };
 
   useEffect(() => {
@@ -3546,7 +3520,7 @@ function App() {
       </main>
 
       {/* Render User Management Modal */}
-      {showUserModal && <UserManagementModal onClose={() => setShowUserModal(false)} users={users} setUsers={handleSetUsers} />}
+      {showUserModal && <UserManagementModal onClose={() => setShowUserModal(false)} users={users} setUsers={handleSetUsers} currentAuthUserId={supabaseSession?.user?.id} />}
       {showMeasurementManager && <MeasurementDeviceManager onClose={() => setShowMeasurementManager(false)} />}
       {showEmailImport && (
         <EmailImportModalV2

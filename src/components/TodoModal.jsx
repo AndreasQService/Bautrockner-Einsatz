@@ -397,7 +397,9 @@ const TodoModal = ({
                         >
                             <option value="">Mitarbeiter auswählen...</option>
                             {users.map(u => (
-                                <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
+                                <option key={u.id} value={u.id}>
+                                    {u.displayName || u.name}{u.email ? ` (${u.email})` : ` (${u.role})`}
+                                </option>
                             ))}
                         </select>
                     </div>

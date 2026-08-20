@@ -20,7 +20,12 @@ export function resolveAuthorizedUser(authUser, users = []) {
       || (metadataUserId && candidateId && metadataUserId === candidateId);
   });
 
-  const authorized = local || BUILTIN_IDENTITIES[email];
+  const metadataRole = String(authUser?.app_metadata?.qtool_role || '').toLowerCase();
+  const metadataName = String(authUser?.app_metadata?.qtool_display_name || '').trim();
+  const metadataIdentity = ['admin', 'technician', 'user'].includes(metadataRole) && metadataName
+    ? { id: authId, name: metadataName, displayName: metadataName, role: metadataRole }
+    : null;
+  const authorized = local || BUILTIN_IDENTITIES[email] || metadataIdentity;
   const role = String(authorized?.role || '').toLowerCase();
   if (!authorized || !['admin', 'technician', 'user'].includes(role)) return null;
 
