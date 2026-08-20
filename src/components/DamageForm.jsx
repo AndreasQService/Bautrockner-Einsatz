@@ -43,6 +43,7 @@ import { PDFService } from '../services/PDFService';
 import { RoomService } from '../services/RoomService';
 import { statusColors, ROOM_OPTIONS } from '../config/damageFormConfig';
 import { createRentalDeviceAssignment, endRentalDeviceAssignment, isRentalTypeSelectionValid, NEW_DEVICE_TYPE_VALUE } from '../lib/rentalDevices';
+import ProjectSyncControlBox from './ProjectSyncControlBox';
 
 /* Custom PDF Icon */
 const PdfIcon = ({ size = 24, style = {} }) => (
@@ -10556,6 +10557,8 @@ END:VCARD`;
                 )}
 
                 <div style={{ height: '80px', ...(mode === 'desktop' ? { order: 3 } : {}) }} />
+
+                <ProjectSyncControlBox report={formData} supabase={supabase} offline={isActuallyOffline} />
 
                 {/* Mobile / Technician Fixed Footer - AutoSave Version */}
                 <div style={{
