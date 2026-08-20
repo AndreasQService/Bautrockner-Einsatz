@@ -7,11 +7,12 @@ const service = fs.readFileSync(new URL('../src/services/AdminUserService.js', i
 const edge = fs.readFileSync(new URL('../supabase/functions/admin-users/index.ts', import.meta.url), 'utf8');
 const app = fs.readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8');
 
-test('user management exposes exactly the requested identity fields', () => {
+test('user management exposes identity fields and the four required roles', () => {
   assert.match(modal, /field\('E-Mail'/);
   assert.match(modal, /field\('Anzeigename'/);
   assert.match(modal, /field\('Passwort'/);
-  assert.match(modal, /<strong>E-Mail<\/strong><strong>Anzeigename<\/strong><strong>Passwort<\/strong>/);
+  assert.match(modal, /<strong>E-Mail<\/strong><strong>Anzeigename<\/strong><strong>Passwort<\/strong><strong>Rolle<\/strong>/);
+  for (const role of ['admin', 'technician', 'handwerker', 'user']) assert.match(modal, new RegExp(`value: '${role}'`));
 });
 
 test('passwords are write-only and never rendered or persisted', () => {
@@ -29,9 +30,15 @@ test('admin mutations stay server-side behind verified auth and admin profile', 
   assert.match(edge, /service\.auth\.admin\.updateUserById/);
   assert.match(edge, /service\.auth\.admin\.deleteUser/);
   assert.match(edge, /userId === authData\.user\.id/);
-  assert.match(edge, /qtool_role:\s*'technician'/);
+  assert.match(edge, /qtool_role:\s*role/);
   assert.match(edge, /qtool_display_name:\s*displayName/);
+  assert.match(edge, /ALLOWED_ROLES\.has\(role\)/);
+  assert.match(edge, /userId === authData\.user\.id && role !== 'admin'/);
   assert.doesNotMatch(service, /service_role|SUPABASE_SERVICE_ROLE_KEY/);
+});
+
+test('edge function CORS accepts the QTool session header used by the shared client', () => {
+  assert.match(edge, /x-qtool-session-token/);
 });
 
 test('directory identities use the Supabase UUID for Todo assignment', () => {

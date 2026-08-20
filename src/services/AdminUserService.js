@@ -25,13 +25,13 @@ export async function listDirectoryUsers() {
   return (Array.isArray(data.users) ? data.users : []).map(normalizeDirectoryUser);
 }
 
-export async function createDirectoryUser({ email, displayName, password }) {
-  await invokeAdminUsers({ action: 'create', email, displayName, password });
+export async function createDirectoryUser({ email, displayName, password, role }) {
+  await invokeAdminUsers({ action: 'create', email, displayName, password, role });
   return listDirectoryUsers();
 }
 
-export async function updateDirectoryUser(userId, { email, displayName, password }) {
-  await invokeAdminUsers({ action: 'update', userId, email, displayName, password: password || undefined });
+export async function updateDirectoryUser(userId, { email, displayName, password, role }) {
+  await invokeAdminUsers({ action: 'update', userId, email, displayName, password: password || undefined, role });
   return listDirectoryUsers();
 }
 

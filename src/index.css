@@ -950,7 +950,7 @@ input[data-lpignore='false'] + div[id^='__lpform_'] { display: none !important; 
 }
 
 .user-management-modal {
-  width: min(980px, 96vw);
+  width: min(1200px, 96vw);
   max-height: 92vh;
   overflow: auto;
   padding: 1.5rem;
@@ -963,7 +963,7 @@ input[data-lpignore='false'] + div[id^='__lpform_'] { display: none !important; 
 
 .user-management-grid {
   display: grid;
-  grid-template-columns: minmax(210px, 1.25fr) minmax(190px, 1fr) minmax(180px, 1fr) auto;
+  grid-template-columns: minmax(210px, 1.25fr) minmax(180px, 1fr) minmax(170px, 0.9fr) minmax(150px, 0.75fr) auto;
   gap: 0.75rem;
   align-items: center;
 }

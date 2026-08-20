@@ -3,7 +3,13 @@ import { createPortal } from 'react-dom';
 import { Edit2, Save, Trash2, UserPlus, X } from 'lucide-react';
 import { createDirectoryUser, deleteDirectoryUser, listDirectoryUsers, updateDirectoryUser } from '../services/AdminUserService.js';
 
-const EMPTY_FORM = Object.freeze({ email: '', displayName: '', password: '' });
+const EMPTY_FORM = Object.freeze({ email: '', displayName: '', password: '', role: 'technician' });
+const ROLE_OPTIONS = Object.freeze([
+    { value: 'admin', label: 'Administrator' },
+    { value: 'technician', label: 'Techniker' },
+    { value: 'handwerker', label: 'Handwerker' },
+    { value: 'user', label: 'Benutzer' },
+]);
 
 const UserManagementModal = ({ onClose, setUsers, currentAuthUserId }) => {
     const [directoryUsers, setDirectoryUsers] = useState([]);
@@ -51,7 +57,7 @@ const UserManagementModal = ({ onClose, setUsers, currentAuthUserId }) => {
 
     const handleStartEdit = (user) => {
         setEditingUserId(user.id);
-        setEditUser({ email: user.email, displayName: user.displayName || user.name, password: '' });
+        setEditUser({ email: user.email, displayName: user.displayName || user.name, password: '', role: user.role });
         setError('');
     };
 
@@ -106,6 +112,15 @@ const UserManagementModal = ({ onClose, setUsers, currentAuthUserId }) => {
         </label>
     );
 
+    const roleField = (value, onChange, disabled = false) => (
+        <label style={{ display: 'grid', gap: '0.4rem', minWidth: 0 }}>
+            <span style={{ fontSize: '0.82rem', fontWeight: 700 }}>Rolle</span>
+            <select className="form-input" value={value} onChange={(event) => onChange(event.target.value)} disabled={disabled} required style={{ width: '100%' }}>
+                {ROLE_OPTIONS.map((role) => <option key={role.value} value={role.value}>{role.label}</option>)}
+            </select>
+        </label>
+    );
+
     return createPortal(
         <div className="user-management-overlay" role="presentation">
             <section className="user-management-modal" role="dialog" aria-modal="true" aria-labelledby="user-management-title">
@@ -121,6 +136,7 @@ const UserManagementModal = ({ onClose, setUsers, currentAuthUserId }) => {
                     {field('E-Mail', 'email', newUser.email, (value) => updateField(setNewUser, 'email', value), 'name@firma.ch')}
                     {field('Anzeigename', 'text', newUser.displayName, (value) => updateField(setNewUser, 'displayName', value), 'Vorname Nachname')}
                     {field('Passwort', 'password', newUser.password, (value) => updateField(setNewUser, 'password', value), 'Mindestens 8 Zeichen')}
+                    {roleField(newUser.role, (value) => updateField(setNewUser, 'role', value))}
                     <button type="submit" className="btn btn-primary" disabled={saving} style={{ gridColumn: '1 / -1', justifySelf: 'end' }}><UserPlus size={18} /> {saving ? 'Wird angelegt…' : 'Benutzer anlegen'}</button>
                 </form>
 
@@ -128,7 +144,7 @@ const UserManagementModal = ({ onClose, setUsers, currentAuthUserId }) => {
 
                 <div style={{ marginTop: '1.5rem', overflow: 'auto' }}>
                     <div className="user-management-grid user-management-heading" aria-hidden="true">
-                        <strong>E-Mail</strong><strong>Anzeigename</strong><strong>Passwort</strong><span />
+                        <strong>E-Mail</strong><strong>Anzeigename</strong><strong>Passwort</strong><strong>Rolle</strong><span />
                     </div>
                     {loading ? <p>Benutzer werden geladen…</p> : directoryUsers.map((user) => (
                         editingUserId === user.id ? (
@@ -136,6 +152,7 @@ const UserManagementModal = ({ onClose, setUsers, currentAuthUserId }) => {
                                 {field('E-Mail', 'email', editUser.email, (value) => updateField(setEditUser, 'email', value), 'name@firma.ch')}
                                 {field('Anzeigename', 'text', editUser.displayName, (value) => updateField(setEditUser, 'displayName', value), 'Vorname Nachname')}
                                 {field('Neues Passwort', 'password', editUser.password, (value) => updateField(setEditUser, 'password', value), 'Leer = unverändert', false)}
+                                {roleField(editUser.role, (value) => updateField(setEditUser, 'role', value), String(user.id) === String(currentAuthUserId))}
                                 <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'end' }}>
                                     <button type="submit" className="btn btn-primary" disabled={saving} aria-label={`${user.name} speichern`}><Save size={17} /></button>
                                     <button type="button" className="btn btn-ghost" onClick={() => setEditingUserId(null)}>Abbrechen</button>
@@ -146,6 +163,7 @@ const UserManagementModal = ({ onClose, setUsers, currentAuthUserId }) => {
                                 <span>{user.email}</span>
                                 <span><strong>{user.displayName || user.name}</strong></span>
                                 <span aria-label="Passwort nicht einsehbar">••••••••</span>
+                                <span>{ROLE_OPTIONS.find((role) => role.value === user.role)?.label || user.role}</span>
                                 <div style={{ display: 'flex', gap: '0.4rem' }}>
                                     <button type="button" className="btn btn-ghost" onClick={() => handleStartEdit(user)} aria-label={`${user.name} bearbeiten`}><Edit2 size={17} /></button>
                                     <button type="button" className="btn btn-danger" disabled={saving || String(user.id) === String(currentAuthUserId)} onClick={() => void handleDeleteUser(user)} aria-label={`${user.name} löschen`}><Trash2 size={17} /></button>

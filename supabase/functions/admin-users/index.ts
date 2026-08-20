@@ -3,7 +3,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.95.3';
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Authorization, Content-Type, apikey, x-client-info',
+  'Access-Control-Allow-Headers': 'Authorization, Content-Type, apikey, x-client-info, x-qtool-session-token',
   'Content-Type': 'application/json',
 };
 
@@ -12,6 +12,8 @@ const json = (status: number, payload: Record<string, unknown>) =>
 
 const normalizeEmail = (value: unknown) => String(value || '').trim().toLowerCase();
 const normalizeName = (value: unknown) => String(value || '').trim();
+const ALLOWED_ROLES = new Set(['admin', 'technician', 'handwerker', 'user']);
+const normalizeRole = (value: unknown) => String(value || '').trim().toLowerCase();
 
 Deno.serve(async (request: Request) => {
   if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS_HEADERS });
@@ -102,7 +104,9 @@ Deno.serve(async (request: Request) => {
   const email = normalizeEmail(body.email);
   const displayName = normalizeName(body.displayName);
   const password = String(body.password || '');
+  const role = normalizeRole(body.role);
   if (!email.includes('@') || !displayName) return json(400, { ok: false, error: 'E-Mail und Anzeigename sind erforderlich.' });
+  if (!ALLOWED_ROLES.has(role)) return json(400, { ok: false, error: 'Ungültige Rolle.' });
 
   if (action === 'create') {
     if (password.length < 8) return json(400, { ok: false, error: 'Das Passwort muss mindestens 8 Zeichen lang sein.' });
@@ -111,7 +115,7 @@ Deno.serve(async (request: Request) => {
       password,
       email_confirm: true,
       app_metadata: {
-        qtool_role: 'technician',
+        qtool_role: role,
         qtool_display_name: displayName,
       },
     });
@@ -120,7 +124,7 @@ Deno.serve(async (request: Request) => {
     const { error: profileError } = await service.from('user_profiles').insert({
       id: created.user.id,
       display_name: displayName,
-      role: 'technician',
+      role,
       is_active: true,
     });
     if (profileError) {
@@ -147,11 +151,14 @@ Deno.serve(async (request: Request) => {
     if (existingProfileError || !existingProfile) {
       return json(404, { ok: false, error: 'Benutzerprofil wurde nicht gefunden.' });
     }
+    if (userId === authData.user.id && role !== 'admin') {
+      return json(400, { ok: false, error: 'Die eigene Administratorrolle kann nicht entfernt werden.' });
+    }
     const authChanges: { email: string; password?: string; app_metadata: Record<string, unknown> } = {
       email,
       app_metadata: {
         ...(existingAuth.user.app_metadata || {}),
-        qtool_role: existingProfile.role,
+        qtool_role: role,
         qtool_display_name: displayName,
       },
     };
@@ -160,7 +167,7 @@ Deno.serve(async (request: Request) => {
     if (updateAuthError) return json(400, { ok: false, error: updateAuthError.message });
     const { error: updateProfileError } = await service
       .from('user_profiles')
-      .update({ display_name: displayName, updated_at: new Date().toISOString() })
+      .update({ display_name: displayName, role, updated_at: new Date().toISOString() })
       .eq('id', userId);
     if (updateProfileError) return json(500, { ok: false, error: updateProfileError.message });
     return json(200, { ok: true });

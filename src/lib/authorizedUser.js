@@ -22,12 +22,12 @@ export function resolveAuthorizedUser(authUser, users = []) {
 
   const metadataRole = String(authUser?.app_metadata?.qtool_role || '').toLowerCase();
   const metadataName = String(authUser?.app_metadata?.qtool_display_name || '').trim();
-  const metadataIdentity = ['admin', 'technician', 'user'].includes(metadataRole) && metadataName
+  const metadataIdentity = ['admin', 'technician', 'handwerker', 'user'].includes(metadataRole) && metadataName
     ? { id: authId, name: metadataName, displayName: metadataName, role: metadataRole }
     : null;
   const authorized = local || BUILTIN_IDENTITIES[email] || metadataIdentity;
   const role = String(authorized?.role || '').toLowerCase();
-  if (!authorized || !['admin', 'technician', 'user'].includes(role)) return null;
+  if (!authorized || !['admin', 'technician', 'handwerker', 'user'].includes(role)) return null;
 
   const { password: _password, ...safeUser } = authorized;
   return { ...safeUser, role, email, authEmail: email, supabaseUserId: authId };
