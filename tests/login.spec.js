@@ -73,7 +73,7 @@ test.describe('Login', () => {
         await page.locator('button[title="Abmelden"]').click();
 
         // Login-Screen soll erscheinen
-        await expect(page.locator('h2')).toContainText('Anmelden');
+        await expect(page.getByRole('heading', { name: 'Anmelden' })).toBeVisible();
     });
 
 });

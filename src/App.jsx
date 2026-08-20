@@ -1277,6 +1277,10 @@ function App() {
     localStorage.setItem('qtool_dark_mode', String(isDarkMode));
   }, [isDarkMode]);
 
+  useEffect(() => {
+    document.documentElement.className = `view-${view}`;
+  }, [view]);
+
   const [showInactivityAlert, setShowInactivityAlert] = useState(false);
   const handleInactivityTimeout = useCallback(async () => {
     // The active writer may leave only through the same verified barrier used

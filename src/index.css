@@ -181,6 +181,65 @@ html, body {
   --color-info-bg:     #E0EEFF;  /* Status Info */
 }
 
+/* Scoped colors for Dashboard view only (Fiori Blue background #E8F4FD, white cards, SAP Fiori primary #0A6ED1, charcoal text #32363A) */
+[data-theme="light"].view-dashboard {
+  /* Legacy overrides */
+  --q-primary:      #0A6ED1;
+  --q-primary-glow: rgba(10, 110, 209, 0.18);
+  --q-accent:       #0854A0;
+
+  --primary:        #0A6ED1;
+  --primary-hover:  #0854A0;
+  --background:     #E8F4FD;
+  --surface:        #FFFFFF;
+  --surface-opaque: #FFFFFF;
+  --border:         #A2B4C6;
+  --text-main:      #32363A;
+  --text-muted:     #595F66;
+  --glass-bg:       #FFFFFF;
+  --glass-border:   #CBD5E1;
+  --glass-blur:     none;
+  --shadow-sm:      0 1px 3px rgba(0,0,0,0.1);
+  --shadow-md:      0 4px 6px -1px rgba(0,0,0,0.1);
+  --shadow-premium: 0 1px 3px rgba(0,0,0,0.07);
+
+  /* Enterprise Tokens */
+  --color-primary:             #0A6ED1;
+  --color-primary-hover:       #0854A0;
+  --color-primary-soft:        #E8F4FD;
+
+  --color-toolbar-bg:          #32363A;
+  --color-toolbar-text:        #FFFFFF;
+  --color-toolbar-border:      #223243;
+
+  --color-app-bg:              #E8F4FD;
+  --color-surface:             #FFFFFF;
+  --color-surface-alt:         #EDF4FA;
+  --color-panel-bg:            #DDEAF4;
+
+  --color-border:              #A2B4C6;
+  --color-border-strong:       #595F66;
+
+  --color-text-primary:        #32363A;
+  --color-text-secondary:      #494E54;
+  --color-text-muted:          #595F66;
+  --color-row-hover:           #EBF5FE;
+  --color-row-selected:        #D1E8FF;
+
+  --color-input-bg:            #FFFFFF;
+  --color-input-border:        #A2B4C6;
+  --color-input-focus:         #0A6ED1;
+
+  --color-btn-secondary-bg:    #FFFFFF;
+  --color-btn-secondary-hover: #F5F7FA;
+
+  /* Status Backgrounds */
+  --color-success-bg:  #E8F4EB;  /* Status OK */
+  --color-warning-bg:  #FFF4C6;  /* Status Warning */
+  --color-danger-bg:   #FCE4E6;  /* Status Critical */
+  --color-info-bg:     #E8F4FD;  /* Status Info */
+}
+
 /* ── Theme Specific Body Overrides ─────────────────────────────────────── */
 [data-theme="dark"] body, 
 .dark body,
