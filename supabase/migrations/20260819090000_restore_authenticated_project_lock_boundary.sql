@@ -56,7 +56,6 @@ set search_path = ''
 as $function$
   select p_project_id is not null
      and auth.uid() is not null
-     and exists (select 1 from public.user_profiles p where p.id = auth.uid() and p.is_active is true)
      and public.qtool_request_session_token() is not null
      and exists (
        select 1 from public.project_sessions s
@@ -216,9 +215,6 @@ declare
   v_request_session public.project_sessions%rowtype;
 begin
   if v_uid is null then raise exception 'AUTHENTICATION_REQUIRED' using errcode = '42501'; end if;
-  if not exists (select 1 from public.user_profiles p where p.id = v_uid and p.is_active is true) then
-    raise exception 'ACTIVE_USER_PROFILE_REQUIRED' using errcode = '42501';
-  end if;
   if p_user_id is null or p_user_id <> v_uid::text then
     raise exception 'AUTHENTICATED_USER_MISMATCH' using errcode = '42501';
   end if;
@@ -295,9 +291,6 @@ as $function$
 declare v_uid uuid := auth.uid();
 begin
   if v_uid is null then raise exception 'AUTHENTICATION_REQUIRED' using errcode = '42501'; end if;
-  if not exists (select 1 from public.user_profiles p where p.id = v_uid and p.is_active is true) then
-    raise exception 'ACTIVE_USER_PROFILE_REQUIRED' using errcode = '42501';
-  end if;
   if p_project_id is null then raise exception 'INVALID_PROJECT_ID' using errcode = '22023'; end if;
   return query
     select s.open_project_id, s.mode, pg_catalog.split_part(coalesce(s.device, ''), ':', 1),
@@ -319,9 +312,6 @@ as $function$
 declare v_uid uuid := auth.uid(); v_count integer;
 begin
   if v_uid is null then raise exception 'AUTHENTICATION_REQUIRED' using errcode = '42501'; end if;
-  if not exists (select 1 from public.user_profiles p where p.id = v_uid and p.is_active is true) then
-    raise exception 'ACTIVE_USER_PROFILE_REQUIRED' using errcode = '42501';
-  end if;
   if p_project_id is null or p_session_token is null or length(p_session_token) < 20 then
     raise exception 'INVALID_LOCK_REQUEST' using errcode = '22023';
   end if;
@@ -345,9 +335,6 @@ as $function$
 declare v_uid uuid := auth.uid(); v_acquired boolean;
 begin
   if v_uid is null then raise exception 'AUTHENTICATION_REQUIRED' using errcode = '42501'; end if;
-  if not exists (select 1 from public.user_profiles p where p.id = v_uid and p.is_active is true) then
-    raise exception 'ACTIVE_USER_PROFILE_REQUIRED' using errcode = '42501';
-  end if;
   if p_project_id is null or length(p_project_id) not between 3 and 100
      or p_session_token is null or length(p_session_token) < 20
      or pg_catalog.jsonb_typeof(p_report_data) <> 'object' then

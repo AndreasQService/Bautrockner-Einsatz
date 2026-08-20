@@ -34,11 +34,11 @@ test('creation, acquire and release prove authenticated ownership fail closed', 
   assert.doesNotMatch(sql, /on conflict \(id\) do update/);
 });
 
-test('locks never expire or switch projects implicitly and require an active profile', () => {
+test('locks never expire or switch projects implicitly and require authenticated ownership', () => {
   assert.doesNotMatch(sql, /interval\s+'20 minutes'/i);
   assert.match(sql, /SESSION_ALREADY_OWNS_PROJECT/);
-  assert.equal((sql.match(/ACTIVE_USER_PROFILE_REQUIRED/g) || []).length, 4);
-  assert.match(sql, /where p\.id = v_uid and p\.is_active is true/);
+  assert.equal((sql.match(/AUTHENTICATION_REQUIRED/g) || []).length, 4);
+  assert.doesNotMatch(sql, /public\.user_profiles/);
 });
 
 test('migration is transactional and creation safely replays only for the same owner session', () => {
@@ -54,10 +54,10 @@ test('direct test bypasses are removed without touching audit RLS', () => {
   assert.doesNotMatch(sql, /qtool_privileged_mutation_audit/);
 });
 
-test('write-lock helpers bind a safe request token to active authenticated ownership', () => {
+test('write-lock helpers bind a safe request token to authenticated ownership', () => {
   assert.match(sql, /function public\.qtool_request_session_token\(\)[\s\S]*?security invoker[\s\S]*?set search_path = ''/);
   assert.match(sql, /exception when others then\s+return null/);
-  assert.match(sql, /function public\.qtool_has_project_write_lock\(p_project_id text\)[\s\S]*?auth\.uid\(\) is not null[\s\S]*?p\.is_active is true[\s\S]*?s\.session_token = public\.qtool_request_session_token\(\)[\s\S]*?s\.owner_user_id = auth\.uid\(\)/);
+  assert.match(sql, /function public\.qtool_has_project_write_lock\(p_project_id text\)[\s\S]*?auth\.uid\(\) is not null[\s\S]*?s\.session_token = public\.qtool_request_session_token\(\)[\s\S]*?s\.owner_user_id = auth\.uid\(\)/);
   assert.doesNotMatch(sql, /grant execute on function public\.qtool_(?:request_session_token|has_project_write_lock)[^;]+to anon/);
 });
 
