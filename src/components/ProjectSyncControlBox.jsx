@@ -64,9 +64,11 @@ export default function ProjectSyncControlBox({ report, supabase, offline = fals
 
   return (
     <section aria-label="Supabase Synchronisationskontrolle und OneDrive Synchronisationskontrolle" aria-live="polite" style={{
-      position: 'fixed', left: '50%', bottom: '56px', transform: 'translateX(-50%)', zIndex: 99,
-      width: 'min(600px, calc(100% - 24px))', background: 'var(--surface)', border: `1px solid ${statusColor}`,
-      borderRadius: '8px 8px 0 0', padding: '0.5rem 0.75rem', boxShadow: '0 -4px 12px rgba(0,0,0,0.22)'
+      position: 'fixed', left: '50%', bottom: '44px', transform: 'translateX(-50%)', zIndex: 99,
+      width: 'min(600px, calc(100% - 24px))', background: 'var(--surface)',
+      borderTop: `1px solid ${statusColor}`, borderRight: `1px solid ${statusColor}`, borderLeft: `1px solid ${statusColor}`,
+      borderBottom: '1px solid var(--border)', borderRadius: '8px 8px 0 0', padding: '0.5rem 0.75rem',
+      boxShadow: '0 -4px 12px rgba(0,0,0,0.22)'
     }}>
       <div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', color: statusColor, fontWeight: 700, fontSize: '0.78rem', marginBottom: '0.45rem' }}>

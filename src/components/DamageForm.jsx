@@ -10569,14 +10569,14 @@ END:VCARD`;
                     width: '100%',
                     maxWidth: '600px',
                     padding: '0.4rem 0.75rem',
-                    backgroundColor: mode === 'technician' ? 'var(--background)' : 'var(--text-main)',
-                    borderTop: mode === 'technician' ? '1px solid var(--border)' : '1px solid #0F172A',
+                    backgroundColor: 'var(--surface)',
+                    borderTop: '1px solid var(--border)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
                     gap: '1rem',
                     zIndex: 100,
-                    boxShadow: mode === 'technician' ? '0 -4px 12px rgba(0,0,0,0.05)' : '0 -4px 12px rgba(0, 0, 0, 0.5)',
+                    boxShadow: '0 -4px 12px rgba(0,0,0,0.22)',
                     pointerEvents: 'auto'
                 }}>
                     {/* Ruhiger, evidenzbasierter Speicherstatus: keine blinkenden Toasts. */}
