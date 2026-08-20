@@ -89,6 +89,14 @@ test('DamageForm uses rental table RPC and never infers rentals from an M prefix
     assert.doesNotMatch(source, /newDevice\.deviceNumber\.trim\(\)\.toUpperCase\(\)\.startsWith\('M'\)/);
 });
 
+test('device entry closes only after confirmed creation succeeds', () => {
+  const source = fs.readFileSync(new URL('../src/components/DamageForm.jsx', import.meta.url), 'utf8');
+  const confirmedClosePaths = source.match(/const success = await handleAddDevice\(\);[\s\S]{0,900}?setShowAddDeviceForm\(false\);/g) || [];
+
+  assert.equal(confirmedClosePaths.length, 2);
+  assert.doesNotMatch(source, /Do NOT close the form/);
+});
+
 test('DeviceManager reads the separate rental table and does not create rentals in owned inventory', () => {
     const source = fs.readFileSync(new URL('../src/components/DeviceManager.jsx', import.meta.url), 'utf8');
     assert.match(source, /\.from\('rental_devices'\)/);

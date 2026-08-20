@@ -9337,10 +9337,6 @@ END:VCARD`;
                                             e.preventDefault();
                                             const success = await handleAddDevice();
                                             if (success) {
-                                                // Do NOT close the form, allowing next entry
-                                                // setShowAddDeviceForm(false);
-
-                                                // Optional: Clear specific fields to ready for next device
                                                 setNewDevice(prev => ({
                                                     ...prev,
                                                     deviceNumber: '',
@@ -9349,11 +9345,8 @@ END:VCARD`;
                                                     newTypeName: '',
                                                     useNewType: false,
                                                     counterStart: ''
-                                                    // Keep Room/Apartment/Date for easier batch entry
                                                 }));
-
-                                                // Show a small toast or visual feedback?
-                                                // For now, the user sees the new device appear in the list below.
+                                                setShowAddDeviceForm(false);
                                             }
                                         }}
                                     >
@@ -9602,10 +9595,6 @@ END:VCARD`;
                                                     }
                                                     const success = await handleAddDevice();
                                                     if (success) {
-                                                        // Do NOT close the form, allowing next entry
-                                                        // setShowAddDeviceForm(false);
-
-                                                        // Optional: Clear specific fields to ready for next device
                                                         setNewDevice(prev => ({
                                                             ...prev,
                                                             deviceNumber: '',
@@ -9616,6 +9605,7 @@ END:VCARD`;
                                                             counterStart: '',
                                                             hours: ''
                                                         }));
+                                                        setShowAddDeviceForm(false);
                                                     }
                                                 }}
                                             >
