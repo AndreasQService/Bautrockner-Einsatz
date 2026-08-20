@@ -42,6 +42,7 @@ import { generateMeasurementExcel } from '../utils/MeasurementExcelExporter';
 import { PDFService } from '../services/PDFService';
 import { RoomService } from '../services/RoomService';
 import { statusColors, ROOM_OPTIONS } from '../config/damageFormConfig';
+import { createRentalDeviceAssignment, endRentalDeviceAssignment, isRentalTypeSelectionValid, NEW_DEVICE_TYPE_VALUE } from '../lib/rentalDevices';
 
 /* Custom PDF Icon */
 const PdfIcon = ({ size = 24, style = {} }) => (
@@ -2120,7 +2121,10 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         hours: '',
         counterStart: '',
         energyConsumption: '',
-        isRental: false
+        isRental: false,
+        catalogId: '',
+        newTypeName: '',
+        useNewType: false
     });
 
     const [activeNumpadField, setActiveNumpadField] = useState(null);
@@ -2146,9 +2150,41 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
 
     const handleAddDevice = async () => {
         let deviceDbId = selectedDevice ? selectedDevice.id : null;
+        let rentalCatalog = null;
+
+        if (!selectedDevice && newDevice.isRental) {
+            try {
+                rentalCatalog = await createRentalDeviceAssignment({
+                    supabase,
+                    reportId: formData.id,
+                    deviceNumber: newDevice.deviceNumber,
+                    catalogId: newDevice.catalogId,
+                    newTypeName: newDevice.newTypeName,
+                    startDate: newDevice.startDate,
+                    apartment: newDevice.apartment,
+                    room: newDevice.room,
+                    counterStart: newDevice.counterStart,
+                    runtimeHours: newDevice.hours
+                });
+                deviceDbId = rentalCatalog.rental_device_id;
+                setDeviceCatalog(prev => prev.some(item => item.id === rentalCatalog.catalog_id)
+                    ? prev
+                    : [...prev, {
+                        id: rentalCatalog.catalog_id,
+                        geraetetyp: rentalCatalog.device_type,
+                        hersteller: 'Noch offen',
+                        modell: 'Vor Ort erfasst',
+                        catalog_status: rentalCatalog.catalog_status
+                    }]);
+            } catch (error) {
+                console.error('Failed to create rental device assignment:', error);
+                alert(error?.message || 'Das Mietgerät konnte nicht sicher angelegt werden.');
+                return false;
+            }
+        }
 
         // If manual entry (no selected device) and we have a device number, add or link to global inventory
-        if (!selectedDevice && newDevice.deviceNumber && supabase) {
+        if (!selectedDevice && !newDevice.isRental && newDevice.deviceNumber && supabase) {
             const trimmedNumber = newDevice.deviceNumber.trim();
 
             // Check if device number already exists in database
@@ -2168,7 +2204,6 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                 deviceDbId = existingDev.id;
             } else {
                 console.log("Inserting new unique device into global inventory...");
-                const isRental = !!(newDevice.isRental || trimmedNumber.toUpperCase().startsWith('M'));
                 const { data, error } = await supabase
                     .from('devices')
                     .insert([{
@@ -2178,8 +2213,8 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                         status: 'Aktiv',
                         current_project: formData.projectTitle || formData.client || 'Unbekannt',
                         current_report_id: formData.id,
-                        is_rental: isRental,
-                        rental_start: isRental ? new Date().toISOString().split('T')[0] : null
+                        is_rental: false,
+                        rental_start: null
                     }])
                     .select();
 
@@ -2196,15 +2231,14 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
             deviceDbId = selectedDevice.id;
         }
 
-        const isRentalDevice = selectedDevice
-            ? !!selectedDevice.is_rental
-            : !!(newDevice.isRental || newDevice.deviceNumber.trim().toUpperCase().startsWith('M'));
+        const isRentalDevice = selectedDevice ? !!selectedDevice.is_rental : !!newDevice.isRental;
+        const selectedCatalogItem = deviceCatalog.find(item => item.id === newDevice.catalogId);
 
         // manual entry fallback if no device selected?
         let deviceToAdd = {
             id: Date.now(),
             deviceNumber: newDevice.deviceNumber,
-            type: selectedDevice ? selectedDevice.type : (selectedCatalogItem ? selectedCatalogItem.geraetetyp : (newDevice.type || 'Unbekannt')),
+            type: selectedDevice ? selectedDevice.type : (rentalCatalog?.device_type || (selectedCatalogItem ? selectedCatalogItem.geraetetyp : (newDevice.type || 'Unbekannt'))),
             model: selectedDevice ? selectedDevice.model : (selectedCatalogItem ? `${selectedCatalogItem.hersteller} ${selectedCatalogItem.modell}`.trim() : ''),
             apartment: newDevice.apartment,
             room: newDevice.room,
@@ -2216,7 +2250,10 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
             energyConsumption: newDevice.energyConsumption,
             isRental: isRentalDevice,
             // Link to Supabase ID if available
-            dbId: deviceDbId
+            dbId: isRentalDevice ? null : deviceDbId,
+            rentalDbId: isRentalDevice ? deviceDbId : null,
+            catalogId: rentalCatalog?.catalog_id || selectedCatalogItem?.id || null,
+            catalogStatus: rentalCatalog?.catalog_status || selectedCatalogItem?.catalog_status || null
         };
 
         setFormData(prev => {
@@ -9117,7 +9154,40 @@ END:VCARD`;
                                             }}
                                         />
 
-                                        {!selectedDevice && newDevice.deviceNumber && (
+                                        {!selectedDevice && newDevice.deviceNumber && newDevice.isRental && (
+                                            <>
+                                                <select
+                                                    className="form-input"
+                                                    value={newDevice.useNewType ? NEW_DEVICE_TYPE_VALUE : (newDevice.catalogId || '')}
+                                                    onChange={(e) => setNewDevice(prev => ({
+                                                        ...prev,
+                                                        catalogId: e.target.value === NEW_DEVICE_TYPE_VALUE ? '' : e.target.value,
+                                                        newTypeName: e.target.value === NEW_DEVICE_TYPE_VALUE ? prev.newTypeName : '',
+                                                        useNewType: e.target.value === NEW_DEVICE_TYPE_VALUE
+                                                    }))}
+                                                >
+                                                    <option value="">Gerätetyp aus Datenbank wählen *</option>
+                                                    {deviceCatalog.map(cat => (
+                                                        <option key={cat.id} value={cat.id}>
+                                                            {cat.geraetetyp}{cat.hersteller && cat.hersteller !== 'Noch offen' ? ` · ${cat.hersteller} ${cat.modell || ''}` : ''}{cat.catalog_status === 'provisional' ? ' (vorläufig)' : ''}
+                                                        </option>
+                                                    ))}
+                                                    <option value={NEW_DEVICE_TYPE_VALUE}>+ Gerätetyp vor Ort neu erfassen</option>
+                                                </select>
+                                                {(newDevice.useNewType || deviceCatalog.length === 0) && (
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Neuen Gerätetyp eingeben *"
+                                                        className="form-input"
+                                                        value={newDevice.newTypeName || ''}
+                                                        onChange={(e) => setNewDevice(prev => ({ ...prev, newTypeName: e.target.value, catalogId: '' }))}
+                                                    />
+                                                )}
+                                                <small style={{ color: 'var(--text-muted)' }}>Neue Typen werden vorläufig gespeichert und können später durch einen Administrator geprüft werden.</small>
+                                            </>
+                                        )}
+
+                                        {!selectedDevice && newDevice.deviceNumber && !newDevice.isRental && (
                                             <>
                                                 <input
                                                     type="text"
@@ -9139,6 +9209,16 @@ END:VCARD`;
                                                 </datalist>
                                             </>
                                         )}
+
+                                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.35rem 0', color: 'var(--text-main)' }}>
+                                            <input
+                                                type="checkbox"
+                                                checked={!!newDevice.isRental}
+                                                onChange={(e) => setNewDevice(prev => ({ ...prev, isRental: e.target.checked, catalogId: '', newTypeName: '', useNewType: false, type: e.target.checked ? '' : prev.type }))}
+                                                style={{ width: '18px', height: '18px', accentColor: 'var(--primary)' }}
+                                            />
+                                            <span style={{ fontWeight: 600 }}>Mietgerät (separates Mietinventar)</span>
+                                        </label>
 
                                         {/* Apartment Selection */}
                                         <select
@@ -9252,7 +9332,7 @@ END:VCARD`;
                                         type="button"
                                         className="btn btn-primary"
                                         style={{ width: '100%', marginTop: '0.5rem' }}
-                                        disabled={!newDevice.deviceNumber || !newDevice.counterStart || (!selectedDevice && !newDevice.type)}
+                                        disabled={!newDevice.deviceNumber || !newDevice.counterStart || (!selectedDevice && (newDevice.isRental ? !isRentalTypeSelectionValid({ catalogId: newDevice.catalogId, newTypeName: newDevice.newTypeName }) : !newDevice.type))}
                                         onClick={async (e) => {
                                             e.preventDefault();
                                             const success = await handleAddDevice();
@@ -9265,6 +9345,9 @@ END:VCARD`;
                                                     ...prev,
                                                     deviceNumber: '',
                                                     type: '',
+                                                    catalogId: '',
+                                                    newTypeName: '',
+                                                    useNewType: false,
                                                     counterStart: ''
                                                     // Keep Room/Apartment/Date for easier batch entry
                                                 }));
@@ -9297,7 +9380,7 @@ END:VCARD`;
                                                 onChange={(e) => {
                                                     const val = e.target.value;
                                                     const trimmedVal = val.trim().toLowerCase();
-                                                    const foundDev = availableDevices.find(d => String(d.number).trim().toLowerCase() === trimmedVal);
+                                                    const foundDev = newDevice.isRental ? null : availableDevices.find(d => String(d.number).trim().toLowerCase() === trimmedVal);
                                                     if (foundDev) {
                                                         setSelectedDevice(foundDev);
                                                     } else {
@@ -9314,6 +9397,18 @@ END:VCARD`;
                                                     </option>
                                                 ))}
                                             </datalist>
+
+                                            {!selectedDevice && (
+                                                <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '0.95rem', cursor: 'pointer', color: newDevice.isRental ? 'var(--text-main)' : 'var(--text-muted)' }}>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={!!newDevice.isRental}
+                                                        onChange={(e) => setNewDevice(prev => ({ ...prev, isRental: e.target.checked, catalogId: '', newTypeName: '', useNewType: false, type: e.target.checked ? '' : prev.type }))}
+                                                        style={{ width: '18px', height: '18px', accentColor: 'var(--primary)' }}
+                                                    />
+                                                    <span style={{ fontWeight: 600 }}>Mietgerät (separates Mietinventar)</span>
+                                                </label>
+                                            )}
 
                                             {selectedDevice && (
                                                 <div style={{
@@ -9336,7 +9431,42 @@ END:VCARD`;
                                                 </div>
                                             )}
 
-                                            {!selectedDevice && newDevice.deviceNumber && !availableDevices.some(d => String(d.number).trim().toLowerCase() === newDevice.deviceNumber.trim().toLowerCase()) && (
+                                            {!selectedDevice && newDevice.deviceNumber && newDevice.isRental && (
+                                                <>
+                                                    <select
+                                                        className="form-input"
+                                                        value={newDevice.useNewType ? NEW_DEVICE_TYPE_VALUE : (newDevice.catalogId || '')}
+                                                        onChange={(e) => setNewDevice(prev => ({
+                                                            ...prev,
+                                                            catalogId: e.target.value === NEW_DEVICE_TYPE_VALUE ? '' : e.target.value,
+                                                            newTypeName: e.target.value === NEW_DEVICE_TYPE_VALUE ? prev.newTypeName : '',
+                                                            useNewType: e.target.value === NEW_DEVICE_TYPE_VALUE
+                                                        }))}
+                                                        style={{ fontSize: '1.1rem', padding: '1rem' }}
+                                                    >
+                                                        <option value="">Gerätetyp aus Datenbank wählen *</option>
+                                                        {deviceCatalog.map(cat => (
+                                                            <option key={cat.id} value={cat.id}>
+                                                                {cat.geraetetyp}{cat.hersteller && cat.hersteller !== 'Noch offen' ? ` · ${cat.hersteller} ${cat.modell || ''}` : ''}{cat.catalog_status === 'provisional' ? ' (vorläufig)' : ''}
+                                                            </option>
+                                                        ))}
+                                                        <option value={NEW_DEVICE_TYPE_VALUE}>+ Gerätetyp vor Ort neu erfassen</option>
+                                                    </select>
+                                                    {(newDevice.useNewType || deviceCatalog.length === 0) && (
+                                                        <input
+                                                            type="text"
+                                                            placeholder="Neuen Gerätetyp eingeben *"
+                                                            className="form-input"
+                                                            value={newDevice.newTypeName || ''}
+                                                            onChange={(e) => setNewDevice(prev => ({ ...prev, newTypeName: e.target.value, catalogId: '' }))}
+                                                            style={{ fontSize: '1.1rem', padding: '1rem' }}
+                                                        />
+                                                    )}
+                                                    <small style={{ color: 'var(--text-muted)' }}>Neue Typen werden als „vorläufig“ in der Datenbank gespeichert.</small>
+                                                </>
+                                            )}
+
+                                            {!selectedDevice && newDevice.deviceNumber && !newDevice.isRental && !availableDevices.some(d => String(d.number).trim().toLowerCase() === newDevice.deviceNumber.trim().toLowerCase()) && (
                                                 <>
                                                     <div style={{ display: 'flex', width: '100%' }}>
                                                         <button
@@ -9460,32 +9590,11 @@ END:VCARD`;
                                                 />
                                             </div>
 
-                                            <label style={{
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                gap: '0.6rem',
-                                                fontSize: '0.95rem',
-                                                cursor: (selectedDevice && !selectedDevice.is_rental) ? 'not-allowed' : 'pointer',
-                                                userSelect: 'none',
-                                                padding: '0.2rem 0',
-                                                color: (selectedDevice ? !!selectedDevice.is_rental : !!newDevice.isRental) ? 'var(--text-main)' : 'var(--text-muted)',
-                                                opacity: (selectedDevice && !selectedDevice.is_rental) ? 0.4 : 0.85
-                                            }}>
-                                                <input
-                                                    type="checkbox"
-                                                    checked={selectedDevice ? !!selectedDevice.is_rental : !!newDevice.isRental}
-                                                    disabled={!!(selectedDevice && !selectedDevice.is_rental)}
-                                                    onChange={(e) => setNewDevice(prev => ({ ...prev, isRental: e.target.checked }))}
-                                                    style={{ width: '18px', height: '18px', accentColor: 'var(--primary)', cursor: (selectedDevice && !selectedDevice.is_rental) ? 'not-allowed' : 'pointer' }}
-                                                />
-                                                <span style={{ fontWeight: 600 }}>Mietgerät (Externes Gerät)</span>
-                                            </label>
-
                                             <button
                                                 type="button"
                                                 className="btn btn-primary"
                                                 style={{ width: '100%', padding: '1rem', fontSize: '1rem' }}
-                                                disabled={!newDevice.deviceNumber || String(newDevice.counterStart ?? '').trim() === '' || (!selectedDevice && !newDevice.type)}
+                                                disabled={!newDevice.deviceNumber || String(newDevice.counterStart ?? '').trim() === '' || (!selectedDevice && (newDevice.isRental ? !isRentalTypeSelectionValid({ catalogId: newDevice.catalogId, newTypeName: newDevice.newTypeName }) : !newDevice.type))}
                                                 onClick={async (e) => {
                                                     e.preventDefault();
                                                     if (!newDevice.apartment && techSelectedEquipmentRoom?.apartment) {
@@ -9501,6 +9610,9 @@ END:VCARD`;
                                                             ...prev,
                                                             deviceNumber: '',
                                                             type: '',
+                                                            catalogId: '',
+                                                            newTypeName: '',
+                                                            useNewType: false,
                                                             counterStart: '',
                                                             hours: ''
                                                         }));
@@ -10059,11 +10171,27 @@ END:VCARD`;
                                             type="button"
                                             className="btn btn-primary"
                                             style={{ flex: 1, padding: '0.75rem', fontWeight: 600 }}
-                                            onClick={() => {
+                                            onClick={async () => {
+                                                const confirmedEndDate = draft.endDate || new Date().toISOString().split('T')[0];
+                                                if (device.isRental) {
+                                                    try {
+                                                        await endRentalDeviceAssignment({
+                                                            supabase,
+                                                            rentalDeviceId: device.rentalDbId,
+                                                            reportId: formData.id,
+                                                            endDate: confirmedEndDate,
+                                                            runtimeHours: draft.hours
+                                                        });
+                                                    } catch (error) {
+                                                        console.error('Failed to end rental device assignment:', error);
+                                                        alert(error?.message || 'Das Mietgerät konnte nicht sicher abgemeldet werden.');
+                                                        return;
+                                                    }
+                                                }
                                                 const newEquipment = [...(formData.equipment || [])];
                                                 newEquipment[idx] = {
                                                     ...newEquipment[idx],
-                                                    endDate: draft.endDate || new Date().toISOString().split('T')[0],
+                                                    endDate: confirmedEndDate,
                                                     counterEnd: draft.counterEnd || '',
                                                     hours: draft.hours || ''
                                                 };
