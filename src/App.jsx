@@ -3252,49 +3252,6 @@ function App() {
       </header>
 
       <main className="container" style={{ marginTop: effectiveMode === 'technician' ? '0.5rem' : '1rem', padding: effectiveMode === 'technician' ? '0.5rem' : '1rem 1.25rem', maxWidth: effectiveMode === 'technician' ? undefined : 'none' }}>
-        {view === 'dashboard' && pendingLocalDrafts.length > 0 && (
-          <section aria-label="Lokale Projektentwürfe" style={{
-            marginBottom: '1rem', padding: '0.85rem 1rem', borderRadius: 8,
-            border: '1px solid #D97706', background: 'rgba(217,119,6,0.10)',
-            display: 'flex', flexDirection: 'column', gap: '0.65rem'
-          }}>
-            <strong style={{ color: '#F59E0B' }}>Lokal gesicherte Fälle – Cloudübertragung ausstehend</strong>
-            {pendingLocalDrafts.map(draft => {
-              const project = draft.project || {};
-              const postalLocation = [project.zip, project.city].filter(Boolean).join(' ');
-              const address = [project.street, postalLocation].filter(Boolean).join(', ') || project.address || '';
-              const damageLocation = project.locationDetails || project.objectName || '';
-              const projectReference = project.projectNumber || project.projectTitle || '';
-              const label = address || damageLocation || projectReference || 'Unbenannter Fall';
-              const details = [
-                damageLocation && damageLocation !== label ? `Schadenort: ${damageLocation}` : '',
-                projectReference && projectReference !== label ? `Projekt-Nr.: ${projectReference}` : '',
-                `Entwurf-ID: ${String(draft.projectId || '').slice(-8)}`
-              ].filter(Boolean).join(' · ');
-              return (
-                <div key={draft.projectId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
-                  <span>
-                    <strong>{label}</strong>
-                    <small style={{ display: 'block', color: 'var(--text-secondary)', marginTop: '0.15rem' }}>
-                      {details}
-                    </small>
-                    <small style={{ display: 'block', color: 'var(--text-muted)' }}>
-                      Lokal geprüft: {draft.updatedAt ? new Date(draft.updatedAt).toLocaleString('de-CH') : 'Zeit unbekannt'}
-                    </small>
-                  </span>
-                  <button type="button" className="btn btn-primary" onClick={() => {
-                    pendingNewProjectIdRef.current = draft.projectId;
-                    setSelectedReport({ ...project, id: draft.projectId, _cloudSyncStatus: 'pending', _is_local_draft: true });
-                    setProjectMode('desktop');
-                    setView('new-report');
-                  }}>
-                    Entwurf öffnen und erneut übertragen
-                  </button>
-                </div>
-              );
-            })}
-          </section>
-        )}
         {needRefresh && (
           <div style={{
             backgroundColor: '#3b82f6',
