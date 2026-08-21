@@ -1363,9 +1363,9 @@ function App() {
     return () => { cancelled = true; };
   }, [currentUser, supabaseSession?.user?.id]);
 
-  const handleSetUsers = (newUsers) => {
+  const handleSetUsers = useCallback((newUsers) => {
     setUsers(stripLegacyPasswords(newUsers));
-  };
+  }, []);
 
   useEffect(() => {
     if (userRole === 'technician') {

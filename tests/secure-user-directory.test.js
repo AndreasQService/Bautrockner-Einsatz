@@ -68,3 +68,8 @@ test('client surfaces the structured Edge Function error instead of hiding it', 
   assert.match(service, /response\.clone\(\)\.json\(\)/);
   assert.match(service, /payload\?\.error/);
 });
+
+test('directory publishing callback is stable and cannot retrigger the modal load loop', () => {
+  assert.match(app, /const handleSetUsers = useCallback\(\(newUsers\) => \{/);
+  assert.match(app, /setUsers\(stripLegacyPasswords\(newUsers\)\);\s*\}, \[\]\);/);
+});
