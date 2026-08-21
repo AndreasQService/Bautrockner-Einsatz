@@ -66,6 +66,23 @@ export const getProjectPhotoCandidates = report => uniqueItems([
   }] : [])
 ].filter(item => !isDocument(item) && item?.assignedTo !== 'Messprotokolle'));
 
+export const getProjectPhotoEvidenceKey = (report, photo) => {
+  if (!photo) return null;
+  const candidates = getProjectPhotoCandidates(report);
+  const photoId = photo.id != null ? String(photo.id) : '';
+  const photoPath = String(photo.supabasePath || photo.storagePath || '');
+  const matches = candidates.map((candidate, index) => ({ candidate, index })).filter(({ candidate }) => {
+    const candidateId = candidate?.id != null ? String(candidate.id) : '';
+    if (photoId && candidateId) return photoId === candidateId;
+    const candidatePath = String(candidate?.supabasePath || candidate?.storagePath || '');
+    if (photoPath && candidatePath) return photoPath === candidatePath;
+    return String(candidate?.name || '') === String(photo.name || '')
+      && String(candidate?.date || candidate?.createdAt || '') === String(photo.date || photo.createdAt || '')
+      && String(candidate?.size || '') === String(photo.size || '');
+  });
+  return matches.length === 1 ? itemKey(matches[0].candidate, matches[0].index) : null;
+};
+
 const stripProtocolDataFromRoom = room => Object.fromEntries(Object.entries(room || {}).filter(([key]) => ![
   'measurementData', 'measurementHistory', 'measurements', 'measurementPoints', 'points', 'canvasImage', 'sketch', 'protocolUrl'
 ].includes(key)));

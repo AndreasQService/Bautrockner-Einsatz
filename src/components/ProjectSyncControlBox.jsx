@@ -7,7 +7,7 @@ import { verifyProjectOneDriveSync } from '../lib/verifyProjectOneDriveSync.js';
 const EMPTY_EVIDENCE = { verifiedPhotoKeys: [], verifiedDeviceKeys: [], textVerified: false, protocolsVerified: false };
 const emptyTarget = () => ({ phase: 'loading', evidence: EMPTY_EVIDENCE, error: null, verifiedAt: null });
 
-export default function ProjectSyncControlBox({ report, supabase, offline = false }) {
+export default function ProjectSyncControlBox({ report, supabase, offline = false, onEvidenceChange }) {
   const [targets, setTargets] = useState({ supabase: emptyTarget(), oneDrive: emptyTarget() });
   const generationRef = useRef(0);
   const summaries = useMemo(() => ({
@@ -56,6 +56,16 @@ export default function ProjectSyncControlBox({ report, supabase, offline = fals
       if (intervalId) clearInterval(intervalId);
     };
   }, [report, supabase, offline]);
+
+  useEffect(() => {
+    if (typeof onEvidenceChange !== 'function') return;
+    onEvidenceChange({
+      supabaseReady: targets.supabase.phase === 'ready',
+      oneDriveReady: targets.oneDrive.phase === 'ready',
+      supabase: targets.supabase.phase === 'ready' ? targets.supabase.evidence : EMPTY_EVIDENCE,
+      oneDrive: targets.oneDrive.phase === 'ready' ? targets.oneDrive.evidence : EMPTY_EVIDENCE
+    });
+  }, [targets, onEvidenceChange]);
 
   const targetComplete = name => targets[name].phase === 'ready' && summaries[name].complete;
   const green = targetComplete('supabase') && targetComplete('oneDrive');

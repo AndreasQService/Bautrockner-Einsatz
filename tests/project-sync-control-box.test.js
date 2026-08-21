@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 import {
+  getProjectPhotoEvidenceKey,
   getProjectPhotoCandidates,
   getProjectSyncSummary,
   reportCategoryMatches
@@ -67,6 +68,22 @@ test('two distinct local photos with the same filename remain two pending object
     ]
   });
   assert.equal(photos.length, 2);
+});
+
+test('gallery photo status resolves only to the exact verifier evidence key', () => {
+  assert.equal(getProjectPhotoEvidenceKey(report, { ...report.images[0] }), 'photo-1');
+  assert.equal(getProjectPhotoEvidenceKey(report, { ...report.images[1] }), 'photo-2');
+  assert.equal(getProjectPhotoEvidenceKey(report, { name: 'not-in-report.jpg' }), null);
+});
+
+test('ambiguous photo metadata fails closed instead of showing a fake green status', () => {
+  const ambiguous = {
+    images: [
+      { name: 'same.jpg', date: '2026-08-21', size: 100 },
+      { name: 'same.jpg', date: '2026-08-21', size: 100 }
+    ]
+  };
+  assert.equal(getProjectPhotoEvidenceKey(ambiguous, { name: 'same.jpg', date: '2026-08-21', size: 100 }), null);
 });
 
 test('text comparison detects operational project fields beyond the title', () => {
@@ -195,6 +212,18 @@ test('periodic verification preserves the last evidence while refreshing instead
   assert.match(source, /const verify = async \(\{ clearEvidence = false \} = \{\}\)/);
   assert.match(source, /if \(clearEvidence\) setTargets\(\{ supabase: emptyTarget\(\), oneDrive: emptyTarget\(\) \}\)/);
   assert.match(source, /setInterval\(verify, 15000\)/);
+});
+
+test('gallery badges consume fresh verifier evidence and never trust local upload flags', () => {
+  const form = readFileSync(new URL('../src/components/DamageForm.jsx', import.meta.url), 'utf8');
+  const start = form.indexOf('{/* DB Sync Status Badge */}');
+  const end = form.indexOf('<button', start);
+  assert.ok(start >= 0 && end > start);
+  const badge = form.slice(start, end);
+  assert.match(badge, /verifiedPhotoEvidence\.supabase\.includes\(evidenceKey\)/);
+  assert.match(badge, /verifiedPhotoEvidence\.oneDrive\.includes\(evidenceKey\)/);
+  assert.doesNotMatch(badge, /img\.syncStatus === 'uploaded_to_backend'/);
+  assert.doesNotMatch(badge, /img\.supabasePath \|\|\s*img\.oneDriveItemId/);
 });
 
 const graphResponse = (status, body) => ({

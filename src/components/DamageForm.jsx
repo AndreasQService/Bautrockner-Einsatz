@@ -45,6 +45,7 @@ import { statusColors, ROOM_OPTIONS } from '../config/damageFormConfig';
 import { createRentalDeviceAssignment, endRentalDeviceAssignment, isRentalTypeSelectionValid, NEW_DEVICE_TYPE_VALUE } from '../lib/rentalDevices';
 import ProjectSyncControlBox from './ProjectSyncControlBox';
 import { saveProjectDraftWithReadback } from '../lib/safeProjectCreation';
+import { getProjectPhotoEvidenceKey } from '../lib/projectSyncSummary.js';
 
 /* Custom PDF Icon */
 const PdfIcon = ({ size = 24, style = {} }) => (
@@ -764,6 +765,13 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
     // Never infer a successful save from an id, a timer, or hydrated UI data.
     // Only the real cloud-save result below may transition this state to saved.
     const [saveState, setSaveState] = useState('pending');
+    const [verifiedPhotoEvidence, setVerifiedPhotoEvidence] = useState({ supabase: [], oneDrive: [] });
+    const handleProjectSyncEvidence = useCallback((evidence) => {
+        setVerifiedPhotoEvidence({
+            supabase: evidence?.supabaseReady ? (evidence.supabase?.verifiedPhotoKeys || []) : [],
+            oneDrive: evidence?.oneDriveReady ? (evidence.oneDrive?.verifiedPhotoKeys || []) : []
+        });
+    }, []);
     const [linkingImageId, setLinkingImageId] = useState(null);
     const [visibleRoomImages, setVisibleRoomImages] = useState({}); // Stores roomId -> boolean for toggle
     const [conflicts, setConflicts] = useState({}); // Stores { fieldPath: { original: '...', new: '...' } }
@@ -10357,15 +10365,9 @@ END:VCARD`;
                                                 />
                                                 {/* DB Sync Status Badge */}
                                                 {(() => {
-                                                    const isCloudSaved = !!(
-                                                        img.supabasePath ||
-                                                        img.oneDriveItemId ||
-                                                        img.supabaseUrl ||
-                                                        img.syncStatus === 'uploaded_to_backend' ||
-                                                        (typeof img.url === 'string' && img.url.startsWith('http')) ||
-                                                        (typeof img.preview === 'string' && img.preview.startsWith('http'))
-                                                    );
-                                                    const hasOneDrive = !!img.oneDriveItemId;
+                                                    const evidenceKey = getProjectPhotoEvidenceKey(formData, img);
+                                                    const isCloudSaved = !!evidenceKey && verifiedPhotoEvidence.supabase.includes(evidenceKey);
+                                                    const hasOneDrive = !!evidenceKey && verifiedPhotoEvidence.oneDrive.includes(evidenceKey);
                                                     return (
                                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', position: 'absolute', top: '6px', left: '6px', zIndex: 2 }}>
                                                             <div
@@ -10382,10 +10384,10 @@ END:VCARD`;
                                                                     boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
                                                                     backdropFilter: 'blur(4px)'
                                                                 }}
-                                                                title={isCloudSaved ? 'In Supabase/Cloud gespeichert' : 'Lokal gesichert'}
+                                                                title={isCloudSaved ? 'Durch frischen Supabase-Storage-Readback bestätigt' : 'Lokal gesichert; Supabase-Bestätigung ausstehend'}
                                                             >
                                                                 <Database size={10} style={{ strokeWidth: 2.5 }} />
-                                                                <span>{isCloudSaved ? 'In Supabase' : 'Lokal gesichert'}</span>
+                                                                <span>{isCloudSaved ? 'Supabase bestätigt' : 'Lokal gespeichert'}</span>
                                                             </div>
                                                             {hasOneDrive && (
                                                                 <div
@@ -10402,9 +10404,9 @@ END:VCARD`;
                                                                         boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
                                                                         backdropFilter: 'blur(4px)'
                                                                     }}
-                                                                    title="Erfolgreich auf OneDrive gesichert"
+                                                                    title="Durch frischen OneDrive-Graph-Readback bestätigt"
                                                                 >
-                                                                    <span>☁️ OneDrive</span>
+                                                                    <span>☁️ OneDrive bestätigt</span>
                                                                 </div>
                                                             )}
                                                         </div>
@@ -10571,7 +10573,7 @@ END:VCARD`;
 
                 <div style={{ height: '92px', ...(mode === 'desktop' ? { order: 3 } : {}) }} />
 
-                <ProjectSyncControlBox report={formData} supabase={supabase} offline={isActuallyOffline} />
+                <ProjectSyncControlBox report={formData} supabase={supabase} offline={isActuallyOffline} onEvidenceChange={handleProjectSyncEvidence} />
 
                 {/* Mobile / Technician Fixed Footer - AutoSave Version */}
                 <div style={{
