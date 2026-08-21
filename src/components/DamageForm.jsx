@@ -44,8 +44,10 @@ import { RoomService } from '../services/RoomService';
 import { statusColors, ROOM_OPTIONS } from '../config/damageFormConfig';
 import { createRentalDeviceAssignment, endRentalDeviceAssignment, isRentalTypeSelectionValid, NEW_DEVICE_TYPE_VALUE } from '../lib/rentalDevices';
 import ProjectSyncControlBox from './ProjectSyncControlBox';
+import AuthenticatedStorageImage from './AuthenticatedStorageImage';
 import { saveProjectDraftWithReadback } from '../lib/safeProjectCreation';
 import { getProjectPhotoEvidenceKey } from '../lib/projectSyncSummary.js';
+import { getCaseFileStoragePath, getDurablePhotoUrl } from '../lib/caseFilePhotoAccess';
 
 /* Custom PDF Icon */
 const PdfIcon = ({ size = 24, style = {} }) => (
@@ -9006,8 +9008,8 @@ END:VCARD`;
                                             }}
                                         >
                                             <div style={{ position: 'relative', width: '100%', height: '120px', backgroundColor: '#000' }}>
-                                                <img
-                                                    src={img.preview || img.url}
+                                                <AuthenticatedStorageImage
+                                                    photo={img}
                                                     alt={img.name || 'Foto'}
                                                     style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: 'pointer' }}
                                                     onClick={() => {
@@ -10415,17 +10417,28 @@ END:VCARD`;
                                                 <button
                                                     type="button"
                                                     onClick={async () => {
-                                                        let url = img.preview || img.url;
-                                                        if (img.storagePath || img.supabasePath) {
-                                                            const parts = ['yx', 'doe', 'cdq', 'ttg', 'dnc', 'gbz', 'yus'];
-                                                            const baseUrl = import.meta.env.VITE_SUPABASE_URL || `https://${parts.join('')}.supabase.co`;
-                                                            url = `${baseUrl}/storage/v1/object/public/case-files/${img.storagePath || img.supabasePath}`;
-                                                        }
                                                         try {
+                                                            const storagePath = getCaseFileStoragePath(img);
+                                                            let url = getDurablePhotoUrl(img);
+
+                                                            if (storagePath) {
+                                                                const { data, error } = await supabase.storage
+                                                                    .from('case-files')
+                                                                    .createSignedUrl(storagePath, 300);
+                                                                if (error || !data?.signedUrl) {
+                                                                    throw error || new Error('SIGNED_URL_MISSING');
+                                                                }
+                                                                url = data.signedUrl;
+                                                            }
+
+                                                            if (!url) throw new Error('PHOTO_URL_UNAVAILABLE');
                                                             await navigator.clipboard.writeText(url);
-                                                            alert('Foto-URL in die Zwischenablage kopiert!');
+                                                            alert(storagePath
+                                                                ? 'Zeitlich begrenzter Foto-Link (5 Minuten) wurde kopiert.'
+                                                                : 'Foto-Link wurde kopiert.');
                                                         } catch (err) {
-                                                            console.error('Failed to copy URL:', err);
+                                                            console.error('Failed to create/copy secure photo URL:', err);
+                                                            alert('Foto-Link konnte nicht sicher erstellt werden.');
                                                         }
                                                     }}
                                                     style={{
