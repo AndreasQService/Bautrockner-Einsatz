@@ -408,7 +408,18 @@ function App() {
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
+    const handleOffline = () => {
+      setIsOnline(false);
+      // navigator.onLine alone is not a connectivity proof. The offline event
+      // may invalidate a previous successful database check, but an initial
+      // false browser flag must never override a fresh Supabase readback.
+      setSupabaseStatus((previous) => ({
+        ok: false,
+        count: previous?.count ?? 0,
+        total: previous?.total,
+        error: 'Netzwerkverbindung unterbrochen',
+      }));
+    };
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
@@ -926,6 +937,19 @@ function App() {
     if (typeof window === 'undefined') return false;
     return new URLSearchParams(window.location.search).get('qtool_invite') === '1';
   });
+
+  const serviceWorkerUpdateStartedRef = useRef(false);
+  useEffect(() => {
+    // Only reload from the dashboard. Project edits and verified IndexedDB
+    // drafts must never be interrupted by an automatic application update.
+    if (!needRefresh || view !== 'dashboard' || serviceWorkerUpdateStartedRef.current) return;
+    serviceWorkerUpdateStartedRef.current = true;
+    setNeedRefresh(false);
+    void updateServiceWorker(true).catch((error) => {
+      serviceWorkerUpdateStartedRef.current = false;
+      console.error('[SW] Automatische Aktualisierung fehlgeschlagen:', error);
+    });
+  }, [needRefresh, setNeedRefresh, updateServiceWorker, view]);
   const [isRecoverySetup, setIsRecoverySetup] = useState(() => {
     if (typeof window === 'undefined') return false;
     return new URLSearchParams(window.location.search).get('qtool_recovery') === '1'
@@ -1273,7 +1297,9 @@ function App() {
 
   // UI-Sperr-Variablen
   // Im Techniker-Modus ist der Lock komplett deaktiviert — Techniker arbeiten immer im Feld
-  const isActuallyOffline = !isOnline || (supabaseStatus && supabaseStatus.ok === false);
+  // The database readback is authoritative. navigator.onLine is only a trigger
+  // for revalidation and must not create a false offline state by itself.
+  const isActuallyOffline = supabaseStatus?.ok === false;
   const lockRequired = projectMode !== 'technician' && !isTechnicianMode && view === 'details' && Boolean(selectedReport?.id);
   const isLockedByOtherMode = lockRequired && !isSessionActive && confirmedForeignLockProjectId === selectedReport?.id;
   // Fail closed while the ownership check is pending or unavailable, without
@@ -3009,7 +3035,7 @@ function App() {
                 role="status"
                 aria-live="polite"
                 title={
-                  !isOnline || supabaseStatus?.ok !== true
+                  supabaseStatus?.ok !== true
                     ? `Datenbank ausstehend${supabaseStatus?.error ? `: ${supabaseStatus.error}` : ''}`
                     : `${supabaseStatus.count} Projekte geladen (Gesamte DB: ${supabaseStatus.total} Einträge)`
                 }
@@ -3020,11 +3046,11 @@ function App() {
                   padding: '0.3rem 0.65rem',
                   borderRadius: '6px',
                   border: `1px solid ${
-                    isOnline && supabaseStatus?.ok === true ? '#10B981' : '#EF4444'
+                    supabaseStatus?.ok === true ? '#10B981' : '#EF4444'
                   }`,
-                  backgroundColor: isOnline && supabaseStatus?.ok === true ? 'rgba(16, 185, 129, 0.06)' : 'rgba(239, 68, 68, 0.06)',
+                  backgroundColor: supabaseStatus?.ok === true ? 'rgba(16, 185, 129, 0.06)' : 'rgba(239, 68, 68, 0.06)',
                   fontSize: '0.78rem',
-                  color: isOnline && supabaseStatus?.ok === true ? '#10B981' : '#EF4444',
+                  color: supabaseStatus?.ok === true ? '#10B981' : '#EF4444',
                   whiteSpace: 'nowrap',
                   userSelect: 'none',
                   transition: 'all 0.3s ease',
@@ -3034,11 +3060,11 @@ function App() {
               >
                 <span style={{
                   width: '7px', height: '7px', borderRadius: '50%',
-                  backgroundColor: isOnline && supabaseStatus?.ok === true ? '#10B981' : '#EF4444',
+                  backgroundColor: supabaseStatus?.ok === true ? '#10B981' : '#EF4444',
                   flexShrink: 0,
                 }} />
                 <span>
-                  {isOnline && supabaseStatus?.ok === true ? 'Supabase verbunden' : 'Supabase ausstehend'}
+                  {supabaseStatus?.ok === true ? 'Supabase verbunden' : 'Supabase ausstehend'}
                 </span>
               </div>
 
@@ -3299,27 +3325,6 @@ function App() {
             </button>
           </div>
         )}
-
-        {isActuallyOffline && (
-          <div style={{
-            backgroundColor: '#ef4444',
-            color: 'white',
-            padding: '1rem',
-            borderRadius: '8px',
-            marginBottom: '1rem',
-            textAlign: 'center',
-            fontWeight: 'bold',
-            boxShadow: '0 4px 12px rgba(239, 68, 68, 0.3)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '0.5rem',
-            zIndex: 9999
-          }}>
-            <span>📡 Offline – Änderungen werden nur lokal gespeichert (Synchronisation ausstehend)</span>
-          </div>
-        )}
-
 
         {view === 'dashboard' && <Dashboard
           reports={reports}
