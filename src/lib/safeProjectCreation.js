@@ -6,6 +6,20 @@ const STORE_NAME = 'drafts';
 
 let dbPromise;
 
+const REQUIRED_PROJECT_FIELDS = [
+  ['projectNumber', 'Projekt-Nr.'],
+  ['locationDetails', 'Schadenort'],
+  ['street', 'Straße und Hausnummer'],
+  ['zip', 'PLZ'],
+  ['city', 'Ort'],
+];
+
+export function getMissingRequiredProjectFields(project) {
+  return REQUIRED_PROJECT_FIELDS
+    .filter(([key]) => !String(project?.[key] ?? '').trim())
+    .map(([, label]) => label);
+}
+
 function openDraftDatabase() {
   if (typeof indexedDB === 'undefined') throw new Error('IndexedDB ist nicht verfügbar');
   if (!dbPromise) {

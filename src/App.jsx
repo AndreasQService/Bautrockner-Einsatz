@@ -5,7 +5,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRegisterSW } from 'virtual:pwa-register/react'
 import { useSessionLock } from './hooks/useSessionLock'
-import { confirmProjectDraftWithReadback, createProjectAtomically, listVerifiedPendingProjectDrafts, saveProjectDraftWithReadback } from './lib/safeProjectCreation.js'
+import { confirmProjectDraftWithReadback, createProjectAtomically, getMissingRequiredProjectFields, listVerifiedPendingProjectDrafts, saveProjectDraftWithReadback } from './lib/safeProjectCreation.js'
 import { Plus, LayoutDashboard, Settings, User, Users, LogOut, Thermometer, Database, RotateCcw, Download, Sun, Moon, Hammer } from 'lucide-react';
 import ProjectSelection from './components/ProjectSelection';
 import { setQToolSessionToken, supabase } from './supabaseClient'
@@ -2069,6 +2069,17 @@ function App() {
       } catch (error) {
         showToast(`Projekt wurde nicht gespeichert: ${error.message}`, 'error', 15000);
         return updatedReport;
+      }
+
+      const missingRequiredFields = getMissingRequiredProjectFields(finalReport);
+      if (missingRequiredFields.length > 0) {
+        showToast(
+          `Entwurf lokal sicher gespeichert. Für die Cloudübertragung fehlen: ${missingRequiredFields.join(', ')}.`,
+          'warning',
+          15000
+        );
+        setPendingLocalDrafts(current => [verifiedDraft, ...current.filter(item => item.projectId !== verifiedDraft.projectId)]);
+        return { ...verifiedDraft.project, _cloudSyncStatus: 'pending', _is_local_draft: true };
       }
 
       try {

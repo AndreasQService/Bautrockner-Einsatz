@@ -4262,7 +4262,7 @@ END:VCARD`;
                         }}>
                             {/* 1. Projekt-Nr */}
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', flex: '1 1 100px', minWidth: '80px' }}>
-                                <label style={{ fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 700 }}>Projekt-Nr:</label>
+                                <label style={{ fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 700 }}>Projekt-Nr. *</label>
                                 <div style={{ position: 'relative' }}>
                                     <input
                                         type="text"
@@ -4280,6 +4280,8 @@ END:VCARD`;
                                             });
                                         }}
                                         placeholder="Projekt-Nr."
+                                        required
+                                        aria-required="true"
                                     />
                                     {renderConflictWarn('projectNumber')}
                                 </div>
@@ -4287,7 +4289,7 @@ END:VCARD`;
 
                             {/* 2. Schadenort */}
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', flex: '2 1 200px', minWidth: '150px' }}>
-                                <label style={{ fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 700 }}>Schadenort:</label>
+                                <label style={{ fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 700 }}>Schadenort *</label>
                                 <input
                                     type="text"
                                     className="form-input"
@@ -4295,12 +4297,14 @@ END:VCARD`;
                                     value={formData.locationDetails || ''}
                                     onChange={(e) => setFormData(prev => ({ ...prev, locationDetails: e.target.value }))}
                                     placeholder="z.B. Küche / Keller"
+                                    required
+                                    aria-required="true"
                                 />
                             </div>
 
                             {/* 3. Strasse */}
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', flex: '3 1 280px', minWidth: '200px' }}>
-                                <label style={{ fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 700 }}>Strasse:</label>
+                                <label style={{ fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 700 }}>Straße und Nr. *</label>
                                 <input
                                     type="text"
                                     className="form-input"
@@ -4308,12 +4312,14 @@ END:VCARD`;
                                     value={formData.street || ''}
                                     onChange={(e) => extractAddressDetails(e.target.value, 'street', 'zip', 'city')}
                                     placeholder="Strasse & Nr."
+                                    required
+                                    aria-required="true"
                                 />
                             </div>
 
                             {/* 4. PLZ / Ort */}
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', flex: '2.5 1 240px', minWidth: '180px' }}>
-                                <label style={{ fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 700 }}>PLZ / Ort:</label>
+                                <label style={{ fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 700 }}>PLZ / Ort *</label>
                                 <div style={{ display: 'flex', gap: '0.4rem' }}>
                                     <input
                                         type="text"
@@ -4331,6 +4337,8 @@ END:VCARD`;
                                             }
                                         }}
                                         placeholder="PLZ"
+                                        required
+                                        aria-required="true"
                                     />
                                     <datalist id="plz-list-header">
                                         {swissPLZ.map((entry, idx) => (
@@ -4358,6 +4366,8 @@ END:VCARD`;
                                             }
                                         }}
                                         placeholder="Ort"
+                                        required
+                                        aria-required="true"
                                     />
                                     <datalist id="ort-list-header">
                                         {swissPLZ.map((entry, idx) => (
