@@ -275,3 +275,14 @@ test('control box separates providers and global green requires both complete', 
   const silentFunction = authSource.slice(authSource.indexOf('export async function getGraphAccessTokenSilent'));
   assert.doesNotMatch(silentFunction, /acquireTokenPopup|loginPopup|loginRedirect/);
 });
+
+test('control box is the bottom-most single-line status bar', () => {
+  const source = readFileSync(new URL('../src/components/ProjectSyncControlBox.jsx', import.meta.url), 'utf8');
+  const form = readFileSync(new URL('../src/components/DamageForm.jsx', import.meta.url), 'utf8');
+  assert.match(source, /left: 0, right: 0, bottom: 0, zIndex: 101/);
+  assert.match(source, /minWidth: 'max-content', whiteSpace: 'nowrap'/);
+  assert.match(source, /overflowX: 'auto', overflowY: 'hidden'/);
+  assert.match(source, /\{row\.label\}:/);
+  assert.doesNotMatch(source, /gridTemplateColumns: 'repeat\(2/);
+  assert.match(form, /bottom: '38px'/);
+});

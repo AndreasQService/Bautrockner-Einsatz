@@ -64,37 +64,37 @@ export default function ProjectSyncControlBox({ report, supabase, offline = fals
 
   return (
     <section aria-label="Supabase Synchronisationskontrolle und OneDrive Synchronisationskontrolle" aria-live="polite" style={{
-      position: 'fixed', left: '50%', bottom: '44px', transform: 'translateX(-50%)', zIndex: 99,
-      width: 'min(600px, calc(100% - 24px))', background: 'var(--surface)',
-      borderTop: `1px solid ${statusColor}`, borderRight: `1px solid ${statusColor}`, borderLeft: `1px solid ${statusColor}`,
-      borderBottom: '1px solid var(--border)', borderRadius: '8px 8px 0 0', padding: '0.5rem 0.75rem',
-      boxShadow: '0 -4px 12px rgba(0,0,0,0.22)'
+      position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 101,
+      minHeight: '38px', background: 'var(--surface)',
+      borderTop: `1px solid ${statusColor}`, padding: '0.35rem 0.75rem',
+      boxShadow: '0 -4px 12px rgba(0,0,0,0.22)', boxSizing: 'border-box',
+      overflowX: 'auto', overflowY: 'hidden'
     }}>
-      <div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', color: statusColor, fontWeight: 700, fontSize: '0.78rem', marginBottom: '0.45rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '1.1rem', minWidth: 'max-content', whiteSpace: 'nowrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: statusColor, fontWeight: 700, fontSize: '0.72rem' }}>
           {loading ? <RefreshCw size={15} aria-hidden="true" /> : <Database size={15} aria-hidden="true" />}
-          <span aria-hidden="true" style={{ width: 9, height: 9, borderRadius: '50%', background: statusColor }} />
+          <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: '50%', background: statusColor }} />
           {green ? 'Alle Daten in beiden Clouds bestätigt' : (loading ? 'Clouds werden geprüft …' : 'Synchronisation ausstehend')}
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', columnGap: '1rem', rowGap: '0.4rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1.1rem' }}>
           {summaries.supabase.rows.map((row, index) => {
             const oneDriveRow = summaries.oneDrive.rows[index];
             const supabaseGreen = targets.supabase.phase === 'ready' && row.complete;
             const oneDriveGreen = targets.oneDrive.phase === 'ready' && oneDriveRow.complete;
-            return <div key={row.label} style={{ fontSize: '0.7rem', fontWeight: 600, minWidth: 0 }}>
-              <div style={{ color: 'var(--text-primary)', marginBottom: 2 }}>{row.label}</div>
+            return <div key={row.label} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.68rem', fontWeight: 600 }}>
+              <span style={{ color: 'var(--text-primary)', fontWeight: 700 }}>{row.label}:</span>
               <span style={{ color: supabaseGreen ? '#10B981' : '#EF4444' }}>● Supabase {row.synced}/{row.total}</span>
               <span aria-hidden="true" style={{ color: 'var(--text-muted)' }}> · </span>
               <span style={{ color: oneDriveGreen ? '#10B981' : '#EF4444' }}>● OneDrive {oneDriveRow.synced}/{oneDriveRow.total}</span>
             </div>;
           })}
         </div>
+        {(targets.supabase.error || targets.oneDrive.error) && <div role="alert" style={{ color: '#EF4444', fontSize: '0.68rem' }}>
+          {targets.supabase.error && `Supabase: ${targets.supabase.error}`}
+          {targets.supabase.error && targets.oneDrive.error && ' · '}
+          {targets.oneDrive.error && `OneDrive: ${targets.oneDrive.error}`}
+        </div>}
       </div>
-      {(targets.supabase.error || targets.oneDrive.error) && <div role="alert" style={{ color: '#EF4444', fontSize: '0.7rem', marginTop: '0.3rem' }}>
-        {targets.supabase.error && `Supabase: ${targets.supabase.error}`}
-        {targets.supabase.error && targets.oneDrive.error && ' · '}
-        {targets.oneDrive.error && `OneDrive: ${targets.oneDrive.error}`}
-      </div>}
     </section>
   );
 }

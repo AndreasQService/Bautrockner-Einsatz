@@ -10556,14 +10556,14 @@ END:VCARD`;
                     </div>
                 )}
 
-                <div style={{ height: '80px', ...(mode === 'desktop' ? { order: 3 } : {}) }} />
+                <div style={{ height: '92px', ...(mode === 'desktop' ? { order: 3 } : {}) }} />
 
                 <ProjectSyncControlBox report={formData} supabase={supabase} offline={isActuallyOffline} />
 
                 {/* Mobile / Technician Fixed Footer - AutoSave Version */}
                 <div style={{
                     position: 'fixed',
-                    bottom: 0,
+                    bottom: '38px',
                     left: '50%',
                     transform: 'translateX(-50%)',
                     width: '100%',
