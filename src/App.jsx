@@ -1337,6 +1337,10 @@ function App() {
     const saved = localStorage.getItem('qtool_users_v2');
     return stripLegacyPasswords(saved ? JSON.parse(saved) : []);
   });
+  // A cloud-pending new project must keep the same id across every retry.
+  // DamageForm does not own the server admission state, so a failed save may
+  // call us again without the id returned by the previous attempt.
+  const pendingNewProjectIdRef = useRef(null);
 
   // Directory cache only. Authentication credentials are owned by Supabase Auth.
   useEffect(() => {
@@ -2014,12 +2018,16 @@ function App() {
         names: finalReport.measurementRooms?.map(r => r.name)
     });
 
+    if (!finalReport.id && isNewProject) {
+      finalReport.id = pendingNewProjectIdRef.current;
+    }
     if (!finalReport.id) {
       // Immer UUID verwenden — verhindert ID-Kollisionen die zu Datenverlust führen
       finalReport.id = (typeof crypto !== 'undefined' && crypto.randomUUID)
         ? crypto.randomUUID()
         : `TMP-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     }
+    if (isNewProject) pendingNewProjectIdRef.current = finalReport.id;
     if (!finalReport.date) finalReport.date = new Date().toISOString();
 
     if (isNewProject) {
@@ -2054,6 +2062,7 @@ function App() {
         setReports(current => [finalReport, ...current.filter(item => item.id !== finalReport.id)]);
         setSelectedReport(finalReport);
         setView('details');
+        pendingNewProjectIdRef.current = null;
         showToast('Projekt erstellt und Datenbank-Sperrbesitz bestätigt.', 'success', 5000);
         return finalReport;
       } catch (error) {

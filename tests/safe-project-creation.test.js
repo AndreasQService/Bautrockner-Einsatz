@@ -68,6 +68,14 @@ test('App keeps failed cloud creation outside project admission', () => {
   assert.match(creation, /await confirmProjectDraftWithReadback\(finalReport\.id\)/);
 });
 
+test('a cloud-pending new project reuses its UUID on every retry', () => {
+  const source = fs.readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8');
+  assert.match(source, /const pendingNewProjectIdRef = useRef\(null\)/);
+  assert.match(source, /if \(!finalReport\.id && isNewProject\) \{\s*finalReport\.id = pendingNewProjectIdRef\.current;/);
+  assert.match(source, /if \(isNewProject\) pendingNewProjectIdRef\.current = finalReport\.id;/);
+  assert.match(source, /setView\('details'\);\s*pendingNewProjectIdRef\.current = null;/);
+});
+
 test('new DamageForm entries are eligible for the first autosave', () => {
   const source = fs.readFileSync(new URL('../src/components/DamageForm.jsx', import.meta.url), 'utf8');
   const editTracking = source.slice(
