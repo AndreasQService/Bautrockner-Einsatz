@@ -89,6 +89,21 @@ test('server editing metadata and the derived address do not prevent an otherwis
   assert.equal(reportCategoryMatches(report, remote).text, true);
 });
 
+test('technical report_data wrapper is ignored but real edits still require a fresh readback', () => {
+  const local = {
+    ...report,
+    cause: 'Leckage',
+    report_data: {
+      projectTitle: 'Veralteter Wrapper',
+      cause: 'Veralteter Wrapper'
+    }
+  };
+  const remote = { ...report, cause: 'Leckage' };
+
+  assert.equal(reportCategoryMatches(local, remote).text, true);
+  assert.equal(reportCategoryMatches({ ...local, cause: 'Neue Ursache' }, remote).text, false);
+});
+
 test('an exterior photo is part of the photo safety total and requires Storage evidence', () => {
   const withExterior = {
     ...report,

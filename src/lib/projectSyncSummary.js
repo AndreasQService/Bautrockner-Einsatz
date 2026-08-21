@@ -1,6 +1,6 @@
 const DOCUMENT_EXTENSIONS = ['.msg', '.pdf', '.txt', '.doc', '.docx', '.xls', '.xlsx', '.csv'];
 const NON_TEXT_CATEGORIES = new Set([
-  'id', 'images', 'photos', 'equipment', 'devices',
+  'id', 'report_data', 'images', 'photos', 'equipment', 'devices',
   'exteriorPhoto', 'exteriorPhotoDeleted', 'exteriorPhotoStoragePath', 'exteriorPhotoOneDriveItemId', 'exteriorPhotoOneDrivePath',
   'address', 'date', 'imageCount', 'version', 'updated_at', 'created_at', 'isLightweight',
   'last_edited_by', 'last_edited_device', 'last_edited_client_id', 'last_edited_at'
