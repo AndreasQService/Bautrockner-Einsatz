@@ -15,7 +15,19 @@ const normalizeDirectoryUser = (user) => ({
 async function invokeAdminUsers(body) {
   if (!supabase?.functions?.invoke) throw new Error('Supabase ist nicht verfügbar.');
   const { data, error } = await supabase.functions.invoke('admin-users', { body });
-  if (error) throw new Error(error.message || 'Benutzerverwaltung nicht erreichbar.');
+  if (error) {
+    let serverMessage = '';
+    try {
+      const response = error.context;
+      if (response && typeof response.clone === 'function') {
+        const payload = await response.clone().json();
+        serverMessage = String(payload?.error || '');
+      }
+    } catch {
+      // Keep the transport message when the response has no JSON body.
+    }
+    throw new Error(serverMessage || error.message || 'Benutzerverwaltung nicht erreichbar.');
+  }
   if (!data?.ok) throw new Error(data?.error || 'Benutzerverwaltung fehlgeschlagen.');
   return data;
 }

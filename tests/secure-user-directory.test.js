@@ -6,6 +6,7 @@ const modal = fs.readFileSync(new URL('../src/components/UserManagementModal.jsx
 const service = fs.readFileSync(new URL('../src/services/AdminUserService.js', import.meta.url), 'utf8');
 const edge = fs.readFileSync(new URL('../supabase/functions/admin-users/index.ts', import.meta.url), 'utf8');
 const app = fs.readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8');
+const migration = fs.readFileSync(new URL('../supabase/migrations/20260821090000_create_secure_user_profiles.sql', import.meta.url), 'utf8');
 
 test('user management exposes identity fields and the four required roles', () => {
   assert.match(modal, /field\('E-Mail'/);
@@ -49,4 +50,21 @@ test('directory identities use the Supabase UUID for Todo assignment', () => {
   assert.match(service, /supabaseUserId: String\(user\.id\)/);
   assert.match(service, /auth_user_id: String\(user\.id\)/);
   assert.match(service, /authEmail:/);
+});
+
+test('user profiles are private, role constrained, and bootstrap only the known administrator', () => {
+  assert.match(migration, /references auth\.users\(id\) on delete cascade/i);
+  assert.match(migration, /role in \('admin', 'technician', 'handwerker', 'user'\)/i);
+  assert.match(migration, /enable row level security/i);
+  assert.match(migration, /revoke all on table public\.user_profiles from public, anon, authenticated/i);
+  assert.match(migration, /grant all on table public\.user_profiles to service_role/i);
+  assert.match(migration, /lower\(coalesce\(u\.email, ''\)\) = 'a\.strehler@q-service\.ch'/i);
+  assert.match(migration, /'Andreas Strehler',\s*'admin',\s*true/i);
+  assert.doesNotMatch(migration, /else 'user'/i);
+});
+
+test('client surfaces the structured Edge Function error instead of hiding it', () => {
+  assert.match(service, /error\.context/);
+  assert.match(service, /response\.clone\(\)\.json\(\)/);
+  assert.match(service, /payload\?\.error/);
 });
