@@ -286,3 +286,12 @@ test('control box is the bottom-most single-line status bar', () => {
   assert.doesNotMatch(source, /gridTemplateColumns: 'repeat\(2/);
   assert.match(form, /bottom: '38px'/);
 });
+
+test('fixed save footer only exposes Finish and no destructive project actions', () => {
+  const form = readFileSync(new URL('../src/components/DamageForm.jsx', import.meta.url), 'utf8');
+  const footerStart = form.indexOf('Mobile / Technician Fixed Footer - AutoSave Version');
+  const footerEnd = form.indexOf('<ImageEditor', footerStart);
+  const footer = form.slice(footerStart, footerEnd);
+  assert.match(footer, />\s*Fertig\s*</);
+  assert.doesNotMatch(footer, /handleArchiveProject|handleDeleteProject|Projekt archivieren|Projekt löschen/);
+});

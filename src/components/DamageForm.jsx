@@ -10596,52 +10596,6 @@ END:VCARD`;
                     })()}
 
                     <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                        {formData?.id && (
-                            <>
-                                <button
-                                    type="button"
-                                    onClick={handleArchiveProject}
-                                    disabled={isSaving}
-                                    title="Projekt archivieren"
-                                    style={{
-                                        padding: '0.35rem 0.75rem',
-                                        fontSize: '0.85rem',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '0.4rem',
-                                        borderRadius: '20px',
-                                        backgroundColor: isSaving ? 'rgba(100, 116, 139, 0.1)' : 'rgba(30, 109, 183, 0.1)',
-                                        color: isSaving ? '#64748B' : '#1E6DB7',
-                                        border: `1px solid ${isSaving ? 'rgba(100, 116, 139, 0.3)' : 'rgba(30, 109, 183, 0.3)'}`,
-                                        cursor: isSaving ? 'not-allowed' : 'pointer'
-                                    }}
-                                >
-                                    <Archive size={14} />
-                                    <span className="hide-mobile">Archivieren</span>
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={handleDeleteProject}
-                                    disabled={isSaving}
-                                    title="Projekt löschen"
-                                    style={{
-                                        padding: '0.35rem 0.75rem',
-                                        fontSize: '0.85rem',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '0.4rem',
-                                        borderRadius: '20px',
-                                        backgroundColor: isSaving ? 'rgba(100, 116, 139, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-                                        color: isSaving ? '#64748B' : '#EF4444',
-                                        border: `1px solid ${isSaving ? 'rgba(100, 116, 139, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
-                                        cursor: isSaving ? 'not-allowed' : 'pointer'
-                                    }}
-                                >
-                                    <Trash2 size={14} />
-                                    <span className="hide-mobile">Löschen</span>
-                                </button>
-                            </>
-                        )}
                         <button
                             type="button"
                             className="btn btn-primary"
