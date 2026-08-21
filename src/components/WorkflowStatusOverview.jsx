@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useMemo, useEffect } from "react"
 import { createPortal } from "react-dom"
 import { X, Check, Minus, CalendarDays, CheckCircle2, MinusCircle, MessageSquare, Zap, AlertTriangle, Bell, Clock, Search, MoreVertical, ChevronDown, ChevronRight } from "lucide-react"
+import { projectMatchesSearch } from "../lib/projectSearch.js"
 
 // ─── Workflow Config ───────────────────────────────────────────────────────────
 const STEPS = [
@@ -676,8 +677,7 @@ export default function WorkflowStatusOverview({ reports, onSelectReport, curren
   const baseList = tab === "archiv" ? archived : tab === "ueberfaellig" ? overdue : tab === "trocknung" ? trocknungList : tab === "aktiv" ? aktiv : allActive
   const filtered = useMemo(() => {
     if (!searchTerm.trim()) return baseList
-    const q = searchTerm.toLowerCase()
-    return baseList.filter(r => [r.street, r.address, r.city, r.zip, r.projectNumber, r.client, r.projectTitle].some(v => v?.toLowerCase().includes(q)))
+    return baseList.filter(r => projectMatchesSearch(r, searchTerm))
   }, [baseList, searchTerm])
 
   const tabs = [

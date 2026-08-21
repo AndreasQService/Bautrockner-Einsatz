@@ -9,6 +9,7 @@ import DashboardTechnicianProjectInfo from './DashboardTechnicianProjectInfo'
 import OfficeProjectsPage from '../features/projects/OfficeProjectsPage'
 import { formatDate } from '../utils/formatUtils'
 import { isVisibleProjectRow } from '../utils/projectVisibility.js'
+import { projectMatchesSearch } from '../lib/projectSearch.js'
 import { formatActiveEquipmentRuntime, formatCompletedEquipmentRuntime, formatEquipmentDate, formatEquipmentLocation, formatEquipmentProjectAddress, formatEquipmentTypeModel, getDryingStartDate, getEquipmentStatus } from '../utils/dashboardUtils'
 import { DASHBOARD_STATUS_COLORS as statusColors } from '../config/dashboardConfig'
 
@@ -624,15 +625,10 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
             if (r.status === 'Abgeschlossen') return false;
         }
 
-        const lowerSearch = searchTerm.toLowerCase();
+        if (projectMatchesSearch(r, searchTerm)) return true;
 
-        // Basic fields
-        if (r.projectNumber?.toString().toLowerCase().includes(lowerSearch)) return true;
-        if (r.report_data?.projectNumber?.toString().toLowerCase().includes(lowerSearch)) return true;
-        if (r.client?.toLowerCase().includes(lowerSearch)) return true;
-        if (r.projectTitle?.toLowerCase().includes(lowerSearch)) return true; // Search inside projectTitle
+        const lowerSearch = searchTerm.toLowerCase();
         if (r.id?.toLowerCase().includes(lowerSearch)) return true;
-        if (r.address?.toLowerCase().includes(lowerSearch)) return true;
         if (r.type?.toLowerCase().includes(lowerSearch)) return true;
         if (r.status?.toLowerCase().includes(lowerSearch)) return true;
         if (r.assignedTo?.toLowerCase().includes(lowerSearch)) return true;
@@ -655,13 +651,7 @@ export default function Dashboard({ reports, onSelectReport, onDeleteReport, mod
 
     const sidebarFilteredReports = useMemo(() => {
         if (!casesSearchTerm) return filteredReports;
-        const lower = casesSearchTerm.toLowerCase();
-        return filteredReports.filter(r => 
-            String(r.projectNumber || '').toLowerCase().includes(lower) ||
-            String(r.projectTitle || '').toLowerCase().includes(lower) ||
-            String(r.client || '').toLowerCase().includes(lower) ||
-            String(r.address || '').toLowerCase().includes(lower)
-        );
+        return filteredReports.filter(r => projectMatchesSearch(r, casesSearchTerm));
     }, [filteredReports, casesSearchTerm]);
 
     // Sort by last opened timestamp, falling back to report date
