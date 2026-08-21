@@ -16,10 +16,15 @@ test('user management exposes identity fields and the four required roles', () =
   for (const role of ['admin', 'technician', 'handwerker', 'user']) assert.match(modal, new RegExp(`value: '${role}'`));
 });
 
-test('passwords are write-only and never rendered or persisted', () => {
-  assert.doesNotMatch(modal, /visiblePasswords|togglePasswordVisibility|user\.password/);
-  assert.match(modal, /Passwörter sind niemals einsehbar/);
+test('stored passwords remain write-only while admins can inspect the new value before submitting', () => {
+  assert.doesNotMatch(modal, /user\.password/);
+  assert.match(modal, /Gespeicherte Passwörter sind niemals einsehbar/);
   assert.match(modal, /aria-label="Passwort nicht einsehbar">••••••••/);
+  assert.match(modal, /showNewPassword/);
+  assert.match(modal, /showEditPassword/);
+  assert.match(modal, /Passwort verbergen/);
+  assert.match(modal, /Passwort anzeigen/);
+  assert.match(modal, /passwordVisible \? 'text' : type/);
   assert.match(service, /stripLegacyPasswords/);
   assert.doesNotMatch(app, /report_data:\s*\{\s*users: newUsers\s*\}/);
 });

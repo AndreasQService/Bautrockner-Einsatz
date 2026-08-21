@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Edit2, Save, Trash2, UserPlus, X } from 'lucide-react';
+import { Edit2, Eye, EyeOff, Save, Trash2, UserPlus, X } from 'lucide-react';
 import { createDirectoryUser, deleteDirectoryUser, listDirectoryUsers, updateDirectoryUser } from '../services/AdminUserService.js';
 
 const EMPTY_FORM = Object.freeze({ email: '', displayName: '', password: '', role: 'technician' });
@@ -19,6 +19,8 @@ const UserManagementModal = ({ onClose, setUsers, currentAuthUserId }) => {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
+    const [showNewPassword, setShowNewPassword] = useState(false);
+    const [showEditPassword, setShowEditPassword] = useState(false);
 
     const publishUsers = useCallback((nextUsers) => {
         setDirectoryUsers(nextUsers);
@@ -48,6 +50,7 @@ const UserManagementModal = ({ onClose, setUsers, currentAuthUserId }) => {
         try {
             publishUsers(await createDirectoryUser(newUser));
             setNewUser(EMPTY_FORM);
+            setShowNewPassword(false);
         } catch (err) {
             setError(err.message || 'Benutzer konnte nicht angelegt werden.');
         } finally {
@@ -58,6 +61,7 @@ const UserManagementModal = ({ onClose, setUsers, currentAuthUserId }) => {
     const handleStartEdit = (user) => {
         setEditingUserId(user.id);
         setEditUser({ email: user.email, displayName: user.displayName || user.name, password: '', role: user.role });
+        setShowEditPassword(false);
         setError('');
     };
 
@@ -69,6 +73,7 @@ const UserManagementModal = ({ onClose, setUsers, currentAuthUserId }) => {
             publishUsers(await updateDirectoryUser(editingUserId, editUser));
             setEditingUserId(null);
             setEditUser(EMPTY_FORM);
+            setShowEditPassword(false);
         } catch (err) {
             setError(err.message || 'Benutzer konnte nicht gespeichert werden.');
         } finally {
@@ -95,20 +100,34 @@ const UserManagementModal = ({ onClose, setUsers, currentAuthUserId }) => {
 
     if (typeof document === 'undefined') return null;
 
-    const field = (label, type, value, onChange, placeholder, required = true) => (
+    const field = (label, type, value, onChange, placeholder, required = true, passwordVisible = false, onTogglePassword) => (
         <label style={{ display: 'grid', gap: '0.4rem', minWidth: 0 }}>
             <span style={{ fontSize: '0.82rem', fontWeight: 700 }}>{label}</span>
-            <input
-                className="form-input"
-                type={type}
-                value={value}
-                onChange={(event) => onChange(event.target.value)}
-                placeholder={placeholder}
-                required={required}
-                autoComplete={type === 'password' ? 'new-password' : type === 'email' ? 'email' : 'name'}
-                minLength={type === 'password' && required ? 8 : undefined}
-                style={{ width: '100%' }}
-            />
+            <span style={{ position: 'relative', display: 'block' }}>
+                <input
+                    className="form-input"
+                    type={type === 'password' && passwordVisible ? 'text' : type}
+                    value={value}
+                    onChange={(event) => onChange(event.target.value)}
+                    placeholder={placeholder}
+                    required={required}
+                    autoComplete={type === 'password' ? 'new-password' : type === 'email' ? 'email' : 'name'}
+                    minLength={type === 'password' && required ? 8 : undefined}
+                    style={{ width: '100%', paddingRight: type === 'password' ? '3rem' : undefined }}
+                />
+                {type === 'password' && (
+                    <button
+                        type="button"
+                        className="btn btn-ghost"
+                        onClick={onTogglePassword}
+                        aria-label={passwordVisible ? 'Passwort verbergen' : 'Passwort anzeigen'}
+                        aria-pressed={passwordVisible}
+                        style={{ position: 'absolute', right: '0.35rem', top: '50%', transform: 'translateY(-50%)', padding: '0.35rem' }}
+                    >
+                        {passwordVisible ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                )}
+            </span>
         </label>
     );
 
@@ -127,7 +146,7 @@ const UserManagementModal = ({ onClose, setUsers, currentAuthUserId }) => {
                 <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem' }}>
                     <div>
                         <h3 id="user-management-title" style={{ margin: 0 }}>Benutzerverwaltung</h3>
-                        <p style={{ margin: '0.35rem 0 0', color: 'var(--text-muted)', fontSize: '0.85rem' }}>Supabase Auth · Passwörter sind niemals einsehbar</p>
+                        <p style={{ margin: '0.35rem 0 0', color: 'var(--text-muted)', fontSize: '0.85rem' }}>Supabase Auth · Gespeicherte Passwörter sind niemals einsehbar</p>
                     </div>
                     <button type="button" onClick={onClose} className="btn btn-ghost" aria-label="Benutzerverwaltung schließen"><X size={22} /></button>
                 </header>
@@ -135,7 +154,7 @@ const UserManagementModal = ({ onClose, setUsers, currentAuthUserId }) => {
                 <form onSubmit={handleAddUser} className="user-management-grid" style={{ marginTop: '1.5rem' }}>
                     {field('E-Mail', 'email', newUser.email, (value) => updateField(setNewUser, 'email', value), 'name@firma.ch')}
                     {field('Anzeigename', 'text', newUser.displayName, (value) => updateField(setNewUser, 'displayName', value), 'Vorname Nachname')}
-                    {field('Passwort', 'password', newUser.password, (value) => updateField(setNewUser, 'password', value), 'Mindestens 8 Zeichen')}
+                    {field('Passwort', 'password', newUser.password, (value) => updateField(setNewUser, 'password', value), 'Mindestens 8 Zeichen', true, showNewPassword, () => setShowNewPassword((visible) => !visible))}
                     {roleField(newUser.role, (value) => updateField(setNewUser, 'role', value))}
                     <button type="submit" className="btn btn-primary" disabled={saving} style={{ gridColumn: '1 / -1', justifySelf: 'end' }}><UserPlus size={18} /> {saving ? 'Wird angelegt…' : 'Benutzer anlegen'}</button>
                 </form>
@@ -151,11 +170,11 @@ const UserManagementModal = ({ onClose, setUsers, currentAuthUserId }) => {
                             <form key={user.id} onSubmit={handleSaveEdit} className="user-management-grid user-management-row">
                                 {field('E-Mail', 'email', editUser.email, (value) => updateField(setEditUser, 'email', value), 'name@firma.ch')}
                                 {field('Anzeigename', 'text', editUser.displayName, (value) => updateField(setEditUser, 'displayName', value), 'Vorname Nachname')}
-                                {field('Neues Passwort', 'password', editUser.password, (value) => updateField(setEditUser, 'password', value), 'Leer = unverändert', false)}
+                                {field('Neues Passwort', 'password', editUser.password, (value) => updateField(setEditUser, 'password', value), 'Leer = unverändert', false, showEditPassword, () => setShowEditPassword((visible) => !visible))}
                                 {roleField(editUser.role, (value) => updateField(setEditUser, 'role', value), String(user.id) === String(currentAuthUserId))}
                                 <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'end' }}>
                                     <button type="submit" className="btn btn-primary" disabled={saving} aria-label={`${user.name} speichern`}><Save size={17} /></button>
-                                    <button type="button" className="btn btn-ghost" onClick={() => setEditingUserId(null)}>Abbrechen</button>
+                                    <button type="button" className="btn btn-ghost" onClick={() => { setEditingUserId(null); setShowEditPassword(false); }}>Abbrechen</button>
                                 </div>
                             </form>
                         ) : (
