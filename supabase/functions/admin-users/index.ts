@@ -54,6 +54,12 @@ Deno.serve(async (request: Request) => {
   }
   const action = String(body.action || '');
 
+  // The directory contains personal data (including email addresses), so reads
+  // and mutations must share the same server-side administrator boundary.
+  if (callerProfile.role !== 'admin') {
+    return json(403, { ok: false, error: 'Administratorrechte erforderlich.' });
+  }
+
   if (action === 'list') {
     const { data: profiles, error: profileError } = await service
       .from('user_profiles')
@@ -74,8 +80,6 @@ Deno.serve(async (request: Request) => {
     })).filter((user) => user.email);
     return json(200, { ok: true, users });
   }
-
-  if (callerProfile.role !== 'admin') return json(403, { ok: false, error: 'Administratorrechte erforderlich.' });
 
   if (action === 'delete') {
     const userId = String(body.userId || '');

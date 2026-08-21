@@ -26,6 +26,10 @@ test('passwords are write-only and never rendered or persisted', () => {
 test('admin mutations stay server-side behind verified auth and admin profile', () => {
   assert.match(edge, /authClient\.auth\.getUser\(token\)/);
   assert.match(edge, /callerProfile\.role !== 'admin'/);
+  assert.ok(
+    edge.indexOf("callerProfile.role !== 'admin'") < edge.indexOf("action === 'list'"),
+    'the admin boundary must also protect directory reads',
+  );
   assert.match(edge, /service\.auth\.admin\.createUser/);
   assert.match(edge, /service\.auth\.admin\.updateUserById/);
   assert.match(edge, /service\.auth\.admin\.deleteUser/);
