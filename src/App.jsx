@@ -3250,12 +3250,23 @@ function App() {
             <strong style={{ color: '#F59E0B' }}>Lokal gesicherte Fälle – Cloudübertragung ausstehend</strong>
             {pendingLocalDrafts.map(draft => {
               const project = draft.project || {};
-              const label = project.projectTitle || project.objectName || project.projectNumber || project.address || 'Unbenannter Fall';
-              const location = [project.street, project.city].filter(Boolean).join(', ') || project.address || '';
+              const postalLocation = [project.zip, project.city].filter(Boolean).join(' ');
+              const address = [project.street, postalLocation].filter(Boolean).join(', ') || project.address || '';
+              const damageLocation = project.locationDetails || project.objectName || '';
+              const projectReference = project.projectNumber || project.projectTitle || '';
+              const label = address || damageLocation || projectReference || 'Unbenannter Fall';
+              const details = [
+                damageLocation && damageLocation !== label ? `Schadenort: ${damageLocation}` : '',
+                projectReference && projectReference !== label ? `Projekt-Nr.: ${projectReference}` : '',
+                `Entwurf-ID: ${String(draft.projectId || '').slice(-8)}`
+              ].filter(Boolean).join(' · ');
               return (
                 <div key={draft.projectId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
                   <span>
-                    <strong>{label}</strong>{location ? ` – ${location}` : ''}
+                    <strong>{label}</strong>
+                    <small style={{ display: 'block', color: 'var(--text-secondary)', marginTop: '0.15rem' }}>
+                      {details}
+                    </small>
                     <small style={{ display: 'block', color: 'var(--text-muted)' }}>
                       Lokal geprüft: {draft.updatedAt ? new Date(draft.updatedAt).toLocaleString('de-CH') : 'Zeit unbekannt'}
                     </small>
