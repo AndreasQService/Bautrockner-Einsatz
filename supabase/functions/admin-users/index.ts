@@ -15,6 +15,7 @@ const normalizeName = (value: unknown) => String(value || '').trim();
 const ALLOWED_ROLES = new Set(['admin', 'technician', 'handwerker', 'user']);
 const normalizeRole = (value: unknown) => String(value || '').trim().toLowerCase();
 const QTOOL_INVITE_REDIRECT = 'https://bautrockner-einsatz.vercel.app/?qtool_invite=1';
+const QTOOL_RECOVERY_REDIRECT = 'https://bautrockner-einsatz.vercel.app/?qtool_recovery=1';
 
 Deno.serve(async (request: Request) => {
   if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS_HEADERS });
@@ -103,6 +104,16 @@ Deno.serve(async (request: Request) => {
       return json(500, { ok: false, error: 'Benutzerkonto konnte nicht gelöscht werden.' });
     }
     await service.from('user_profiles').delete().eq('id', userId);
+    return json(200, { ok: true });
+  }
+
+  if (action === 'password-reset') {
+    const userId = String(body.userId || '');
+    if (!/^[0-9a-f-]{36}$/i.test(userId)) return json(400, { ok: false, error: 'Ungültige Benutzer-ID.' });
+    const { data: target, error: targetError } = await service.auth.admin.getUserById(userId);
+    if (targetError || !target.user?.email) return json(404, { ok: false, error: 'Benutzer wurde nicht gefunden.' });
+    const { error: resetError } = await service.auth.resetPasswordForEmail(target.user.email, { redirectTo: QTOOL_RECOVERY_REDIRECT });
+    if (resetError) return json(400, { ok: false, error: resetError.message });
     return json(200, { ok: true });
   }
 

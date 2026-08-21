@@ -4,6 +4,7 @@ import { fetchAllTodos, completeTodoAndArchiveProjectRpc, deleteTodo } from '../
 import TodoModal from './TodoModal';
 import TodoHistoryModal from './TodoHistoryModal';
 import { compareTodosByDueDateAndProject, isTodoAssignedToUser, matchesTodoAssigneeFilter } from '../lib/todoAssignee.js';
+import { canDeleteData } from '../lib/permissions.js';
 
 function getCleanProjectTitle(proj) {
     if (!proj) return 'Unbekanntes Projekt';
@@ -778,7 +779,7 @@ const TodoMonitor = ({
                                                     >
                                                         <Edit2 size={16} />
                                                     </button>
-                                                    <button
+                                                    {canDeleteData(currentUser) && <button
                                                         onClick={async () => {
                                                             if (window.confirm('Möchten Sie dieses To-do wirklich löschen?')) {
                                                                 setTodos(prev => prev.filter(t => t.id !== todoItem.id));
@@ -792,7 +793,7 @@ const TodoMonitor = ({
                                                         title="Aufgabe löschen"
                                                     >
                                                         <Trash2 size={16} />
-                                                    </button>
+                                                    </button>}
                                                 </div>
                                             </td>
                                         </tr>

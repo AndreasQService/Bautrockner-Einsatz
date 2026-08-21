@@ -52,6 +52,10 @@ export async function deleteDirectoryUser(userId) {
   return listDirectoryUsers();
 }
 
+export async function sendDirectoryPasswordReset(userId) {
+  await invokeAdminUsers({ action: 'password-reset', userId });
+}
+
 export function stripLegacyPasswords(users) {
   return (Array.isArray(users) ? users : []).map(({ password: _password, ...user }) => user);
 }

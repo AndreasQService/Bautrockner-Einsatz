@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Edit2, Eye, EyeOff, Mail, Save, Trash2, X } from 'lucide-react';
-import { createDirectoryUser, deleteDirectoryUser, listDirectoryUsers, updateDirectoryUser } from '../services/AdminUserService.js';
+import { createDirectoryUser, deleteDirectoryUser, listDirectoryUsers, sendDirectoryPasswordReset, updateDirectoryUser } from '../services/AdminUserService.js';
 
 const EMPTY_FORM = Object.freeze({ email: '', displayName: '', password: '', role: 'technician' });
 const ROLE_OPTIONS = Object.freeze([
@@ -99,6 +99,20 @@ const UserManagementModal = ({ onClose, setUsers, currentAuthUserId }) => {
         }
     };
 
+    const handlePasswordReset = async (user) => {
+        setSaving(true);
+        setError('');
+        setNotice('');
+        try {
+            await sendDirectoryPasswordReset(user.id);
+            setNotice(`Link zum Festlegen eines neuen Passworts wurde an ${user.email} gesendet.`);
+        } catch (err) {
+            setError(err.message || 'Passwort-Link konnte nicht gesendet werden.');
+        } finally {
+            setSaving(false);
+        }
+    };
+
     if (typeof document === 'undefined') return null;
 
     const field = (label, type, value, onChange, placeholder, required = true, passwordVisible = false, onTogglePassword) => (
@@ -185,6 +199,7 @@ const UserManagementModal = ({ onClose, setUsers, currentAuthUserId }) => {
                                 <span aria-label="Passwort nicht einsehbar">••••••••</span>
                                 <span>{ROLE_OPTIONS.find((role) => role.value === user.role)?.label || user.role}</span>
                                 <div style={{ display: 'flex', gap: '0.4rem' }}>
+                                    <button type="button" className="btn btn-ghost" disabled={saving} onClick={() => void handlePasswordReset(user)} aria-label={`Passwort-Link an ${user.name} senden`} title="Link für neues Passwort senden"><Mail size={17} /></button>
                                     <button type="button" className="btn btn-ghost" onClick={() => handleStartEdit(user)} aria-label={`${user.name} bearbeiten`}><Edit2 size={17} /></button>
                                     <button type="button" className="btn btn-danger" disabled={saving || String(user.id) === String(currentAuthUserId)} onClick={() => void handleDeleteUser(user)} aria-label={`${user.name} löschen`}><Trash2 size={17} /></button>
                                 </div>

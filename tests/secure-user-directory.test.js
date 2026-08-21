@@ -8,6 +8,7 @@ const edge = fs.readFileSync(new URL('../supabase/functions/admin-users/index.ts
 const app = fs.readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8');
 const migration = fs.readFileSync(new URL('../supabase/migrations/20260821090000_create_secure_user_profiles.sql', import.meta.url), 'utf8');
 const passwordSetup = fs.readFileSync(new URL('../src/components/PasswordSetupScreen.jsx', import.meta.url), 'utf8');
+const login = fs.readFileSync(new URL('../src/components/LoginScreen.jsx', import.meta.url), 'utf8');
 
 test('user management exposes identity fields and the four required roles', () => {
   assert.match(modal, /field\('E-Mail'/);
@@ -98,4 +99,15 @@ test('client surfaces the structured Edge Function error instead of hiding it', 
 test('directory publishing callback is stable and cannot retrigger the modal load loop', () => {
   assert.match(app, /const handleSetUsers = useCallback\(\(newUsers\) => \{/);
   assert.match(app, /setUsers\(stripLegacyPasswords\(newUsers\)\);\s*\}, \[\]\);/);
+});
+
+test('users and administrators can request a password reset without exposing a password', () => {
+  assert.match(login, /resetPasswordForEmail\(email/);
+  assert.match(login, /Passwort vergessen/);
+  assert.match(login, /qtool_recovery=1/);
+  assert.match(service, /sendDirectoryPasswordReset/);
+  assert.match(edge, /action === 'password-reset'/);
+  assert.match(edge, /service\.auth\.resetPasswordForEmail/);
+  assert.match(edge, /QTOOL_RECOVERY_REDIRECT/);
+  assert.doesNotMatch(edge, /password_hash|encrypted_password/);
 });

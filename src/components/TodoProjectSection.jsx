@@ -3,6 +3,7 @@ import { ClipboardList, Plus, Clock, Edit2, ShieldAlert, Check, HelpCircle, Tras
 import { fetchTodosForProject, completeTodoAndArchiveProjectRpc, deleteTodo } from '../services/TodoService';
 import TodoModal from './TodoModal';
 import TodoHistoryModal from './TodoHistoryModal';
+import { canDeleteData } from '../lib/permissions.js';
 
 const TodoProjectSection = ({
     project = null,
@@ -105,6 +106,10 @@ const TodoProjectSection = ({
     };
 
     const handleDeleteTodo = async (todoId) => {
+        if (!canDeleteData(currentUser)) {
+            setError('Nur Administratoren dürfen Aufgaben löschen.');
+            return;
+        }
         if (!window.confirm('Möchten Sie dieses To-do wirklich löschen?')) return;
         setLoading(true);
         setError('');
@@ -229,7 +234,7 @@ const TodoProjectSection = ({
                                 >
                                     <Edit2 size={14} />
                                 </button>
-                                <button
+                                {canDeleteData(currentUser) && <button
                                     type="button"
                                     title="To-do löschen"
                                     onClick={() => handleDeleteTodo(t.id)}
@@ -237,7 +242,7 @@ const TodoProjectSection = ({
                                     disabled={pendingActionTodoId !== null}
                                 >
                                     <Trash2 size={14} />
-                                </button>
+                                </button>}
                             </div>
                         </div>
                     ))

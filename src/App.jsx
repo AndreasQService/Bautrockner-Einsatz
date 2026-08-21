@@ -28,6 +28,7 @@ import { isVisibleProjectRow } from './utils/projectVisibility.js';
 import { connectOneDrive, getGraphAccessTokenSilent, initOneDriveAuth } from './lib/onedrive/auth.js';
 import { readAuthorizedUsers, resolveAuthorizedUser } from './lib/authorizedUser.js';
 import { listDirectoryUsers, stripLegacyPasswords } from './services/AdminUserService.js';
+import { canDeleteData } from './lib/permissions.js';
 const canonicalJson = value => {
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
   if (value && typeof value === 'object') {
@@ -906,6 +907,11 @@ function App() {
   const [isInvitationSetup, setIsInvitationSetup] = useState(() => {
     if (typeof window === 'undefined') return false;
     return new URLSearchParams(window.location.search).get('qtool_invite') === '1';
+  });
+  const [isRecoverySetup, setIsRecoverySetup] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return new URLSearchParams(window.location.search).get('qtool_recovery') === '1'
+      || window.location.hash.includes('type=recovery');
   });
 
   useEffect(() => {
@@ -2595,6 +2601,10 @@ function App() {
   };
 
   const handleDeleteReport = async (reportId) => {
+    if (!canDeleteData(currentUser)) {
+      showToast('Nur Administratoren dürfen Projekte löschen.', 'error');
+      return false;
+    }
     // 1. Immediately remove from local state
     setReports(prev => {
       const newReports = prev.filter(r => r.id !== reportId);
@@ -2890,12 +2900,14 @@ function App() {
     );
   }
 
-  if (isInvitationSetup && supabaseSession?.user) {
+  if ((isInvitationSetup || isRecoverySetup) && supabaseSession?.user) {
     return <PasswordSetupScreen supabase={supabase} onComplete={() => {
       const url = new URL(window.location.href);
       url.searchParams.delete('qtool_invite');
+      url.searchParams.delete('qtool_recovery');
       window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
       setIsInvitationSetup(false);
+      setIsRecoverySetup(false);
     }} />;
   }
 
@@ -3312,7 +3324,7 @@ function App() {
             }
           }}
         />}
-        {view === 'devices' && <DeviceManager reports={reports} onBack={() => setView('dashboard')} onNavigateToReport={handleNavigateToReport} />}
+        {view === 'devices' && <DeviceManager reports={reports} currentUser={currentUser} onBack={() => setView('dashboard')} onNavigateToReport={handleNavigateToReport} />}
         {view === 'project_selection' && (
           <ProjectSelection
             reports={reports}

@@ -6,6 +6,29 @@ const LoginScreen = ({ users, onLogin, supabase }) => {
     const [name, setName] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
+    const [notice, setNotice] = useState('');
+    const [resetting, setResetting] = useState(false);
+
+    const handleForgotPassword = async () => {
+        const email = name.trim().toLowerCase();
+        setError('');
+        setNotice('');
+        if (!email.includes('@')) {
+            setError('Bitte zuerst die E-Mail-Adresse eingeben.');
+            return;
+        }
+        setResetting(true);
+        try {
+            const redirectTo = `${window.location.origin}/?qtool_recovery=1`;
+            const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
+            if (resetError) throw resetError;
+            setNotice('Wenn das Konto existiert, wurde ein Link für ein neues Passwort versendet.');
+        } catch (err) {
+            setError(err.message || 'Passwort-Link konnte nicht versendet werden.');
+        } finally {
+            setResetting(false);
+        }
+    };
 
     const handleLogin = async (e) => {
         e.preventDefault();
@@ -181,6 +204,8 @@ const LoginScreen = ({ users, onLogin, supabase }) => {
                         </div>
                     )}
 
+                    {notice && <div role="status" style={{ color: '#34D399', fontSize: '0.85rem' }}>{notice}</div>}
+
                     <button
                         type="submit"
                         style={{
@@ -205,6 +230,9 @@ const LoginScreen = ({ users, onLogin, supabase }) => {
                     >
                         <span>Anmelden</span>
                         <LogIn size={18} />
+                    </button>
+                    <button type="button" onClick={() => void handleForgotPassword()} disabled={resetting} style={{ border: 0, background: 'transparent', color: '#38A8E0', cursor: 'pointer', minHeight: 44 }}>
+                        {resetting ? 'Link wird versendet…' : 'Passwort vergessen?'}
                     </button>
                 </form>
             </div>

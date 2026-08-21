@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import generatedDevices from '../data/imported_devices.json';
 import { supabase } from '../supabaseClient';
+import { canDeleteData, canUnregisterDevice } from '../lib/permissions.js';
 
 const DEVICE_TYPES = [
     'Kondenstrockner',
@@ -70,7 +71,7 @@ function parseModel(modelStr) {
     };
 }
 
-export default function DeviceManager({ onBack, onNavigateToReport, reports = [] }) {
+export default function DeviceManager({ onBack, onNavigateToReport, reports = [], currentUser = null }) {
     const [activeTab, setActiveTab] = useState('inventar'); // 'inventar' oder 'typen'
     const [devices, setDevices] = useState([]);
     const [rentalDevices, setRentalDevices] = useState([]);
@@ -280,6 +281,10 @@ export default function DeviceManager({ onBack, onNavigateToReport, reports = []
     };
 
     const handleDeleteDevice = async (id) => {
+        if (!canDeleteData(currentUser)) {
+            setError('Nur Administratoren dürfen Geräte löschen. Geräte abmelden bleibt erlaubt.');
+            return;
+        }
         const dev = devices.find(d => d.id === id);
         if (dev && dev.current_report_id) {
             alert(`Das Gerät ${dev.number} ist noch im Projekt "${dev.current_project}" im Einsatz und kann nicht gelöscht/ausgebucht werden!`);
@@ -305,6 +310,10 @@ export default function DeviceManager({ onBack, onNavigateToReport, reports = []
     };
 
     const handleDeleteModel = async (id) => {
+        if (!canDeleteData(currentUser)) {
+            setError('Nur Administratoren dürfen Gerätetypen löschen.');
+            return;
+        }
         if (window.confirm('Gerätetyp wirklich löschen? Hinweis: Physische Geräte, die diesen Typ verwenden, bleiben bestehen, sind jedoch nicht mehr korrekt verknüpft.')) {
             setIsLoading(true);
             try {
@@ -322,6 +331,7 @@ export default function DeviceManager({ onBack, onNavigateToReport, reports = []
     };
 
     const handleReleaseDevice = async (id, projectName) => {
+        if (!canUnregisterDevice(currentUser)) return;
         if (window.confirm(`Möchten Sie das Gerät wirklich aus dem Projekt "${projectName}" freigeben?`)) {
             setIsLoading(true);
             try {
@@ -340,6 +350,7 @@ export default function DeviceManager({ onBack, onNavigateToReport, reports = []
     };
 
     const handleReturnRentalDevice = async (device) => {
+        if (!canUnregisterDevice(currentUser)) return;
         const confirmMsg = `Mietgerät "${device.number}" (${device.type || 'Mietgerät'}) wirklich abmelden und aus dem Inventar löschen? Die Projektdaten bleiben im Schadensbericht vollständig erhalten.`;
         if (window.confirm(confirmMsg)) {
             setIsLoading(true);
