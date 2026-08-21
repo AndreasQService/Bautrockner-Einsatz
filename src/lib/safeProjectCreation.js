@@ -87,6 +87,21 @@ export async function confirmProjectDraftWithReadback(projectId) {
   return readback;
 }
 
+export async function listVerifiedPendingProjectDrafts() {
+  const db = await openDraftDatabase();
+  const rows = await db.getAll(STORE_NAME);
+  const verified = [];
+
+  for (const row of rows) {
+    if (!row || row.state !== 'cloud_pending' || !row.projectId || !row.project || !row.checksum) continue;
+    if (String(row.project.id || '') !== String(row.projectId)) continue;
+    if (await sha256(row.project) !== row.checksum) continue;
+    verified.push(row);
+  }
+
+  return verified.sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
+}
+
 const firstRow = data => Array.isArray(data) ? data[0] : data;
 
 export async function createProjectAtomically({

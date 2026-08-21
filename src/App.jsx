@@ -5,7 +5,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRegisterSW } from 'virtual:pwa-register/react'
 import { useSessionLock } from './hooks/useSessionLock'
-import { confirmProjectDraftWithReadback, createProjectAtomically, saveProjectDraftWithReadback } from './lib/safeProjectCreation.js'
+import { confirmProjectDraftWithReadback, createProjectAtomically, listVerifiedPendingProjectDrafts, saveProjectDraftWithReadback } from './lib/safeProjectCreation.js'
 import { Plus, LayoutDashboard, Settings, User, Users, LogOut, Thermometer, Database, RotateCcw, Download, Sun, Moon, Hammer } from 'lucide-react';
 import ProjectSelection from './components/ProjectSelection';
 import { setQToolSessionToken, supabase } from './supabaseClient'
@@ -384,7 +384,25 @@ function App() {
   const [showUserModal, setShowUserModal] = useState(false);
   const [showMeasurementManager, setShowMeasurementManager] = useState(false);
   const [unsavedReports, setUnsavedReports] = useState({});
+  const [pendingLocalDrafts, setPendingLocalDrafts] = useState([]);
   useEffect(() => { unsavedReportsRef.current = unsavedReports; }, [unsavedReports]);
+
+  const refreshPendingLocalDrafts = useCallback(async () => {
+    try {
+      setPendingLocalDrafts(await listVerifiedPendingProjectDrafts());
+    } catch (error) {
+      console.error('[LocalDraftRecovery] Lokale Entwürfe konnten nicht geprüft werden:', error);
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshPendingLocalDrafts();
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') void refreshPendingLocalDrafts();
+    };
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+    return () => document.removeEventListener('visibilitychange', refreshWhenVisible);
+  }, [refreshPendingLocalDrafts]);
 
   const [isOnline, setIsOnline] = useState(() => typeof navigator !== 'undefined' ? navigator.onLine : true);
 
@@ -2068,6 +2086,7 @@ function App() {
           clientId: getOrCreateClientId(),
         });
         await confirmProjectDraftWithReadback(finalReport.id);
+        void refreshPendingLocalDrafts();
         confirmedProjectPayloadRef.current.set(finalReport.id, creationPayload);
         setIsSessionActive(true);
         setReports(current => [finalReport, ...current.filter(item => item.id !== finalReport.id)]);
@@ -2080,6 +2099,7 @@ function App() {
         // Admission stays closed: without RPC + DB + lock proof the draft must
         // not enter reports/details or become editable as a cloud project.
         showToast(`Entwurf lokal sicher gespeichert – Cloud ausstehend. Bitte erneut speichern: ${error.message}`, 'warning', 15000);
+        setPendingLocalDrafts(current => [verifiedDraft, ...current.filter(item => item.projectId !== verifiedDraft.projectId)]);
         return { ...verifiedDraft.project, _cloudSyncStatus: 'pending', _is_local_draft: true };
       }
     }
@@ -3221,6 +3241,38 @@ function App() {
       </header>
 
       <main className="container" style={{ marginTop: effectiveMode === 'technician' ? '0.5rem' : '1rem', padding: effectiveMode === 'technician' ? '0.5rem' : '1rem 1.25rem', maxWidth: effectiveMode === 'technician' ? undefined : 'none' }}>
+        {view === 'dashboard' && pendingLocalDrafts.length > 0 && (
+          <section aria-label="Lokale Projektentwürfe" style={{
+            marginBottom: '1rem', padding: '0.85rem 1rem', borderRadius: 8,
+            border: '1px solid #D97706', background: 'rgba(217,119,6,0.10)',
+            display: 'flex', flexDirection: 'column', gap: '0.65rem'
+          }}>
+            <strong style={{ color: '#F59E0B' }}>Lokal gesicherte Fälle – Cloudübertragung ausstehend</strong>
+            {pendingLocalDrafts.map(draft => {
+              const project = draft.project || {};
+              const label = project.projectTitle || project.objectName || project.projectNumber || project.address || 'Unbenannter Fall';
+              const location = [project.street, project.city].filter(Boolean).join(', ') || project.address || '';
+              return (
+                <div key={draft.projectId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
+                  <span>
+                    <strong>{label}</strong>{location ? ` – ${location}` : ''}
+                    <small style={{ display: 'block', color: 'var(--text-muted)' }}>
+                      Lokal geprüft: {draft.updatedAt ? new Date(draft.updatedAt).toLocaleString('de-CH') : 'Zeit unbekannt'}
+                    </small>
+                  </span>
+                  <button type="button" className="btn btn-primary" onClick={() => {
+                    pendingNewProjectIdRef.current = draft.projectId;
+                    setSelectedReport({ ...project, id: draft.projectId, _cloudSyncStatus: 'pending', _is_local_draft: true });
+                    setProjectMode('desktop');
+                    setView('new-report');
+                  }}>
+                    Entwurf öffnen und erneut übertragen
+                  </button>
+                </div>
+              );
+            })}
+          </section>
+        )}
         {needRefresh && (
           <div style={{
             backgroundColor: '#3b82f6',
@@ -3444,7 +3496,7 @@ function App() {
                     )}
                   </div>
                 )}
-                {selectedReport && selectedReport.id && !selectedReport.id.startsWith('TMP-') && (selectedReport.isLightweight || !selectedReport._supabase_updated_at) ? (
+                {selectedReport && selectedReport.id && !selectedReport.id.startsWith('TMP-') && !selectedReport._is_local_draft && (selectedReport.isLightweight || !selectedReport._supabase_updated_at) ? (
                   <div style={{
                     display: 'flex',
                     flexDirection: 'column',
