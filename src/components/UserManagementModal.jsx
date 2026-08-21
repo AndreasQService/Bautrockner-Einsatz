@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Edit2, Eye, EyeOff, Save, Trash2, UserPlus, X } from 'lucide-react';
+import { Edit2, Eye, EyeOff, Mail, Save, Trash2, X } from 'lucide-react';
 import { createDirectoryUser, deleteDirectoryUser, listDirectoryUsers, updateDirectoryUser } from '../services/AdminUserService.js';
 
 const EMPTY_FORM = Object.freeze({ email: '', displayName: '', password: '', role: 'technician' });
@@ -19,8 +19,8 @@ const UserManagementModal = ({ onClose, setUsers, currentAuthUserId }) => {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
-    const [showNewPassword, setShowNewPassword] = useState(false);
     const [showEditPassword, setShowEditPassword] = useState(false);
+    const [notice, setNotice] = useState('');
 
     const publishUsers = useCallback((nextUsers) => {
         setDirectoryUsers(nextUsers);
@@ -47,10 +47,11 @@ const UserManagementModal = ({ onClose, setUsers, currentAuthUserId }) => {
         event.preventDefault();
         setSaving(true);
         setError('');
+        setNotice('');
         try {
             publishUsers(await createDirectoryUser(newUser));
+            setNotice(`Einladung wurde an ${newUser.email.trim().toLowerCase()} gesendet. Der Benutzer legt sein Passwort selbst fest.`);
             setNewUser(EMPTY_FORM);
-            setShowNewPassword(false);
         } catch (err) {
             setError(err.message || 'Benutzer konnte nicht angelegt werden.');
         } finally {
@@ -146,7 +147,7 @@ const UserManagementModal = ({ onClose, setUsers, currentAuthUserId }) => {
                 <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem' }}>
                     <div>
                         <h3 id="user-management-title" style={{ margin: 0 }}>Benutzerverwaltung</h3>
-                        <p style={{ margin: '0.35rem 0 0', color: 'var(--text-muted)', fontSize: '0.85rem' }}>Supabase Auth · Gespeicherte Passwörter sind niemals einsehbar</p>
+                        <p style={{ margin: '0.35rem 0 0', color: 'var(--text-muted)', fontSize: '0.85rem' }}>Supabase Auth · Benutzer erhalten einen sicheren Einladungslink und legen ihr Passwort selbst fest.</p>
                     </div>
                     <button type="button" onClick={onClose} className="btn btn-ghost" aria-label="Benutzerverwaltung schließen"><X size={22} /></button>
                 </header>
@@ -154,12 +155,12 @@ const UserManagementModal = ({ onClose, setUsers, currentAuthUserId }) => {
                 <form onSubmit={handleAddUser} className="user-management-grid" style={{ marginTop: '1.5rem' }}>
                     {field('E-Mail', 'email', newUser.email, (value) => updateField(setNewUser, 'email', value), 'name@firma.ch')}
                     {field('Anzeigename', 'text', newUser.displayName, (value) => updateField(setNewUser, 'displayName', value), 'Vorname Nachname')}
-                    {field('Passwort', 'password', newUser.password, (value) => updateField(setNewUser, 'password', value), 'Mindestens 8 Zeichen', true, showNewPassword, () => setShowNewPassword((visible) => !visible))}
                     {roleField(newUser.role, (value) => updateField(setNewUser, 'role', value))}
-                    <button type="submit" className="btn btn-primary" disabled={saving} style={{ gridColumn: '1 / -1', justifySelf: 'end' }}><UserPlus size={18} /> {saving ? 'Wird angelegt…' : 'Benutzer anlegen'}</button>
+                    <button type="submit" className="btn btn-primary" disabled={saving} style={{ gridColumn: '1 / -1', justifySelf: 'end' }}><Mail size={18} /> {saving ? 'Einladung wird versendet…' : 'Benutzer einladen'}</button>
                 </form>
 
                 {error && <div role="alert" style={{ marginTop: '1rem', color: '#EF4444' }}>{error}</div>}
+                {notice && <div role="status" style={{ marginTop: '1rem', color: '#10B981' }}>{notice}</div>}
 
                 <div style={{ marginTop: '1.5rem', overflow: 'auto' }}>
                     <div className="user-management-grid user-management-heading" aria-hidden="true">

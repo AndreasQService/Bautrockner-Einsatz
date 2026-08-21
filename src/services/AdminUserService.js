@@ -37,8 +37,8 @@ export async function listDirectoryUsers() {
   return (Array.isArray(data.users) ? data.users : []).map(normalizeDirectoryUser);
 }
 
-export async function createDirectoryUser({ email, displayName, password, role }) {
-  await invokeAdminUsers({ action: 'create', email, displayName, password, role });
+export async function createDirectoryUser({ email, displayName, role }) {
+  await invokeAdminUsers({ action: 'create', creationMode: 'invite', email, displayName, role });
   return listDirectoryUsers();
 }
 

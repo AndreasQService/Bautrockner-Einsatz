@@ -15,6 +15,7 @@ import DeviceManager from './components/DeviceManager'
 import UserManagementModal from './components/UserManagementModal'
 import MeasurementDeviceManager from './components/MeasurementDeviceManager'
 import LoginScreen from './components/LoginScreen'
+import PasswordSetupScreen from './components/PasswordSetupScreen'
 import TodoProjectSection from './components/TodoProjectSection'
 import { ensureAuthenticated, lastAuthError } from './services/TodoService'
 import EmailImportModalV2 from './components/EmailImportModalV2'
@@ -902,6 +903,10 @@ function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [supabaseSession, setSupabaseSession] = useState(null);
   const [authReady, setAuthReady] = useState(false);
+  const [isInvitationSetup, setIsInvitationSetup] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return new URLSearchParams(window.location.search).get('qtool_invite') === '1';
+  });
 
   useEffect(() => {
     if (!supabase) {
@@ -2883,6 +2888,15 @@ function App() {
         Lade Sitzung...
       </div>
     );
+  }
+
+  if (isInvitationSetup && supabaseSession?.user) {
+    return <PasswordSetupScreen supabase={supabase} onComplete={() => {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('qtool_invite');
+      window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+      setIsInvitationSetup(false);
+    }} />;
   }
 
   // --- LOGIN SCREEN CHECK ---

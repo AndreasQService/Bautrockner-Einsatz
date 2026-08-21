@@ -14,6 +14,7 @@ const normalizeEmail = (value: unknown) => String(value || '').trim().toLowerCas
 const normalizeName = (value: unknown) => String(value || '').trim();
 const ALLOWED_ROLES = new Set(['admin', 'technician', 'handwerker', 'user']);
 const normalizeRole = (value: unknown) => String(value || '').trim().toLowerCase();
+const QTOOL_INVITE_REDIRECT = 'https://bautrockner-einsatz.vercel.app/?qtool_invite=1';
 
 Deno.serve(async (request: Request) => {
   if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS_HEADERS });
@@ -113,29 +114,36 @@ Deno.serve(async (request: Request) => {
   if (!ALLOWED_ROLES.has(role)) return json(400, { ok: false, error: 'Ungültige Rolle.' });
 
   if (action === 'create') {
-    if (password.length < 8) return json(400, { ok: false, error: 'Das Passwort muss mindestens 8 Zeichen lang sein.' });
-    const { data: created, error: createError } = await service.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
+    if (body.creationMode !== 'invite') {
+      return json(409, { ok: false, error: 'QTool wurde aktualisiert. Bitte die Seite neu laden und den Benutzer erneut einladen.' });
+    }
+    const { data: invited, error: inviteError } = await service.auth.admin.inviteUserByEmail(email, {
+      redirectTo: QTOOL_INVITE_REDIRECT,
+    });
+    if (inviteError || !invited.user) return json(400, { ok: false, error: inviteError?.message || 'Einladung konnte nicht versendet werden.' });
+
+    const { error: metadataError } = await service.auth.admin.updateUserById(invited.user.id, {
       app_metadata: {
         qtool_role: role,
         qtool_display_name: displayName,
       },
     });
-    if (createError || !created.user) return json(400, { ok: false, error: createError?.message || 'Benutzer konnte nicht angelegt werden.' });
+    if (metadataError) {
+      await service.auth.admin.deleteUser(invited.user.id);
+      return json(500, { ok: false, error: 'Rolle der Einladung konnte nicht gesichert werden.' });
+    }
 
     const { error: profileError } = await service.from('user_profiles').insert({
-      id: created.user.id,
+      id: invited.user.id,
       display_name: displayName,
       role,
       is_active: true,
     });
     if (profileError) {
-      await service.auth.admin.deleteUser(created.user.id);
+      await service.auth.admin.deleteUser(invited.user.id);
       return json(500, { ok: false, error: 'Benutzerprofil konnte nicht angelegt werden.' });
     }
-    return json(200, { ok: true });
+    return json(200, { ok: true, invited: true });
   }
 
   if (action === 'update') {

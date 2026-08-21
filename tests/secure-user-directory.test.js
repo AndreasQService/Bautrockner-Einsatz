@@ -7,26 +7,47 @@ const service = fs.readFileSync(new URL('../src/services/AdminUserService.js', i
 const edge = fs.readFileSync(new URL('../supabase/functions/admin-users/index.ts', import.meta.url), 'utf8');
 const app = fs.readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8');
 const migration = fs.readFileSync(new URL('../supabase/migrations/20260821090000_create_secure_user_profiles.sql', import.meta.url), 'utf8');
+const passwordSetup = fs.readFileSync(new URL('../src/components/PasswordSetupScreen.jsx', import.meta.url), 'utf8');
 
 test('user management exposes identity fields and the four required roles', () => {
   assert.match(modal, /field\('E-Mail'/);
   assert.match(modal, /field\('Anzeigename'/);
-  assert.match(modal, /field\('Passwort'/);
+  assert.match(modal, /Benutzer einladen/);
   assert.match(modal, /<strong>E-Mail<\/strong><strong>Anzeigename<\/strong><strong>Passwort<\/strong><strong>Rolle<\/strong>/);
   for (const role of ['admin', 'technician', 'handwerker', 'user']) assert.match(modal, new RegExp(`value: '${role}'`));
 });
 
-test('stored passwords remain write-only while admins can inspect the new value before submitting', () => {
+test('stored passwords remain write-only while admins can reset only a newly entered value', () => {
   assert.doesNotMatch(modal, /user\.password/);
-  assert.match(modal, /Gespeicherte Passwörter sind niemals einsehbar/);
+  assert.match(modal, /Benutzer erhalten einen sicheren Einladungslink/);
   assert.match(modal, /aria-label="Passwort nicht einsehbar">••••••••/);
-  assert.match(modal, /showNewPassword/);
   assert.match(modal, /showEditPassword/);
   assert.match(modal, /Passwort verbergen/);
   assert.match(modal, /Passwort anzeigen/);
   assert.match(modal, /passwordVisible \? 'text' : type/);
   assert.match(service, /stripLegacyPasswords/);
   assert.doesNotMatch(app, /report_data:\s*\{\s*users: newUsers\s*\}/);
+});
+
+test('admin creates an invitation without choosing the users password', () => {
+  assert.match(edge, /service\.auth\.admin\.inviteUserByEmail\(email/);
+  assert.match(edge, /QTOOL_INVITE_REDIRECT/);
+  assert.match(edge, /qtool_role:\s*role/);
+  assert.match(edge, /user_profiles/);
+  assert.doesNotMatch(edge, /createUser\(\{\s*email,\s*password/);
+  assert.match(service, /createDirectoryUser\(\{ email, displayName, role \}\)/);
+  assert.match(service, /creationMode: 'invite'/);
+  assert.match(edge, /body\.creationMode !== 'invite'/);
+  assert.doesNotMatch(service, /action: 'create', email, displayName, password/);
+});
+
+test('invited user sets and confirms their own password in an authenticated session', () => {
+  assert.match(passwordSetup, /supabase\.auth\.updateUser\(\{ password \}\)/);
+  assert.match(passwordSetup, /password !== confirmation/);
+  assert.match(passwordSetup, /password\.length < 8/);
+  assert.match(passwordSetup, /Eigenes Passwort festlegen/);
+  assert.match(app, /qtool_invite/);
+  assert.match(app, /supabaseSession\?\.user/);
 });
 
 test('admin mutations stay server-side behind verified auth and admin profile', () => {
@@ -36,7 +57,7 @@ test('admin mutations stay server-side behind verified auth and admin profile', 
     edge.indexOf("callerProfile.role !== 'admin'") < edge.indexOf("action === 'list'"),
     'the admin boundary must also protect directory reads',
   );
-  assert.match(edge, /service\.auth\.admin\.createUser/);
+  assert.match(edge, /service\.auth\.admin\.inviteUserByEmail/);
   assert.match(edge, /service\.auth\.admin\.updateUserById/);
   assert.match(edge, /service\.auth\.admin\.deleteUser/);
   assert.match(edge, /userId === authData\.user\.id/);
