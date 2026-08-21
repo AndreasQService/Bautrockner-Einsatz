@@ -6,6 +6,16 @@ import { jsPDF } from 'jspdf';
 import CameraCaptureModal from './CameraCaptureModal';
 import { ROOM_OPTIONS } from './DamageForm/DamageForm.constants';
 
+const withDeadline = (promise, timeoutMs, label) => {
+    let timer;
+    return Promise.race([
+        promise,
+        new Promise((_, reject) => {
+            timer = setTimeout(() => reject(new Error(`${label} hat das Zeitlimit überschritten`)), timeoutMs);
+        })
+    ]).finally(() => clearTimeout(timer));
+};
+
 // Default starting positions for up to 4 photos (in %)
 const DEFAULT_POSITIONS = [
     { x: 2, y: 2 }, { x: 52, y: 2 },
@@ -1390,7 +1400,7 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
             // Capture the entire modal content (sketch + table)
             // On iPad/Safari, use scale: 1 to prevent memory crashes and ensure rapid processing
             const isIpadOrMobile = /iPad|iPhone|iPod|android/i.test(navigator.userAgent) || (navigator.maxTouchPoints && navigator.maxTouchPoints > 2);
-            const canvas = await html2canvas(containerRef.current, {
+            const canvas = await withDeadline(html2canvas(containerRef.current, {
                 scale: isIpadOrMobile ? 1 : 1.2, // Drastically improves capture speed and limits memory usage
                 backgroundColor: '#ffffff',
                 onclone: (clonedDoc) => {
@@ -1422,7 +1432,7 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
                         });
                     }
                 }
-            });
+            }), isIpadOrMobile ? 8000 : 15000, 'Messprotokoll-Vorschau');
 
             // Capture canvas state as DataURL for restoration
             const toggleCanvas = hiddenCanvasRef.current;
@@ -1534,40 +1544,44 @@ const MeasurementModal = ({ isTechnicianMode, isOpen, onClose, onSave, onStartNe
             } else {
                 // Standard Image Save - Use JPEG format with 0.8 quality to make it 10x smaller than PNG!
                 // This accelerates upload over slow cellar networks (e.g., cellars) by 1000%
-                await new Promise((resolve, reject) => {
+                const blob = await new Promise((resolve, reject) => {
+                    let settled = false;
+                    const timer = setTimeout(() => {
+                        settled = true;
+                        reject(new Error('Messprotokoll-Dateierstellung hat das Zeitlimit überschritten'));
+                    }, isIpadOrMobile ? 8000 : 15000);
                     try {
-                        canvas.toBlob(async (blob) => {
-                            try {
-                                if (!blob) {
-                                    throw new Error("Canvas toBlob yielded null blob");
-                                }
-                                let file;
-                                try {
-                                    file = new File([blob], `Messprotokoll_${projectTitle || 'Neu'}_${Date.now()}.jpg`, { type: 'image/jpeg' });
-                                } catch (fileErr) {
-                                    // Safari/iOS Fallback
-                                    file = new Blob([blob], { type: 'image/jpeg' });
-                                    file.name = `Messprotokoll_${projectTitle || 'Neu'}_${Date.now()}.jpg`;
-                                    file.lastModifiedDate = new Date();
-                                }
-
-                                await onSave({
-                                    file,
-                                    measurements: saveMeasurements,
-                                    globalSettings: saveGlobalSettings,
-                                    canvasImage: saveCanvasImage,
-                                    galleryPhotos: saveGalleryPhotos,
-                                    measurementHistory: updatedHistory || undefined,
-                                    isAutosave: false
-                                });
-                                resolve();
-                            } catch (err) {
-                                reject(err);
-                            }
+                        canvas.toBlob((result) => {
+                            if (settled) return;
+                            settled = true;
+                            clearTimeout(timer);
+                            result ? resolve(result) : reject(new Error('Canvas toBlob yielded null blob'));
                         }, 'image/jpeg', 0.8);
                     } catch (err) {
-                        reject(err);
+                        if (!settled) {
+                            settled = true;
+                            clearTimeout(timer);
+                            reject(err);
+                        }
                     }
+                });
+                let file;
+                try {
+                    file = new File([blob], `Messprotokoll_${projectTitle || 'Neu'}_${Date.now()}.jpg`, { type: 'image/jpeg' });
+                } catch (fileErr) {
+                    // Safari/iOS Fallback
+                    file = new Blob([blob], { type: 'image/jpeg' });
+                    file.name = `Messprotokoll_${projectTitle || 'Neu'}_${Date.now()}.jpg`;
+                    file.lastModifiedDate = new Date();
+                }
+                await onSave({
+                    file,
+                    measurements: saveMeasurements,
+                    globalSettings: saveGlobalSettings,
+                    canvasImage: saveCanvasImage,
+                    galleryPhotos: saveGalleryPhotos,
+                    measurementHistory: updatedHistory || undefined,
+                    isAutosave: false
                 });
             }
 

@@ -44,6 +44,7 @@ import { RoomService } from '../services/RoomService';
 import { statusColors, ROOM_OPTIONS } from '../config/damageFormConfig';
 import { createRentalDeviceAssignment, endRentalDeviceAssignment, isRentalTypeSelectionValid, NEW_DEVICE_TYPE_VALUE } from '../lib/rentalDevices';
 import ProjectSyncControlBox from './ProjectSyncControlBox';
+import { saveProjectDraftWithReadback } from '../lib/safeProjectCreation';
 
 /* Custom PDF Icon */
 const PdfIcon = ({ size = 24, style = {} }) => (
@@ -3797,18 +3798,12 @@ END:VCARD`;
                           showMeasurementModal
                         });
                         const { file, measurements, globalSettings, canvasImage, galleryPhotos, measurementHistory: updatedHistoryFromModal } = data;
-                        let protocolUrl = null;
-                        if (supabase && file) {
-                            try {
-                                const fileExt = file.name.split('.').pop() || (file.type === 'application/pdf' ? 'pdf' : 'png');
-                                const fileName = `cases/${formData.id || 'temp'}/protocols/${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
-                                const { error } = await supabase.storage.from('case-files').upload(fileName, file);
-                                if (!error) {
-                                    const { data: { publicUrl } } = supabase.storage.from('case-files').getPublicUrl(fileName);
-                                    protocolUrl = publicUrl;
-                                }
-                            } catch (err) { console.error(err); }
-                        }
+                        // The measurement data and canvas are the authoritative record.
+                        // Never block an iPad save on a Storage request: in a cellar the
+                        // request may stay pending for minutes. The full project snapshot
+                        // is committed to IndexedDB below and cloud sync is triggered only
+                        // after that durable local readback.
+                        const protocolUrl = null;
                         if (activeRoomForMeasurement) {
                             const prev = formData;
                             let updatedRooms;
@@ -4014,10 +4009,18 @@ END:VCARD`;
                                 ? { ...dryingUpdate, measurementRooms: updatedMeasurementRooms, rooms: updatedRooms }
                                 : { ...prev, measurementRooms: updatedMeasurementRooms, rooms: updatedRooms };
 
+                            await saveProjectDraftWithReadback(
+                                updatedFormData,
+                                currentUser?.email || currentUser?.name || 'Unbekannt'
+                            );
                             setFormData(updatedFormData);
 
                             if (typeof onSave === 'function') {
-                                onSave(updatedFormData, data?.isAutosave ?? false);
+                                // Cloud confirmation deliberately runs after the durable
+                                // IndexedDB commit. Do not await an unreliable network here;
+                                // App keeps the project marked pending until real readback.
+                                void Promise.resolve(onSave(updatedFormData, data?.isAutosave ?? false))
+                                    .catch(error => console.warn('[Measurement] Cloud sync pending:', error));
                             }
 
                             setIsNewMeasurement(false); // So subsequent saves don't duplicate history
@@ -10793,18 +10796,10 @@ END:VCARD`;
                           showMeasurementModal
                         });
                         const { file, measurements, globalSettings, canvasImage, galleryPhotos, measurementHistory: updatedHistoryFromModal } = data;
-                        let protocolUrl = null;
-                        if (supabase && file) {
-                            try {
-                                const fileExt = file.name.split('.').pop() || (file.type === 'application/pdf' ? 'pdf' : 'png');
-                                const fileName = `cases/${formData.id || 'temp'}/protocols/${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
-                                const { error } = await supabase.storage.from('case-files').upload(fileName, file);
-                                if (!error) {
-                                    const { data: { publicUrl } } = supabase.storage.from('case-files').getPublicUrl(fileName);
-                                    protocolUrl = publicUrl;
-                                }
-                            } catch (err) { console.error(err); }
-                        }
+                        // Offline-first: never wait for Storage before accepting a
+                        // measurement. The embedded data/canvas are committed durably
+                        // to IndexedDB below; cloud confirmation remains pending.
+                        const protocolUrl = null;
                         if (activeRoomForMeasurement) {
                             const prev = formData;
                             let updatedRooms;
@@ -11010,10 +11005,15 @@ END:VCARD`;
                                 ? { ...dryingUpdate, measurementRooms: updatedMeasurementRooms, rooms: updatedRooms }
                                 : { ...prev, measurementRooms: updatedMeasurementRooms, rooms: updatedRooms };
 
+                            await saveProjectDraftWithReadback(
+                                updatedFormData,
+                                currentUser?.email || currentUser?.name || 'Unbekannt'
+                            );
                             setFormData(updatedFormData);
 
                             if (typeof onSave === 'function') {
-                                onSave(updatedFormData, data?.isAutosave ?? false);
+                                void Promise.resolve(onSave(updatedFormData, data?.isAutosave ?? false))
+                                    .catch(error => console.warn('[Measurement] Cloud sync pending:', error));
                             }
 
                             setIsNewMeasurement(false); // So subsequent saves don't duplicate history
