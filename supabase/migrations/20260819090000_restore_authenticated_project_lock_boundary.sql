@@ -3,6 +3,22 @@
 
 begin;
 
+-- Production predates authenticated ownership metadata. Add it before any
+-- helper or policy references these columns.
+alter table public.project_sessions
+  add column if not exists owner_user_id uuid,
+  add column if not exists client_id text;
+
+-- Legacy leases have no verifiable authenticated owner. Release only their
+-- project pointer while preserving the session row for audit purposes.
+update public.project_sessions
+   set open_project_id = null
+ where open_project_id is not null
+   and owner_user_id is null;
+
+create index if not exists project_sessions_owner_user_id_idx
+  on public.project_sessions (owner_user_id);
+
 revoke all on table public.project_sessions from public, anon, authenticated;
 revoke insert, update, delete, truncate on table public.damage_reports from public, anon;
 

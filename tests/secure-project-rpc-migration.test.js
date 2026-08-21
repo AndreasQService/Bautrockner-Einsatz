@@ -55,6 +55,8 @@ test('direct test bypasses are removed without touching audit RLS', () => {
 });
 
 test('write-lock helpers bind a safe request token to authenticated ownership', () => {
+  assert.match(sql, /alter table public\.project_sessions[\s\S]*?add column if not exists owner_user_id uuid[\s\S]*?add column if not exists client_id text/);
+  assert.match(sql, /update public\.project_sessions[\s\S]*?set open_project_id = null[\s\S]*?owner_user_id is null/);
   assert.match(sql, /function public\.qtool_request_session_token\(\)[\s\S]*?security invoker[\s\S]*?set search_path = ''/);
   assert.match(sql, /exception when others then\s+return null/);
   assert.match(sql, /function public\.qtool_has_project_write_lock\(p_project_id text\)[\s\S]*?auth\.uid\(\) is not null[\s\S]*?s\.session_token = public\.qtool_request_session_token\(\)[\s\S]*?s\.owner_user_id = auth\.uid\(\)/);
