@@ -16,6 +16,8 @@ import UserManagementModal from './components/UserManagementModal'
 import MeasurementDeviceManager from './components/MeasurementDeviceManager'
 import LoginScreen from './components/LoginScreen'
 import PasswordSetupScreen from './components/PasswordSetupScreen'
+import AuthLinkConfirmationScreen from './components/AuthLinkConfirmationScreen'
+import { readAuthLinkConfirmation } from './lib/authLinkConfirmation.js'
 import TodoProjectSection from './components/TodoProjectSection'
 import { ensureAuthenticated, lastAuthError } from './services/TodoService'
 import EmailImportModalV2 from './components/EmailImportModalV2'
@@ -933,6 +935,9 @@ function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [supabaseSession, setSupabaseSession] = useState(null);
   const [authReady, setAuthReady] = useState(false);
+  const [authLinkConfirmation, setAuthLinkConfirmation] = useState(() => (
+    readAuthLinkConfirmation(typeof window === 'undefined' ? null : window.location)
+  ));
   const [isInvitationSetup, setIsInvitationSetup] = useState(() => {
     if (typeof window === 'undefined') return false;
     return new URLSearchParams(window.location.search).get('qtool_invite') === '1';
@@ -2940,6 +2945,26 @@ function App() {
       isAndreasStored = !!(parsed && parsed.name && parsed.name.toLowerCase() === 'andreas strehler');
     }
   } catch {}
+
+  if (authLinkConfirmation.active) {
+    return <AuthLinkConfirmationScreen
+      request={authLinkConfirmation}
+      supabase={supabase}
+      onVerified={(session, type) => {
+        setSupabaseSession(session);
+        const url = new URL(window.location.href);
+        ['qtool_auth_confirm', 'type', 'token_hash', 'qtool_invite', 'qtool_recovery'].forEach((key) => {
+          url.searchParams.delete(key);
+        });
+        url.searchParams.set(type === 'invite' ? 'qtool_invite' : 'qtool_recovery', '1');
+        window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+        setIsInvitationSetup(type === 'invite');
+        setIsRecoverySetup(type === 'recovery');
+        setAuthLinkConfirmation({ active: false });
+        setAuthReady(true);
+      }}
+    />;
+  }
 
   if (!authReady) {
     return (
