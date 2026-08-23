@@ -7,22 +7,53 @@ import { createRoot } from 'react-dom/client'
 import './tw.css'
 import './index.css'
 import ErrorBoundary from './ErrorBoundary.jsx'
+import { isOneDrivePopupCallback } from './lib/onedrive/popupCallback.js'
 
-// ─── Variante C: Offline-Blobs → Supabase Storage synchen (kein MSAL) ───────
-// Startet beim App-Boot im Hintergrund, blockiert Render nicht.
-import('./lib/sync/supabaseSyncWorker.js')
-  .then(({ syncPendingToSupabase }) => syncPendingToSupabase())
-  .then(({ synced }) => { if (synced > 0) console.info(`[Boot] ☁️ ${synced} Fotos zu Supabase synchronisiert`); })
-  .catch((e) => console.warn('[Boot] Sync fehlgeschlagen:', e.message));
+const rootElement = document.getElementById('root');
+const isPopupCallback = isOneDrivePopupCallback(
+  window.location,
+  window.opener !== null
+);
 
-// ─── App rendern (kein MSAL-Provider nötig) ──────────────────────────────────
-import('./App.jsx').then(({ default: App }) => {
-  const root = createRoot(document.getElementById('root'));
+if (isPopupCallback) {
+  const root = createRoot(rootElement);
   root.render(
-    <ErrorBoundary>
-      <App />
-    </ErrorBoundary>
+    <main
+      role="status"
+      aria-live="polite"
+      style={{
+        minHeight: '100vh',
+        display: 'grid',
+        placeItems: 'center',
+        padding: '2rem',
+        background: '#0f1b2e',
+        color: '#f8fafc',
+        fontFamily: 'system-ui, sans-serif',
+      }}
+    >
+      <div style={{ display: 'grid', gap: '.75rem', textAlign: 'center' }}>
+        <strong>OneDrive-Anmeldung wird abgeschlossen…</strong>
+        <span>Dieses Fenster schließt automatisch.</span>
+      </div>
+    </main>
   );
-}).catch(err => {
-  console.error('[QTool] Ladefehler:', err);
-});
+} else {
+  // ─── Variante C: Offline-Blobs → Supabase Storage synchen (kein MSAL) ─────
+  // Startet beim App-Boot im Hintergrund, blockiert Render nicht.
+  import('./lib/sync/supabaseSyncWorker.js')
+    .then(({ syncPendingToSupabase }) => syncPendingToSupabase())
+    .then(({ synced }) => { if (synced > 0) console.info(`[Boot] ☁️ ${synced} Fotos zu Supabase synchronisiert`); })
+    .catch((e) => console.warn('[Boot] Sync fehlgeschlagen:', e.message));
+
+  // ─── App rendern (kein MSAL-Provider nötig) ────────────────────────────────
+  import('./App.jsx').then(({ default: App }) => {
+    const root = createRoot(rootElement);
+    root.render(
+      <ErrorBoundary>
+        <App />
+      </ErrorBoundary>
+    );
+  }).catch(err => {
+    console.error('[QTool] Ladefehler:', err);
+  });
+}
