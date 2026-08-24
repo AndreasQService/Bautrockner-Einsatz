@@ -1028,7 +1028,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         if (isSyncing) return;
         setIsSyncing(true);
 
-        console.log('[Sync] 🔄 Starte Sync ausstehender Fotos...');
+        console.log('[Sync] 🔄 Starte dauerhafte Synchronisation ausstehender Fotos...');
 
         try {
             {
