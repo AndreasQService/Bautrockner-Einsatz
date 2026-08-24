@@ -22,7 +22,7 @@ import { supabase } from '../supabaseClient';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import { buildProjectFolderName, uploadPhotoAndGetUrl, getPhotoDownloadUrl, uploadReport } from '../services/OneDriveService';
-import { savePhotoLocally, updatePhotoSyncStatus, deleteOldSyncedPhotos, getPendingCount, getPhotoBlob, getProjectPhotos } from '../services/PhotoStorage';
+import { savePhotoLocally, updatePhotoSyncStatus, deleteOldSyncedPhotos, getPendingCount, getPhotoBlob, getProjectPhotos, reassignTemporaryPhotos } from '../services/PhotoStorage';
 const IS_TEST_ENV = !!(typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_EXPECTED_SUPABASE_PROJECT_ID === 'aoxduqspiezzyqeqyzzl');
 import { swissPLZ } from '../data/swiss_plz';
 
@@ -1068,9 +1068,20 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         // Pending-Count beim Mount laden
         getPendingCount().then(count => setPendingSyncCount(count));
 
+        // Recover photos queued under "temp" by an old null-id draft, but only
+        // when their photo id is present in this project's report data.
+        const recoverAndSync = async () => {
+            const photoIds = (formData.images || []).map(image => image?.id).filter(Boolean);
+            const recovered = await reassignTemporaryPhotos(photoIds, formData.id);
+            if (recovered > 0) {
+                console.info(`[Sync] ${recovered} temporäre Foto-Zuordnung(en) für Projekt ${formData.id} repariert.`);
+            }
+            return syncPendingPhotos();
+        };
+
         // Beim Mount: wenn bereits online, sofort syncen
         if (navigator.onLine) {
-            syncPendingPhotos();
+            recoverAndSync().catch(error => console.warn('[Sync] Wiederherstellung fehlgeschlagen:', error.message));
         }
 
         // Set up recurring auto-sync interval (every 10 seconds) to retry failed uploads or catch newly added photos
