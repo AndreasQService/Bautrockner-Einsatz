@@ -1127,25 +1127,34 @@ function App() {
   const [syncPending, setSyncPending] = useState(0);
   const [oneDriveServiceStatus, setOneDriveServiceStatus] = useState({ ok: null, error: null, driveId: null });
 
-  const verifyOneDriveServiceConnectivity = useCallback(async () => {
+  const verifyOneDriveServiceConnectivity = useCallback(async (popupAccessToken = null) => {
     if (!navigator.onLine) {
       setOneDriveServiceStatus({ ok: false, error: 'Offline', driveId: null });
       return false;
     }
     try {
-      const account = await initOneDriveAuth();
-      if (!account) throw new Error('Microsoft-Anmeldung fehlt');
-      const token = await getGraphAccessTokenSilent();
-      if (!token) throw new Error('Microsoft-Anmeldung muss erneuert werden');
+      let token = popupAccessToken;
+      if (!token) {
+        const account = await initOneDriveAuth();
+        if (!account) throw new Error('Microsoft-Anmeldung fehlt');
+        token = await getGraphAccessTokenSilent();
+        if (!token) throw new Error('Microsoft-Anmeldung muss erneuert werden');
+      }
       const response = await fetch('https://graph.microsoft.com/v1.0/me/drive?$select=id,driveType', {
         method: 'GET', headers: { Authorization: `Bearer ${token}` },
       });
-      if (!response.ok) throw new Error(`Microsoft Graph ${response.status}`);
+      if (!response.ok) {
+        const graphError = await response.json().catch(() => null);
+        throw new Error(
+          `Microsoft Graph ${response.status}: ${graphError?.error?.message || response.statusText}`
+        );
+      }
       const drive = await response.json();
       if (!drive?.id) throw new Error('OneDrive-ID fehlt');
       setOneDriveServiceStatus({ ok: true, error: null, driveId: drive.id, checkedAt: new Date().toISOString() });
       return true;
     } catch (error) {
+      console.error('[OneDrive] Verbindungsprüfung fehlgeschlagen:', error);
       setOneDriveServiceStatus({ ok: false, error: error?.message || 'OneDrive nicht erreichbar', driveId: null });
       return false;
     }
@@ -1156,8 +1165,10 @@ function App() {
     try {
       const result = await connectOneDrive();
       if (!result?.account) throw new Error('Microsoft-Anmeldung wurde nicht bestätigt');
-      await verifyOneDriveServiceConnectivity();
+      if (!result?.accessToken) throw new Error('Microsoft hat kein Zugriffstoken zurückgegeben');
+      await verifyOneDriveServiceConnectivity(result.accessToken);
     } catch (error) {
+      console.error('[OneDrive] Anmeldung fehlgeschlagen:', error);
       setOneDriveServiceStatus({ ok: false, error: error?.message || 'OneDrive-Anmeldung fehlgeschlagen', driveId: null });
     }
   }, [verifyOneDriveServiceConnectivity]);
