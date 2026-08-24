@@ -1025,14 +1025,13 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
     }, [formData.id]);
 
     const syncPendingPhotos = useCallback(async () => {
-        const isCloudFirstEnabled = import.meta.env.VITE_CLOUD_FIRST_IMAGES === 'true' || import.meta.env.VITE_CLOUD_FIRST_IMAGES === true;
         if (isSyncing) return;
         setIsSyncing(true);
 
         console.log('[Sync] 🔄 Starte Sync ausstehender Fotos...');
 
         try {
-            if (IS_TEST_ENV || isCloudFirstEnabled) {
+            {
                 const { syncPendingToSupabase } = await import('../lib/sync/supabaseSyncWorker');
                 const { synced, failed } = await syncPendingToSupabase();
                 console.log(`[Sync] Cloud-first sync done. Synced: ${synced}, Failed: ${failed}`);
@@ -2360,7 +2359,9 @@ END:VCARD`;
     const handleImageUpload = async (files, contextData = {}) => {
         if (!files || files.length === 0) return;
 
-        const isCloudFirstEnabled = import.meta.env.VITE_CLOUD_FIRST_IMAGES === 'true' || import.meta.env.VITE_CLOUD_FIRST_IMAGES === true;
+        // One durable pipeline in every environment. A missing/false deployment
+        // flag previously selected the legacy path and stranded queued_for_remote.
+        const isCloudFirstEnabled = true;
 
         if (isCloudFirstEnabled) {
             for (let file of files) {

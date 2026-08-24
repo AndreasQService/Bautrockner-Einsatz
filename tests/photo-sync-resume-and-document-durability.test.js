@@ -24,3 +24,7 @@ test('documents are durably stored before background sync', () => {
   assert.doesNotMatch(cloudBranch, /isDoc\)[\s\S]*URL\.createObjectURL\(file\)/);
 });
 
+test('production auto-sync cannot fall back to the legacy queue', () => {
+  assert.doesNotMatch(form, /if \(IS_TEST_ENV \|\| isCloudFirstEnabled\)/);
+  assert.match(form, /const isCloudFirstEnabled = true;/);
+});
