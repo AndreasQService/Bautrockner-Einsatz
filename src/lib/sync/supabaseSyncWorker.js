@@ -6,6 +6,7 @@
 import { supabase } from '../../supabaseClient.js';
 import { updatePhotoSyncStatus, openDB } from '../../services/PhotoStorage.js';
 import { queueImageCompression } from '../../utils/imageCompressor.js';
+import { uploadPhotoAndGetUrl } from '../../services/OneDriveService.js';
 
 let isSyncRunning = false;
 
@@ -100,13 +101,11 @@ async function getPendingPhotosFromDb() {
         const req = tx.objectStore('photos').getAll();
         req.onsuccess = () => {
             const all = req.result || [];
-            // Get everything not fully uploaded/remote_verified, and not failed 3+ times (avoids blocking queue/CPU lock)
+            // Resume every item until both clouds are verified. In particular, do not
+            // strand items after the Supabase upload or while waiting for OneDrive.
             resolve(all.filter(p => 
                 p.syncStatus !== 'remote_verified' && 
                 p.syncStatus !== 'synced' && 
-                p.syncStatus !== 'uploaded_to_backend' && 
-                p.syncStatus !== 'queued_for_remote' && 
-                !p.supabasePath && 
                 !p.oneDriveItemId &&
                 (p.retryCount || 0) < 3
             ));
@@ -129,10 +128,10 @@ async function syncOnePhoto(photo) {
         safeName = `photo_${photo.id || Date.now()}.jpg`;
     }
     const ext = safeName.split('.').pop().toLowerCase() || 'jpg';
-    const storagePath = `${testRunId}/${projectId}/Fotos/TEST__${photo.id}.${ext}`;
+    const storagePath = photo.supabasePath || `${testRunId}/${projectId}/Fotos/TEST__${photo.id}.${ext}`;
     
     // 1. Compression Phase
-    if (!photo.compressed || !photo.compressed.blob) {
+    if (!photo.supabasePath && (!photo.compressed || !photo.compressed.blob)) {
         console.log(`[SyncWorker] ⚙️ Compressing photo ${photo.id}...`);
         const targetBlob = photo.blob || photo.original?.blob;
         if (!targetBlob || !(targetBlob instanceof Blob) || targetBlob.size === 0) {
@@ -181,7 +180,7 @@ async function syncOnePhoto(photo) {
     const sha256 = photo.compressed?.sha256 || photo.original?.sha256 || 'SHA_FALLBACK';
 
     // 2. Storage Upload (run for any photo not yet uploaded)
-    if (photo.syncStatus !== 'uploaded_to_backend' && photo.syncStatus !== 'remote_verified' && photo.syncStatus !== 'synced') {
+    if (!photo.supabasePath) {
         console.log(`[SyncWorker] ☁️ Uploading photo ${photo.id} to Supabase storage...`);
         
         const { error: uploadErr } = await supabase.storage
@@ -203,6 +202,10 @@ async function syncOnePhoto(photo) {
             syncStatus: 'uploaded_to_backend',
             supabasePath: storagePath
         });
+        photo.supabasePath = storagePath;
+        photo.syncStatus = 'uploaded_to_backend';
+    }
+    if (photo.supabasePath && photo.syncStatus !== 'remote_verified' && photo.syncStatus !== 'synced') {
         photo.syncStatus = 'uploaded_to_backend';
     }
 
@@ -229,10 +232,11 @@ async function syncOnePhoto(photo) {
         const reportData = projectRow.report_data || {};
         if (!reportData.images) reportData.images = [];
 
-        // Check if already linked
-        const isLinked = reportData.images.some(img => img.id === photo.id);
-        if (!isLinked) {
-            reportData.images.push({
+        // Always merge the verified Supabase path into an existing image too.
+        // The previous implementation only handled a missing image, leaving
+        // already-present entries permanently at local_only/uploading=true.
+        const linkedIndex = reportData.images.findIndex(img => img.id === photo.id);
+        const cloudImage = {
                 id: photo.id,
                 name: photo.name,
                 date: photo.createdAt || new Date().toISOString(),
@@ -241,70 +245,78 @@ async function syncOnePhoto(photo) {
                 supabaseBackedUpAt: new Date().toISOString(),
                 uploading: false,
                 error: false,
-                type: 'image',
+                type: ['pdf', 'msg', 'txt'].includes(ext) ? 'document' : 'image',
                 size: photo.compressed?.size || compressedBlob.size || photo.size || 0,
                 fileType: ext,
                 sha256: sha256,
                 assignedTo: photo.meta?.assignedTo || 'Sonstiges',
                 includeInReport: photo.meta?.includeInReport !== undefined ? photo.meta.includeInReport : true
-            });
-
-            const { error: updateErr } = await supabase
-                .from('damage_reports')
-                .update({ report_data: reportData })
-                .eq('id', projectId);
-
-            if (updateErr) {
-                throw new Error(`Project report_data update failed: ${updateErr.message}`);
-            }
-            console.log(`[SyncWorker] 🔗 Photo ${photo.id} successfully linked to project.`);
+        };
+        if (linkedIndex === -1) {
+            reportData.images.push(cloudImage);
+        } else {
+            reportData.images[linkedIndex] = {
+                ...reportData.images[linkedIndex],
+                ...cloudImage,
+                uploading: true,
+                syncStatus: 'uploaded_to_backend'
+            };
         }
 
-        // 6. Complete and wait for OneDrive Sync (queued_for_remote -> remote_verified)
-        // Since OneDrive is handled by the backend function, we trigger the Edge function trigger
+        const { error: updateErr } = await supabase
+            .from('damage_reports')
+            .update({ report_data: reportData })
+            .eq('id', projectId);
+
+        if (updateErr) {
+            throw new Error(`Project report_data update failed: ${updateErr.message}`);
+        }
+        console.log(`[SyncWorker] 🔗 Photo ${photo.id} successfully linked to project.`);
+
+        // 6. Upload with the connected user's OneDrive token. The former anonymous
+        // Edge-function call was rejected with HTTP 401 and could never complete.
         await updatePhotoSyncStatus(photo.id, {
             syncStatus: 'queued_for_remote'
         });
         photo.syncStatus = 'queued_for_remote';
-
-        // Trigger Edge function upload
-        fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/onedrive-upload-worker`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({}),
-        }).catch(() => {});
-
-        // Since the backend Edge function runs asynchronously, we check the project_image_uploads status in Supabase DB 
-        // to verify when it gets marked as remote_verified or uploaded.
-        // Let's poll or wait momentarily. If not complete, it will be picked up on the next sync run or boot.
-        let checkAttempts = 0;
-        const maxChecks = 5;
-        while (checkAttempts < maxChecks) {
-            await new Promise(r => setTimeout(r, 1000));
-            const { data: journalRow, error: checkErr } = await supabase
-                .from('project_image_uploads')
-                .select('storage_status, remote_path, remote_item_id')
-                .eq('local_image_id', photo.id)
-                .single();
-
-            if (!checkErr && journalRow) {
-                if (journalRow.storage_status === 'remote_verified' || journalRow.remote_item_id) {
-                    console.log(`[SyncWorker] ☁️ OneDrive Verified for photo ${photo.id}!`);
-                    await updatePhotoSyncStatus(photo.id, {
-                        syncStatus: 'remote_verified',
-                        oneDriveItemId: journalRow.remote_item_id,
-                        oneDrivePath: journalRow.remote_path
-                    });
-                    break;
-                }
-            }
-            checkAttempts++;
+        const sourceBlob = photo.blob || photo.original?.blob || compressedBlob;
+        const oneDriveFile = sourceBlob instanceof File
+            ? sourceBlob
+            : new File([sourceBlob], safeName, { type: sourceBlob.type || photo.type || 'application/octet-stream' });
+        const odFolder = photo.meta?.odFolder || String(projectId);
+        const subFolder = photo.meta?.subFolder || photo.meta?.assignedTo || 'Sonstiges';
+        const odResult = await uploadPhotoAndGetUrl(odFolder, subFolder, oneDriveFile);
+        if (!odResult?.itemId && !odResult?.odPath) {
+            throw new Error('OneDrive upload was not confirmed');
         }
+
         await updatePhotoSyncStatus(photo.id, {
+            syncStatus: 'remote_verified',
+            oneDriveItemId: odResult.itemId || null,
+            oneDrivePath: odResult.odPath || null,
+            errorMessage: null,
+            retryCount: 0
+        });
+
+        const verifiedData = { ...reportData };
+        verifiedData.images = reportData.images.map(img => img.id === photo.id ? {
+            ...img,
+            storagePath,
+            supabasePath: storagePath,
+            oneDriveItemId: odResult.itemId || null,
+            oneDrivePath: odResult.odPath || null,
+            uploading: false,
+            error: false,
+            errorMessage: null,
             syncStatus: 'remote_verified'
-        }).catch(() => {});
+        } : img);
+        const { error: verifyUpdateErr } = await supabase
+            .from('damage_reports')
+            .update({ report_data: verifiedData })
+            .eq('id', projectId);
+        if (verifyUpdateErr) {
+            throw new Error(`Verified project image update failed: ${verifyUpdateErr.message}`);
+        }
     }
 }
+
