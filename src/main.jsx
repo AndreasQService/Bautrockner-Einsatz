@@ -8,6 +8,7 @@ import './tw.css'
 import './index.css'
 import ErrorBoundary from './ErrorBoundary.jsx'
 import { isOneDrivePopupCallback } from './lib/onedrive/popupCallback.js'
+import { completeOneDrivePopup } from './lib/onedrive/popupBridge.js'
 
 const rootElement = document.getElementById('root');
 const isPopupCallback = isOneDrivePopupCallback(
@@ -37,6 +38,29 @@ if (isPopupCallback) {
       </div>
     </main>
   );
+
+  completeOneDrivePopup().catch((error) => {
+    console.error('[OneDrive] OAuth-Callback konnte nicht abgeschlossen werden:', error);
+    root.render(
+      <main
+        role="alert"
+        style={{
+          minHeight: '100vh',
+          display: 'grid',
+          placeItems: 'center',
+          padding: '2rem',
+          background: '#0f1b2e',
+          color: '#f8fafc',
+          fontFamily: 'system-ui, sans-serif',
+        }}
+      >
+        <div style={{ display: 'grid', gap: '.75rem', maxWidth: '32rem', textAlign: 'center' }}>
+          <strong>OneDrive-Anmeldung konnte nicht abgeschlossen werden.</strong>
+          <span>Schließe dieses Fenster und starte die Verbindung im Hauptfenster erneut.</span>
+        </div>
+      </main>
+    );
+  });
 } else {
   // ─── Variante C: Offline-Blobs → Supabase Storage synchen (kein MSAL) ─────
   // Startet beim App-Boot im Hintergrund, blockiert Render nicht.
