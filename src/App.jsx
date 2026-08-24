@@ -1724,7 +1724,7 @@ function App() {
             ...report,
             ...unsaved[report.id].reportData,
             // A stale/local draft may contain id: null. Never let it replace the
-            // authoritative database row id, otherwise photos are queued as "temp".
+            // authoritative database row id; otherwise photos are queued as "temp".
             id: report.id,
             isLightweight: false
           };
