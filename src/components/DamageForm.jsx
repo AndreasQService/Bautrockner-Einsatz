@@ -2371,22 +2371,18 @@ END:VCARD`;
                 try {
                     // 1. Immediately and durably save the original blob in IndexedDB (Step 0)
                     let localPreviewUrl = null;
-                    if (!isDoc) {
-                        const subFolder = contextData.assignedTo || contextData.roomName || 'Sonstiges';
-                        const odFolder = buildProjectFolderName(
-                            formData.projectNumber || formData.id || 'Unbekannt',
-                            formData
-                        );
-                        localPreviewUrl = await savePhotoLocally(imageId, formData.id || 'temp', file, {
-                            ...contextData,
-                            subFolder,
-                            odFolder,
-                            isSketch: contextData.assignedTo === 'Messprotokolle' || (file.name && file.name.includes('sketch'))
-                        });
-                        trackObjectURL(localPreviewUrl);
-                    } else {
-                        localPreviewUrl = trackObjectURL(URL.createObjectURL(file));
-                    }
+                    const subFolder = contextData.assignedTo || contextData.roomName || 'Sonstiges';
+                    const odFolder = buildProjectFolderName(
+                        formData.projectNumber || formData.id || 'Unbekannt',
+                        formData
+                    );
+                    localPreviewUrl = await savePhotoLocally(imageId, formData.id || 'temp', file, {
+                        ...contextData,
+                        subFolder,
+                        odFolder,
+                        isSketch: contextData.assignedTo === 'Messprotokolle' || (file.name && file.name.includes('sketch'))
+                    });
+                    trackObjectURL(localPreviewUrl);
 
                     // 2. Add to React state only after confirmed local IndexedDB save
                     const imageEntry = {
