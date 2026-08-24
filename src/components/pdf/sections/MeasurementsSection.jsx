@@ -5,8 +5,9 @@
 import React from 'react';
 import { View, Text, Image } from '@react-pdf/renderer';
 import { styles } from '../PDFStyles';
+import { buildMeasurementRooms, chunkMeasurementRows } from '../measurementPdfModel';
 
-const MeasurementsSection = ({ data }) => {
+const LegacyMeasurementsSection = ({ data }) => {
     const measurementImages = data.images
         ? data.images.filter(img => img.assignedTo === 'Messprotokolle' && img.includeInReport !== false)
         : [];
@@ -76,6 +77,95 @@ const MeasurementsSection = ({ data }) => {
             })}
         </View>
     );
+};
+
+const displayValue = value => (value === undefined || value === null || value === '' ? '—' : String(value));
+
+const displayDate = value => {
+    if (!value) return '—';
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return String(value);
+    return parsed.toLocaleDateString('de-CH');
+};
+
+const MeasurementTable = ({ rows }) => (
+    <View style={styles.table}>
+        <View style={styles.tableHeaderRow}>
+            <Text style={{ ...styles.tableHeader, width: '22%' }}>Messpunkt</Text>
+            <Text style={{ ...styles.tableHeader, width: '18%' }}>Wand</Text>
+            <Text style={{ ...styles.tableHeader, width: '18%' }}>Boden</Text>
+            <Text style={{ ...styles.tableHeader, width: '42%' }}>Notizen</Text>
+        </View>
+        {rows.map(row => (
+            <View key={row.id} style={styles.tableRow} wrap={false}>
+                <Text style={{ ...styles.tableCell, width: '22%' }}>{displayValue(row.point)}</Text>
+                <Text style={{ ...styles.tableCell, width: '18%' }}>{displayValue(row.wall)}</Text>
+                <Text style={{ ...styles.tableCell, width: '18%' }}>{displayValue(row.floor)}</Text>
+                <Text style={{ ...styles.tableCell, width: '42%' }}>{displayValue(row.notes)}</Text>
+            </View>
+        ))}
+    </View>
+);
+
+const SeriesMeta = ({ series }) => (
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 5 }}>
+        <Text style={{ width: '25%', fontSize: 8 }}><Text style={{ fontWeight: 'bold' }}>Datum: </Text>{displayDate(series.date)}</Text>
+        <Text style={{ width: '35%', fontSize: 8 }}><Text style={{ fontWeight: 'bold' }}>Messgerät: </Text>{displayValue(series.device)}</Text>
+        <Text style={{ width: '20%', fontSize: 8 }}><Text style={{ fontWeight: 'bold' }}>Temperatur: </Text>{displayValue(series.temperature)}</Text>
+        <Text style={{ width: '20%', fontSize: 8 }}><Text style={{ fontWeight: 'bold' }}>Feuchte: </Text>{displayValue(series.humidity)}</Text>
+    </View>
+);
+
+const StructuredMeasurementsSection = ({ rooms }) => {
+    const pages = [];
+
+    rooms.forEach(room => {
+        room.series.forEach((series, seriesIndex) => {
+            const chunks = chunkMeasurementRows(series.rows, 10);
+            chunks.forEach((rows, chunkIndex) => {
+                pages.push({ room, series, seriesIndex, rows, chunkIndex, chunkCount: chunks.length });
+            });
+        });
+    });
+
+    return pages.map(({ room, series, seriesIndex, rows, chunkIndex, chunkCount }) => (
+        <View key={`${room.id}-${series.id}-${chunkIndex}`} break>
+            <View wrap={false}>
+                <View style={styles.divider} />
+                <Text style={styles.sectionTitle}>MESSPROTOKOLLE</Text>
+                <Text style={styles.roomHeader}>
+                    {room.name}
+                    {room.apartment ? ` · ${room.apartment}` : ''}
+                    {room.floor ? ` · ${room.floor}` : ''}
+                    {room.series.length > 1 ? ` · Messreihe ${seriesIndex + 1}` : ''}
+                    {chunkCount > 1 ? ` · Seite ${chunkIndex + 1}/${chunkCount}` : ''}
+                </Text>
+                <SeriesMeta series={series} />
+            </View>
+
+            {chunkIndex === 0 && series.sketch && (
+                <View wrap={false} style={{ marginBottom: 8 }}>
+                    <Image
+                        src={series.sketch}
+                        style={{ width: '100%', height: 285, objectFit: 'contain', objectPosition: 'center' }}
+                    />
+                </View>
+            )}
+
+            <MeasurementTable rows={rows} />
+        </View>
+    ));
+};
+
+const MeasurementsSection = ({ data }) => {
+    const structuredRooms = buildMeasurementRooms(data);
+    const structuredEnabled = import.meta.env.VITE_PDF_ROOM_MEASUREMENTS !== 'false';
+
+    if (!structuredEnabled || structuredRooms.length === 0) {
+        return <LegacyMeasurementsSection data={data} />;
+    }
+
+    return <StructuredMeasurementsSection rooms={structuredRooms} />;
 };
 
 export default MeasurementsSection;
