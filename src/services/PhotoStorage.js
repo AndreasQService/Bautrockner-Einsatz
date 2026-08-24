@@ -13,14 +13,30 @@ const STORE_PHOTOS = 'photos';
 const STORE_QUEUE = 'upload-queue';
 
 let _db = null;
+let _dbOpening = null;
+
+function invalidateDb(db) {
+    if (!db || _db === db) {
+        _db = null;
+    }
+}
+
+function isClosingConnectionError(error) {
+    const message = String(error?.message || error || '').toLowerCase();
+    return error?.name === 'InvalidStateError' ||
+        message.includes('connection is closing') ||
+        message.includes('database connection is closing') ||
+        message.includes('closing connection');
+}
 
 /**
  * IndexedDB öffnen / initialisieren
  */
 export async function openDB() {
     if (_db) return _db;
+    if (_dbOpening) return _dbOpening;
 
-    return new Promise((resolve, reject) => {
+    _dbOpening = new Promise((resolve, reject) => {
         const req = indexedDB.open(DB_NAME, DB_VERSION);
 
         req.onupgradeneeded = (event) => {
@@ -41,12 +57,39 @@ export async function openDB() {
             }
         };
 
-        req.onsuccess = () => { 
-            _db = req.result; 
-            resolve(_db); 
+        req.onsuccess = () => {
+            const db = req.result;
+            db.onversionchange = () => {
+                db.close();
+                invalidateDb(db);
+            };
+            db.onclose = () => invalidateDb(db);
+            _db = db;
+            resolve(db);
         };
         req.onerror = () => reject(req.error);
     });
+
+    try {
+        return await _dbOpening;
+    } finally {
+        _dbOpening = null;
+    }
+}
+
+async function openPhotoWriteTransaction() {
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+        const db = await openDB();
+        try {
+            return db.transaction(STORE_PHOTOS, 'readwrite');
+        } catch (error) {
+            if (!isClosingConnectionError(error) || attempt === 1) throw error;
+            invalidateDb(db);
+            try { db.close(); } catch (_) {}
+            await new Promise(resolve => setTimeout(resolve, 50));
+        }
+    }
+    throw new Error('IndexedDB konnte nicht erneut geöffnet werden.');
 }
 
 /**
@@ -99,9 +142,9 @@ export async function savePhotoLocally(photoId, projectId, file, meta = {}) {
         retryCount: 0
     };
 
-    return new Promise((resolve, reject) => {
+    return new Promise(async (resolve, reject) => {
         try {
-            const tx = db.transaction(STORE_PHOTOS, 'readwrite');
+            const tx = await openPhotoWriteTransaction();
             tx.objectStore(STORE_PHOTOS).put(entry);
             tx.oncomplete = () => {
                 console.log(`[PhotoStorage] 📸 Original-Foto lokal gesichert (${entry.syncStatus}): ${photoId}`);
