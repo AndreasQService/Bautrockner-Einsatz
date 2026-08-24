@@ -1723,6 +1723,9 @@ function App() {
           activeReport = {
             ...report,
             ...unsaved[report.id].reportData,
+            // A stale/local draft may contain id: null. Never let it replace the
+            // authoritative database row id, otherwise photos are queued as "temp".
+            id: report.id,
             isLightweight: false
           };
           console.log('[Offline] Loaded unsaved report data for:', report.id);

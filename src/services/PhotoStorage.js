@@ -195,6 +195,44 @@ export async function updatePhotoSyncStatus(photoId, updates) {
 }
 
 /**
+ * Recover photos that were queued with the temporary project key after a stale
+ * local draft replaced the real report id. Only explicitly named photo ids are
+ * moved, so photos from another draft cannot be attached to the open project.
+ */
+export async function reassignTemporaryPhotos(photoIds, projectId) {
+    const ids = new Set((photoIds || []).filter(Boolean));
+    if (!projectId || ids.size === 0) return 0;
+
+    const db = await openDB();
+    if (!db.objectStoreNames.contains(STORE_PHOTOS)) return 0;
+
+    return new Promise((resolve, reject) => {
+        let recovered = 0;
+        const tx = db.transaction(STORE_PHOTOS, 'readwrite');
+        const store = tx.objectStore(STORE_PHOTOS);
+        const req = store.getAll();
+
+        req.onsuccess = () => {
+            for (const photo of req.result || []) {
+                if (photo.projectId !== 'temp' || !ids.has(photo.id)) continue;
+                store.put({
+                    ...photo,
+                    projectId,
+                    syncStatus: photo.supabasePath ? 'uploaded_to_backend' : 'local_only',
+                    retryCount: 0,
+                    errorMessage: null
+                });
+                recovered += 1;
+            }
+        };
+        req.onerror = () => reject(req.error);
+        tx.oncomplete = () => resolve(recovered);
+        tx.onerror = () => reject(tx.error);
+        tx.onabort = () => reject(tx.error || new Error('Foto-Zuordnung wurde abgebrochen.'));
+    });
+}
+
+/**
  * Alle pending Fotos eines Projekts laden (für Sync).
  */
 export async function getPendingPhotos(projectId) {
