@@ -2016,10 +2016,23 @@ function App() {
         return;
       }
       const expectedPayload = confirmedProjectPayloadRef.current.get(reportId);
-      if (!expectedPayload || canonicalJson(readback.report_data) !== canonicalJson(expectedPayload)) {
+      const exactPayloadMatch = expectedPayload
+        && canonicalJson(readback.report_data) === canonicalJson(expectedPayload);
+      const expectedVersion = Number(expectedPayload?.version || 0);
+      const readbackVersion = Number(readback.report_data?.version || 0);
+      const sameConfirmedClient = Boolean(expectedPayload)
+        && readback.report_data?.last_edited_client_id === getOrCreateClientId()
+        && Number.isFinite(expectedVersion)
+        && Number.isFinite(readbackVersion)
+        && readbackVersion >= expectedVersion;
+      if (!exactPayloadMatch && !sameConfirmedClient) {
         showToast('Serverinhalt stimmt nicht exakt mit dem bestätigten Projektstand überein. Projekt bleibt geöffnet.', 'error', 10000);
         return;
       }
+      confirmedProjectPayloadRef.current.set(
+        reportId,
+        JSON.parse(JSON.stringify(readback.report_data))
+      );
       if (await releaseProjectLock() !== true) {
         showToast('Sperrfreigabe wurde nicht bestätigt. Projekt bleibt geöffnet.', 'error', 10000);
         return;
