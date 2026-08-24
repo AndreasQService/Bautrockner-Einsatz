@@ -55,7 +55,7 @@ test('cleanup never releases and explicit release requires RPC true', () => {
   assert.match(exit, /silentSaveDebounceTimers\.current\[reportId\]/);
   assert.match(exit, /await pendingWrite/);
   assert.match(exit, /unsavedReportsRef\.current = JSON\.parse/);
-  assert.match(exit, /canonicalJson\(readback\.report_data\) !== canonicalJson\(expectedPayload\)/);
+  assert.match(exit, /if \(!exactPayloadMatch && !sameConfirmedClient\)/);
 });
 
 test('opening an existing project stays inactive until RPC ownership proof', () => {
