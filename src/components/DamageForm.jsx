@@ -1053,55 +1053,6 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                         })
                     }));
                 } catch (e) {}
-            } else {
-                // Legacy sync loop
-                const { getPendingPhotos } = await import('../services/PhotoStorage');
-                const pending = await getPendingPhotos(formData.id || 'temp');
-
-                if (pending.length === 0) {
-                    setPendingSyncCount(0);
-                    return;
-                }
-
-                let synced = 0;
-                for (const photo of pending) {
-                    try {
-                        const meta = photo.meta || {};
-                        const subFolder = meta.subFolder || 'Sonstiges';
-                        const odFolder = meta.odFolder || buildProjectFolderName(formData.projectNumber || formData.id || 'Unbekannt', formData);
-
-                        // Supabase Upload
-                        let supabasePath = photo.supabasePath;
-                        if (!supabasePath && supabase) {
-                            const ext = photo.name.split('.').pop();
-                            const fileName = `cases/${formData.id || 'temp'}/images/${Date.now()}_${photo.id}.${ext}`;
-                            const { error } = await supabase.storage.from('case-files').upload(fileName, photo.blob);
-                            if (!error) supabasePath = fileName;
-                        }
-
-                        // OneDrive Upload
-                        let oneDriveItemId = photo.oneDriveItemId;
-                        let oneDrivePath = photo.oneDrivePath;
-                        if (!oneDriveItemId) {
-                            const odResult = await uploadPhotoAndGetUrl(odFolder, subFolder, new File([photo.blob], photo.name, { type: photo.type }));
-                            if (odResult) {
-                                oneDriveItemId = odResult.itemId;
-                                oneDrivePath = odResult.odPath;
-                            }
-                        }
-
-                        await updatePhotoSyncStatus(photo.id, {
-                            supabasePath,
-                            oneDriveItemId,
-                            oneDrivePath,
-                            syncStatus: oneDriveItemId ? 'synced' : (supabasePath ? 'synced' : 'error'),
-                        });
-
-                        synced++;
-                    } catch (photoErr) {
-                        console.warn(`[Sync] Foto ${photo.id} fehlgeschlagen:`, photoErr.message);
-                    }
-                }
             }
             const count = await getPendingCount();
             setPendingSyncCount(count);
@@ -11321,3 +11272,4 @@ END:VCARD`;
         </>
     );
 }
+
