@@ -22,7 +22,7 @@ const msalConfig = {
     clientId:               import.meta.env.VITE_MSAL_CLIENT_ID,
     // 'common' erlaubt jedes Microsoft-Konto (persönlich + Arbeits-/Schulkonto)
     authority:              `https://login.microsoftonline.com/${import.meta.env.VITE_MSAL_TENANT_ID}`,
-    redirectUri:            window.location.origin,
+    redirectUri:            `${window.location.origin}/auth/onedrive-callback.html`,
     postLogoutRedirectUri:  window.location.origin,
     navigateToLoginRequestUrl: false,
   },
@@ -70,7 +70,13 @@ export async function initOneDriveAuth() {
   }
 
   // Nach Popup-Redirect → Ergebnis verarbeiten
-  const redirectResult = await msal.handleRedirectPromise().catch(() => null);
+  let redirectResult = null;
+  try {
+    redirectResult = await msal.handleRedirectPromise();
+  } catch (error) {
+    console.error('[Auth] Redirect-Verarbeitung fehlgeschlagen:', error);
+    throw error;
+  }
   if (redirectResult?.account) {
     msal.setActiveAccount(redirectResult.account);
     return redirectResult.account;
@@ -117,10 +123,21 @@ export function getActiveAccount() {
  * @returns {Promise<import('@azure/msal-browser').AuthenticationResult>}
  */
 export async function connectOneDrive() {
-  const msal   = getMsalInstance();
-  const result = await msal.loginPopup(loginRequest);
-  if (result.account) msal.setActiveAccount(result.account);
-  return result;
+  const msal = getMsalInstance();
+
+  if (!_initialized) {
+    await msal.initialize();
+    _initialized = true;
+  }
+
+  try {
+    const result = await msal.loginPopup(loginRequest);
+    if (result.account) msal.setActiveAccount(result.account);
+    return result;
+  } catch (error) {
+    console.error('[Auth] OneDrive-Popup-Anmeldung fehlgeschlagen:', error);
+    throw error;
+  }
 }
 
 // ─── Token-Beschaffung ───────────────────────────────────────────────────────
