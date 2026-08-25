@@ -184,10 +184,11 @@ export async function updatePhotoSyncStatus(photoId, updates) {
                     const updated = { ...entry, ...updates };
                     store.put(updated);
                 }
-                resolve();
             };
+            req.onerror = () => reject(req.error);
             tx.oncomplete = () => resolve();
             tx.onerror = () => reject(tx.error);
+            tx.onabort = () => reject(tx.error || new Error('Foto-Syncstatus konnte nicht dauerhaft gespeichert werden.'));
         } catch (e) {
             reject(e);
         }
@@ -250,12 +251,10 @@ export async function getPendingPhotos(projectId) {
             req.onsuccess = () => {
                 const all = req.result || [];
                 resolve(all.filter(p =>
-                    p.syncStatus === 'local_only' ||
-                    p.syncStatus === 'queued_for_sync' ||
-                    p.syncStatus === 'pending' ||
-                    p.syncStatus === 'error'   ||
-                    p.syncStatus === 'uploaded_to_backend' || // needs OneDrive sync
-                    (p.syncStatus === 'synced' && !p.oneDriveItemId) // legacy OneDrive sync missing
+                    p.syncStatus !== 'remote_verified' &&
+                    p.syncStatus !== 'synced' &&
+                    p.syncStatus !== 'terminal_error' &&
+                    p.terminalFailure !== true
                 ));
             };
             req.onerror = () => reject(req.error);
@@ -356,9 +355,14 @@ export async function deleteOldSyncedPhotos(olderThanDays = 30) {
                 const cursor = event.target.result;
                 if (cursor) {
                     const entry = cursor.value;
-                    // Nur löschen wenn remote_verified (oder legacy synced + oneDriveItemId)
-                    const isFullySynced = entry.syncStatus === 'remote_verified' || 
-                                         (entry.syncStatus === 'synced' && entry.oneDriveItemId);
+                    // Lokale Originale erst löschen, wenn beide Provider und die
+                    // Projektverknüpfung explizit bestätigt wurden. Alte/abgeleitete
+                    // Statuswerte sind kein belastbarer Nachweis.
+                    const isFullySynced = entry.syncStatus === 'remote_verified' &&
+                        !!entry.supabaseVerifiedAt &&
+                        !!entry.projectLinkedAt &&
+                        !!entry.oneDriveVerifiedAt &&
+                        !!entry.oneDriveItemId;
                     if (isFullySynced) {
                         cursor.delete();
                         count++;
@@ -381,36 +385,8 @@ export async function deleteOldSyncedPhotos(olderThanDays = 30) {
  * setting their syncStatus to 'remote_verified'.
  */
 export async function markUploadedPhotosAsVerified() {
-    const db = await openDB();
-    if (!db.objectStoreNames.contains(STORE_PHOTOS)) return 0;
-    return new Promise((resolve) => {
-        try {
-            const tx = db.transaction(STORE_PHOTOS, 'readwrite');
-            const store = tx.objectStore(STORE_PHOTOS);
-            const req = store.getAll();
-            req.onsuccess = () => {
-                const all = req.result || [];
-                let count = 0;
-                all.forEach(p => {
-                    const hasBlob = !!(p.blob || p.compressed?.blob || p.compressed || p.original?.blob);
-                    const isUploaded = !!(p.supabasePath || p.oneDriveItemId || p.syncStatus === 'uploaded_to_backend' || p.syncStatus === 'queued_for_remote' || (typeof p.url === 'string' && p.url.startsWith('http')));
-                    
-                    // If uploaded OR if corrupted binary blob is missing OR error status: mark as remote_verified
-                    if (!hasBlob || isUploaded || p.syncStatus === 'error') {
-                        if (p.syncStatus !== 'remote_verified' && p.syncStatus !== 'synced') {
-                            p.syncStatus = 'remote_verified';
-                            store.put(p);
-                            count++;
-                        }
-                    }
-                });
-                resolve(count);
-            };
-            req.onerror = () => resolve(0);
-        } catch (e) {
-            resolve(0);
-        }
-    });
+    console.warn('[PhotoStorage] Automatische Verifikation deaktiviert: Provider-Nachweise sind erforderlich.');
+    return 0;
 }
 
 /**
@@ -428,13 +404,11 @@ export async function getPendingCount() {
             const store = tx.objectStore(STORE_PHOTOS);
             const req = store.getAll();
             req.onsuccess = () => {
-                const pending = (req.result || []).filter(p => 
-                    p.syncStatus !== 'remote_verified' && 
-                    p.syncStatus !== 'synced' && 
-                    p.syncStatus !== 'uploaded_to_backend' && 
-                    p.syncStatus !== 'queued_for_remote' && 
-                    !p.supabasePath && 
-                    !p.oneDriveItemId
+                const pending = (req.result || []).filter(p =>
+                    p.syncStatus !== 'remote_verified' &&
+                    p.syncStatus !== 'synced' &&
+                    p.syncStatus !== 'terminal_error' &&
+                    p.terminalFailure !== true
                 );
                 resolve(pending.length);
             };
@@ -466,10 +440,11 @@ export async function sanitizeCorruptPhotosInDb() {
                     const isCorrupt = !targetBlob || !(targetBlob instanceof Blob) || targetBlob.size === 0;
                     const isInvalidName = !p.name || p.name === 'undefined' || p.name === 'null';
 
-                    if (isCorrupt && p.syncStatus !== 'error') {
-                        p.syncStatus = 'error';
+                    if (isCorrupt && p.syncStatus !== 'terminal_error') {
+                        p.syncStatus = 'terminal_error';
                         p.errorMessage = 'Automatisch bereinigter ungültiger Foto-Blob';
-                        p.retryCount = 99;
+                        p.terminalFailure = true;
+                        p.needsUserAction = true;
                         store.put(p);
                         fixedCount++;
                     } else if (isInvalidName) {

@@ -230,10 +230,12 @@ export async function processUploadItem(itemId, onStatusChange) {
 
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    const nextRetryCount = (item.retryCount || 0) + 1;
     item = await updateItem(item, {
       status:       'failed',
       errorMessage: message,
-      retryCount:   item.retryCount + 1,
+      retryCount:   nextRetryCount,
+      nextAttemptAt: new Date(Date.now() + Math.min(15 * 60 * 1000, backoffMs(nextRetryCount))).toISOString(),
     });
     onStatusChange?.(item);
     return item;
@@ -246,7 +248,7 @@ export async function processUploadItem(itemId, onStatusChange) {
  * Verarbeitet alle ausstehenden Upload-Items mit begrenzter Parallelität.
  *
  * Kandidaten für den Lauf:
- *   persisted | pending_resume | failed (retryCount < MAX_RETRIES)
+ *   persisted | pending_resume | failed (dauerhaft, mit persistiertem Backoff)
  *
  * Items in 'uploaded_unverified' werden NICHT hier verarbeitet –
  * das ist Aufgabe des Reconcile-Workers.
@@ -262,7 +264,8 @@ export async function runUploadWorker({ maxParallel = 2, onItemChange } = {}) {
   // Kandidaten filtern: nur was der Worker anfassen soll
   const candidates = pending.filter((i) => {
     if (i.status === 'uploaded_unverified') return false; // → Reconcile
-    if (i.status === 'failed' && i.retryCount >= MAX_RETRIES) return false;
+    if (i.terminalFailure === true) return false;
+    if (i.nextAttemptAt && Date.parse(i.nextAttemptAt) > Date.now()) return false;
     return true;
   });
 
