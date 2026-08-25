@@ -15,13 +15,15 @@ import {
 } from '@azure/msal-browser';
 
 // ─── MSAL-Konfiguration ──────────────────────────────────────────────────────
-// Nutzt die bestehenden VITE_MSAL_* Umgebungsvariablen aus .env
+// LIVE muss sich gegen das OneDrive des angemeldeten Q-Service-Benutzers
+// authentifizieren. Die feste Tenant-ID bleibt ausschließlich für Test/Preview.
+const isLiveQTool = window.location.hostname === 'bautrockner-einsatz.vercel.app';
+const oneDriveTenant = isLiveQTool ? 'organizations' : import.meta.env.VITE_MSAL_TENANT_ID;
 
 const msalConfig = {
   auth: {
     clientId:               import.meta.env.VITE_MSAL_CLIENT_ID,
-    // 'common' erlaubt jedes Microsoft-Konto (persönlich + Arbeits-/Schulkonto)
-    authority:              `https://login.microsoftonline.com/${import.meta.env.VITE_MSAL_TENANT_ID}`,
+    authority:              `https://login.microsoftonline.com/${oneDriveTenant}`,
     redirectUri:            window.location.origin,
     postLogoutRedirectUri:  window.location.origin,
     navigateToLoginRequestUrl: false,
