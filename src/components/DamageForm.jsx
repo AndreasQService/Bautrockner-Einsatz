@@ -797,7 +797,9 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
     const [verifiedPhotoEvidence, setVerifiedPhotoEvidence] = useState({ supabase: [], oneDrive: [] });
     const [cloudSyncComplete, setCloudSyncComplete] = useState(false);
     const oneDriveBackfillInFlightRef = useRef(new Set());
-    const oneDriveBackfillRetryRef = useRef(new Map());
+    // `Map` is also the imported lucide map icon in this component.
+    // Use the native constructor explicitly to avoid instantiating the icon.
+    const oneDriveBackfillRetryRef = useRef(new globalThis.Map());
     const [oneDriveBackfillRetryTick, setOneDriveBackfillRetryTick] = useState(0);
     const handleProjectSyncEvidence = useCallback((evidence) => {
         setCloudSyncComplete(evidence?.cloudsComplete === true);

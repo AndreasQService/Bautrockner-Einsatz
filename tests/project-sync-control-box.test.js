@@ -417,6 +417,8 @@ test('save footer requires both cloud readbacks and OneDrive backfill retries mi
   assert.match(form, /const oneDriveBackfillSignature = getProjectPhotoCandidates\(formData\)/);
   assert.match(form, /exteriorPhotoOneDriveItemId: oneDriveUpdate\.oneDriveItemId/);
   assert.match(form, /oneDriveBackfillRetryTick/);
+  assert.match(form, /useRef\(new globalThis\.Map\(\)\)/);
+  assert.doesNotMatch(form, /oneDriveBackfillRetryRef = useRef\(new Map\(\)\)/);
   assert.match(form, /\[1500, 3000, 6000, 12000, 30000\]/);
 });
 
