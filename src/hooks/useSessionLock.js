@@ -72,6 +72,7 @@ export function useSessionLock(
   const [activeLockDevice, setActiveLockDevice]   = useState(null);
   const [isLockedByIPad, setIsLockedByIPad]       = useState(false);
   const [activeLockActivity, setActiveLockActivity] = useState(null);
+  const [lockConnectivityUnknown, setLockConnectivityUnknown] = useState(false);
   // A locally inactive session is not automatically a foreign lock.  Keep the
   // project id for which the database explicitly confirmed another owner so
   // the UI cannot flash a false red lock dialog while acquisition is pending.
@@ -114,10 +115,16 @@ export function useSessionLock(
   useEffect(() => { viewRef.current     = view;            }, [view]);
 
   // iPad detection
-  const isIPad = /iPad/i.test(navigator.userAgent) ||
-                 (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) ||
-                 (navigator.userAgent.includes('Macintosh') && 'ontouchend' in document);
-  const myDevice = isIPad ? 'iPad' : (/iPhone|Android/i.test(navigator.userAgent) ? 'Mobil' : 'Desktop');
+  const browserNavigator = typeof navigator !== 'undefined' ? navigator : {
+    userAgent: '',
+    platform: '',
+    maxTouchPoints: 0,
+  };
+  const hasDocument = typeof document !== 'undefined';
+  const isIPad = /iPad/i.test(browserNavigator.userAgent) ||
+                 (browserNavigator.platform === 'MacIntel' && browserNavigator.maxTouchPoints > 1) ||
+                 (browserNavigator.userAgent.includes('Macintosh') && hasDocument && 'ontouchend' in document);
+  const myDevice = isIPad ? 'iPad' : (/iPhone|Android/i.test(browserNavigator.userAgent) ? 'Mobil' : 'Desktop');
 
   const userEmail = currentUser?.email || 'Unbekannt';
   const userId = currentUser?.id || 'unknown';
@@ -160,8 +167,17 @@ export function useSessionLock(
                              String(error.message).toLowerCase().includes('network') ||
                              String(error.message).toLowerCase().includes('timeout') ||
                              String(error.message).toLowerCase().includes('connection');
+      if (isNetworkError) {
+        // A missing response is not proof that another user owns the lock.
+        // Preserve the last confirmed state, block cloud writes elsewhere via
+        // the server-side lease and reacquire as soon as connectivity returns.
+        setLockConnectivityUnknown(true);
+        return;
+      }
+      setLockConnectivityUnknown(false);
       setIsSessionActive(false);
     } else {
+      setLockConnectivityUnknown(false);
       const result = data && data[0];
       if (result && result.acquired) {
         // Lock confirmed by DB
@@ -262,9 +278,10 @@ export function useSessionLock(
 
     if (error) {
       console.warn('[SessionLock] poll failed:', error.message);
-      setIsSessionActive(false);
+      setLockConnectivityUnknown(true);
       return;
     }
+    setLockConnectivityUnknown(false);
     const status = Array.isArray(data) ? data[0] : data;
     const amIOwner = status?.is_owner === true;
 
@@ -286,6 +303,27 @@ export function useSessionLock(
       setActiveLockActivity(status?.last_seen_at || null);
     }
   }, [supabase, myDevice, username, onInactivityTimeout, deleteSession]);
+
+  // iOS may freeze timers while the PWA is backgrounded. Reacquire the lease
+  // immediately after foregrounding or regaining connectivity instead of
+  // waiting for the next polling interval.
+  useEffect(() => {
+    if (!enabled || !supabase) return undefined;
+    if (typeof window === 'undefined' || typeof document === 'undefined') return undefined;
+    const reacquire = () => {
+      const isOnline = typeof navigator === 'undefined' || navigator.onLine !== false;
+      if (document.visibilityState === 'visible' && isOnline) {
+        upsertSession();
+        pollSessions();
+      }
+    };
+    window.addEventListener('online', reacquire);
+    document.addEventListener('visibilitychange', reacquire);
+    return () => {
+      window.removeEventListener('online', reacquire);
+      document.removeEventListener('visibilitychange', reacquire);
+    };
+  }, [enabled, supabase, upsertSession, pollSessions]);
 
   // Main lifecycle loop setup
   useEffect(() => {
@@ -318,6 +356,7 @@ export function useSessionLock(
     activeLockDevice,
     activeLockActivity,
     confirmedForeignLockProjectId,
+    lockConnectivityUnknown,
     registerProjectActivity,
     releaseProjectLock: deleteSession
   };

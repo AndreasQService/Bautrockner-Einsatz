@@ -10,6 +10,23 @@ import { uploadPhotoAndGetUrl } from '../../services/OneDriveService.js';
 
 let isSyncRunning = false;
 
+const retryDelayMs = (attempt) => Math.min(15 * 60 * 1000, 1000 * (2 ** Math.min(attempt, 9)));
+
+async function verifySupabaseObject(storagePath, expectedSize) {
+    const parts = String(storagePath || '').split('/').filter(Boolean);
+    const fileName = parts.pop();
+    const folder = parts.join('/');
+    if (!fileName) return false;
+    const { data, error } = await supabase.storage
+        .from('case-files')
+        .list(folder, { search: fileName, limit: 100 });
+    if (error) throw new Error(`Supabase Storage verification failed: ${error.message}`);
+    const exact = (data || []).find((entry) => entry.name === fileName);
+    if (!exact) return false;
+    const remoteSize = Number(exact.metadata?.size ?? exact.size ?? 0);
+    return !expectedSize || !remoteSize || remoteSize === Number(expectedSize);
+}
+
 /**
  * Run background sync for all local photos
  */
@@ -70,13 +87,16 @@ export async function syncPendingToSupabase() {
                 }
 
                 const isCorruptOrInvalid = errMsg.includes('Canvas') || errMsg.includes('Invalid') || errMsg.includes('corrupt') || errMsg.includes('DOM Event');
-                const finalRetryCount = isCorruptOrInvalid ? 99 : (photo.retryCount || 0) + 1;
+                const finalRetryCount = (photo.retryCount || 0) + 1;
 
                 console.warn('[SyncWorker] ⚠️ Bypassing photo sync issue:', photo.id, errMsg);
                 await updatePhotoSyncStatus(photo.id, { 
-                    syncStatus: 'error',
+                    syncStatus: isCorruptOrInvalid ? 'terminal_error' : 'error',
                     errorMessage: errMsg,
-                    retryCount: finalRetryCount
+                    retryCount: finalRetryCount,
+                    terminalFailure: isCorruptOrInvalid,
+                    needsUserAction: isCorruptOrInvalid,
+                    nextRetryAt: isCorruptOrInvalid ? null : new Date(Date.now() + retryDelayMs(finalRetryCount)).toISOString()
                 }).catch(() => {});
             }
         }
@@ -103,11 +123,13 @@ async function getPendingPhotosFromDb() {
             const all = req.result || [];
             // Resume every item until both clouds are verified. In particular, do not
             // strand items after the Supabase upload or while waiting for OneDrive.
-            resolve(all.filter(p => 
-                p.syncStatus !== 'remote_verified' && 
-                p.syncStatus !== 'synced' && 
-                !p.oneDriveItemId &&
-                (p.retryCount || 0) < 3
+            const now = Date.now();
+            resolve(all.filter(p =>
+                p.syncStatus !== 'remote_verified' &&
+                p.syncStatus !== 'synced' &&
+                p.syncStatus !== 'terminal_error' &&
+                p.terminalFailure !== true &&
+                (!p.nextRetryAt || Date.parse(p.nextRetryAt) <= now)
             ));
         };
         req.onerror = () => reject(req.error);
@@ -137,9 +159,10 @@ async function syncOnePhoto(photo) {
         if (!targetBlob || !(targetBlob instanceof Blob) || targetBlob.size === 0) {
             console.warn(`[SyncWorker] ⚠️ Bypassing invalid/corrupt photo blob for ${photo.id}`);
             await updatePhotoSyncStatus(photo.id, { 
-                syncStatus: 'error',
+                syncStatus: 'terminal_error',
                 errorMessage: 'Invalid or empty photo blob in local storage',
-                retryCount: 99
+                terminalFailure: true,
+                needsUserAction: true
             }).catch(() => {});
             return;
         }
@@ -205,6 +228,14 @@ async function syncOnePhoto(photo) {
         photo.supabasePath = storagePath;
         photo.syncStatus = 'uploaded_to_backend';
     }
+    const expectedSize = photo.compressed?.size || compressedBlob.size || photo.size || 0;
+    if (!(await verifySupabaseObject(photo.supabasePath || storagePath, expectedSize))) {
+        throw new Error('Supabase upload could not be verified by exact object name and size');
+    }
+    if (!photo.supabaseVerifiedAt) {
+        photo.supabaseVerifiedAt = new Date().toISOString();
+        await updatePhotoSyncStatus(photo.id, { supabaseVerifiedAt: photo.supabaseVerifiedAt });
+    }
     if (photo.supabasePath && photo.syncStatus !== 'remote_verified' && photo.syncStatus !== 'synced') {
         photo.syncStatus = 'uploaded_to_backend';
     }
@@ -258,7 +289,7 @@ async function syncOnePhoto(photo) {
             reportData.images[linkedIndex] = {
                 ...reportData.images[linkedIndex],
                 ...cloudImage,
-                uploading: true,
+                uploading: false,
                 syncStatus: 'uploaded_to_backend'
             };
         }
@@ -272,6 +303,9 @@ async function syncOnePhoto(photo) {
             throw new Error(`Project report_data update failed: ${updateErr.message}`);
         }
         console.log(`[SyncWorker] 🔗 Photo ${photo.id} successfully linked to project.`);
+        const projectLinkedAt = new Date().toISOString();
+        await updatePhotoSyncStatus(photo.id, { projectLinkedAt });
+        photo.projectLinkedAt = projectLinkedAt;
 
         // 6. Upload with the connected user's OneDrive token. The former anonymous
         // Edge-function call was rejected with HTTP 401 and could never complete.
@@ -285,17 +319,22 @@ async function syncOnePhoto(photo) {
             : new File([sourceBlob], safeName, { type: sourceBlob.type || photo.type || 'application/octet-stream' });
         const odFolder = photo.meta?.odFolder || String(projectId);
         const subFolder = photo.meta?.subFolder || photo.meta?.assignedTo || 'Sonstiges';
-        const odResult = await uploadPhotoAndGetUrl(odFolder, subFolder, oneDriveFile);
-        if (!odResult?.itemId && !odResult?.odPath) {
+        const odResult = await uploadPhotoAndGetUrl(odFolder, subFolder, oneDriveFile, photo.id);
+        if (!odResult?.itemId) {
             throw new Error('OneDrive upload was not confirmed');
         }
 
+        const oneDriveVerifiedAt = new Date().toISOString();
         await updatePhotoSyncStatus(photo.id, {
             syncStatus: 'remote_verified',
-            oneDriveItemId: odResult.itemId || null,
+            oneDriveItemId: odResult.itemId,
             oneDrivePath: odResult.odPath || null,
+            supabaseVerifiedAt: photo.supabaseVerifiedAt,
+            projectLinkedAt: photo.projectLinkedAt,
+            oneDriveVerifiedAt,
             errorMessage: null,
-            retryCount: 0
+            retryCount: 0,
+            nextRetryAt: null
         });
 
         const verifiedData = { ...reportData };

@@ -25,7 +25,7 @@ import DisponentMockup from './components/mockups/DisponentMockup'
 import i18n from './i18n'
 import { buildProjectFolderName, uploadProjectJson } from "./services/OneDriveService";
 import { syncPendingToSupabase } from './lib/sync/supabaseSyncWorker.js';
-import { markUploadedPhotosAsVerified, sanitizeCorruptPhotosInDb } from './services/PhotoStorage';
+import { getPendingCount, sanitizeCorruptPhotosInDb } from './services/PhotoStorage';
 import { isVisibleProjectRow } from './utils/projectVisibility.js';
 import { connectOneDrive, getGraphAccessTokenSilent, initOneDriveAuth } from './lib/onedrive/auth.js';
 import { readAuthorizedUsers, resolveAuthorizedUser } from './lib/authorizedUser.js';
@@ -545,6 +545,12 @@ function App() {
     }
 
     const source = !navigator.onLine ? 'offline-edit' : 'failed-save';
+    // A stable operation id is persisted with the local draft.  It survives
+    // reloads/retries and lets us prove that a write whose HTTP response was
+    // lost actually reached Supabase, without ever issuing a blind overwrite.
+    const syncOperationId = (typeof crypto !== 'undefined' && crypto.randomUUID)
+      ? crypto.randomUUID()
+      : `${getOrCreateClientId()}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     const next = {
       ...prev,
       [finalReport.id]: {
@@ -560,6 +566,7 @@ function App() {
         reportData: finalReport,
         changedPaths: mergedPaths,
         operations: mergedOps,
+        syncOperationId,
         clientId: getOrCreateClientId(),
         userId: currentUser || 'unknown',
         schemaVersion: 'v1',
@@ -632,6 +639,21 @@ function App() {
       return;
     }
 
+    if (!offlineEntry.syncOperationId) {
+      // Legacy drafts predate response-loss reconciliation. Assign and persist
+      // an id before the first mutation so every subsequent retry is provable.
+      offlineEntry = {
+        ...offlineEntry,
+        syncOperationId: (typeof crypto !== 'undefined' && crypto.randomUUID)
+          ? crypto.randomUUID()
+          : `${getOrCreateClientId()}-${Date.now()}-${Math.random().toString(36).slice(2)}`
+      };
+      const cachedEntries = JSON.parse(localStorage.getItem('qservice_unsaved_reports') || '{}');
+      cachedEntries[reportId] = offlineEntry;
+      safeSetItem('qservice_unsaved_reports', JSON.stringify(cachedEntries));
+      setUnsavedReports(cachedEntries);
+    }
+
     const logAudit = (result, errorMsg = null) => {
       try {
         const historyCached = localStorage.getItem('qtool_sync_history') || '[]';
@@ -685,8 +707,10 @@ function App() {
       let isConflict = false;
       let isLockLost = false;
       let isOwnClientUpdate = false;
+      let alreadyCommitted = false;
 
       if (dbRecord) {
+        alreadyCommitted = dbRecord.report_data?.last_sync_operation_id === offlineEntry.syncOperationId;
         isOwnClientUpdate = !!offlineEntry.clientId &&
           dbRecord.report_data?.last_edited_client_id === offlineEntry.clientId;
 
@@ -704,13 +728,13 @@ function App() {
         // the project-lock hook has finished acquiring ownership.  That is a
         // deferred sync, not evidence of a version conflict.  Keep the local
         // entry intact and perform no cloud mutation until ownership is proven.
-        if (isLockLost && !forceOverwrite) {
+        if (isLockLost && !forceOverwrite && !alreadyCommitted) {
           console.info('[Sync] Deferred pending project-lock ownership:', reportId);
           return;
         }
 
         // 2. Version conflict check
-        if ((dbVersion > localVersion && !isOwnClientUpdate) && !forceOverwrite) {
+        if ((dbVersion > localVersion && !isOwnClientUpdate) && !forceOverwrite && !alreadyCommitted) {
           isConflict = true;
         } else {
           const serverReportData = dbRecord.report_data || {};
@@ -780,6 +804,10 @@ function App() {
 
       const now = new Date().toISOString();
       const localReportData = offlineEntry.reportData;
+      mergedReportData = {
+        ...mergedReportData,
+        last_sync_operation_id: offlineEntry.syncOperationId
+      };
       const rowData = {
         id: reportId,
         project_title: localReportData.projectTitle,
@@ -795,8 +823,8 @@ function App() {
 
       if (dbRecord) saveBackupRecord(reportId, dbRecord);
 
-      let success = false;
-      if (dbRecord) {
+      let success = alreadyCommitted;
+      if (dbRecord && !alreadyCommitted) {
         let query = supabase
           .from('damage_reports')
           .update(rowData)
@@ -811,18 +839,20 @@ function App() {
         if (updateError) throw updateError;
         success = updateResult && updateResult.length === 1;
 
-        if (!success && !isLockLost) {
-          // Fallback retry for same client update if baseUpdatedAt was slightly skewed by previous auto-save
-          const { data: retryResult, error: retryError } = await supabase
+        if (!success) {
+          // A zero-row response is never retried without the original version
+          // predicate. Read back instead: only our exact persisted operation id
+          // can turn this into success. Otherwise it remains a real conflict.
+          const { data: readback, error: readbackError } = await supabase
             .from('damage_reports')
-            .update(rowData)
+            .select('id, updated_at, report_data')
             .eq('id', reportId)
-            .select('id');
-          if (!retryError && retryResult && retryResult.length === 1) {
+            .single();
+          if (!readbackError && readback?.report_data?.last_sync_operation_id === offlineEntry.syncOperationId) {
             success = true;
           }
         }
-      } else {
+      } else if (!dbRecord) {
         const { error: insertError } = await supabase
           .from('damage_reports')
           .insert(rowData);
@@ -1197,37 +1227,30 @@ function App() {
   // Fällt automatisch auf 0 nach erfolgreichem Supabase-Upload
   useEffect(() => {
     console.log("Vite App Mount - webdriver:", navigator.webdriver, "IS_TEST_ENV:", IS_TEST_ENV);
-    const countPending = () => new Promise((resolve) => {
-      const req = indexedDB.open('qtool-photos');
-      req.onsuccess = () => {
-        const db = req.result;
-        if (!db.objectStoreNames.contains('photos')) { resolve(0); return; }
-        const tx  = db.transaction('photos', 'readonly');
-        const all = tx.objectStore('photos').getAll();
-        all.onsuccess = () => resolve(
-          (all.result || []).filter(p => 
-            p.syncStatus !== 'error' && 
-            p.syncStatus !== 'remote_verified' && 
-            p.syncStatus !== 'synced' && 
-            p.syncStatus !== 'uploaded_to_backend' && 
-            p.syncStatus !== 'queued_for_remote' && 
-            !p.supabasePath && 
-            !p.oneDriveItemId
-          ).length
-        );
-        all.onerror = () => resolve(0);
-      };
-      req.onerror = () => resolve(0);
-      req.onupgradeneeded = () => resolve(0);
-    });
+    const refreshPending = () => getPendingCount().then(setSyncPending).catch(() => {});
+    const runPhotoSync = async () => {
+      setSyncStatus('syncing');
+      try {
+        const result = await syncPendingToSupabase();
+        setSyncStatus(result.failed > 0 ? 'error' : 'idle');
+      } catch {
+        setSyncStatus('error');
+      } finally {
+        await refreshPending();
+      }
+    };
 
-    sanitizeCorruptPhotosInDb().then(() => markUploadedPhotosAsVerified()).then(() => countPending().then(setSyncPending)).catch(() => {});
-    syncPendingToSupabase().catch(() => {});
+    sanitizeCorruptPhotosInDb().then(refreshPending).catch(() => {});
+    void runPhotoSync();
+    const onOnline = () => { void runPhotoSync(); };
+    window.addEventListener('online', onOnline);
     const interval = setInterval(() => {
-      syncPendingToSupabase().catch(() => {});
-      markUploadedPhotosAsVerified().then(() => countPending().then(setSyncPending)).catch(() => {});
+      void runPhotoSync();
     }, 10_000);
-    return () => clearInterval(interval);
+    return () => {
+      window.removeEventListener('online', onOnline);
+      clearInterval(interval);
+    };
   }, []);
 
   // ======================================================

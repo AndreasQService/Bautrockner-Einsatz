@@ -187,13 +187,14 @@ export async function uploadPhotoFile(folderName, subFolder, file) {
  * Ersetzt Supabase Storage für neue Fotos.
  * @returns {{ itemId, odPath, downloadUrl }} oder null bei Fehler
  */
-export async function uploadPhotoAndGetUrl(folderName, subFolder, file) {
+export async function uploadPhotoAndGetUrl(folderName, subFolder, file, idempotencyKey = null) {
   const token = await getAccessToken();
   if (!token) return null;
 
   const safe = (s) => (s || 'Sonstiges').replace(/[^a-zA-Z0-9]/g, '_').replace(/_+/g, '_');
   const ext = file.name.split('.').pop().toLowerCase() || 'jpg';
-  const fileName = `${safe(subFolder)}_${Date.now()}.${ext}`;
+  const stableKey = idempotencyKey ? safe(String(idempotencyKey)) : String(Date.now());
+  const fileName = `${safe(subFolder)}_${stableKey}.${ext}`;
   const folder = `${ROOT_FOLDER}/${folderName}/Fotos/${safe(subFolder)}`;
   const odPath = `${folder}/${fileName}`;
 
@@ -218,8 +219,7 @@ export async function uploadPhotoAndGetUrl(folderName, subFolder, file) {
     console.warn('[OneDrive] Item-Details nicht abrufbar:', e.message);
   }
 
-  console.log(`[OneDrive] ✅ Foto hochgeladen (ohne URL): ${odPath}`);
-  return { itemId: null, odPath, downloadUrl: null };
+  throw new Error(`OneDrive upload could not be verified: ${odPath}`);
 }
 
 
