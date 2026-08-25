@@ -441,6 +441,8 @@ test('damage photo deletion removes the durable IndexedDB row before form state'
   assert.match(storage, /export async function deletePhotoLocally\(photoId\)/);
   assert.match(storage, /objectStore\(STORE_PHOTOS\)\.delete\(photoId\)/);
   assert.match(form, /await deletePhotoLocally\(img\.id\)/);
+  assert.match(form, /const deleteTargets = \[img, thermalImg\]\.filter\(Boolean\)/);
+  assert.match(form, /Promise\.allSettled\(deleteTargets\.map/);
 });
 
 test('cloud verification rechecks OneDrive project JSON promptly without overlapping requests', () => {

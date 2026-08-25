@@ -7149,11 +7149,18 @@ END:VCARD`;
                                                                                 fontSize: '0.8rem',
                                                                                 whiteSpace: 'nowrap'
                                                                             }}
-                                                                            onClick={() => {
+                                                                            onClick={async () => {
                                                                                 if (window.confirm('Bild wirklich löschen?')) {
+                                                                                    const deleteTargets = [img, thermalImg].filter(Boolean);
+                                                                                    await Promise.allSettled(deleteTargets.map(target =>
+                                                                                        target.id ? deletePhotoLocally(target.id) : Promise.resolve(false)
+                                                                                    ));
+                                                                                    deleteTargets.forEach(revokeImageBlob);
                                                                                     setFormData(prev => ({
                                                                                         ...prev,
-                                                                                        images: prev.images.filter(i => i !== img && (!thermalImg || i !== thermalImg))
+                                                                                        images: prev.images.filter(i =>
+                                                                                            !deleteTargets.some(target => target.id ? i.id === target.id : i === target)
+                                                                                        )
                                                                                     }));
                                                                                 }
                                                                             }}
