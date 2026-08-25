@@ -70,9 +70,17 @@ test('fresh Supabase readbacks are required for every green category', async () 
 test('control box is wired into DamageForm and refreshes both cloud readbacks in a loop', () => {
   const form = fs.readFileSync(new URL('../src/components/DamageForm.jsx', import.meta.url), 'utf8');
   const box = fs.readFileSync(new URL('../src/components/ProjectSyncControlBox.jsx', import.meta.url), 'utf8');
-  assert.match(form, /<ProjectSyncControlBox report=\{formData\}/);
-  assert.match(box, /setInterval\(verify, 15000\)/);
+  assert.match(form, /<ProjectSyncControlBox[\s\S]*?report=\{formData\}/);
+  assert.match(form, /localSaveConfirmed=\{saveState === 'saved' && !isSaving && !isSyncPending\}/);
+  assert.match(box, /setInterval\(verify, 60000\)/);
   assert.match(box, /Supabase Synchronisationskontrolle und OneDrive Synchronisationskontrolle/);
   assert.match(box, /verifyProjectSupabaseSync/);
   assert.match(box, /verifyProjectOneDriveSync/);
+});
+
+test('durable photo metadata preserves room assignment and room galleries recover legacy rows', () => {
+  const worker = fs.readFileSync(new URL('../src/lib/sync/supabaseSyncWorker.js', import.meta.url), 'utf8');
+  const form = fs.readFileSync(new URL('../src/components/DamageForm.jsx', import.meta.url), 'utf8');
+  assert.match(worker, /roomId: photo\.meta\?\.roomId \?\? null/);
+  assert.match(form, /img\.assignedTo === room\.name/);
 });

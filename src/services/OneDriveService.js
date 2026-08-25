@@ -13,6 +13,8 @@ import { getGraphAccessToken } from '../lib/onedrive/auth.js';
 
 const GRAPH_BASE = 'https://graph.microsoft.com/v1.0';
 const ROOT_FOLDER = 'QTool';
+const confirmedFolders = new Set();
+const folderChecksInFlight = new Map();
 
 // ─── Token ───────────────────────────────────────────────────────────────────
 
@@ -78,26 +80,58 @@ async function graphFetch(path, options = {}) {
   return res;
 }
 
+const encodeDrivePath = path => String(path)
+  .split('/')
+  .filter(Boolean)
+  .map(segment => encodeURIComponent(segment))
+  .join('/');
+
 /**
- * Ordner erstellen (ignoriert "already exists"-Fehler)
+ * Ordner nur erstellen, wenn er noch nicht existiert. Gleichzeitige Aufrufe
+ * für denselben Pfad teilen sich eine einzige Graph-Anfrage.
  */
 async function ensureFolder(parentPath, folderName) {
-  const token = await getAccessToken();
-  if (!token) return;
+  const fullPath = `${parentPath}/${folderName}`.replace(/^\/+|\/+$/g, '');
+  if (confirmedFolders.has(fullPath)) return;
+  if (folderChecksInFlight.has(fullPath)) return folderChecksInFlight.get(fullPath);
 
-  await fetch(`${GRAPH_BASE}/me/drive/root:/${parentPath}:/children`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      name: folderName,
-      folder: {},
-      '@microsoft.graph.conflictBehavior': 'fail',
-    }),
-  });
-  // 409 = already exists → ok
+  const task = (async () => {
+    const token = await getAccessToken();
+    if (!token) return;
+    const headers = { Authorization: `Bearer ${token}` };
+    const itemUrl = `${GRAPH_BASE}/me/drive/root:/${encodeDrivePath(fullPath)}?$select=id,folder`;
+    const existing = await fetch(itemUrl, { headers });
+
+    if (existing.ok) {
+      confirmedFolders.add(fullPath);
+      return;
+    }
+    if (existing.status !== 404) {
+      const err = await existing.json().catch(() => ({}));
+      throw new Error(`Graph-Fehler ${existing.status}: ${err?.error?.message || existing.statusText}`);
+    }
+
+    const created = await fetch(`${GRAPH_BASE}/me/drive/root:/${encodeDrivePath(parentPath)}:/children`, {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: folderName,
+        folder: {},
+        '@microsoft.graph.conflictBehavior': 'fail',
+      }),
+    });
+
+    // A 409 can only remain when another client created the folder between
+    // our GET and POST. In that race the requested end state is fulfilled.
+    if (!created.ok && created.status !== 409) {
+      const err = await created.json().catch(() => ({}));
+      throw new Error(`Graph-Fehler ${created.status}: ${err?.error?.message || created.statusText}`);
+    }
+    confirmedFolders.add(fullPath);
+  })().finally(() => folderChecksInFlight.delete(fullPath));
+
+  folderChecksInFlight.set(fullPath, task);
+  return task;
 }
 
 /**

@@ -34,6 +34,7 @@ import { getDaysSince }        from './statusRules.js';
 import { updateProjectStatus } from './statusActions.js';
 import ProjectDashboard        from './ProjectDashboard.jsx';
 import ProjectListRow          from './ProjectListRow.jsx';
+import { hasSupplierInvoice }  from './invoiceEvidence.js';
 
 // ─── Compute dashboard stats from view models ─────────────────────────────────
 
@@ -60,7 +61,7 @@ const buildStats = (rows, allReports) => {
     openReports:      rows.filter(r => ['Leckortung', 'leckortung', 'aufnahme', 'Schadenaufnahme', 'bericht'].includes(r.currentStatus)).length,
     openInvoices:     rows.filter(r => {
       const raw = r._raw;
-      const hasInv = raw?.images?.some(img => img.assignedTo === 'Sonstiges');
+      const hasInv = hasSupplierInvoice(raw);
       return !hasInv && ['Instandsetzung', 'Instandstellung', 'instandstellung', 'rechnung'].includes(r.currentStatus);
     }).length,
     noActivity:       rows.filter(r => (r.daysInStatus ?? 0) >= 3 && r.openTasksCount > 0).length,

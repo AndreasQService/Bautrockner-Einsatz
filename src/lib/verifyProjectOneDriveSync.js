@@ -65,8 +65,14 @@ export async function verifyProjectOneDriveSync({ report, tokenProvider, fetchIm
   const token = await resolveToken();
   if (!token) throw new Error('OneDrive nicht verbunden – stille Prüfung ausstehend.');
 
-  const remoteReport = await readProjectJson(fetchImpl, token, report);
-  const matches = reportCategoryMatches(report, remoteReport);
+  let matches = { text: false, protocols: false, devices: false };
+  try {
+    const remoteReport = await readProjectJson(fetchImpl, token, report);
+    matches = reportCategoryMatches(report, remoteReport);
+  } catch {
+    // A missing/stale project JSON keeps text, protocol and device evidence
+    // pending, but must not prevent independent photo readbacks.
+  }
   const photos = getProjectPhotoCandidates(report);
   const verifiedPhotoKeys = [];
   for (let index = 0; index < photos.length; index += 1) {

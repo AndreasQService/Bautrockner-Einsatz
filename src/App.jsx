@@ -2081,15 +2081,15 @@ function App() {
     setIsSessionActive(true);
   }
 
-  const handleSaveReport = useCallback(async (updatedReport, silent = false) => {
+  const handleSaveReport = useCallback(async (updatedReport, silent = false, saveReason = null) => {
     const isLocked = (projectMode === 'technician' || isTechnicianMode || view === 'new-report') ? false : !isSessionActiveRef.current;
     if (isLocked) {
       console.warn('[handleSaveReport] Aborted save because project is locked by another device/mode.');
-      return updatedReport;
+      return { success: false, error: 'Projekt ist durch einen anderen Modus gesperrt' };
     }
     if (updatedReport && updatedReport.isLightweight === true) {
       console.warn('[handleSaveReport] Aborted save of lightweight report to prevent data loss:', updatedReport.id);
-      return;
+      return { success: false, error: 'Projekt ist noch nicht vollständig geladen' };
     }
     let finalReport = sanitizeMeasurementStorage({ ...updatedReport });
 
@@ -2276,6 +2276,7 @@ function App() {
       delete silentSaveDebounceTimers.current[finalReport.id];
     }
 
+    let saveConfirmation = null;
     if (supabase) {
       // ── Schutz vor unvollständigem Speichern: Kein Supabase-Save wenn Report noch lädt ──
       // ── Client-side self-healing due date calculator ──
@@ -2670,8 +2671,10 @@ function App() {
       const hasImageChanges = JSON.stringify(finalReport.images?.map(img => ({ id: img.id, uploading: img.uploading, preview: img.preview }))) !==
                               JSON.stringify((existingRecord?.images || existingRecord?.report_data?.images || []).map(img => ({ id: img.id, uploading: img.uploading, preview: img.preview })));
       
-      const shouldSaveInstantly = !silent || hasImageChanges || (typeof navigator !== 'undefined' && navigator.webdriver);
-
+      // Form autosave and project exit must return a real database confirmation.
+      // Do not put another debounce behind DamageForm's own debounce.
+      const requiresConfirmation = saveReason === 'user-edit' || saveReason === 'project-exit';
+      const shouldSaveInstantly = requiresConfirmation || !silent || hasImageChanges || (typeof navigator !== 'undefined' && navigator.webdriver);
       const enqueueCloudSave = () => {
         const reportId = finalReport.id;
         const previous = cloudSaveChainsRef.current.get(reportId) || Promise.resolve();
@@ -2693,7 +2696,7 @@ function App() {
           clearTimeout(silentSaveDebounceTimers.current[finalReport.id]);
           delete silentSaveDebounceTimers.current[finalReport.id];
         }
-        await enqueueCloudSave();
+        saveConfirmation = await enqueueCloudSave();
       } else if (silent) {
         // Fast debounced cloud autosave (2 seconds) so changes save smoothly in background
         silentSaveDebounceTimers.current[finalReport.id] = setTimeout(() => {
@@ -2703,7 +2706,12 @@ function App() {
       }
     }
 
-    return finalReport;
+    return saveConfirmation || {
+      success: false,
+      pending: true,
+      projectId: finalReport.id,
+      reportData: finalReport
+    };
   }, [supabase, view]);
 
   const handleNavigateToReport = (identifier) => {

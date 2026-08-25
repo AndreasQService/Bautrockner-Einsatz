@@ -21,9 +21,10 @@ import { Camera, Image, Trash, Trash2, Archive, X, Plus, Edit3, Save, Upload, Fi
 import { supabase } from '../supabaseClient';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
-import { buildProjectFolderName, uploadPhotoAndGetUrl, getPhotoDownloadUrl, uploadReport } from '../services/OneDriveService';
+import { buildProjectFolderName, ensureProjectFolders, uploadPhotoAndGetUrl, getPhotoDownloadUrl, uploadReport } from '../services/OneDriveService';
 import { savePhotoLocally, updatePhotoSyncStatus, deleteOldSyncedPhotos, getPendingCount, getPhotoBlob, getProjectPhotos, reassignTemporaryPhotos } from '../services/PhotoStorage';
 const IS_TEST_ENV = !!(typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_EXPECTED_SUPABASE_PROJECT_ID === 'aoxduqspiezzyqeqyzzl');
+const ENABLE_ONEDRIVE_DEV = !!(typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_ENABLE_ONEDRIVE_DEV === 'true');
 import { swissPLZ } from '../data/swiss_plz';
 
 import { DEVICE_INVENTORY } from '../data/device_inventory';
@@ -48,6 +49,7 @@ import AuthenticatedStorageImage from './AuthenticatedStorageImage';
 import { saveProjectDraftWithReadback } from '../lib/safeProjectCreation';
 import { getProjectPhotoEvidenceKey } from '../lib/projectSyncSummary.js';
 import { getCaseFileStoragePath, getDurablePhotoUrl } from '../lib/caseFilePhotoAccess';
+import { hasSupplierInvoice } from '../features/projects/invoiceEvidence.js';
 
 /* Custom PDF Icon */
 const PdfIcon = ({ size = 24, style = {} }) => (
@@ -605,6 +607,11 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         setFormData(prev => ({ ...prev, [streetField]: inputVal }));
     };
 
+    const previewRestoreSignature = (formData.images || [])
+        .map(img => `${img?.id || img?.name || ''}:${img?.storagePath || img?.supabasePath || ''}`)
+        .sort()
+        .join('|');
+
     useEffect(() => {
         console.log('[MEASUREMENT-ROOMS TRACE] 2. DamageForm formData updated:', {
             measurementRoomsLength: (formData.measurementRooms || []).length,
@@ -764,16 +771,49 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
 
     const [isSaving, setIsSaving] = useState(false);
     const [lastSaved, setLastSaved] = useState(null);
-    // Never infer a successful save from an id, a timer, or hydrated UI data.
-    // Only the real cloud-save result below may transition this state to saved.
-    const [saveState, setSaveState] = useState('pending');
+    // A fully hydrated existing report is the last confirmed cloud state.
+    // Every semantic edit immediately changes this to pending until autosave succeeds.
+    const [saveState, setSaveState] = useState(
+        initialData && initialData.isLightweight !== true ? 'saved' : 'pending'
+    );
     const [verifiedPhotoEvidence, setVerifiedPhotoEvidence] = useState({ supabase: [], oneDrive: [] });
+    const oneDriveBackfillInFlightRef = useRef(new Set());
     const handleProjectSyncEvidence = useCallback((evidence) => {
         setVerifiedPhotoEvidence({
             supabase: evidence?.supabaseReady ? (evidence.supabase?.verifiedPhotoKeys || []) : [],
             oneDrive: evidence?.oneDriveReady ? (evidence.oneDrive?.verifiedPhotoKeys || []) : []
         });
     }, []);
+    const renderVerifiedStorageBadge = (photo) => {
+        const evidenceKey = getProjectPhotoEvidenceKey(formData, photo);
+        const supabaseVerified = !!evidenceKey && verifiedPhotoEvidence.supabase.includes(evidenceKey);
+        const oneDriveVerified = !!evidenceKey && verifiedPhotoEvidence.oneDrive.includes(evidenceKey);
+        const failed = photo?.syncStatus === 'error';
+        const label = supabaseVerified && oneDriveVerified
+            ? '✅ Vollständig verifiziert'
+            : supabaseVerified
+                ? '✅ In Supabase gespeichert'
+                : failed
+                    ? '❌ Fehler – erneut versuchen'
+                    : '❌ Nicht in Supabase bestätigt';
+        const verified = supabaseVerified;
+        return (
+            <button
+                type="button"
+                onClick={verified ? undefined : () => syncPendingPhotos()}
+                disabled={verified || isSyncing}
+                title={verified ? 'Durch frischen Supabase-Storage-Readback bestätigt' : 'Kein aktueller Supabase-Storage-Readback vorhanden'}
+                style={{
+                    fontSize: '0.7rem', fontWeight: 600, padding: '2px 6px', borderRadius: '4px',
+                    backgroundColor: verified ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)',
+                    color: verified ? '#10B981' : '#EF4444',
+                    border: '1px solid currentColor', cursor: verified || isSyncing ? 'default' : 'pointer'
+                }}
+            >
+                {verified ? label : (isSyncing ? '↻ Supabase wird geprüft …' : '↻ Supabase erneut prüfen')}
+            </button>
+        );
+    };
     const [linkingImageId, setLinkingImageId] = useState(null);
     const [visibleRoomImages, setVisibleRoomImages] = useState({}); // Stores roomId -> boolean for toggle
     const [conflicts, setConflicts] = useState({}); // Stores { fieldPath: { original: '...', new: '...' } }
@@ -791,6 +831,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
     const [isOnline, setIsOnline] = useState(navigator.onLine);
     const [pendingSyncCount, setPendingSyncCount] = useState(0);
     const [isSyncing, setIsSyncing] = useState(false);
+    const isSyncingRef = useRef(false);
 
     const handleArchiveProject = async () => {
         const streetPart = formData.street || (initialData?.address ? initialData.address.split(',')[0] : 'Keine Strasse');
@@ -956,6 +997,18 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                         img.error = localPhoto.syncStatus === 'error';
                         imgChanged = true;
                     }
+                    if ((img.roomId === undefined || img.roomId === null) && localPhoto.meta?.roomId !== undefined) {
+                        img.roomId = localPhoto.meta.roomId;
+                        imgChanged = true;
+                    }
+                    if (!img.roomName && (localPhoto.meta?.roomName || localPhoto.meta?.assignedTo)) {
+                        img.roomName = localPhoto.meta.roomName || localPhoto.meta.assignedTo;
+                        imgChanged = true;
+                    }
+                    if ((!img.assignedTo || img.assignedTo === 'Sonstiges') && localPhoto.meta?.assignedTo) {
+                        img.assignedTo = localPhoto.meta.assignedTo;
+                        imgChanged = true;
+                    }
                     if (previewUrl && (!img.preview || (img.preview.startsWith('blob:') && !objectUrlsRef.current.includes(img.preview)))) {
                         img.preview = previewUrl;
                         trackObjectURL(previewUrl);
@@ -1017,15 +1070,28 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
             }
         };
 
-        const timer = setTimeout(restoreLocalPreviews, 1500);
+        const timer = setTimeout(restoreLocalPreviews, 0);
         return () => {
             active = false;
             clearTimeout(timer);
         };
-    }, [formData.id]);
+    }, [formData.id, previewRestoreSignature]);
 
     const syncPendingPhotos = useCallback(async () => {
-        if (isSyncing) return;
+        if (isSyncingRef.current) return;
+        isSyncingRef.current = true;
+        let queuedCount;
+        try {
+            queuedCount = await getPendingCount();
+        } catch (error) {
+            isSyncingRef.current = false;
+            throw error;
+        }
+        setPendingSyncCount(queuedCount);
+        if (queuedCount === 0) {
+            isSyncingRef.current = false;
+            return;
+        }
         setIsSyncing(true);
 
         console.log('[Sync] 🔄 Starte dauerhafte Synchronisation ausstehender Fotos...');
@@ -1059,9 +1125,10 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         } catch (e) {
             console.warn('[Sync] Fehler:', e.message);
         } finally {
+            isSyncingRef.current = false;
             setIsSyncing(false);
         }
-    }, [formData.id, formData.projectNumber, isSyncing, supabase]);
+    }, [formData.id, formData.projectNumber, supabase]);
 
     // ── Auto-Sync: Pending Fotos hochladen wenn Netz zurückkommt ─────────────
     useEffect(() => {
@@ -1117,8 +1184,14 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
     // gesichert sind (storagePath vorhanden) aber noch nicht auf OneDrive sind
     // (oneDriveItemId fehlt). Download via Supabase Storage → Upload via User-Token.
     // Funktioniert auf jedem Gerät, da Blobs per HTTP aus Supabase geladen werden.
+    const oneDriveBackfillSignature = (formData.images || [])
+        .filter(img => (img?.storagePath || img?.supabasePath) && !img?.oneDriveItemId)
+        .map(img => `${img.id || img.name}:${img.storagePath || img.supabasePath}`)
+        .sort()
+        .join('|');
+
     useEffect(() => {
-        if (IS_TEST_ENV || !formData.id || !supabase) return;
+        if ((IS_TEST_ENV && !ENABLE_ONEDRIVE_DEV) || !formData.id || !supabase) return;
 
         const backfill = async () => {
             const odFolder = buildProjectFolderName(
@@ -1127,53 +1200,75 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
             );
 
             // Alle Bilder die in Supabase sind aber nicht in OneDrive
-            const missing = (formData.images || []).filter(
-                img => img.storagePath && !img.oneDriveItemId && !img.uploading
+            const missing = (formData.images || []).filter(img =>
+                (img.storagePath || img.supabasePath) &&
+                !img.oneDriveItemId &&
+                !oneDriveBackfillInFlightRef.current.has(img.id)
             );
 
             if (missing.length === 0) return;
             console.log(`[OneDrive-Backfill] 🔄 ${missing.length} Fotos ohne OneDrive-Link – starte Backfill...`);
 
+            try {
+                await ensureProjectFolders(odFolder);
+            } catch (error) {
+                console.warn('[OneDrive-Backfill] ⚠️ Projektordner konnten nicht vorbereitet werden:', error.message);
+                return;
+            }
+
             for (const img of missing) {
+                oneDriveBackfillInFlightRef.current.add(img.id);
                 try {
+                    const supabaseStoragePath = img.storagePath || img.supabasePath;
                     // Blob von Supabase Storage laden
                     const { data: blob, error: dlErr } = await supabase.storage
                         .from('case-files')
-                        .download(img.storagePath);
+                        .download(supabaseStoragePath);
 
                     if (dlErr || !blob) {
-                        console.warn(`[OneDrive-Backfill] ⚠️ Download fehlgeschlagen: ${img.storagePath}`);
+                        console.warn(`[OneDrive-Backfill] ⚠️ Download fehlgeschlagen: ${supabaseStoragePath}`);
                         continue;
                     }
 
                     // Upload ins persönliche OneDrive
                     const subFolder = img.roomName || img.assignedTo || 'Sonstiges';
                     const file = new File([blob], img.name || 'foto.jpg', { type: blob.type || 'image/jpeg' });
-                    const odResult = await uploadPhotoAndGetUrl(odFolder, subFolder, file);
+                    const odResult = await uploadPhotoAndGetUrl(odFolder, subFolder, file, img.id);
 
                     if (odResult?.itemId || odResult?.odPath) {
+                        const oneDriveUpdate = {
+                            oneDriveItemId: odResult.itemId || null,
+                            oneDrivePath: odResult.odPath || null,
+                            oneDriveSyncedAt: new Date().toISOString(),
+                            oneDriveErrorMessage: null
+                        };
+                        await updatePhotoSyncStatus(img.id, oneDriveUpdate);
                         setFormData(prev => ({
                             ...prev,
                             images: prev.images.map(i =>
                                 i.id === img.id ? {
                                     ...i,
-                                    oneDriveItemId: odResult.itemId || null,
-                                    oneDrivePath: odResult.odPath || null,
+                                    ...oneDriveUpdate,
+                                    uploading: false,
                                 } : i
                             )
                         }));
                         console.log(`[OneDrive-Backfill] ✅ ${img.name} → OneDrive`);
                     }
                 } catch (err) {
+                    await updatePhotoSyncStatus(img.id, {
+                        oneDriveErrorMessage: err.message || String(err)
+                    }).catch(() => {});
                     console.warn(`[OneDrive-Backfill] ⚠️ Fehler bei ${img.name}:`, err.message);
+                } finally {
+                    oneDriveBackfillInFlightRef.current.delete(img.id);
                 }
             }
         };
 
-        // 3s warten bis formData vollständig geladen ist
-        const timer = setTimeout(backfill, 3000);
+        const timer = setTimeout(backfill, 0);
         return () => clearTimeout(timer);
-    }, [formData.id]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [formData.id, oneDriveBackfillSignature]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // Primary Auto-Save Effect (Handled in unified effect below)
 
@@ -1989,6 +2084,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
             lastSavedData.current = JSON.parse(JSON.stringify(formData));
             isHydratedRef.current = true;
             hasUserEditedRef.current = false;
+            if (formData.id) setSaveState('saved');
             return;
         }
 
@@ -2037,7 +2133,10 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
             try {
                 const savedReport = await onSave(reportData, true, 'user-edit');
                 if (savedReport?.success === true) {
-                    lastSavedData.current = JSON.parse(JSON.stringify(reportData));
+                    // Compare future edits against the actual form shape. The
+                    // cloud payload contains derived fields (address/type/imageCount)
+                    // which would otherwise look like a fresh edit forever.
+                    lastSavedData.current = JSON.parse(JSON.stringify(formData));
                     hasUserEditedRef.current = false;
                     setLastSaved(new Date());
                     setSaveState('saved');
@@ -2052,19 +2151,27 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
             } finally {
                 setIsSaving(false);
             }
-        }, 2000); // 2 second debounce
+        }, 300); // Short debounce: save promptly after the user pauses typing.
 
         return () => clearTimeout(timeoutId);
     }, [formData, onSave, initialData]);
 
-    // Save on Unmount
+    // Last safety net when the user switches projects or leaves this view.
+    // Normal edits are already persisted by the short autosave debounce above.
     useEffect(() => {
         return () => {
             console.log("Component Unmounting - Saving final state...");
             if (onSave && latestFormData.current && lastSavedData.current && latestFormData.current.id === lastSavedData.current.id) {
                 const hasChanges = hasSemanticChanges(lastSavedData.current, latestFormData.current);
                 if (hasUserEditedRef.current && hasChanges) {
-                    onSave(latestFormData.current, true, 'user-edit');
+                    const pending = latestFormData.current;
+                    const fullAddress = `${pending.street || ''}, ${pending.zip || ''} ${pending.city || ''}`;
+                    onSave({
+                        ...pending,
+                        address: fullAddress,
+                        type: pending.damageType,
+                        imageCount: (pending.images || []).length
+                    }, true, 'project-exit');
                 }
             }
         };
@@ -2913,20 +3020,38 @@ END:VCARD`;
 
 
 
-    const handleSubmit = (e) => {
-        e.preventDefault()
+    const handleSubmit = async (e) => {
+        e?.preventDefault?.();
+        if (isSaving) return;
+        setIsSaving(true);
+        setSaveState('pending');
 
         // Combine address parts
-        const fullAddress = `${formData.street}, ${formData.zip} ${formData.city}`;
+        const fullAddress = `${formData.street || ''}, ${formData.zip || ''} ${formData.city || ''}`;
 
         // Map form data back to report structure
         const reportData = {
             ...formData,
             address: fullAddress, // Save standardized address string
             type: formData.damageType, // Map back to 'type'
-            imageCount: formData.images.length
+            imageCount: (formData.images || []).length
+        };
+        try {
+            const savedReport = await onSave(reportData, false, 'finish');
+            if (savedReport?.success !== true) {
+                throw new Error(savedReport?.error || 'Cloud-Speicherung wurde nicht bestätigt');
+            }
+            lastSavedData.current = JSON.parse(JSON.stringify(formData));
+            hasUserEditedRef.current = false;
+            setLastSaved(new Date());
+            setSaveState('saved');
+            onCancel();
+        } catch (error) {
+            console.error('[Finish Save] Speichern fehlgeschlagen:', error);
+            setSaveState('pending');
+        } finally {
+            setIsSaving(false);
         }
-        onSave(reportData)
     }
 
     const handleDamageTypeImageUpload = (e) => {
@@ -4403,7 +4528,7 @@ END:VCARD`;
                             </div>
 
                             {/* 8. Lieferantenrechnung Badge */}
-                            {formData.images?.some(img => img.assignedTo === 'Sonstiges') && (
+                            {hasSupplierInvoice(formData) && (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', justifyContent: 'flex-end', flexShrink: 0 }}>
                                     <label style={{ fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#F59E0B', fontWeight: 700 }}>Rechnung:</label>
                                     <div style={{
@@ -4587,7 +4712,7 @@ END:VCARD`;
                         })()}
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                             {/* Lieferantenrechnung Badge */}
-                            {mode === 'desktop' && formData.images?.some(img => img.assignedTo === 'Sonstiges') && (
+                            {mode === 'desktop' && hasSupplierInvoice(formData) && (
                                 <div style={{
                                     display: 'flex', flexDirection: 'column', gap: '0.2rem'
                                 }}>
@@ -5446,22 +5571,7 @@ END:VCARD`;
                                                 }}
                                             />
                                             <div style={{ marginTop: '0.35rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                                                <span style={{
-                                                    fontSize: '0.7rem',
-                                                    fontWeight: 600,
-                                                    padding: '2px 6px',
-                                                    borderRadius: '4px',
-                                                    backgroundColor: img.oneDriveItemId ? 'rgba(5,150,105,0.15)' :
-                                                                     (img.syncStatus === 'uploaded_to_backend' || img.storagePath || img.supabasePath || img.supabaseBackedUpAt) ? 'rgba(16,185,129,0.15)' :
-                                                                     img.syncStatus === 'error' ? 'rgba(239,68,68,0.15)' : 'rgba(59,130,246,0.15)',
-                                                    color: img.oneDriveItemId ? '#059669' :
-                                                           (img.syncStatus === 'uploaded_to_backend' || img.storagePath || img.supabasePath || img.supabaseBackedUpAt) ? '#10B981' :
-                                                           img.syncStatus === 'error' ? '#EF4444' : '#3B82F6'
-                                                }}>
-                                                    {img.oneDriveItemId ? '✅ Vollständig verifiziert' :
-                                                     (img.syncStatus === 'uploaded_to_backend' || img.storagePath || img.supabasePath || img.supabaseBackedUpAt) ? '✅ In Supabase gespeichert' :
-                                                     img.syncStatus === 'error' ? '❌ Fehler – erneut versuchen' : '💾 Lokal gesichert'}
-                                                </span>
+                                                {renderVerifiedStorageBadge(img)}
                                             </div>
                                         </div>
                                         {/* Delete */}
@@ -6662,7 +6772,10 @@ END:VCARD`;
                                 <div style={{ padding: '0.75rem' }}>
                                 <>
                                     {(() => {
-                                        const roomImages = formData.images.filter(img => img.roomId === room.id);
+                                        const roomImages = formData.images.filter(img =>
+                                            (img.roomId != null && String(img.roomId) === String(room.id)) ||
+                                            (img.roomId == null && img.assignedTo === room.name)
+                                        );
                                         const shouldCollapse = mode === 'technician' && formData.status === 'Trocknung';
                                         const isVisible = !shouldCollapse || visibleRoomImages[room.id];
 
@@ -6870,22 +6983,7 @@ END:VCARD`;
                                                                             </button>
                                                                         </div>
                                                                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '2px' }}>
-                                                                            <span style={{
-                                                                                fontSize: '0.7rem',
-                                                                                fontWeight: 600,
-                                                                                padding: '2px 6px',
-                                                                                borderRadius: '4px',
-                                                                                backgroundColor: img.oneDriveItemId ? 'rgba(5,150,105,0.15)' :
-                                                                                                 (img.syncStatus === 'uploaded_to_backend' || img.storagePath || img.supabasePath || img.supabaseBackedUpAt) ? 'rgba(16,185,129,0.15)' :
-                                                                                                 img.syncStatus === 'error' ? 'rgba(239,68,68,0.15)' : 'rgba(59,130,246,0.15)',
-                                                                                color: img.oneDriveItemId ? '#059669' :
-                                                                                       (img.syncStatus === 'uploaded_to_backend' || img.storagePath || img.supabasePath || img.supabaseBackedUpAt) ? '#10B981' :
-                                                                                       img.syncStatus === 'error' ? '#EF4444' : '#3B82F6'
-                                                                             }}>
-                                                                                {img.oneDriveItemId ? '✅ Vollständig verifiziert' :
-                                                                                 (img.syncStatus === 'uploaded_to_backend' || img.storagePath || img.supabasePath || img.supabaseBackedUpAt) ? '✅ In Supabase gespeichert' :
-                                                                                 img.syncStatus === 'error' ? '❌ Fehler – erneut versuchen' : '💾 Lokal gesichert'}
-                                                                            </span>
+                                                                            {renderVerifiedStorageBadge(img)}
                                                                         </div>
                                                                     </div>
 
@@ -7344,22 +7442,7 @@ END:VCARD`;
                                                     </button>
                                                 </div>
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '2px' }}>
-                                                    <span style={{
-                                                        fontSize: '0.7rem',
-                                                        fontWeight: 600,
-                                                        padding: '2px 6px',
-                                                        borderRadius: '4px',
-                                                        backgroundColor: item.oneDriveItemId ? 'rgba(5,150,105,0.15)' :
-                                                                         (item.syncStatus === 'uploaded_to_backend' || item.storagePath || item.supabasePath || item.supabaseBackedUpAt) ? 'rgba(16,185,129,0.15)' :
-                                                                         item.syncStatus === 'error' ? 'rgba(239,68,68,0.15)' : 'rgba(59,130,246,0.15)',
-                                                        color: item.oneDriveItemId ? '#059669' :
-                                                               (item.syncStatus === 'uploaded_to_backend' || item.storagePath || item.supabasePath || item.supabaseBackedUpAt) ? '#10B981' :
-                                                               item.syncStatus === 'error' ? '#EF4444' : '#3B82F6'
-                                                    }}>
-                                                        {item.oneDriveItemId ? '✅ Vollständig verifiziert' :
-                                                         (item.syncStatus === 'uploaded_to_backend' || item.storagePath || item.supabasePath || item.supabaseBackedUpAt) ? '✅ In Supabase gespeichert' :
-                                                         item.syncStatus === 'error' ? '❌ Fehler – erneut versuchen' : '💾 Lokal gesichert'}
-                                                    </span>
+                                                    {renderVerifiedStorageBadge(item)}
                                                 </div>
                                             </div>
                                             {/* Delete */}
@@ -10545,9 +10628,15 @@ END:VCARD`;
 
                 <div style={{ height: '92px', ...(mode === 'desktop' ? { order: 3 } : {}) }} />
 
-                <ProjectSyncControlBox report={formData} supabase={supabase} offline={isActuallyOffline} onEvidenceChange={handleProjectSyncEvidence} />
+                <ProjectSyncControlBox
+                    report={formData}
+                    supabase={supabase}
+                    offline={isActuallyOffline}
+                    localSaveConfirmed={saveState === 'saved' && !isSaving && !isSyncPending}
+                    onEvidenceChange={handleProjectSyncEvidence}
+                />
 
-                {/* Mobile / Technician Fixed Footer - AutoSave Version */}
+                {/* Mobile / Technician Fixed Footer - AutoSave status only */}
                 <div style={{
                     position: 'fixed',
                     bottom: '38px',
@@ -10560,7 +10649,7 @@ END:VCARD`;
                     borderTop: '1px solid var(--border)',
                     display: 'flex',
                     alignItems: 'center',
-                    justifyContent: 'space-between',
+                    justifyContent: 'center',
                     gap: '1rem',
                     zIndex: 100,
                     boxShadow: '0 -4px 12px rgba(0,0,0,0.22)',
@@ -10581,25 +10670,13 @@ END:VCARD`;
                             </div>
                         );
                     })()}
-
-                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                        <button
-                            type="button"
-                            className="btn btn-primary"
-                            onClick={onCancel}
-                            style={{ padding: '0.35rem 1rem', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.4rem', borderRadius: '20px' }}
-                        >
-                            <CheckCircle size={14} />
-                            Fertig
-                        </button>
-                    </div>
                 </div>
                 {
                     editingImage && (
                         <ImageEditor
                             image={editingImage}
                             caseId={formData.id}
-                            onSave={(newPreview, newDescription) => {
+                            onSave={(newPreview, newDescription, editedFile) => {
                                 setFormData(prev => {
                                     // 1. Check if it's the Aussenaufnahme (Special case)
                                     if (editingImage.isExterior) {
@@ -10623,13 +10700,19 @@ END:VCARD`;
                                             // 2. Add the EDITED photo with drawings right next to it
                                             nextImages.push({
                                                 ...img,
-                                                id: `edited_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
-                                                name: img.name ? `${img.name} (Bearbeitet)` : 'Bearbeitetes Bild',
+                                                id: editedFile?.id,
+                                                name: img.name
+                                                    ? img.name.replace(/(\.[^.]+)?$/, '_bearbeitet$1')
+                                                    : 'Bearbeitetes_Bild.jpg',
                                                 preview: newPreview,
                                                 url: newPreview,
                                                 description: newDescription || img.description || '',
                                                 includeInReport: true,
-                                                syncStatus: 'local_only'
+                                                syncStatus: 'local_only',
+                                                supabasePath: null,
+                                                storagePath: null,
+                                                oneDrivePath: null,
+                                                oneDriveItemId: null
                                             });
                                         } else {
                                             nextImages.push(img);

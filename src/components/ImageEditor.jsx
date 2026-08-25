@@ -248,27 +248,37 @@ const ImageEditor = ({ image, caseId, onSave, onCancel }) => {
             mergeCtx.drawImage(canvasRef.current, 0, 0);
 
             const dataUrl = mergeCanvas.toDataURL('image/jpeg', 0.85);
+            const editedPhotoId = 'img_edited_' + Math.random().toString(36).substring(2, 9) + '_' + Date.now();
+            let editedBlob = null;
 
             // Convert base64 to Blob & save in IndexedDB so preview persists permanently across reloads
             try {
                 const res = await fetch(dataUrl);
-                const blob = await res.blob();
-                const newPhotoId = 'img_edited_' + Math.random().toString(36).substring(2, 9) + '_' + Date.now();
+                editedBlob = await res.blob();
                 const { savePhotoLocally } = await import('../services/PhotoStorage.js');
-                await savePhotoLocally(newPhotoId, caseId || 'temp', blob, {
+                const originalName = image?.name || 'Bild.jpg';
+                const extensionIndex = originalName.lastIndexOf('.');
+                const editedName = extensionIndex > 0
+                    ? `${originalName.slice(0, extensionIndex)}_bearbeitet${originalName.slice(extensionIndex)}`
+                    : `${originalName}_bearbeitet.jpg`;
+                await savePhotoLocally(editedPhotoId, caseId || 'temp', editedBlob, {
+                    name: editedName,
                     description: localDescription,
-                    isEdited: true
+                    isEdited: true,
+                    originalPhotoId: image?.id || null,
+                    roomId: image?.roomId || null,
+                    roomName: image?.roomName || image?.assignedTo || null,
+                    assignedTo: image?.assignedTo || image?.roomName || null,
+                    includeInReport: true
                 });
-
-                // Immediately trigger background sync for edited photo
-                import('../lib/sync/supabaseSyncWorker.js').then(({ syncPendingToSupabase }) => {
-                    syncPendingToSupabase().catch(() => {});
-                }).catch(() => {});
             } catch (storageErr) {
                 console.warn('Failed to save edited photo locally:', storageErr);
+                throw storageErr;
             }
 
-            onSave(dataUrl, localDescription);
+            // The form must use the exact same durable ID as IndexedDB. It then
+            // starts its normal project-aware autosave/sync pipeline.
+            onSave(dataUrl, localDescription, { id: editedPhotoId, blob: editedBlob });
         } catch (err) {
             console.error('Error saving edited image:', err);
             alert('Fehler beim Speichern des Bildes.');

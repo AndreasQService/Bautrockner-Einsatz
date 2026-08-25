@@ -13,6 +13,7 @@ import {
   verifyProjectSupabaseSync
 } from '../src/lib/verifyProjectSupabaseSync.js';
 import { verifyProjectOneDriveSync } from '../src/lib/verifyProjectOneDriveSync.js';
+import { hasSupplierInvoice } from '../src/features/projects/invoiceEvidence.js';
 
 const measuredRoom = {
   id: 'room-1',
@@ -211,7 +212,7 @@ test('periodic verification preserves the last evidence while refreshing instead
   const source = readFileSync(new URL('../src/components/ProjectSyncControlBox.jsx', import.meta.url), 'utf8');
   assert.match(source, /const verify = async \(\{ clearEvidence = false \} = \{\}\)/);
   assert.match(source, /if \(clearEvidence\) setTargets\(\{ supabase: emptyTarget\(\), oneDrive: emptyTarget\(\) \}\)/);
-  assert.match(source, /setInterval\(verify, 15000\)/);
+  assert.match(source, /setInterval\(verify, 60000\)/);
 });
 
 test('gallery badges consume fresh verifier evidence and never trust local upload flags', () => {
@@ -306,12 +307,37 @@ test('missing silent OneDrive auth fails closed before any Graph request', async
   assert.equal(fetched, false);
 });
 
+test('missing OneDrive project JSON does not suppress independent photo evidence', async () => {
+  const oneDriveReport = {
+    ...report,
+    images: report.images.map((item, index) => ({ ...item, oneDriveItemId: `od-${index + 1}` }))
+  };
+  const fetchImpl = async url => {
+    if (url.includes('/Projektdaten.json:')) return { ok: false, status: 404, json: async () => ({}) };
+    if (url.includes('/items/od-1?')) return { ok: true, status: 200, json: async () => ({ id: 'od-1', name: oneDriveReport.images[0].name, size: 10, file: {} }) };
+    if (url.includes('/items/od-2?')) return { ok: true, status: 200, json: async () => ({ id: 'od-2', name: oneDriveReport.images[1].name, size: 10, file: {} }) };
+    throw new Error(`Unexpected URL ${url}`);
+  };
+  const evidence = await verifyProjectOneDriveSync({
+    report: oneDriveReport,
+    tokenProvider: async () => 'token',
+    fetchImpl
+  });
+  assert.deepEqual(evidence.verifiedPhotoKeys, ['photo-1', 'photo-2']);
+  assert.equal(evidence.textVerified, false);
+  assert.equal(evidence.protocolsVerified, false);
+});
+
 test('control box separates providers and global green requires both complete', () => {
   const source = readFileSync(new URL('../src/components/ProjectSyncControlBox.jsx', import.meta.url), 'utf8');
   assert.match(source, /verifyProjectSupabaseSync/);
   assert.match(source, /verifyProjectOneDriveSync/);
   assert.match(source, /Promise\.allSettled/);
-  assert.match(source, /targetComplete\('supabase'\) && targetComplete\('oneDrive'\)/);
+  assert.match(source, /const cloudsComplete = targetComplete\('supabase'\) && targetComplete\('oneDrive'\)/);
+  assert.match(source, /const green = localSaveConfirmed && cloudsComplete/);
+  assert.match(source, /Cloud-Prüfung wartet auf Speicherung des aktuellen Stands/);
+  assert.match(source, /\{localSaveConfirmed && <div/);
+  assert.doesNotMatch(source, /Cloud-Nachweis gilt für den letzten gespeicherten Stand/);
   assert.match(source, /Supabase \{row\.synced\}\/\{row\.total\}/);
   assert.match(source, /OneDrive \{oneDriveRow\.synced\}\/\{oneDriveRow\.total\}/);
 
@@ -331,11 +357,67 @@ test('control box is the bottom-most single-line status bar', () => {
   assert.match(form, /bottom: '38px'/);
 });
 
-test('fixed save footer only exposes Finish and no destructive project actions', () => {
+test('fixed save footer is status-only because autosave owns persistence', () => {
   const form = readFileSync(new URL('../src/components/DamageForm.jsx', import.meta.url), 'utf8');
   const footerStart = form.indexOf('Mobile / Technician Fixed Footer - AutoSave Version');
   const footerEnd = form.indexOf('<ImageEditor', footerStart);
   const footer = form.slice(footerStart, footerEnd);
-  assert.match(footer, />\s*Fertig\s*</);
+  assert.doesNotMatch(footer, /onClick=\{handleSubmit\}/);
+  assert.doesNotMatch(footer, />Fertig</);
+  assert.match(form, /}, 300\); \/\/ Short debounce/);
+  assert.match(form, /'project-exit'/);
+  assert.doesNotMatch(footer, /onClick=\{onCancel\}/);
   assert.doesNotMatch(footer, /handleArchiveProject|handleDeleteProject|Projekt archivieren|Projekt löschen/);
+});
+
+test('edited photos keep the same durable id from ImageEditor through project sync', () => {
+  const editor = readFileSync(new URL('../src/components/ImageEditor.jsx', import.meta.url), 'utf8');
+  const form = readFileSync(new URL('../src/components/DamageForm.jsx', import.meta.url), 'utf8');
+  assert.match(editor, /savePhotoLocally\(editedPhotoId/);
+  assert.match(editor, /onSave\(dataUrl, localDescription, \{ id: editedPhotoId, blob: editedBlob \}\)/);
+  assert.match(form, /id: editedFile\?\.id/);
+  assert.doesNotMatch(form, /id: `edited_\$\{Date\.now\(\)\}/);
+  assert.match(form, /if \(isSyncingRef\.current\) return/);
+  assert.doesNotMatch(form, /\[formData\.id, formData\.projectNumber, isSyncing, supabase\]/);
+});
+
+test('OneDrive folder creation checks existence and deduplicates concurrent requests', () => {
+  const service = readFileSync(new URL('../src/services/OneDriveService.js', import.meta.url), 'utf8');
+  assert.match(service, /const confirmedFolders = new Set\(\)/);
+  assert.match(service, /const folderChecksInFlight = new Map\(\)/);
+  assert.match(service, /if \(folderChecksInFlight\.has\(fullPath\)\) return folderChecksInFlight\.get\(fullPath\)/);
+  assert.match(service, /\?\$select=id,folder/);
+  assert.match(service, /if \(existing\.ok\)/);
+  assert.match(service, /if \(existing\.status !== 404\)/);
+});
+
+test('form autosave waits for and returns the actual Supabase confirmation', () => {
+  const app = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8');
+  assert.match(app, /handleSaveReport = useCallback\(async \(updatedReport, silent = false, saveReason = null\)/);
+  assert.match(app, /saveReason === 'user-edit' \|\| saveReason === 'project-exit'/);
+  assert.match(app, /saveConfirmation = await enqueueCloudSave\(\)/);
+  assert.match(app, /return saveConfirmation \|\| \{/);
+});
+
+test('cloud verification rechecks OneDrive project JSON promptly without overlapping requests', () => {
+  const source = readFileSync(new URL('../src/components/ProjectSyncControlBox.jsx', import.meta.url), 'utf8');
+  assert.match(source, /let verificationInFlight = false/);
+  assert.match(source, /if \(verificationInFlight\) return/);
+  assert.match(source, /setTimeout\(\(\) => verify\(\{ clearEvidence: false \}\), 2000\)/);
+  assert.match(source, /setTimeout\(\(\) => verify\(\{ clearEvidence: false \}\), 6000\)/);
+});
+
+test('autosave baseline uses the form shape and cannot loop on derived cloud fields', () => {
+  const form = readFileSync(new URL('../src/components/DamageForm.jsx', import.meta.url), 'utf8');
+  const matches = form.match(/lastSavedData\.current = JSON\.parse\(JSON\.stringify\(formData\)\)/g) || [];
+  assert.ok(matches.length >= 2);
+  assert.doesNotMatch(form, /lastSavedData\.current = JSON\.parse\(JSON\.stringify\(reportData\)\)/);
+});
+
+test('invoice evidence requires an actual file in the explicit invoice category', () => {
+  assert.equal(hasSupplierInvoice({ images: [] }), false);
+  assert.equal(hasSupplierInvoice({ images: [{ id: 'misc', name: 'foto.jpg', assignedTo: 'Sonstiges' }] }), false);
+  assert.equal(hasSupplierInvoice({ images: [{ id: 'empty', assignedTo: 'Lieferantenrechnungen' }] }), false);
+  assert.equal(hasSupplierInvoice({ images: [{ id: 'inv', name: 'rechnung.pdf', assignedTo: 'Lieferantenrechnungen' }] }), true);
+  assert.equal(hasSupplierInvoice({ images: [{ id: 'deleted', name: 'rechnung.pdf', assignedTo: 'Lieferantenrechnungen', deleted: true }] }), false);
 });

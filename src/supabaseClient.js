@@ -399,6 +399,54 @@ if (isWebDriver || isDevMock) {
   supabaseInstance = {
     from: mockFrom,
     storage: mockStorage,
+    rpc: async (functionName, params = {}) => {
+      const now = new Date().toISOString();
+      if (functionName === 'get_project_lock_status') {
+        return {
+          data: [{
+            open_project_id: params.p_project_id || null,
+            is_owner: true,
+            lock_owner: 'Andreas Strehler',
+            device_type: 'Desktop',
+            locked_at: now,
+            last_seen_at: now
+          }],
+          error: null
+        };
+      }
+      if (functionName === 'acquire_project_lock') {
+        return { data: [{ acquired: true, project_id: params.p_project_id || null }], error: null };
+      }
+      if (functionName === 'release_project_lock') {
+        return { data: true, error: null };
+      }
+      if (functionName === 'create_project_and_acquire_lock') {
+        const project = params.p_report_data;
+        if (!project || String(project.id || '') !== String(params.p_project_id || '')) {
+          return { data: null, error: { message: 'Dev-Mock: ungültige Projektdaten' } };
+        }
+        const row = {
+          id: project.id,
+          project_title: project.projectTitle,
+          client: project.client,
+          address: project.address,
+          status: project.status,
+          assigned_to: project.assignedTo,
+          date: project.date,
+          drying_started: project.dryingStarted,
+          report_data: project,
+          created_at: now,
+          updated_at: now,
+          _is_dev_mock: true
+        };
+        const index = mockProjects.findIndex(candidate => candidate.id === row.id);
+        if (index >= 0) mockProjects[index] = { ...mockProjects[index], ...row };
+        else mockProjects.push(row);
+        setSessionStorageItem('mock_db_projects', mockProjects);
+        return { data: [{ created: true, project_id: row.id }], error: null };
+      }
+      return { data: null, error: { message: `Dev-Mock RPC nicht implementiert: ${functionName}` } };
+    },
     auth: {
       getSession: () => {
         return Promise.resolve({ data: { session: { user: { id: 2, email: 'Techniker 1' } } }, error: null });

@@ -35,7 +35,7 @@ const msalConfig = {
 };
 
 export const loginRequest = {
-  scopes: ['User.Read', 'Files.ReadWrite', 'Files.ReadWrite.All', 'offline_access'],
+  scopes: ['User.Read', 'Files.ReadWrite', 'offline_access'],
 };
 
 // ─── Singleton ───────────────────────────────────────────────────────────────

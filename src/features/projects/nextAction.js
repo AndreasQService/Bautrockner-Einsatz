@@ -17,6 +17,7 @@
 
 import { toCanonical } from './statusTransitions.js';
 import { getDaysSince, getDaysSinceLastMeasurement } from './statusRules.js';
+import { hasSupplierInvoice } from './invoiceEvidence.js';
 
 /**
  * @param {ProjectRecord} project
@@ -92,7 +93,7 @@ export const getNextAction = (project, allOpenTasks = []) => {
       return { action: 'Instandstellungs-Termin koordinieren', icon: '🔧' };
 
     case 'rechnung': {
-      const hasInvoice = project.images?.some(img => img.assignedTo === 'Sonstiges');
+      const hasInvoice = hasSupplierInvoice(project);
       if (!hasInvoice)
         return { action: 'Rechnung ausstellen und an Auftraggeber senden', icon: '💰' };
       return { action: 'Projektabschluss prüfen und archivieren', icon: '✅' };

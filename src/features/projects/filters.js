@@ -1,3 +1,5 @@
+import { hasSupplierInvoice } from './invoiceEvidence.js';
+
 /**
  * filters.js
  * ─────────────────────────────────────────────────────────────────────────────
@@ -19,7 +21,7 @@ export const FILTER_PREDICATES = {
   reportOpen:  (r) => ['Leckortung', 'leckortung', 'Schadenaufnahme', 'aufnahme', 'bericht'].includes(r.currentStatus),
   invoiceOpen: (r) => {
     const raw = r._raw;
-    const hasInvoice = raw?.images?.some(img => img.assignedTo === 'Sonstiges');
+    const hasInvoice = hasSupplierInvoice(raw);
     return !hasInvoice && ['Instandsetzung', 'Instandstellung', 'instandstellung', 'rechnung'].includes(r.currentStatus);
   },
   unassigned:  (r) => r.isUnassigned,

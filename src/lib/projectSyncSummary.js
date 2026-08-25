@@ -87,13 +87,28 @@ const stripProtocolDataFromRoom = room => Object.fromEntries(Object.entries(room
   'measurementData', 'measurementHistory', 'measurements', 'measurementPoints', 'points', 'canvasImage', 'sketch', 'protocolUrl'
 ].includes(key)));
 
+const compactSemanticEmpty = value => {
+  if (Array.isArray(value)) {
+    const items = value.map(compactSemanticEmpty).filter(item => item !== undefined);
+    return items.length ? items : undefined;
+  }
+  if (value && typeof value === 'object') {
+    const entries = Object.entries(value)
+      .map(([key, item]) => [key, compactSemanticEmpty(item)])
+      .filter(([, item]) => item !== undefined);
+    return entries.length ? Object.fromEntries(entries) : undefined;
+  }
+  if (value === undefined || value === null || value === '') return undefined;
+  return value;
+};
+
 const textPayload = report => {
   const payload = Object.fromEntries(Object.entries(report || {})
     .filter(([key]) => !NON_TEXT_CATEGORIES.has(key) && !key.startsWith('_')));
   payload.damageType = report?.damageType ?? report?.type ?? '';
   payload.rooms = (Array.isArray(report?.rooms) ? report.rooms : []).map(stripProtocolDataFromRoom);
   payload.measurementRooms = (Array.isArray(report?.measurementRooms) ? report.measurementRooms : []).map(stripProtocolDataFromRoom);
-  return payload;
+  return compactSemanticEmpty(payload) || {};
 };
 
 export const reportCategoryMatches = (localReport, remoteReport) => ({

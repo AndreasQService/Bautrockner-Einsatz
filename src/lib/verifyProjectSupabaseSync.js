@@ -20,25 +20,23 @@ const verifyStorageObject = async (supabase, path) => {
 };
 
 const verifyDevices = async (supabase, reportId, devices) => {
-  const verified = [];
-  for (let index = 0; index < devices.length; index += 1) {
-    const device = devices[index];
+  const checks = devices.map(async (device, index) => {
     const key = itemKey(device, index);
     if (device?.isRental) {
-      if (!device.rentalDbId) continue;
+      if (!device.rentalDbId) return null;
       const { data, error } = await supabase.from('rental_devices').select('id, report_id, end_date')
         .eq('id', device.rentalDbId).eq('report_id', reportId).maybeSingle();
       if (error) throw error;
-      if (data?.id && data.end_date == null) verified.push(key);
+      return data?.id && data.end_date == null ? key : null;
     } else {
-      if (!device?.dbId) continue;
+      if (!device?.dbId) return null;
       const { data, error } = await supabase.from('devices').select('id, current_report_id')
         .eq('id', device.dbId).eq('current_report_id', reportId).maybeSingle();
       if (error) throw error;
-      if (data?.id) verified.push(key);
+      return data?.id ? key : null;
     }
-  }
-  return verified;
+  });
+  return (await Promise.all(checks)).filter(Boolean);
 };
 
 export async function verifyProjectSupabaseSync({ supabase, report }) {
@@ -52,11 +50,10 @@ export async function verifyProjectSupabaseSync({ supabase, report }) {
 
   const matches = reportCategoryMatches(report, remoteRow.report_data);
   const photos = getProjectPhotoCandidates(report);
-  const verifiedPhotoKeys = [];
-  for (let index = 0; index < photos.length; index += 1) {
-    const path = storagePathFor(photos[index]);
-    if (path && await verifyStorageObject(supabase, path)) verifiedPhotoKeys.push(itemKey(photos[index], index));
-  }
+  const verifiedPhotoKeys = (await Promise.all(photos.map(async (photo, index) => {
+    const path = storagePathFor(photo);
+    return path && await verifyStorageObject(supabase, path) ? itemKey(photo, index) : null;
+  }))).filter(Boolean);
 
   const devices = Array.isArray(report?.equipment) ? report.equipment : (Array.isArray(report?.devices) ? report.devices : []);
   return {
