@@ -3080,8 +3080,8 @@ function App() {
             <span style={{ fontSize: '1.1rem', fontWeight: 700, letterSpacing: '-0.02em' }}>Q-Service AG</span>
           </div>
 
-          <nav style={{ flexGrow: 1, display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '0.5rem' }}>
-            <div id="provider-status-group" style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexShrink: 0 }}>
+          <nav className="header-actions">
+            <div id="provider-status-group" className="provider-status-group">
               <div
                 id="supabase-status-badge"
                 role="status"

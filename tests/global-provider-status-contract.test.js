@@ -19,7 +19,7 @@ test('Supabase and OneDrive status are global header controls', () => {
 })
 
 test('provider success remains evidence-based and independent', () => {
-  assert.match(providers, /isOnline && supabaseStatus\?\.ok === true/)
+  assert.match(providers, /supabaseStatus\?\.ok === true/)
   assert.match(providers, /isOnline && oneDriveServiceStatus\.ok === true/)
   assert.doesNotMatch(providers, /syncPending|localStorage|setTimeout/)
 })

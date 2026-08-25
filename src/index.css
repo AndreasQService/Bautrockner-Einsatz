@@ -597,6 +597,29 @@ body {
   justify-content: space-between;
   gap: 12px;
   width: 100%;
+  min-width: 0;
+}
+.header-actions {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin-left: auto;
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 0.5rem;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+.header-actions::-webkit-scrollbar {
+  display: none;
+}
+.provider-status-group {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex: 0 0 auto;
+  order: -1;
 }
 /* Logo: Spec 15px / 600 */
 .logo-area {
@@ -608,6 +631,11 @@ body {
   color: var(--color-toolbar-text);
   letter-spacing: -0.01em;
   flex-shrink: 0;
+}
+@media (max-width: 1180px) {
+  .app-header .logo-area > span {
+    display: none;
+  }
 }
 .logo-img {
   height: 28px;
