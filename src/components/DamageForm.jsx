@@ -1224,8 +1224,8 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
     // (oneDriveItemId fehlt). Download via Supabase Storage → Upload via User-Token.
     // Funktioniert auf jedem Gerät, da Blobs per HTTP aus Supabase geladen werden.
     const oneDriveBackfillSignature = getProjectPhotoCandidates(formData)
-        .filter(img => (img?.storagePath || img?.supabasePath) && (!img?.oneDriveItemId || oneDriveRepairPhotoIds.includes(img.id)))
-        .map(img => `${img.id || img.name}:${img.storagePath || img.supabasePath}:${img.oneDriveSyncedAt || ''}`)
+        .filter(img => getCaseFileStoragePath(img) && (!img?.oneDriveItemId || oneDriveRepairPhotoIds.includes(img.id)))
+        .map(img => `${img.id || img.name}:${getCaseFileStoragePath(img)}:${img.oneDriveSyncedAt || ''}`)
         .sort()
         .join('|');
 
@@ -1243,7 +1243,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
             const missing = getProjectPhotoCandidates(formData).filter(img => {
                 const needsRepair = oneDriveRepairPhotoIds.includes(img.id);
                 const lastRepairAt = oneDriveRepairAttemptedAtRef.current.get(img.id) || 0;
-                return (img.storagePath || img.supabasePath) &&
+                return getCaseFileStoragePath(img) &&
                     (!img.oneDriveItemId || (needsRepair && nowMs - lastRepairAt >= 5000)) &&
                     !oneDriveBackfillInFlightRef.current.has(img.id);
             });
@@ -1264,7 +1264,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
             const uploadMissingPhoto = async (img) => {
                 oneDriveRepairAttemptedAtRef.current.set(img.id, Date.now());
                 try {
-                    const supabaseStoragePath = img.storagePath || img.supabasePath;
+                    const supabaseStoragePath = getCaseFileStoragePath(img);
                     // Blob von Supabase Storage laden
                     const { data: blob, error: dlErr } = await supabase.storage
                         .from('case-files')
