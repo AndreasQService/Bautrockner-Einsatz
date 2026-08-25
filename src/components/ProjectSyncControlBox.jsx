@@ -6,6 +6,18 @@ import { verifyProjectOneDriveSync } from '../lib/verifyProjectOneDriveSync.js';
 
 const EMPTY_EVIDENCE = { verifiedPhotoKeys: [], verifiedDeviceKeys: [], textVerified: false, protocolsVerified: false };
 const emptyTarget = () => ({ phase: 'loading', evidence: EMPTY_EVIDENCE, error: null, verifiedAt: null });
+const VERIFY_TIMEOUT_MS = 12_000;
+
+const withTimeout = (promise, provider) => new Promise((resolve, reject) => {
+  const timeoutId = setTimeout(
+    () => reject(new Error(`${provider}-Prüfung hat das Zeitlimit überschritten.`)),
+    VERIFY_TIMEOUT_MS
+  );
+  Promise.resolve(promise).then(
+    value => { clearTimeout(timeoutId); resolve(value); },
+    error => { clearTimeout(timeoutId); reject(error); }
+  );
+});
 
 export default function ProjectSyncControlBox({ report, supabase, offline = false, onEvidenceChange }) {
   const [targets, setTargets] = useState({ supabase: emptyTarget(), oneDrive: emptyTarget() });
@@ -34,15 +46,22 @@ export default function ProjectSyncControlBox({ report, supabase, offline = fals
         return;
       }
       const checks = [
-        ['supabase', verifyProjectSupabaseSync({ supabase, report })],
-        ['oneDrive', verifyProjectOneDriveSync({ report })]
+        ['supabase', 'Supabase', () => verifyProjectSupabaseSync({ supabase, report })],
+        ['oneDrive', 'OneDrive', () => verifyProjectOneDriveSync({ report })]
       ];
-      const results = await Promise.allSettled(checks.map(([, promise]) => promise));
-      results.forEach((result, index) => {
-        const name = checks[index][0];
-        if (result.status === 'fulfilled') updateTarget(name, { phase: 'ready', evidence: result.value, error: null, verifiedAt: result.value.verifiedAt });
-        else updateTarget(name, { phase: 'error', evidence: EMPTY_EVIDENCE, error: result.reason?.message || `${name}-Prüfung fehlgeschlagen`, verifiedAt: null });
-      });
+      // Publish each provider as soon as its own readback finishes. A stalled
+      // Graph request must never hold a successful Supabase result hostage.
+      await Promise.all(checks.map(async ([name, label, start]) => {
+        try {
+          const evidence = await withTimeout(start(), label);
+          updateTarget(name, { phase: 'ready', evidence, error: null, verifiedAt: evidence.verifiedAt });
+        } catch (error) {
+          updateTarget(name, {
+            phase: 'error', evidence: EMPTY_EVIDENCE,
+            error: error?.message || `${label}-Prüfung fehlgeschlagen`, verifiedAt: null
+          });
+        }
+      }));
     };
 
     setTargets({ supabase: emptyTarget(), oneDrive: emptyTarget() });
