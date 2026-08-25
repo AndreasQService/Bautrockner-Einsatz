@@ -63,6 +63,7 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: 'index.html',
+        oneDriveCallback: 'auth/onedrive-callback.html',
         mockup: 'mockup.html',
         handwerker: 'handwerker.html',
         disponent: 'disponent.html'

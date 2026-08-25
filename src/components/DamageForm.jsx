@@ -336,6 +336,24 @@ export function hasSemanticChanges(base, current) {
     return false;
 }
 
+function isImageStoredInCloud(image) {
+    if (!image) return false;
+    const cloudUrl = [image.url, image.preview, image.supabaseUrl].find(value =>
+        typeof value === 'string' && value.includes('/storage/v1/object/public/case-files/')
+    );
+    return !!(
+        image.storagePath ||
+        image.supabasePath ||
+        image.supabaseBackedUpAt ||
+        image.oneDriveItemId ||
+        image.syncStatus === 'uploaded_to_backend' ||
+        image.syncStatus === 'queued_for_remote' ||
+        image.syncStatus === 'remote_verified' ||
+        image.syncStatus === 'synced' ||
+        cloudUrl
+    );
+}
+
 
 export default function DamageForm({ onCancel, initialData, onSave, mode = 'desktop', isDarkMode = true, isSyncPending, fetchReports, readOnly, currentUser, isActuallyOffline, supabase, onDeleteProject }) {
     // Helper to parse address string if editing
@@ -5630,10 +5648,18 @@ END:VCARD`;
                                                     setFormData(prev => ({
                                                         ...prev,
                                                         images: [...(prev.images || []), {
+                                                            id: `mail_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
                                                             preview: publicUrl,
+                                                            url: publicUrl,
                                                             name: file.name,
                                                             description: 'Initialbild (Mail)',
                                                             date: new Date().toISOString(),
+                                                            storagePath: filePath,
+                                                            supabasePath: filePath,
+                                                            supabaseBackedUpAt: new Date().toISOString(),
+                                                            syncStatus: 'uploaded_to_backend',
+                                                            uploading: false,
+                                                            error: false,
                                                             roomId: null // Global / Initial
                                                         }]
                                                     }));
