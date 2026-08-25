@@ -62,7 +62,8 @@ export const getProjectPhotoCandidates = report => uniqueItems([
     url: report.exteriorPhoto,
     storagePath: report.exteriorPhotoStoragePath,
     oneDriveItemId: report.exteriorPhotoOneDriveItemId,
-    oneDrivePath: report.exteriorPhotoOneDrivePath
+    oneDrivePath: report.exteriorPhotoOneDrivePath,
+    oneDriveSyncedAt: report.exteriorPhotoOneDriveSyncedAt
   }] : [])
 ].filter(item => !isDocument(item) && item?.assignedTo !== 'Messprotokolle'));
 

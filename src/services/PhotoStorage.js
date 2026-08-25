@@ -195,6 +195,25 @@ export async function updatePhotoSyncStatus(photoId, updates) {
     });
 }
 
+/** Remove one photo from the durable offline store. */
+export async function deletePhotoLocally(photoId) {
+    if (!photoId) return false;
+    const db = await openDB();
+    if (!db.objectStoreNames.contains(STORE_PHOTOS)) return false;
+
+    return new Promise((resolve, reject) => {
+        try {
+            const tx = db.transaction(STORE_PHOTOS, 'readwrite');
+            tx.objectStore(STORE_PHOTOS).delete(photoId);
+            tx.oncomplete = () => resolve(true);
+            tx.onerror = () => reject(tx.error);
+            tx.onabort = () => reject(tx.error || new Error('Foto konnte lokal nicht gelöscht werden.'));
+        } catch (error) {
+            reject(error);
+        }
+    });
+}
+
 /**
  * Recover photos that were queued with the temporary project key after a stale
  * local draft replaced the real report id. Only explicitly named photo ids are
@@ -392,7 +411,11 @@ export async function markUploadedPhotosAsVerified() {
 /**
  * Anzahl pending (nicht vollständig hochgeladener) Fotos
  */
-export async function getPendingCount() {
+export async function getPendingCount(projectId = null) {
+    if (projectId) {
+        const pending = await getPendingPhotos(projectId);
+        return pending.length;
+    }
     const db = await openDB();
     if (!db.objectStoreNames.contains(STORE_PHOTOS)) {
         return 0;

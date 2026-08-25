@@ -30,7 +30,8 @@ export default function ProjectSyncControlBox({ report, supabase, offline = fals
       photo?.id || null,
       photo?.supabasePath || photo?.storagePath || null,
       photo?.oneDriveItemId || null,
-      photo?.oneDrivePath || null
+      photo?.oneDrivePath || null,
+      photo?.oneDriveSyncedAt || null
     ]),
     devices: (Array.isArray(report?.equipment) ? report.equipment : (report?.devices || []))
       .map(device => [device?.id || null, device?.dbId || null, device?.rentalDbId || null])

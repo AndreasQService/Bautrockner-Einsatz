@@ -422,6 +422,25 @@ test('save footer requires both cloud readbacks and OneDrive backfill retries mi
   assert.match(form, /\[1500, 3000, 6000, 12000, 30000\]/);
 });
 
+test('open project counts and uploads only its own pending photos', () => {
+  const form = readFileSync(new URL('../src/components/DamageForm.jsx', import.meta.url), 'utf8');
+  const storage = readFileSync(new URL('../src/services/PhotoStorage.js', import.meta.url), 'utf8');
+  const worker = readFileSync(new URL('../src/lib/sync/supabaseSyncWorker.js', import.meta.url), 'utf8');
+  assert.match(form, /getPendingCount\(formData\.id \|\| 'temp'\)/);
+  assert.match(form, /syncPendingToSupabase\(formData\.id \|\| 'temp'\)/);
+  assert.match(storage, /export async function getPendingCount\(projectId = null\)/);
+  assert.match(worker, /export async function syncPendingToSupabase\(projectId = null\)/);
+  assert.match(worker, /if \(projectId && p\.projectId !== projectId\) return false/);
+});
+
+test('damage photo deletion removes the durable IndexedDB row before form state', () => {
+  const form = readFileSync(new URL('../src/components/DamageForm.jsx', import.meta.url), 'utf8');
+  const storage = readFileSync(new URL('../src/services/PhotoStorage.js', import.meta.url), 'utf8');
+  assert.match(storage, /export async function deletePhotoLocally\(photoId\)/);
+  assert.match(storage, /objectStore\(STORE_PHOTOS\)\.delete\(photoId\)/);
+  assert.match(form, /await deletePhotoLocally\(img\.id\)/);
+});
+
 test('cloud verification rechecks OneDrive project JSON promptly without overlapping requests', () => {
   const source = readFileSync(new URL('../src/components/ProjectSyncControlBox.jsx', import.meta.url), 'utf8');
   assert.match(source, /let verificationInFlight = false/);

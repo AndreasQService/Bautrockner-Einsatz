@@ -29,7 +29,7 @@ async function verifySupabaseObject(storagePath, expectedSize) {
 /**
  * Run background sync for all local photos
  */
-export async function syncPendingToSupabase() {
+export async function syncPendingToSupabase(projectId = null) {
     if (isSyncRunning) return { synced: 0, failed: 0 };
     if (!supabase) return { synced: 0, failed: 0 };
 
@@ -46,7 +46,7 @@ export async function syncPendingToSupabase() {
     let failed = 0;
 
     try {
-        const photos = await getPendingPhotosFromDb();
+        const photos = await getPendingPhotosFromDb(projectId);
         if (!photos.length) {
             isSyncRunning = false;
             return { synced: 0, failed: 0 };
@@ -132,7 +132,7 @@ export async function syncPendingToSupabase() {
 /**
  * Get all pending photos from IndexedDB
  */
-async function getPendingPhotosFromDb() {
+async function getPendingPhotosFromDb(projectId = null) {
     const db = await openDB();
     if (!db.objectStoreNames.contains('photos')) return [];
     
@@ -143,6 +143,7 @@ async function getPendingPhotosFromDb() {
             const all = req.result || [];
             // This worker owns Supabase only. OneDrive has an independent path.
             resolve(all.filter(p => {
+                if (projectId && p.projectId !== projectId) return false;
                 const supabasePending = !p.supabasePath || !p.supabaseVerifiedAt || !p.projectLinkedAt;
                 const localBlob = p.blob || p.original?.blob || p.compressed?.blob;
                 const hasRecoverableBlob = localBlob instanceof Blob && localBlob.size > 0;

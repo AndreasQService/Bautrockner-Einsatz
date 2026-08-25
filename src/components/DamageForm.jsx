@@ -22,7 +22,7 @@ import { supabase } from '../supabaseClient';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import { buildProjectFolderName, ensureProjectFolders, uploadPhotoAndGetUrl, getPhotoDownloadUrl, uploadReport } from '../services/OneDriveService';
-import { savePhotoLocally, updatePhotoSyncStatus, deleteOldSyncedPhotos, getPendingCount, getPhotoBlob, getProjectPhotos, reassignTemporaryPhotos } from '../services/PhotoStorage';
+import { savePhotoLocally, updatePhotoSyncStatus, deletePhotoLocally, deleteOldSyncedPhotos, getPendingCount, getPhotoBlob, getProjectPhotos, reassignTemporaryPhotos } from '../services/PhotoStorage';
 const IS_TEST_ENV = !!(typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_EXPECTED_SUPABASE_PROJECT_ID === 'aoxduqspiezzyqeqyzzl');
 const ENABLE_ONEDRIVE_DEV = !!(typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_ENABLE_ONEDRIVE_DEV === 'true');
 import { swissPLZ } from '../data/swiss_plz';
@@ -796,13 +796,28 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
     );
     const [verifiedPhotoEvidence, setVerifiedPhotoEvidence] = useState({ supabase: [], oneDrive: [] });
     const [cloudSyncComplete, setCloudSyncComplete] = useState(false);
+    const [oneDriveRepairPhotoIds, setOneDriveRepairPhotoIds] = useState([]);
     const oneDriveBackfillInFlightRef = useRef(new Set());
     // `Map` is also the imported lucide map icon in this component.
     // Use the native constructor explicitly to avoid instantiating the icon.
     const oneDriveBackfillRetryRef = useRef(new globalThis.Map());
+    const oneDriveRepairAttemptedAtRef = useRef(new globalThis.Map());
     const [oneDriveBackfillRetryTick, setOneDriveBackfillRetryTick] = useState(0);
     const handleProjectSyncEvidence = useCallback((evidence) => {
         setCloudSyncComplete(evidence?.cloudsComplete === true);
+        if (evidence?.oneDriveReady) {
+            const verifiedKeys = new Set(evidence.oneDrive?.verifiedPhotoKeys || []);
+            const missingIds = getProjectPhotoCandidates(latestFormData.current)
+                .filter(photo => {
+                    const key = getProjectPhotoEvidenceKey(latestFormData.current, photo);
+                    return key && !verifiedKeys.has(key);
+                })
+                .map(photo => photo.id)
+                .filter(Boolean);
+            setOneDriveRepairPhotoIds(previous =>
+                JSON.stringify(previous) === JSON.stringify(missingIds) ? previous : missingIds
+            );
+        }
         setVerifiedPhotoEvidence({
             supabase: evidence?.supabaseReady ? (evidence.supabase?.verifiedPhotoKeys || []) : [],
             oneDrive: evidence?.oneDriveReady ? (evidence.oneDrive?.verifiedPhotoKeys || []) : []
@@ -1106,7 +1121,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         isSyncingRef.current = true;
         let queuedCount;
         try {
-            queuedCount = await getPendingCount();
+            queuedCount = await getPendingCount(formData.id || 'temp');
         } catch (error) {
             isSyncingRef.current = false;
             throw error;
@@ -1123,7 +1138,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         try {
             {
                 const { syncPendingToSupabase } = await import('../lib/sync/supabaseSyncWorker');
-                const { synced, failed } = await syncPendingToSupabase();
+                const { synced, failed } = await syncPendingToSupabase(formData.id || 'temp');
                 console.log(`[Sync] Cloud-first sync done. Synced: ${synced}, Failed: ${failed}`);
                 try {
                     const updatedLocal = await getProjectPhotos(formData.id || 'temp');
@@ -1144,7 +1159,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                     }));
                 } catch (e) {}
             }
-            const count = await getPendingCount();
+            const count = await getPendingCount(formData.id || 'temp');
             setPendingSyncCount(count);
         } catch (e) {
             console.warn('[Sync] Fehler:', e.message);
@@ -1157,7 +1172,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
     // ── Auto-Sync: Pending Fotos hochladen wenn Netz zurückkommt ─────────────
     useEffect(() => {
         // Pending-Count beim Mount laden
-        getPendingCount().then(count => setPendingSyncCount(count));
+        getPendingCount(formData.id || 'temp').then(count => setPendingSyncCount(count));
 
         // Recover photos queued under "temp" by an old null-id draft, but only
         // when their photo id is present in this project's report data.
@@ -1209,8 +1224,8 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
     // (oneDriveItemId fehlt). Download via Supabase Storage → Upload via User-Token.
     // Funktioniert auf jedem Gerät, da Blobs per HTTP aus Supabase geladen werden.
     const oneDriveBackfillSignature = getProjectPhotoCandidates(formData)
-        .filter(img => (img?.storagePath || img?.supabasePath) && !img?.oneDriveItemId)
-        .map(img => `${img.id || img.name}:${img.storagePath || img.supabasePath}`)
+        .filter(img => (img?.storagePath || img?.supabasePath) && (!img?.oneDriveItemId || oneDriveRepairPhotoIds.includes(img.id)))
+        .map(img => `${img.id || img.name}:${img.storagePath || img.supabasePath}:${img.oneDriveSyncedAt || ''}`)
         .sort()
         .join('|');
 
@@ -1224,11 +1239,14 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
             );
 
             // Alle Bilder die in Supabase sind aber nicht in OneDrive
-            const missing = getProjectPhotoCandidates(formData).filter(img =>
-                (img.storagePath || img.supabasePath) &&
-                !img.oneDriveItemId &&
-                !oneDriveBackfillInFlightRef.current.has(img.id)
-            );
+            const nowMs = Date.now();
+            const missing = getProjectPhotoCandidates(formData).filter(img => {
+                const needsRepair = oneDriveRepairPhotoIds.includes(img.id);
+                const lastRepairAt = oneDriveRepairAttemptedAtRef.current.get(img.id) || 0;
+                return (img.storagePath || img.supabasePath) &&
+                    (!img.oneDriveItemId || (needsRepair && nowMs - lastRepairAt >= 5000)) &&
+                    !oneDriveBackfillInFlightRef.current.has(img.id);
+            });
 
             if (missing.length === 0) return;
             console.log(`[OneDrive-Backfill] 🔄 ${missing.length} Fotos ohne OneDrive-Link – starte Backfill...`);
@@ -1244,6 +1262,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
             // updates from an early upload must not start duplicate backfills.
             missing.forEach(img => oneDriveBackfillInFlightRef.current.add(img.id));
             const uploadMissingPhoto = async (img) => {
+                oneDriveRepairAttemptedAtRef.current.set(img.id, Date.now());
                 try {
                     const supabaseStoragePath = img.storagePath || img.supabasePath;
                     // Blob von Supabase Storage laden
@@ -1274,7 +1293,8 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                             ...prev,
                             ...(img.id === 'exterior-photo' ? {
                                 exteriorPhotoOneDriveItemId: oneDriveUpdate.oneDriveItemId,
-                                exteriorPhotoOneDrivePath: oneDriveUpdate.oneDrivePath
+                                exteriorPhotoOneDrivePath: oneDriveUpdate.oneDrivePath,
+                                exteriorPhotoOneDriveSyncedAt: oneDriveUpdate.oneDriveSyncedAt
                             } : {}),
                             images: (prev.images || []).map(i =>
                                 i.id === img.id ? {
@@ -1328,7 +1348,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
 
         const timer = setTimeout(backfill, 0);
         return () => clearTimeout(timer);
-    }, [formData.id, oneDriveBackfillSignature, oneDriveBackfillRetryTick]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [formData.id, oneDriveBackfillSignature, oneDriveBackfillRetryTick, oneDriveRepairPhotoIds]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // Primary Auto-Save Effect (Handled in unified effect below)
 
@@ -2541,7 +2561,7 @@ END:VCARD`;
 
                     // 3. Immediately trigger background sync worker without blocking UI
                     import('../lib/sync/supabaseSyncWorker.js').then(({ syncPendingToSupabase }) => {
-                        syncPendingToSupabase().then(() => {
+                        syncPendingToSupabase(formData.id || 'temp').then(() => {
                             getProjectPhotos(formData.id || 'temp').then(localPhotos => {
                                     setFormData(prev => ({
                                         ...prev,
@@ -2610,7 +2630,7 @@ END:VCARD`;
 
                 // 3. Immediately trigger background sync worker without blocking UI
                 import('../lib/sync/supabaseSyncWorker.js').then(({ syncPendingToSupabase }) => {
-                    syncPendingToSupabase().then(() => {
+                    syncPendingToSupabase(formData.id || 'temp').then(() => {
                         getProjectPhotos(formData.id || 'temp').then(localPhotos => {
                                 setFormData(prev => ({
                                     ...prev,
@@ -5644,7 +5664,11 @@ END:VCARD`;
                                         </div>
                                         {/* Delete */}
                                         <div style={{ display: 'flex', flexDirection: 'column', height: '140px', justifyContent: 'flex-start' }}>
-                                            <button type="button" onClick={() => setFormData(prev => ({ ...prev, images: prev.images.filter(i => { if (i === img) revokeImageBlob(i); return i !== img; }) }))} style={{ color: '#EF4444', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '6px', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}><Trash size={16} /></button>
+                                            <button type="button" onClick={async () => {
+                                                if (img.id) await deletePhotoLocally(img.id).catch(error => console.warn('[Foto löschen] IndexedDB:', error.message));
+                                                revokeImageBlob(img);
+                                                setFormData(prev => ({ ...prev, images: prev.images.filter(i => i.id ? i.id !== img.id : i !== img) }));
+                                            }} style={{ color: '#EF4444', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '6px', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}><Trash size={16} /></button>
                                         </div>
                                     </div>
                                 ))}
