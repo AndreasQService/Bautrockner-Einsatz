@@ -129,10 +129,13 @@ export default function ProjectSyncControlBox({ report, supabase, offline = fals
     onEvidenceChange({
       supabaseReady: targets.supabase.phase === 'ready',
       oneDriveReady: targets.oneDrive.phase === 'ready',
+      cloudsComplete:
+        targets.supabase.phase === 'ready' && summaries.supabase.complete &&
+        targets.oneDrive.phase === 'ready' && summaries.oneDrive.complete,
       supabase: targets.supabase.phase === 'ready' ? supabaseEvidence : EMPTY_EVIDENCE,
       oneDrive: targets.oneDrive.phase === 'ready' ? oneDriveEvidence : EMPTY_EVIDENCE
     });
-  }, [targets, onEvidenceChange]);
+  }, [targets, summaries, onEvidenceChange]);
 
   const targetComplete = name => targets[name].phase === 'ready' && summaries[name].complete;
   const cloudsComplete = targetComplete('supabase') && targetComplete('oneDrive');

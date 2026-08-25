@@ -399,6 +399,27 @@ test('form autosave waits for and returns the actual Supabase confirmation', () 
   assert.match(app, /return saveConfirmation \|\| \{/);
 });
 
+test('autosave coalesces rerenders and edits while a cloud save is in flight', () => {
+  const form = readFileSync(new URL('../src/components/DamageForm.jsx', import.meta.url), 'utf8');
+  assert.match(form, /const autosaveInFlightRef = useRef\(false\)/);
+  assert.match(form, /if \(autosaveInFlightRef\.current\) return/);
+  assert.match(form, /const newerEditPending = hasSemanticChanges\(formData, latestFormData\.current\)/);
+  assert.match(form, /autosaveInFlightRef\.current = false/);
+});
+
+test('save footer requires both cloud readbacks and OneDrive backfill retries missing photos', () => {
+  const form = readFileSync(new URL('../src/components/DamageForm.jsx', import.meta.url), 'utf8');
+  const control = readFileSync(new URL('../src/components/ProjectSyncControlBox.jsx', import.meta.url), 'utf8');
+  assert.match(control, /cloudsComplete:/);
+  assert.match(form, /const saveConfirmed = localSaveConfirmed && cloudSyncComplete/);
+  assert.match(form, /Cloud-Synchronisierung ausstehend/);
+  assert.match(form, /Math\.min\(3, queue\.length\)/);
+  assert.match(form, /const oneDriveBackfillSignature = getProjectPhotoCandidates\(formData\)/);
+  assert.match(form, /exteriorPhotoOneDriveItemId: oneDriveUpdate\.oneDriveItemId/);
+  assert.match(form, /oneDriveBackfillRetryTick/);
+  assert.match(form, /\[1500, 3000, 6000, 12000, 30000\]/);
+});
+
 test('cloud verification rechecks OneDrive project JSON promptly without overlapping requests', () => {
   const source = readFileSync(new URL('../src/components/ProjectSyncControlBox.jsx', import.meta.url), 'utf8');
   assert.match(source, /let verificationInFlight = false/);

@@ -47,7 +47,7 @@ import { createRentalDeviceAssignment, endRentalDeviceAssignment, isRentalTypeSe
 import ProjectSyncControlBox from './ProjectSyncControlBox';
 import AuthenticatedStorageImage from './AuthenticatedStorageImage';
 import { saveProjectDraftWithReadback } from '../lib/safeProjectCreation';
-import { getProjectPhotoEvidenceKey } from '../lib/projectSyncSummary.js';
+import { getProjectPhotoCandidates, getProjectPhotoEvidenceKey } from '../lib/projectSyncSummary.js';
 import { getCaseFileStoragePath, getDurablePhotoUrl } from '../lib/caseFilePhotoAccess';
 import { hasSupplierInvoice } from '../features/projects/invoiceEvidence.js';
 
@@ -795,8 +795,12 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         initialData && initialData.isLightweight !== true ? 'saved' : 'pending'
     );
     const [verifiedPhotoEvidence, setVerifiedPhotoEvidence] = useState({ supabase: [], oneDrive: [] });
+    const [cloudSyncComplete, setCloudSyncComplete] = useState(false);
     const oneDriveBackfillInFlightRef = useRef(new Set());
+    const oneDriveBackfillRetryRef = useRef(new Map());
+    const [oneDriveBackfillRetryTick, setOneDriveBackfillRetryTick] = useState(0);
     const handleProjectSyncEvidence = useCallback((evidence) => {
+        setCloudSyncComplete(evidence?.cloudsComplete === true);
         setVerifiedPhotoEvidence({
             supabase: evidence?.supabaseReady ? (evidence.supabase?.verifiedPhotoKeys || []) : [],
             oneDrive: evidence?.oneDriveReady ? (evidence.oneDrive?.verifiedPhotoKeys || []) : []
@@ -1202,7 +1206,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
     // gesichert sind (storagePath vorhanden) aber noch nicht auf OneDrive sind
     // (oneDriveItemId fehlt). Download via Supabase Storage → Upload via User-Token.
     // Funktioniert auf jedem Gerät, da Blobs per HTTP aus Supabase geladen werden.
-    const oneDriveBackfillSignature = (formData.images || [])
+    const oneDriveBackfillSignature = getProjectPhotoCandidates(formData)
         .filter(img => (img?.storagePath || img?.supabasePath) && !img?.oneDriveItemId)
         .map(img => `${img.id || img.name}:${img.storagePath || img.supabasePath}`)
         .sort()
@@ -1218,7 +1222,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
             );
 
             // Alle Bilder die in Supabase sind aber nicht in OneDrive
-            const missing = (formData.images || []).filter(img =>
+            const missing = getProjectPhotoCandidates(formData).filter(img =>
                 (img.storagePath || img.supabasePath) &&
                 !img.oneDriveItemId &&
                 !oneDriveBackfillInFlightRef.current.has(img.id)
@@ -1234,8 +1238,10 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                 return;
             }
 
-            for (const img of missing) {
-                oneDriveBackfillInFlightRef.current.add(img.id);
+            // Reserve the complete batch before starting requests. React state
+            // updates from an early upload must not start duplicate backfills.
+            missing.forEach(img => oneDriveBackfillInFlightRef.current.add(img.id));
+            const uploadMissingPhoto = async (img) => {
                 try {
                     const supabaseStoragePath = img.storagePath || img.supabasePath;
                     // Blob von Supabase Storage laden
@@ -1244,8 +1250,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                         .download(supabaseStoragePath);
 
                     if (dlErr || !blob) {
-                        console.warn(`[OneDrive-Backfill] ⚠️ Download fehlgeschlagen: ${supabaseStoragePath}`);
-                        continue;
+                        throw new Error(`Supabase-Download fehlgeschlagen: ${supabaseStoragePath}`);
                     }
 
                     // Upload ins persönliche OneDrive
@@ -1260,33 +1265,68 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                             oneDriveSyncedAt: new Date().toISOString(),
                             oneDriveErrorMessage: null
                         };
-                        await updatePhotoSyncStatus(img.id, oneDriveUpdate);
+                        if (img.id !== 'exterior-photo') {
+                            await updatePhotoSyncStatus(img.id, oneDriveUpdate);
+                        }
                         setFormData(prev => ({
                             ...prev,
-                            images: prev.images.map(i =>
+                            ...(img.id === 'exterior-photo' ? {
+                                exteriorPhotoOneDriveItemId: oneDriveUpdate.oneDriveItemId,
+                                exteriorPhotoOneDrivePath: oneDriveUpdate.oneDrivePath
+                            } : {}),
+                            images: (prev.images || []).map(i =>
                                 i.id === img.id ? {
                                     ...i,
                                     ...oneDriveUpdate,
                                     uploading: false,
                                 } : i
+                            ),
+                            photos: (prev.photos || []).map(i =>
+                                i.id === img.id ? { ...i, ...oneDriveUpdate, uploading: false } : i
                             )
                         }));
                         console.log(`[OneDrive-Backfill] ✅ ${img.name} → OneDrive`);
+                        const retryState = oneDriveBackfillRetryRef.current.get(img.id);
+                        if (retryState?.timer) clearTimeout(retryState.timer);
+                        oneDriveBackfillRetryRef.current.delete(img.id);
+                    } else {
+                        throw new Error('OneDrive-Upload lieferte keine dauerhafte Datei-ID zurück');
                     }
                 } catch (err) {
                     await updatePhotoSyncStatus(img.id, {
                         oneDriveErrorMessage: err.message || String(err)
                     }).catch(() => {});
                     console.warn(`[OneDrive-Backfill] ⚠️ Fehler bei ${img.name}:`, err.message);
+                    const previousRetry = oneDriveBackfillRetryRef.current.get(img.id) || { attempts: 0, timer: null };
+                    const attempts = previousRetry.attempts + 1;
+                    if (attempts <= 5 && !previousRetry.timer) {
+                        const retryDelay = [1500, 3000, 6000, 12000, 30000][attempts - 1];
+                        const timer = setTimeout(() => {
+                            oneDriveBackfillRetryRef.current.set(img.id, { attempts, timer: null });
+                            setOneDriveBackfillRetryTick(value => value + 1);
+                        }, retryDelay);
+                        oneDriveBackfillRetryRef.current.set(img.id, { attempts, timer });
+                    }
                 } finally {
                     oneDriveBackfillInFlightRef.current.delete(img.id);
                 }
-            }
+            };
+
+            // A small bounded pool is much faster than serial uploads without
+            // triggering Microsoft Graph throttling for large projects.
+            const queue = [...missing];
+            const workers = Array.from({ length: Math.min(3, queue.length) }, async () => {
+                while (queue.length > 0) {
+                    const img = queue.shift();
+                    if (img) await uploadMissingPhoto(img);
+                }
+            });
+            await Promise.allSettled(workers);
         };
 
         const timer = setTimeout(backfill, 0);
         return () => clearTimeout(timer);
-    }, [formData.id, oneDriveBackfillSignature]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [formData.id, oneDriveBackfillSignature, oneDriveBackfillRetryTick]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // Primary Auto-Save Effect (Handled in unified effect below)
 
@@ -2086,6 +2126,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
 
     const isHydratedRef = useRef(false);
     const hasUserEditedRef = useRef(false);
+    const autosaveInFlightRef = useRef(false);
 
     // Track user edit status:
     useEffect(() => {
@@ -2123,6 +2164,10 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
     useEffect(() => {
         // Condition checks for starting the autosave timer:
         if (!isHydratedRef.current) return;
+        // App updates initialData while a confirmed save is still returning.
+        // Never enqueue the same snapshot again; a newer user edit is picked up
+        // once the active request completes and isSaving changes back to false.
+        if (autosaveInFlightRef.current) return;
         // A brand-new report intentionally has no initialData. Blocking that
         // state prevents the first durable draft/cloud admission entirely
         // while the footer still misleadingly renders "Gespeichert".
@@ -2133,10 +2178,11 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         const hasChanges = hasSemanticChanges(lastSavedData.current, formData);
         if (!hasChanges) return;
 
-        setIsSaving(true);
         setSaveState('pending');
         const timeoutId = setTimeout(async () => {
             if (!formData.projectTitle && !formData.id) return;
+            if (autosaveInFlightRef.current) return;
+            autosaveInFlightRef.current = true;
             setIsSaving(true);
 
             // Prepare data similar to handleSubmit
@@ -2155,9 +2201,10 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                     // cloud payload contains derived fields (address/type/imageCount)
                     // which would otherwise look like a fresh edit forever.
                     lastSavedData.current = JSON.parse(JSON.stringify(formData));
-                    hasUserEditedRef.current = false;
                     setLastSaved(new Date());
-                    setSaveState('saved');
+                    const newerEditPending = hasSemanticChanges(formData, latestFormData.current);
+                    hasUserEditedRef.current = newerEditPending;
+                    setSaveState(newerEditPending ? 'pending' : 'saved');
                     // If the report was new (no ID) and the save generated one, update local state
                     if (savedReport.id && !formData.id) {
                         setFormData(prev => ({ ...prev, id: savedReport.id }));
@@ -2167,12 +2214,13 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                 console.error("Auto-save failed:", e);
                 setSaveState('pending');
             } finally {
+                autosaveInFlightRef.current = false;
                 setIsSaving(false);
             }
         }, 300); // Short debounce: save promptly after the user pauses typing.
 
         return () => clearTimeout(timeoutId);
-    }, [formData, onSave, initialData]);
+    }, [formData, onSave, initialData, isSaving]);
 
     // Last safety net when the user switches projects or leaves this view.
     // Normal edits are already persisted by the short autosave debounce above.
@@ -10683,16 +10731,17 @@ END:VCARD`;
                 }}>
                     {/* Ruhiger, evidenzbasierter Speicherstatus: keine blinkenden Toasts. */}
                     {(() => {
-                        const saveConfirmed = saveState === 'saved' && !isSaving && !isSyncPending;
+                        const localSaveConfirmed = saveState === 'saved' && !isSaving && !isSyncPending;
+                        const saveConfirmed = localSaveConfirmed && cloudSyncComplete;
                         return (
                             <div
                                 role="status"
                                 aria-live="polite"
-                                aria-label={saveConfirmed ? 'Projekt gespeichert' : 'Speicherung ausstehend'}
+                                aria-label={saveConfirmed ? 'Projekt in beiden Clouds gespeichert' : (localSaveConfirmed ? 'Cloud-Synchronisierung ausstehend' : 'Speicherung ausstehend')}
                                 style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.75rem', color: saveConfirmed ? '#10B981' : '#EF4444' }}
                             >
                                 <span aria-hidden="true" style={{ width: '9px', height: '9px', borderRadius: '50%', backgroundColor: saveConfirmed ? '#10B981' : '#EF4444', flex: '0 0 9px' }} />
-                                {saveConfirmed ? 'Gespeichert' : 'Speicherung ausstehend'}
+                                {saveConfirmed ? 'Gespeichert' : (localSaveConfirmed ? 'Cloud-Synchronisierung ausstehend' : 'Speicherung ausstehend')}
                             </div>
                         );
                     })()}
