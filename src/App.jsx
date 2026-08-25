@@ -1676,7 +1676,9 @@ function App() {
                   date: merged.date !== undefined ? merged.date : existing.date,
                   dryingStarted: merged.dryingStarted !== undefined ? merged.dryingStarted : existing.dryingStarted,
                   deletedAt: merged.deletedAt !== undefined ? merged.deletedAt : existing.deletedAt,
-                  _supabase_updated_at: existing._supabase_updated_at,
+                  // Preserve an established version, but repair older local
+                  // cache entries that predate the Supabase timestamp field.
+                  _supabase_updated_at: existing._supabase_updated_at || merged._supabase_updated_at,
                   isLightweight: false
                 };
               }
@@ -1990,6 +1992,15 @@ function App() {
 
   const handleCancelEntry = async () => {
     const reportId = selectedReportRef.current?.id;
+    // The explicit development mock has no real database lock/readback to
+    // release. Running the production exit checks here leaves navigation
+    // waiting on RPC calls that the mock cannot meaningfully confirm.
+    if (import.meta.env.DEV && import.meta.env.VITE_QTOOL_DEV_MOCK_AUTH === 'true') {
+      setView('dashboard');
+      setSelectedReport(null);
+      setIsSessionActive(true);
+      return;
+    }
     if (reportId) {
       if (unsavedReports[reportId]) {
         showToast('Projekt hat noch unbestätigte lokale Änderungen. Bitte zuerst speichern und synchronisieren.', 'error', 10000);
@@ -3555,7 +3566,7 @@ function App() {
                     )}
                   </div>
                 )}
-                {selectedReport && selectedReport.id && !selectedReport.id.startsWith('TMP-') && !selectedReport._is_local_draft && (selectedReport.isLightweight || !selectedReport._supabase_updated_at) ? (
+                {selectedReport && selectedReport.id && !selectedReport.id.startsWith('TMP-') && !selectedReport._is_local_draft && (selectedReport.isLightweight || (!selectedReport._supabase_updated_at && !selectedReport._is_dev_mock)) ? (
                   <div style={{
                     display: 'flex',
                     flexDirection: 'column',

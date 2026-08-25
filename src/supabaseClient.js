@@ -112,13 +112,14 @@ const env = (typeof import.meta !== 'undefined' && import.meta.env) ? import.met
 const rawUrl = env.VITE_SUPABASE_URL;
 const rawKey = env.VITE_SUPABASE_ANON_KEY;
 const expectedProjectId = env.VITE_EXPECTED_SUPABASE_PROJECT_ID;
+const isDevMock = env.DEV === true && env.VITE_QTOOL_DEV_MOCK_AUTH === 'true';
 
 let validatedUrl = null;
 let supabaseInstance = null;
 
 const isWebDriver = typeof navigator !== 'undefined' && navigator.webdriver && !navigator.userAgent.includes('QToolDeepTest');
 
-if (isWebDriver) {
+if (isWebDriver || isDevMock) {
   // SessionStorage helpers for persistent mock DB state across reloads
   const getSessionStorageItem = (key, fallback) => {
     try {
@@ -165,6 +166,16 @@ if (isWebDriver) {
       }
     }
   ]);
+  // Lightweight project guards require the same durable timestamps returned
+  // by real Supabase rows. Normalize older sessionStorage fixtures as well so
+  // an already-open dev browser cannot get stuck on "vollständig geladen".
+  mockProjects = mockProjects.map(project => ({
+    ...project,
+    _is_dev_mock: isDevMock,
+    created_at: project.created_at || new Date().toISOString(),
+    updated_at: project.updated_at || new Date().toISOString()
+  }));
+  setSessionStorageItem('mock_db_projects', mockProjects);
 
   let systemSettings = {
     id: 'SYSTEM_SETTINGS',
@@ -267,6 +278,8 @@ if (isWebDriver) {
         const rows = Array.isArray(payload) ? payload : [payload];
         for (const r of rows) {
           if (tableName === 'damage_reports') {
+            r.updated_at = new Date().toISOString();
+            r.created_at = r.created_at || r.updated_at;
             const idx = mockProjects.findIndex(p => p.id === r.id);
             if (idx >= 0) {
               mockProjects[idx] = { ...mockProjects[idx], ...r };
@@ -314,16 +327,71 @@ if (isWebDriver) {
     };
   };
 
+  const DEV_STORAGE_DB = 'qtool-dev-supabase-storage';
+  const openDevStorage = () => new Promise((resolve, reject) => {
+    const request = indexedDB.open(DEV_STORAGE_DB, 1);
+    request.onupgradeneeded = () => {
+      if (!request.result.objectStoreNames.contains('objects')) {
+        request.result.createObjectStore('objects');
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+  const devStoragePut = async (key, blob) => {
+    const db = await openDevStorage();
+    await new Promise((resolve, reject) => {
+      const transaction = db.transaction('objects', 'readwrite');
+      transaction.objectStore('objects').put(blob, key);
+      transaction.oncomplete = resolve;
+      transaction.onerror = () => reject(transaction.error);
+    });
+    db.close();
+  };
+  const devStorageGet = async key => {
+    const db = await openDevStorage();
+    const value = await new Promise((resolve, reject) => {
+      const request = db.transaction('objects', 'readonly').objectStore('objects').get(key);
+      request.onsuccess = () => resolve(request.result || null);
+      request.onerror = () => reject(request.error);
+    });
+    db.close();
+    return value;
+  };
+
   const mockStorage = {
     from: (bucket) => {
       return {
-        upload: (path, blob, opts) => {
-          return Promise.resolve({ data: { path }, error: null });
+        upload: async (path, blob, opts) => {
+          try {
+            await devStoragePut(`${bucket}/${path}`, blob);
+            return { data: { path }, error: null };
+          } catch (error) {
+            return { data: null, error };
+          }
         },
-        list: (path, opts) => {
-          const searchName = opts.search || '';
-          return Promise.resolve({ data: [{ name: searchName, metadata: { size: 100 }, size: 100 }], error: null });
-        }
+        list: async (folder, opts = {}) => {
+          const name = opts.search || '';
+          const objectPath = [folder, name].filter(Boolean).join('/');
+          try {
+            const blob = await devStorageGet(`${bucket}/${objectPath}`);
+            return {
+              data: blob ? [{ id: `dev-storage-${objectPath}`, name, metadata: { size: blob.size }, size: blob.size }] : [],
+              error: null
+            };
+          } catch (error) {
+            return { data: null, error };
+          }
+        },
+        download: async path => {
+          try {
+            const blob = await devStorageGet(`${bucket}/${path}`);
+            return blob ? { data: blob, error: null } : { data: null, error: { message: 'Objekt nicht gespeichert' } };
+          } catch (error) {
+            return { data: null, error };
+          }
+        },
+        getPublicUrl: path => ({ data: { publicUrl: `dev-storage://${bucket}/${path}` } })
       };
     }
   };
@@ -336,9 +404,24 @@ if (isWebDriver) {
         return Promise.resolve({ data: { session: { user: { id: 2, email: 'Techniker 1' } } }, error: null });
       },
       signInWithPassword: ({ email, password }) => {
+        if (isDevMock && email?.trim().toLowerCase() === 'a.strehler@q-service.ch' && password === 'dev-admin') {
+          const user = {
+            id: 'dev-admin-user',
+            email: 'a.strehler@q-service.ch',
+            email_confirmed_at: new Date().toISOString()
+          };
+          return Promise.resolve({
+            data: { user, session: { access_token: 'dev-mock-access-token', user } },
+            error: null
+          });
+        }
         const user = systemSettings.report_data.users.find(u => u.name === email && u.password === password);
         if (user) {
-          return Promise.resolve({ data: { user: { id: user.id, email: user.name } }, error: null });
+          const sessionUser = { id: String(user.id), email: user.name };
+          return Promise.resolve({
+            data: { user: sessionUser, session: { access_token: 'webdriver-mock-access-token', user: sessionUser } },
+            error: null
+          });
         }
         return Promise.resolve({ data: { user: null }, error: { message: 'Invalid credentials' } });
       },

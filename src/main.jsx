@@ -10,6 +10,22 @@ import ErrorBoundary from './ErrorBoundary.jsx'
 import { isOneDrivePopupCallback } from './lib/onedrive/popupCallback.js'
 import { completeOneDrivePopup } from './lib/onedrive/popupBridge.js'
 
+// A previously installed production PWA must never cache local development
+// bundles. Otherwise the browser can keep serving an old login implementation
+// even while Vite has already rebuilt the current source.
+if (import.meta.env.DEV) {
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.getRegistrations()
+      .then(registrations => Promise.all(registrations.map(registration => registration.unregister())))
+      .catch(error => console.warn('[Dev] Service-Worker konnte nicht entfernt werden:', error));
+  }
+  if ('caches' in window) {
+    caches.keys()
+      .then(keys => Promise.all(keys.map(key => caches.delete(key))))
+      .catch(error => console.warn('[Dev] PWA-Cache konnte nicht geleert werden:', error));
+  }
+}
+
 const rootElement = document.getElementById('root');
 const isPopupCallback = isOneDrivePopupCallback(
   window.location,
