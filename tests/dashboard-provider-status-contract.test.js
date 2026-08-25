@@ -30,7 +30,7 @@ test('interactive Microsoft login is restricted to the explicit connect button',
   assert.match(backgroundToken, /if \(!account\) return null/);
   assert.doesNotMatch(backgroundToken, /connectOneDrive\(|loginPopup\(/);
   const explicitConnect = auth.slice(auth.indexOf('export async function connectOneDrive()'), auth.indexOf('export async function getGraphAccessToken()'));
-  assert.match(explicitConnect, /loginPopup\(loginRequest\)/);
+  assert.match(explicitConnect, /loginPopup\(\{[\s\S]*\.\.\.loginRequest,[\s\S]*prompt:\s*'select_account'/);
 });
 
 test('offline event immediately invalidates OneDrive status', () => {

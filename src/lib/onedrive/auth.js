@@ -118,7 +118,14 @@ export function getActiveAccount() {
  */
 export async function connectOneDrive() {
   const msal   = getMsalInstance();
-  const result = await msal.loginPopup(loginRequest);
+  // Always let the user choose the Microsoft account explicitly. Without this,
+  // Microsoft may silently reuse a cached account from another tenant (for
+  // example a Q-Service account while this app registration belongs to the
+  // Fast-Tool tenant) and return AADSTS50020/AADSTS700016.
+  const result = await msal.loginPopup({
+    ...loginRequest,
+    prompt: 'select_account',
+  });
   if (result.account) msal.setActiveAccount(result.account);
   return result;
 }
