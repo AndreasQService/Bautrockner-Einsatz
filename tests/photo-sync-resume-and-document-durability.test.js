@@ -18,6 +18,14 @@ test('existing project image metadata is repaired and verified', () => {
   assert.match(worker, /uploading: false/);
 });
 
+test('legacy Supabase photos without an id remain eligible for OneDrive repair', () => {
+  assert.match(form, /photo\?\.id \|\| getCaseFileStoragePath\(photo\)/);
+  assert.match(form, /oneDriveRepairPhotoIds\.includes\(getOneDriveRepairKey\(img\)\)/);
+  assert.match(form, /uploadPhotoAndGetUrl\(odFolder, subFolder, file, repairKey\)/);
+  assert.match(form, /if \(img\.id && img\.id !== 'exterior-photo'\) \{\s*await updatePhotoSyncStatus\(img\.id, oneDriveUpdate\)/);
+  assert.match(form, /getOneDriveRepairKey\(i\) === repairKey/);
+});
+
 test('documents are durably stored before background sync', () => {
   const cloudBranch = form.slice(form.indexOf('if (isCloudFirstEnabled)'), form.indexOf('return;', form.indexOf('if (isCloudFirstEnabled)')));
   assert.match(cloudBranch, /savePhotoLocally\(imageId/);

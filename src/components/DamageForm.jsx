@@ -803,6 +803,9 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
     const oneDriveBackfillRetryRef = useRef(new globalThis.Map());
     const oneDriveRepairAttemptedAtRef = useRef(new globalThis.Map());
     const [oneDriveBackfillRetryTick, setOneDriveBackfillRetryTick] = useState(0);
+    const getOneDriveRepairKey = useCallback((photo) => String(
+        photo?.id || getCaseFileStoragePath(photo) || getProjectPhotoEvidenceKey(latestFormData.current, photo) || ''
+    ), []);
     const handleProjectSyncEvidence = useCallback((evidence) => {
         setCloudSyncComplete(evidence?.cloudsComplete === true);
         if (evidence?.oneDriveReady) {
@@ -812,7 +815,10 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                     const key = getProjectPhotoEvidenceKey(latestFormData.current, photo);
                     return key && !verifiedKeys.has(key);
                 })
-                .map(photo => photo.id)
+                // Legacy photos do not always have an id. Their durable
+                // Supabase path is still a stable identity and must be
+                // repairable instead of remaining permanently at 21/22.
+                .map(photo => getOneDriveRepairKey(photo))
                 .filter(Boolean);
             setOneDriveRepairPhotoIds(previous =>
                 JSON.stringify(previous) === JSON.stringify(missingIds) ? previous : missingIds
@@ -822,7 +828,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
             supabase: evidence?.supabaseReady ? (evidence.supabase?.verifiedPhotoKeys || []) : [],
             oneDrive: evidence?.oneDriveReady ? (evidence.oneDrive?.verifiedPhotoKeys || []) : []
         });
-    }, []);
+    }, [getOneDriveRepairKey]);
     const renderVerifiedStorageBadge = (photo) => {
         const evidenceKey = getProjectPhotoEvidenceKey(formData, photo);
         const supabaseVerified = !!evidenceKey && verifiedPhotoEvidence.supabase.includes(evidenceKey);
@@ -1224,7 +1230,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
     // (oneDriveItemId fehlt). Download via Supabase Storage → Upload via User-Token.
     // Funktioniert auf jedem Gerät, da Blobs per HTTP aus Supabase geladen werden.
     const oneDriveBackfillSignature = getProjectPhotoCandidates(formData)
-        .filter(img => getCaseFileStoragePath(img) && (!img?.oneDriveItemId || oneDriveRepairPhotoIds.includes(img.id)))
+        .filter(img => getCaseFileStoragePath(img) && (!img?.oneDriveItemId || oneDriveRepairPhotoIds.includes(getOneDriveRepairKey(img))))
         .map(img => `${img.id || img.name}:${getCaseFileStoragePath(img)}:${img.oneDriveSyncedAt || ''}`)
         .sort()
         .join('|');
@@ -1241,11 +1247,12 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
             // Alle Bilder die in Supabase sind aber nicht in OneDrive
             const nowMs = Date.now();
             const missing = getProjectPhotoCandidates(formData).filter(img => {
-                const needsRepair = oneDriveRepairPhotoIds.includes(img.id);
-                const lastRepairAt = oneDriveRepairAttemptedAtRef.current.get(img.id) || 0;
+                const repairKey = getOneDriveRepairKey(img);
+                const needsRepair = oneDriveRepairPhotoIds.includes(repairKey);
+                const lastRepairAt = oneDriveRepairAttemptedAtRef.current.get(repairKey) || 0;
                 return getCaseFileStoragePath(img) &&
                     (!img.oneDriveItemId || (needsRepair && nowMs - lastRepairAt >= 5000)) &&
-                    !oneDriveBackfillInFlightRef.current.has(img.id);
+                    repairKey && !oneDriveBackfillInFlightRef.current.has(repairKey);
             });
 
             if (missing.length === 0) return;
@@ -1260,9 +1267,10 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
 
             // Reserve the complete batch before starting requests. React state
             // updates from an early upload must not start duplicate backfills.
-            missing.forEach(img => oneDriveBackfillInFlightRef.current.add(img.id));
+            missing.forEach(img => oneDriveBackfillInFlightRef.current.add(getOneDriveRepairKey(img)));
             const uploadMissingPhoto = async (img) => {
-                oneDriveRepairAttemptedAtRef.current.set(img.id, Date.now());
+                const repairKey = getOneDriveRepairKey(img);
+                oneDriveRepairAttemptedAtRef.current.set(repairKey, Date.now());
                 try {
                     const supabaseStoragePath = getCaseFileStoragePath(img);
                     // Blob von Supabase Storage laden
@@ -1277,7 +1285,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                     // Upload ins persönliche OneDrive
                     const subFolder = img.roomName || img.assignedTo || 'Sonstiges';
                     const file = new File([blob], img.name || 'foto.jpg', { type: blob.type || 'image/jpeg' });
-                    const odResult = await uploadPhotoAndGetUrl(odFolder, subFolder, file, img.id);
+                    const odResult = await uploadPhotoAndGetUrl(odFolder, subFolder, file, repairKey);
 
                     if (odResult?.itemId || odResult?.odPath) {
                         const oneDriveUpdate = {
@@ -1286,7 +1294,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                             oneDriveSyncedAt: new Date().toISOString(),
                             oneDriveErrorMessage: null
                         };
-                        if (img.id !== 'exterior-photo') {
+                        if (img.id && img.id !== 'exterior-photo') {
                             await updatePhotoSyncStatus(img.id, oneDriveUpdate);
                         }
                         setFormData(prev => ({
@@ -1297,20 +1305,20 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                                 exteriorPhotoOneDriveSyncedAt: oneDriveUpdate.oneDriveSyncedAt
                             } : {}),
                             images: (prev.images || []).map(i =>
-                                i.id === img.id ? {
+                                getOneDriveRepairKey(i) === repairKey ? {
                                     ...i,
                                     ...oneDriveUpdate,
                                     uploading: false,
                                 } : i
                             ),
                             photos: (prev.photos || []).map(i =>
-                                i.id === img.id ? { ...i, ...oneDriveUpdate, uploading: false } : i
+                                getOneDriveRepairKey(i) === repairKey ? { ...i, ...oneDriveUpdate, uploading: false } : i
                             )
                         }));
                         console.log(`[OneDrive-Backfill] ✅ ${img.name} → OneDrive`);
-                        const retryState = oneDriveBackfillRetryRef.current.get(img.id);
+                        const retryState = oneDriveBackfillRetryRef.current.get(repairKey);
                         if (retryState?.timer) clearTimeout(retryState.timer);
-                        oneDriveBackfillRetryRef.current.delete(img.id);
+                        oneDriveBackfillRetryRef.current.delete(repairKey);
                     } else {
                         throw new Error('OneDrive-Upload lieferte keine dauerhafte Datei-ID zurück');
                     }
@@ -1319,18 +1327,18 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                         oneDriveErrorMessage: err.message || String(err)
                     }).catch(() => {});
                     console.warn(`[OneDrive-Backfill] ⚠️ Fehler bei ${img.name}:`, err.message);
-                    const previousRetry = oneDriveBackfillRetryRef.current.get(img.id) || { attempts: 0, timer: null };
+                    const previousRetry = oneDriveBackfillRetryRef.current.get(repairKey) || { attempts: 0, timer: null };
                     const attempts = previousRetry.attempts + 1;
                     if (attempts <= 5 && !previousRetry.timer) {
                         const retryDelay = [1500, 3000, 6000, 12000, 30000][attempts - 1];
                         const timer = setTimeout(() => {
-                            oneDriveBackfillRetryRef.current.set(img.id, { attempts, timer: null });
+                            oneDriveBackfillRetryRef.current.set(repairKey, { attempts, timer: null });
                             setOneDriveBackfillRetryTick(value => value + 1);
                         }, retryDelay);
-                        oneDriveBackfillRetryRef.current.set(img.id, { attempts, timer });
+                        oneDriveBackfillRetryRef.current.set(repairKey, { attempts, timer });
                     }
                 } finally {
-                    oneDriveBackfillInFlightRef.current.delete(img.id);
+                    oneDriveBackfillInFlightRef.current.delete(repairKey);
                 }
             };
 
