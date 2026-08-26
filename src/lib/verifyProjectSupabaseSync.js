@@ -50,14 +50,23 @@ export async function verifyProjectSupabaseSync({ supabase, report }) {
 
   const matches = reportCategoryMatches(report, remoteRow.report_data);
   const photos = getProjectPhotoCandidates(report);
-  const verifiedPhotoKeys = (await Promise.all(photos.map(async (photo, index) => {
+  const photoResults = await Promise.all(photos.map(async (photo, index) => {
+    const key = itemKey(photo, index);
     const path = storagePathFor(photo);
-    return path && await verifyStorageObject(supabase, path) ? itemKey(photo, index) : null;
-  }))).filter(Boolean);
+    if (!path) return { key, id: photo?.id || null, name: photo?.name || null, storagePath: null, verified: false, reason: photo?.id ? 'MISSING_SUPABASE_PATH' : 'LEGACY_IDENTITY_MISSING' };
+    try {
+      const verified = await verifyStorageObject(supabase, path);
+      return { key, id: photo?.id || null, name: photo?.name || null, storagePath: path, verified, reason: verified ? null : 'MISSING_SUPABASE_OBJECT' };
+    } catch (error) {
+      return { key, id: photo?.id || null, name: photo?.name || null, storagePath: path, verified: false, reason: 'SUPABASE_READ_ERROR', detail: error?.message || String(error) };
+    }
+  }));
+  const verifiedPhotoKeys = photoResults.filter(result => result.verified).map(result => result.key);
 
   const devices = Array.isArray(report?.equipment) ? report.equipment : (Array.isArray(report?.devices) ? report.devices : []);
   return {
     verifiedPhotoKeys,
+    photoResults,
     verifiedDeviceKeys: matches.devices ? await verifyDevices(supabase, reportId, devices) : [],
     textVerified: matches.text,
     protocolsVerified: matches.protocols,

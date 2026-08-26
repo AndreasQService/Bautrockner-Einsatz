@@ -18,7 +18,7 @@ const isDocument = item => {
   return DOCUMENT_EXTENSIONS.some(extension => name.endsWith(extension));
 };
 
-export const itemKey = (item, index) => String(item?.id || item?.supabasePath || item?.storagePath || `${item?.name || 'item'}:${item?.date || item?.createdAt || ''}:${item?.size || ''}:${index}`);
+export const itemKey = (item, index) => String(item?.id || item?.recoveryKey || item?.supabasePath || item?.storagePath || item?.contentHash || `unidentified:${index}`);
 
 const uniqueItems = items => {
   const seen = new Set();
@@ -72,14 +72,17 @@ export const getProjectPhotoEvidenceKey = (report, photo) => {
   const candidates = getProjectPhotoCandidates(report);
   const photoId = photo.id != null ? String(photo.id) : '';
   const photoPath = String(photo.supabasePath || photo.storagePath || '');
+  const photoRecoveryKey = String(photo.recoveryKey || '');
+  const photoHash = String(photo.contentHash || '');
   const matches = candidates.map((candidate, index) => ({ candidate, index })).filter(({ candidate }) => {
     const candidateId = candidate?.id != null ? String(candidate.id) : '';
     if (photoId && candidateId) return photoId === candidateId;
     const candidatePath = String(candidate?.supabasePath || candidate?.storagePath || '');
     if (photoPath && candidatePath) return photoPath === candidatePath;
-    return String(candidate?.name || '') === String(photo.name || '')
-      && String(candidate?.date || candidate?.createdAt || '') === String(photo.date || photo.createdAt || '')
-      && String(candidate?.size || '') === String(photo.size || '');
+    const candidateRecoveryKey = String(candidate?.recoveryKey || '');
+    if (photoRecoveryKey && candidateRecoveryKey) return photoRecoveryKey === candidateRecoveryKey;
+    const candidateHash = String(candidate?.contentHash || '');
+    return Boolean(photoHash && candidateHash && photoHash === candidateHash);
   });
   return matches.length === 1 ? itemKey(matches[0].candidate, matches[0].index) : null;
 };
@@ -101,6 +104,11 @@ const compactSemanticEmpty = value => {
   }
   if (value === undefined || value === null || value === '') return undefined;
   return value;
+};
+
+export const hasVerifiedPhotoEvidence = (report, photo, verifiedKeys = []) => {
+  const key = getProjectPhotoEvidenceKey(report, photo);
+  return Boolean(key && verifiedKeys.includes(key));
 };
 
 const textPayload = report => {

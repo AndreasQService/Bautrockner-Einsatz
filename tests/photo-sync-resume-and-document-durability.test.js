@@ -8,13 +8,14 @@ const form = fs.readFileSync(new URL('../src/components/DamageForm.jsx', import.
 test('photo sync resumes Supabase-backed items until OneDrive is verified', () => {
   assert.doesNotMatch(worker, /p\.syncStatus !== 'uploaded_to_backend'/);
   assert.doesNotMatch(worker, /p\.syncStatus !== 'queued_for_remote'/);
-  assert.match(worker, /const storagePath = photo\.supabasePath \|\|/);
-  assert.match(worker, /uploadPhotoAndGetUrl\(odFolder, subFolder, oneDriveFile\)/);
+  assert.match(worker, /let storagePath = photo\.supabasePath \|\|/);
+  assert.doesNotMatch(worker, /uploadPhotoAndGetUrl/);
+  assert.match(worker, /supabaseObjectVerified/);
 });
 
 test('existing project image metadata is repaired and verified', () => {
   assert.match(worker, /findIndex\(img => img\.id === photo\.id\)/);
-  assert.match(worker, /syncStatus: 'remote_verified'/);
+  assert.match(worker, /syncStatus: 'uploaded_to_backend'/);
   assert.match(worker, /uploading: false/);
 });
 

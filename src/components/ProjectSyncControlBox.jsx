@@ -28,6 +28,8 @@ export default function ProjectSyncControlBox({ report, supabase, offline = fals
     projectId: report?.id || null,
     photos: getProjectPhotoCandidates(report).map(photo => [
       photo?.id || null,
+      photo?.recoveryKey || null,
+      photo?.contentHash || null,
       photo?.supabasePath || photo?.storagePath || null,
       photo?.oneDriveItemId || null,
       photo?.oneDrivePath || null,
@@ -143,6 +145,11 @@ export default function ProjectSyncControlBox({ report, supabase, offline = fals
   const green = localSaveConfirmed && cloudsComplete;
   const statusColor = green ? '#10B981' : '#EF4444';
   const loading = localSaveConfirmed && (targets.supabase.phase === 'loading' || targets.oneDrive.phase === 'loading');
+  const photoFailures = ['supabase', 'oneDrive'].flatMap(provider => (
+    targets[provider].phase === 'ready'
+      ? (targets[provider].evidence?.photoResults || []).filter(result => !result.verified).map(result => ({ provider, ...result }))
+      : []
+  ));
 
   return (
     <section aria-label="Supabase Synchronisationskontrolle und OneDrive Synchronisationskontrolle" aria-live="polite" style={{
@@ -183,6 +190,10 @@ export default function ProjectSyncControlBox({ report, supabase, offline = fals
           {targets.supabase.error && `Supabase: ${targets.supabase.error}`}
           {targets.supabase.error && targets.oneDrive.error && ' · '}
           {targets.oneDrive.error && `OneDrive: ${targets.oneDrive.error}`}
+        </div>}
+        {localSaveConfirmed && photoFailures.length > 0 && <div role="alert" title={photoFailures.map(item => `${item.provider}: ${item.id || 'ohne ID'} | ${item.storagePath || 'ohne Pfad'} | ${item.reason}`).join('\n')} style={{ color: '#F59E0B', fontSize: '0.68rem', maxWidth: '42vw', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          Fehlend: {photoFailures.slice(0, 3).map(item => `${item.name || item.id || item.storagePath || 'unbekannt'} (${item.provider}: ${item.reason})`).join(' · ')}
+          {photoFailures.length > 3 ? ` · +${photoFailures.length - 3}` : ''}
         </div>}
       </div>
     </section>

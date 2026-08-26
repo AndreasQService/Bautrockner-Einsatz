@@ -5,6 +5,27 @@
  */
 
 let compressionQueue = Promise.resolve();
+export const IMAGE_DECODE_TIMEOUT_MS = 5000;
+
+export const convertHeicToJpeg = async (blob, converter = null) => {
+    const runConverter = converter || (async input => {
+        const module = await import('heic2any');
+        return module.default(input);
+    });
+    const converted = await new Promise((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error('HEIC_CONVERSION_TIMEOUT')), IMAGE_DECODE_TIMEOUT_MS);
+        Promise.resolve(runConverter({ blob, toType: 'image/jpeg', quality: 0.9 })).then(
+            value => { clearTimeout(timer); resolve(value); },
+            error => { clearTimeout(timer); reject(error); }
+        );
+    });
+    const jpeg = Array.isArray(converted) ? converted[0] : converted;
+    if (!(jpeg instanceof Blob) || jpeg.size === 0) throw new Error('HEIC_CONVERSION_EMPTY');
+    const normalized = jpeg.type === 'image/jpeg' ? jpeg : new Blob([jpeg], { type: 'image/jpeg' });
+    const signature = new Uint8Array(await normalized.slice(0, 3).arrayBuffer());
+    if (signature[0] !== 0xFF || signature[1] !== 0xD8 || signature[2] !== 0xFF) throw new Error('HEIC_CONVERSION_INVALID_JPEG');
+    return normalized;
+};
 
 /**
  * Strips metadata, rotates, scales and compresses an image using a canvas.
@@ -28,6 +49,18 @@ export function compressSingleImage(blob, maxDimension, quality, format = 'image
 
         const url = URL.createObjectURL(blob);
         const img = new Image();
+        let settled = false;
+        const finish = (callback) => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(decodeTimeout);
+            URL.revokeObjectURL(url);
+            callback();
+        };
+        const decodeTimeout = setTimeout(() => {
+            try { img.src = ''; } catch (_) {}
+            finish(() => reject(new Error(`Image decode timed out after ${IMAGE_DECODE_TIMEOUT_MS}ms (type: ${blob?.type || 'unknown'}, size: ${blob?.size || 0} bytes)`)));
+        }, IMAGE_DECODE_TIMEOUT_MS);
 
         img.onload = () => {
             try {
@@ -35,8 +68,7 @@ export function compressSingleImage(blob, maxDimension, quality, format = 'image
                 let height = img.naturalHeight || img.height;
 
                 if (!width || !height) {
-                    URL.revokeObjectURL(url);
-                    reject(new Error('Image has 0 width or height'));
+                    finish(() => reject(new Error('Image has 0 width or height')));
                     return;
                 }
 
@@ -57,8 +89,7 @@ export function compressSingleImage(blob, maxDimension, quality, format = 'image
 
                 const ctx = canvas.getContext('2d');
                 if (!ctx) {
-                    URL.revokeObjectURL(url);
-                    reject(new Error('Canvas context not available'));
+                    finish(() => reject(new Error('Canvas context not available')));
                     return;
                 }
 
@@ -68,17 +99,15 @@ export function compressSingleImage(blob, maxDimension, quality, format = 'image
                     // Cleanup canvas and image to prevent memory leaks on iPad
                     canvas.width = 0;
                     canvas.height = 0;
-                    URL.revokeObjectURL(url);
 
                     if (resultBlob) {
-                        resolve(resultBlob);
+                        finish(() => resolve(resultBlob));
                     } else {
-                        reject(new Error('Canvas conversion to Blob returned null'));
+                        finish(() => reject(new Error('Canvas conversion to Blob returned null')));
                     }
                 }, format, quality);
             } catch (err) {
-                URL.revokeObjectURL(url);
-                reject(err instanceof Error ? err : new Error(String(err)));
+                finish(() => reject(err instanceof Error ? err : new Error(String(err))));
             }
         };
 
@@ -88,9 +117,8 @@ export function compressSingleImage(blob, maxDimension, quality, format = 'image
                 blobType: blob?.type,
                 blobUrl: url
             });
-            URL.revokeObjectURL(url);
             const detail = evt?.type ? `DOM Event (${evt.type})` : 'Image load error';
-            reject(new Error(`Failed to load image into Canvas (${detail}, type: ${blob?.type || 'unknown'}, size: ${blob?.size || 0} bytes)`));
+            finish(() => reject(new Error(`Failed to load image into Canvas (${detail}, type: ${blob?.type || 'unknown'}, size: ${blob?.size || 0} bytes)`)));
         };
 
         img.src = url;
@@ -141,7 +169,7 @@ export function queueImageCompression(file, isSketch = false) {
         const isPdf = fileType === 'application/pdf' || fileName.toLowerCase().endsWith('.pdf');
         const isImage = fileType.startsWith('image/') || isHeic || /\.(jpe?g|png|webp|heic|heif|gif|bmp)$/i.test(fileName);
         
-        let originalBlob = file;
+        const originalBlob = file;
         const originalSha = await calculateSha256(originalBlob);
 
         // Non-image files (PDFs, documents) skip canvas image compression
@@ -156,28 +184,48 @@ export function queueImageCompression(file, isSketch = false) {
         }
 
         const lossless = isSketch || isLossless(fileName, fileType);
+        let workingBlob = originalBlob;
+        if (isHeic) {
+            try {
+                workingBlob = await convertHeicToJpeg(originalBlob);
+            } catch (error) {
+                const conversionError = new Error(`HEIC_CONVERSION_FAILED: ${error?.message || String(error)}`);
+                conversionError.code = 'HEIC_CONVERSION_FAILED';
+                throw conversionError;
+            }
+        }
         
-        let compressedBlob = originalBlob;
-        let pdfBlob = originalBlob;
-        let previewBlob = originalBlob;
+        let compressedBlob = workingBlob;
+        let pdfBlob = workingBlob;
+        let previewBlob = workingBlob;
 
         try {
             // Determine if it is already small and doesn't need re-processing
             // Small: longest edge <= 2048px and size < 2MB (2097152 bytes) and not HEIC
             let needsRecompression = true;
             
-            if (originalBlob.size < 2097152 && !isHeic && !lossless) {
+            if (workingBlob.size < 2097152 && !isHeic && !lossless) {
                 try {
                     const dims = await new Promise((resolve, reject) => {
-                        const u = URL.createObjectURL(originalBlob);
+                        const u = URL.createObjectURL(workingBlob);
                         const i = new Image();
-                        i.onload = () => {
-                            resolve({ w: i.width, h: i.height });
+                        let settled = false;
+                        const finish = (callback) => {
+                            if (settled) return;
+                            settled = true;
+                            clearTimeout(timeoutId);
                             URL.revokeObjectURL(u);
+                            callback();
+                        };
+                        const timeoutId = setTimeout(() => {
+                            try { i.src = ''; } catch (_) {}
+                            finish(() => reject(new Error(`Dimension check timed out for ${fileName}`)));
+                        }, IMAGE_DECODE_TIMEOUT_MS);
+                        i.onload = () => {
+                            finish(() => resolve({ w: i.width, h: i.height }));
                         };
                         i.onerror = (err) => {
-                            URL.revokeObjectURL(u);
-                            reject(new Error(`Dimension check failed for ${fileName}`));
+                            finish(() => reject(new Error(`Dimension check failed for ${fileName}`)));
                         };
                         i.src = u;
                     });
@@ -191,27 +239,26 @@ export function queueImageCompression(file, isSketch = false) {
             
             if (lossless) {
                 // For sketches/lossless diagrams, compress to WebP or PNG lossless
-                compressedBlob = await compressSingleImage(originalBlob, 2048, 1.0, 'image/png');
-                pdfBlob = await compressSingleImage(originalBlob, 1600, 1.0, 'image/png');
-                previewBlob = await compressSingleImage(originalBlob, 480, 0.8, 'image/png');
+                compressedBlob = await compressSingleImage(workingBlob, 2048, 1.0, 'image/png');
+                pdfBlob = await compressSingleImage(workingBlob, 1600, 1.0, 'image/png');
+                previewBlob = await compressSingleImage(workingBlob, 480, 0.8, 'image/png');
             } else if (needsRecompression || isHeic) {
                 // Compress main photo (JPEG quality 82%)
-                compressedBlob = await compressSingleImage(originalBlob, 2048, 0.82, 'image/jpeg');
+                compressedBlob = await compressSingleImage(workingBlob, 2048, 0.82, 'image/jpeg');
                 // PDF version (1600px quality 78%)
-                pdfBlob = await compressSingleImage(originalBlob, 1600, 0.78, 'image/jpeg');
+                pdfBlob = await compressSingleImage(workingBlob, 1600, 0.78, 'image/jpeg');
                 // UI preview version (480px quality 70%)
-                previewBlob = await compressSingleImage(originalBlob, 480, 0.70, 'image/jpeg');
+                previewBlob = await compressSingleImage(workingBlob, 480, 0.70, 'image/jpeg');
             } else {
                 // Already small, generate only PDF version and preview to be efficient
-                pdfBlob = await compressSingleImage(originalBlob, 1600, 0.78, 'image/jpeg');
-                previewBlob = await compressSingleImage(originalBlob, 480, 0.70, 'image/jpeg');
+                pdfBlob = await compressSingleImage(workingBlob, 1600, 0.78, 'image/jpeg');
+                previewBlob = await compressSingleImage(workingBlob, 480, 0.70, 'image/jpeg');
             }
         } catch (compressionErr) {
             const errDetail = compressionErr?.message || (compressionErr?.type ? `DOM Event (${compressionErr.type})` : String(compressionErr));
-            console.warn(`[imageCompressor] ⚠️ Canvas compression failed for ${fileName} (${errDetail}). Falling back to original blob.`);
-            compressedBlob = originalBlob;
-            pdfBlob = originalBlob;
-            previewBlob = originalBlob;
+            const unreadable = new Error(`IMAGE_DECODE_UNREADABLE: Datei beschädigt oder nicht lesbar – erneut auswählen (${fileName})`);
+            unreadable.code = 'IMAGE_DECODE_UNREADABLE';
+            throw unreadable;
         }
 
         const compressedSha = await calculateSha256(compressedBlob);
@@ -240,7 +287,9 @@ export function queueImageCompression(file, isSketch = false) {
                 blob: previewBlob,
                 size: previewBlob.size,
                 mimeType: lossless ? 'image/png' : 'image/jpeg'
-            }
+            },
+            convertedFromHeic: isHeic,
+            cloudExtension: isHeic ? 'jpg' : null
         };
     });
     

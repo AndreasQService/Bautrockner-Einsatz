@@ -1,6 +1,7 @@
 import { getProjectPhotoCandidates, itemKey, reportCategoryMatches } from './projectSyncSummary.js';
 
 const GRAPH_BASE = 'https://graph.microsoft.com/v1.0';
+const GRAPH_READ_TIMEOUT_MS = 5000;
 
 const safeFolderPart = value => String(value || '')
   .replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue')
@@ -18,7 +19,17 @@ export const projectOneDriveFolder = report => {
 const encodeDrivePath = path => String(path).split('/').filter(Boolean).map(encodeURIComponent).join('/');
 
 const graphJson = async (fetchImpl, token, resource) => {
-  const response = await fetchImpl(`${GRAPH_BASE}${resource}`, { headers: { Authorization: `Bearer ${token}` } });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), GRAPH_READ_TIMEOUT_MS);
+  let response;
+  try {
+    response = await fetchImpl(`${GRAPH_BASE}${resource}`, { headers: { Authorization: `Bearer ${token}` }, signal: controller.signal });
+  } catch (error) {
+    if (controller.signal.aborted) throw new Error('ONEDRIVE_GRAPH_TIMEOUT');
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
   if (!response.ok) throw new Error(`OneDrive-Readback fehlgeschlagen (${response.status}).`);
   return response.json();
 };
@@ -75,10 +86,21 @@ export async function verifyProjectOneDriveSync({ report, tokenProvider, fetchIm
   }
   const photos = getProjectPhotoCandidates(report);
   const verifiedPhotoKeys = [];
+  const photoResults = [];
   for (let index = 0; index < photos.length; index += 1) {
+    const photo = photos[index];
+    const key = itemKey(photo, index);
+    const locator = photo?.oneDriveItemId || photo?.oneDrivePath || null;
+    if (!locator) {
+      photoResults.push({ key, id: photo?.id || null, name: photo?.name || null, storagePath: photo?.storagePath || photo?.supabasePath || null, verified: false, reason: 'MISSING_ONEDRIVE_LOCATOR' });
+      continue;
+    }
     try {
-      if (await verifyPhotoItem(fetchImpl, token, photos[index])) verifiedPhotoKeys.push(itemKey(photos[index], index));
-    } catch {
+      const verified = await verifyPhotoItem(fetchImpl, token, photo);
+      if (verified) verifiedPhotoKeys.push(key);
+      photoResults.push({ key, id: photo?.id || null, name: photo?.name || null, storagePath: photo?.storagePath || photo?.supabasePath || null, verified, reason: verified ? null : 'STALE_ONEDRIVE_LOCATOR' });
+    } catch (error) {
+      photoResults.push({ key, id: photo?.id || null, name: photo?.name || null, storagePath: photo?.storagePath || photo?.supabasePath || null, verified: false, reason: error?.message === 'ONEDRIVE_GRAPH_TIMEOUT' ? 'ONEDRIVE_GRAPH_TIMEOUT' : 'ONEDRIVE_GRAPH_ERROR', detail: error?.message || String(error) });
       // One missing/stale photo remains pending without invalidating fresh
       // evidence already obtained for the other objects.
     }
@@ -86,6 +108,7 @@ export async function verifyProjectOneDriveSync({ report, tokenProvider, fetchIm
   const devices = Array.isArray(report?.equipment) ? report.equipment : (Array.isArray(report?.devices) ? report.devices : []);
   return {
     verifiedPhotoKeys,
+    photoResults,
     verifiedDeviceKeys: matches.devices ? devices.map(itemKey) : [],
     textVerified: matches.text,
     protocolsVerified: matches.protocols,

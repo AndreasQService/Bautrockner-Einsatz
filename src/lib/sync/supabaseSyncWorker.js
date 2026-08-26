@@ -8,6 +8,15 @@ import { updatePhotoSyncStatus, openDB } from '../../services/PhotoStorage.js';
 import { queueImageCompression } from '../../utils/imageCompressor.js';
 
 let isSyncRunning = false;
+const PHOTO_SYNC_DEADLINE_MS = 20000;
+const withDeadline = (start, photo) => new Promise((resolve, reject) => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => {
+        controller.abort();
+        reject(new Error(`SUPABASE_SYNC_TIMEOUT: ${photo?.id || 'ohne-id'} ${photo?.name || 'ohne-name'}`));
+    }, PHOTO_SYNC_DEADLINE_MS);
+    Promise.resolve().then(() => start(controller.signal)).then(value => { clearTimeout(timer); resolve(value); }, error => { clearTimeout(timer); reject(error); });
+});
 
 const retryDelayMs = (attempt) => Math.min(15 * 60 * 1000, 1000 * (2 ** Math.min(attempt, 9)));
 
@@ -56,7 +65,7 @@ export async function syncPendingToSupabase(projectId = null) {
 
         for (const photo of photos) {
             try {
-                await syncOnePhoto(photo);
+                await withDeadline(signal => syncOnePhoto(photo, signal), photo);
                 synced++;
             } catch (err) {
                 let errMsg = 'Unknown sync error';
@@ -84,7 +93,11 @@ export async function syncPendingToSupabase(projectId = null) {
                     errMsg = 'Corrupt or un-decodable photo data in local storage';
                 }
 
-                const isCorruptOrInvalid = errMsg.includes('Canvas') || errMsg.includes('Invalid') || errMsg.includes('corrupt') || errMsg.includes('DOM Event');
+                const unreadable = errMsg.includes('IMAGE_DECODE_UNREADABLE');
+                const localBlobMissing = errMsg.includes('LOCAL_BLOB_MISSING');
+                const isCorruptOrInvalid = unreadable || localBlobMissing || errMsg.includes('Canvas') || errMsg.includes('Invalid') || errMsg.includes('corrupt') || errMsg.includes('DOM Event');
+                if (unreadable) errMsg = 'Datei beschädigt oder nicht lesbar – erneut auswählen';
+                if (localBlobMissing) errMsg = 'Lokales Original fehlt oder ist leer – Datei erneut auswählen';
                 const finalRetryCount = (photo.retryCount || 0) + 1;
                 const supabaseConfirmed = Boolean(
                     photo.supabasePath &&
@@ -92,7 +105,7 @@ export async function syncPendingToSupabase(projectId = null) {
                     photo.projectLinkedAt
                 );
 
-                console.warn('[SyncWorker] ⚠️ Bypassing photo sync issue:', photo.id, errMsg);
+                console.warn('[SyncWorker] Foto-Synchronisation fehlgeschlagen:', { id: photo.id, name: photo.name, supabasePath: photo.supabasePath || null, reason: errMsg });
                 if (supabaseConfirmed) {
                     // Supabase is already durable and linked. A later OneDrive
                     // failure is a separate provider result and must not turn
@@ -144,6 +157,7 @@ async function getPendingPhotosFromDb(projectId = null) {
             // This worker owns Supabase only. OneDrive has an independent path.
             resolve(all.filter(p => {
                 if (projectId && p.projectId !== projectId) return false;
+                if (p.terminalFailure === true || p.syncStatus === 'terminal_error') return false;
                 const supabasePending = !p.supabasePath || !p.supabaseVerifiedAt || !p.projectLinkedAt;
                 const localBlob = p.blob || p.original?.blob || p.compressed?.blob;
                 const hasRecoverableBlob = localBlob instanceof Blob && localBlob.size > 0;
@@ -158,8 +172,9 @@ async function getPendingPhotosFromDb(projectId = null) {
 /**
  * Process and sync a single photo
  */
-async function syncOnePhoto(photo) {
+async function syncOnePhoto(photo, signal) {
     if (!supabase) throw new Error('Supabase Client not available');
+    const throwIfAborted = () => { if (signal?.aborted) throw new Error('SUPABASE_SYNC_ABORTED'); };
     
     const projectId = photo.projectId || 'TEST__ISOLATION_001';
     const testRunId = photo.testRunId || import.meta.env.VITE_ONEDRIVE_TEST_RUN_ID || 'TESTRUN_DEFAULT';
@@ -168,8 +183,8 @@ async function syncOnePhoto(photo) {
     if (!safeName || safeName === 'undefined' || safeName === 'null') {
         safeName = `photo_${photo.id || Date.now()}.jpg`;
     }
-    const ext = safeName.split('.').pop().toLowerCase() || 'jpg';
-    const storagePath = photo.supabasePath || `${testRunId}/${projectId}/Fotos/TEST__${photo.id}.${ext}`;
+    let ext = safeName.split('.').pop().toLowerCase() || 'jpg';
+    let storagePath = photo.supabasePath || `${testRunId}/${projectId}/Fotos/TEST__${photo.id}.${ext}`;
     
     // 1. Compression Phase
     if (!photo.supabasePath && (!photo.compressed || !photo.compressed.blob)) {
@@ -179,11 +194,11 @@ async function syncOnePhoto(photo) {
             console.warn(`[SyncWorker] ⚠️ Bypassing invalid/corrupt photo blob for ${photo.id}`);
             await updatePhotoSyncStatus(photo.id, { 
                 syncStatus: 'terminal_error',
-                errorMessage: 'Invalid or empty photo blob in local storage',
+                errorMessage: 'Lokales Original fehlt oder ist leer – Datei erneut auswählen',
                 terminalFailure: true,
                 needsUserAction: true
             }).catch(() => {});
-            return;
+            throw new Error('LOCAL_BLOB_MISSING: Lokales Original fehlt oder ist leer – Datei erneut auswählen');
         }
         let fileToCompress = targetBlob;
         if (!(targetBlob instanceof File)) {
@@ -199,12 +214,19 @@ async function syncOnePhoto(photo) {
             }
         }
         const result = await queueImageCompression(fileToCompress, photo.meta?.isSketch);
+        throwIfAborted();
         
         photo.compressed = result.compressed;
         photo.pdf = result.pdf;
         photo.preview = result.preview;
         photo.original = photo.original || {};
         photo.original.sha256 = result.original.sha256;
+        photo.convertedFromHeic = result.convertedFromHeic === true;
+        photo.cloudFileName = photo.convertedFromHeic ? `${photo.id}.jpg` : null;
+        if (!photo.supabasePath && result.cloudExtension) {
+            ext = result.cloudExtension;
+            storagePath = `${testRunId}/${projectId}/Fotos/TEST__${photo.id}.${ext}`;
+        }
         photo.syncStatus = 'queued_for_sync';
         
         await updatePhotoSyncStatus(photo.id, {
@@ -212,6 +234,9 @@ async function syncOnePhoto(photo) {
             compressed: photo.compressed,
             pdf: photo.pdf,
             preview: photo.preview,
+            convertedFromHeic: photo.convertedFromHeic,
+            cloudFileName: photo.cloudFileName,
+            cloudExtension: result.cloudExtension,
             syncStatus: 'queued_for_sync'
         });
     }
@@ -229,8 +254,10 @@ async function syncOnePhoto(photo) {
             .from('case-files')
              .upload(storagePath, compressedBlob, {
                 contentType: photo.compressed?.mimeType || photo.type || 'image/jpeg',
-                upsert: true
+                upsert: true,
+                signal
             });
+        throwIfAborted();
 
         if (uploadErr) {
             throw new Error(`Supabase Storage upload failed: ${uploadErr.message}`);
@@ -257,8 +284,10 @@ async function syncOnePhoto(photo) {
             .from('case-files')
             .upload(photo.supabasePath, compressedBlob, {
                 contentType: photo.compressed?.mimeType || photo.type || 'image/jpeg',
-                upsert: true
+                upsert: true,
+                signal
             });
+        throwIfAborted();
         if (repairUploadError) {
             throw new Error(`Supabase repair upload failed: ${repairUploadError.message}`);
         }
@@ -283,7 +312,9 @@ async function syncOnePhoto(photo) {
             .from('damage_reports')
             .select('report_data')
             .eq('id', projectId)
+            .abortSignal(signal)
             .single();
+        throwIfAborted();
 
         if (fetchErr || !projectRow) {
             console.log(`[SyncWorker] ℹ️ Project row ${projectId} not in DB yet. Photo ${photo.id} uploaded to storage successfully.`);
@@ -320,6 +351,8 @@ async function syncOnePhoto(photo) {
                 roomName: photo.meta?.roomName || photo.meta?.assignedTo || null,
                 description: photo.meta?.description || '',
                 includeInReport: photo.meta?.includeInReport !== undefined ? photo.meta.includeInReport : true
+                ,convertedFromHeic: photo.convertedFromHeic === true
+                ,cloudFileName: photo.convertedFromHeic ? `${photo.id}.jpg` : null
         };
         if (linkedIndex === -1) {
             reportData.images.push(cloudImage);
@@ -335,7 +368,9 @@ async function syncOnePhoto(photo) {
         const { error: updateErr } = await supabase
             .from('damage_reports')
             .update({ report_data: reportData })
-            .eq('id', projectId);
+            .eq('id', projectId)
+            .abortSignal(signal);
+        throwIfAborted();
 
         if (updateErr) {
             throw new Error(`Project report_data update failed: ${updateErr.message}`);

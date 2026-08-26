@@ -47,13 +47,16 @@ import { createRentalDeviceAssignment, endRentalDeviceAssignment, isRentalTypeSe
 import ProjectSyncControlBox from './ProjectSyncControlBox';
 import AuthenticatedStorageImage from './AuthenticatedStorageImage';
 import { saveProjectDraftWithReadback } from '../lib/safeProjectCreation';
-import { getProjectPhotoCandidates, getProjectPhotoEvidenceKey } from '../lib/projectSyncSummary.js';
+import { getProjectPhotoCandidates, getProjectPhotoEvidenceKey, hasVerifiedPhotoEvidence } from '../lib/projectSyncSummary.js';
 import { getCaseFileStoragePath, getDurablePhotoUrl } from '../lib/caseFilePhotoAccess';
 import { hasSupplierInvoice } from '../features/projects/invoiceEvidence.js';
 import { isHeicHeifPhoto } from '../lib/photoFormat.js';
+import { createPhotoId, calculatePhotoContentHash, createOneDrivePhotoFile } from '../lib/photoIdentity.js';
+import { scheduleSupabasePhotoRepairs } from '../lib/photoRepair.js';
 
 const HeicFormatBadge = ({ photo, compact = false, style = {} }) => {
     if (!isHeicHeifPhoto(photo)) return null;
+    const converted = photo?.convertedFromHeic === true;
     return (
         <span
             title="HEIC/HEIF kann je nach Browser nicht als Vorschau, im Bildeditor oder im PDF dargestellt werden. Das Original bleibt gespeichert."
@@ -61,11 +64,11 @@ const HeicFormatBadge = ({ photo, compact = false, style = {} }) => {
                 display: 'inline-flex', alignItems: 'center', width: 'fit-content',
                 fontSize: compact ? '0.58rem' : '0.7rem', fontWeight: 800,
                 padding: compact ? '2px 4px' : '2px 6px', borderRadius: '4px',
-                backgroundColor: 'rgba(180,83,9,0.94)', color: '#FFF',
-                border: '1px solid #F59E0B', whiteSpace: 'nowrap', ...style
+                backgroundColor: converted ? 'rgba(4,120,87,0.94)' : 'rgba(180,83,9,0.94)', color: '#FFF',
+                border: `1px solid ${converted ? '#10B981' : '#F59E0B'}`, whiteSpace: 'nowrap', ...style
             }}
         >
-            {compact ? '⚠ HEIC' : '⚠ HEIC – eingeschränkt unterstützt'}
+            {converted ? (compact ? '✓ HEIC→JPG' : '✓ HEIC → JPEG konvertiert') : (compact ? '⚠ HEIC' : '⚠ HEIC – eingeschränkt unterstützt')}
         </span>
     );
 };
@@ -821,7 +824,28 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
     // Use the native constructor explicitly to avoid instantiating the icon.
     const oneDriveBackfillRetryRef = useRef(new globalThis.Map());
     const oneDriveRepairAttemptedAtRef = useRef(new globalThis.Map());
+    const supabaseRepairScheduledRef = useRef(new Set());
+    const photoRecoveryKeysRef = useRef(new WeakMap());
+    const getPhotoRecoveryKey = useCallback((photo) => {
+        const durable = photo?.id || getCaseFileStoragePath(photo) || photo?.oneDriveItemId || photo?.contentHash || photo?.recoveryKey;
+        if (durable) return String(durable);
+        if (!photo || typeof photo !== 'object') return null;
+        if (!photoRecoveryKeysRef.current.has(photo)) photoRecoveryKeysRef.current.set(photo, `legacy_${globalThis.crypto.randomUUID()}`);
+        return photoRecoveryKeysRef.current.get(photo);
+    }, []);
     const [oneDriveBackfillRetryTick, setOneDriveBackfillRetryTick] = useState(0);
+    useEffect(() => {
+        const addRecoveryKeys = items => (items || []).map(item => {
+            if (item?.id || item?.recoveryKey || getCaseFileStoragePath(item) || item?.oneDriveItemId || item?.contentHash) return item;
+            return { ...item, recoveryKey: `legacy_${globalThis.crypto.randomUUID()}` };
+        });
+        setFormData(previous => {
+            const images = addRecoveryKeys(previous.images);
+            const photos = addRecoveryKeys(previous.photos);
+            const changed = images.some((item, index) => item !== previous.images?.[index]) || photos.some((item, index) => item !== previous.photos?.[index]);
+            return changed ? { ...previous, images, photos } : previous;
+        });
+    }, [formData.id]);
     const getOneDriveRepairKey = useCallback((photo) => String(
         photo?.id || getCaseFileStoragePath(photo) || getProjectPhotoEvidenceKey(latestFormData.current, photo) || ''
     ), []);
@@ -843,6 +867,23 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                 JSON.stringify(previous) === JSON.stringify(missingIds) ? previous : missingIds
             );
         }
+        if (evidence?.supabaseReady) {
+            const legacyFailures = (evidence.supabase?.photoResults || []).filter(result => result.reason === 'LEGACY_IDENTITY_MISSING');
+            if (legacyFailures.length) {
+                const keys = new Set(legacyFailures.map(result => result.key));
+                setFormData(previous => ({
+                    ...previous,
+                    images: (previous.images || []).map(item => keys.has(getPhotoRecoveryKey(item)) ? { ...item, terminalFailure: true, syncStatus: 'terminal_error', errorMessage: 'Foto ohne sichere technische Identität – Datei ersetzen oder sicher löschen' } : item),
+                    photos: (previous.photos || []).map(item => keys.has(getPhotoRecoveryKey(item)) ? { ...item, terminalFailure: true, syncStatus: 'terminal_error', errorMessage: 'Foto ohne sichere technische Identität – Datei ersetzen oder sicher löschen' } : item)
+                }));
+            }
+            scheduleSupabasePhotoRepairs({
+                results: evidence.supabase?.photoResults || [],
+                scheduled: supabaseRepairScheduledRef.current,
+                updateStatus: updatePhotoSyncStatus,
+                sync: syncPendingPhotos
+            }).catch(error => console.warn('[Supabase-Reparatur] Foto konnte nicht eingeplant werden:', error.message));
+        }
         setVerifiedPhotoEvidence({
             supabase: evidence?.supabaseReady ? (evidence.supabase?.verifiedPhotoKeys || []) : [],
             oneDrive: evidence?.oneDriveReady ? (evidence.oneDrive?.verifiedPhotoKeys || []) : []
@@ -852,20 +893,22 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
         const evidenceKey = getProjectPhotoEvidenceKey(formData, photo);
         const supabaseVerified = !!evidenceKey && verifiedPhotoEvidence.supabase.includes(evidenceKey);
         const oneDriveVerified = !!evidenceKey && verifiedPhotoEvidence.oneDrive.includes(evidenceKey);
-        const failed = photo?.syncStatus === 'error';
+        const terminalFailure = photo?.syncStatus === 'terminal_error' || photo?.terminalFailure === true;
+        const failed = photo?.syncStatus === 'error' || terminalFailure;
         const label = supabaseVerified && oneDriveVerified
             ? '✅ Vollständig verifiziert'
             : supabaseVerified
                 ? '✅ In Supabase gespeichert'
                 : failed
-                    ? '❌ Fehler – erneut versuchen'
+                    ? (terminalFailure ? (photo?.errorMessage || 'Datei beschädigt oder nicht lesbar – erneut auswählen') : '❌ Fehler – erneut versuchen')
                     : '❌ Nicht in Supabase bestätigt';
         const verified = supabaseVerified;
+        const recoveryKey = getPhotoRecoveryKey(photo);
         return (
             <>
             <button
                 type="button"
-                onClick={verified ? undefined : () => syncPendingPhotos()}
+                onClick={terminalFailure ? () => document.getElementById(`replace-photo-${recoveryKey}`)?.click() : (verified ? undefined : () => syncPendingPhotos())}
                 disabled={verified || isSyncing}
                 title={verified ? 'Durch frischen Supabase-Storage-Readback bestätigt' : 'Kein aktueller Supabase-Storage-Readback vorhanden'}
                 style={{
@@ -875,8 +918,14 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                     border: '1px solid currentColor', cursor: verified || isSyncing ? 'default' : 'pointer'
                 }}
             >
-                {verified ? label : (isSyncing ? '↻ Supabase wird geprüft …' : '↻ Supabase erneut prüfen')}
+                {verified ? label : (terminalFailure ? `${label} · ersetzen` : (isSyncing ? '↻ Supabase wird geprüft …' : '↻ Supabase erneut prüfen'))}
             </button>
+            {terminalFailure && recoveryKey && <input id={`replace-photo-${recoveryKey}`} type="file" accept="image/*,.heic,.heif" hidden onChange={async event => {
+                const replacement = event.target.files?.[0];
+                if (!replacement) return;
+                await replacePhotoAtomically(photo, replacement);
+                event.target.value = '';
+            }} />}
             <HeicFormatBadge photo={photo} />
             </>
         );
@@ -1051,12 +1100,20 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                         syncStatus: localPhoto.syncStatus,
                         oneDriveItemId: localPhoto.oneDriveItemId,
                         oneDrivePath: localPhoto.oneDrivePath,
-                        storagePath: localPhoto.supabasePath
+                        storagePath: localPhoto.supabasePath,
+                        convertedFromHeic: localPhoto.convertedFromHeic === true,
+                        cloudFileName: localPhoto.cloudFileName || null
                     });
                     updated = true;
                 } else {
                     const img = nextImages[existingIdx];
                     let imgChanged = false;
+
+                    if (localPhoto.convertedFromHeic === true && (img.convertedFromHeic !== true || img.cloudFileName !== localPhoto.cloudFileName)) {
+                        img.convertedFromHeic = true;
+                        img.cloudFileName = localPhoto.cloudFileName || `${localPhoto.id}.jpg`;
+                        imgChanged = true;
+                    }
 
                     if (localPhoto.syncStatus && img.syncStatus !== localPhoto.syncStatus) {
                         img.syncStatus = localPhoto.syncStatus;
@@ -1179,6 +1236,8 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                                 syncStatus: lp.syncStatus,
                                 supabasePath: lp.supabasePath || img.supabasePath,
                                 oneDriveItemId: lp.oneDriveItemId || img.oneDriveItemId,
+                                convertedFromHeic: lp.convertedFromHeic === true || img.convertedFromHeic === true,
+                                cloudFileName: lp.cloudFileName || img.cloudFileName,
                                 error: lp.syncStatus === 'error',
                                 errorMessage: lp.errorMessage || null,
                                 uploading: !lp.oneDriveItemId && lp.syncStatus !== 'error'
@@ -1251,9 +1310,10 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
     // gesichert sind (storagePath vorhanden) aber noch nicht auf OneDrive sind
     // (oneDriveItemId fehlt). Download via Supabase Storage → Upload via User-Token.
     // Funktioniert auf jedem Gerät, da Blobs per HTTP aus Supabase geladen werden.
+    const hasFreshSupabaseEvidence = img => hasVerifiedPhotoEvidence(formData, img, verifiedPhotoEvidence.supabase);
     const oneDriveBackfillSignature = getProjectPhotoCandidates(formData)
-        .filter(img => getCaseFileStoragePath(img) && (!img?.oneDriveItemId || oneDriveRepairPhotoIds.includes(getOneDriveRepairKey(img))))
-        .map(img => `${img.id || img.name}:${getCaseFileStoragePath(img)}:${img.oneDriveSyncedAt || ''}`)
+        .filter(img => hasFreshSupabaseEvidence(img) && getCaseFileStoragePath(img) && (!img?.oneDriveItemId || oneDriveRepairPhotoIds.includes(getOneDriveRepairKey(img))))
+        .map(img => `${getOneDriveRepairKey(img)}:${getCaseFileStoragePath(img)}:${img.oneDriveSyncedAt || ''}`)
         .sort()
         .join('|');
 
@@ -1272,7 +1332,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                 const repairKey = getOneDriveRepairKey(img);
                 const needsRepair = oneDriveRepairPhotoIds.includes(repairKey);
                 const lastRepairAt = oneDriveRepairAttemptedAtRef.current.get(repairKey) || 0;
-                return getCaseFileStoragePath(img) &&
+                return hasFreshSupabaseEvidence(img) && getCaseFileStoragePath(img) &&
                     (!img.oneDriveItemId || (needsRepair && nowMs - lastRepairAt >= 5000)) &&
                     repairKey && !oneDriveBackfillInFlightRef.current.has(repairKey);
             });
@@ -1306,7 +1366,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
 
                     // Upload ins persönliche OneDrive
                     const subFolder = img.roomName || img.assignedTo || 'Sonstiges';
-                    const file = new File([blob], img.name || 'foto.jpg', { type: blob.type || 'image/jpeg' });
+                    const file = await createOneDrivePhotoFile(img, blob);
                     const odResult = await uploadPhotoAndGetUrl(odFolder, subFolder, file, repairKey);
 
                     if (odResult?.itemId || odResult?.odPath) {
@@ -1378,7 +1438,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
 
         const timer = setTimeout(backfill, 0);
         return () => clearTimeout(timer);
-    }, [formData.id, oneDriveBackfillSignature, oneDriveBackfillRetryTick, oneDriveRepairPhotoIds]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [formData.id, oneDriveBackfillSignature, oneDriveBackfillRetryTick, oneDriveRepairPhotoIds, verifiedPhotoEvidence.supabase]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // Primary Auto-Save Effect (Handled in unified effect below)
 
@@ -2554,7 +2614,7 @@ END:VCARD`;
             for (let file of files) {
                 const fileExt = file.name.split('.').pop().toLowerCase();
                 const isDoc = ['pdf', 'msg', 'txt'].includes(fileExt);
-                const imageId = 'img_' + Math.random().toString(36).substring(2, 15) + '_' + Date.now();
+                const imageId = createPhotoId();
 
                 try {
                     // 1. Immediately and durably save the original blob in IndexedDB (Step 0)
@@ -2571,6 +2631,8 @@ END:VCARD`;
                         isSketch: contextData.assignedTo === 'Messprotokolle' || (file.name && file.name.includes('sketch'))
                     });
                     trackObjectURL(localPreviewUrl);
+                    const contentHash = await calculatePhotoContentHash(file);
+                    await updatePhotoSyncStatus(imageId, { contentHash, meta: { ...contextData, subFolder, odFolder, contentHash } });
 
                     // 2. Add to React state only after confirmed local IndexedDB save
                     const imageEntry = {
@@ -2602,6 +2664,8 @@ END:VCARD`;
                                                 syncStatus: lp.syncStatus,
                                                 supabasePath: lp.supabasePath || img.supabasePath,
                                                 oneDriveItemId: lp.oneDriveItemId || img.oneDriveItemId,
+                                                convertedFromHeic: lp.convertedFromHeic === true || img.convertedFromHeic === true,
+                                                cloudFileName: lp.cloudFileName || img.cloudFileName,
                                                 error: lp.syncStatus === 'error',
                                                 errorMessage: lp.errorMessage || null,
                                                 uploading: !lp.oneDriveItemId && lp.syncStatus !== 'error'
@@ -2626,7 +2690,7 @@ END:VCARD`;
         for (let file of files) {
             const fileExt = file.name.split('.').pop().toLowerCase();
             const isDoc = ['pdf', 'msg', 'txt'].includes(fileExt);
-            const imageId = 'img_' + Math.random().toString(36).substring(2, 15) + '_' + Date.now();
+            const imageId = createPhotoId();
 
             try {
                 // 1. Immediately and durably save the original blob in IndexedDB (Step 0)
@@ -2637,6 +2701,8 @@ END:VCARD`;
                         isSketch: contextData.assignedTo === 'Messprotokolle' || (file.name && file.name.includes('sketch'))
                     });
                     trackObjectURL(localPreviewUrl);
+                    const contentHash = await calculatePhotoContentHash(file);
+                    await updatePhotoSyncStatus(imageId, { contentHash, meta: { ...contextData, contentHash } });
                 } else {
                     localPreviewUrl = trackObjectURL(URL.createObjectURL(file));
                 }
@@ -2671,6 +2737,8 @@ END:VCARD`;
                                             syncStatus: lp.syncStatus,
                                             supabasePath: lp.supabasePath || img.supabasePath,
                                             oneDriveItemId: lp.oneDriveItemId || img.oneDriveItemId,
+                                            convertedFromHeic: lp.convertedFromHeic === true || img.convertedFromHeic === true,
+                                            cloudFileName: lp.cloudFileName || img.cloudFileName,
                                             error: lp.syncStatus === 'error',
                                             errorMessage: lp.errorMessage || null,
                                             uploading: !lp.oneDriveItemId && lp.syncStatus !== 'error'
@@ -2688,6 +2756,37 @@ END:VCARD`;
                 console.error('[handleImageUpload] Failed to save image locally:', error);
                 alert("Fehler bei der lokalen Bildsicherung: " + error.message);
             }
+        }
+    };
+
+    const replacePhotoAtomically = async (oldPhoto, replacement) => {
+        const oldKey = getPhotoRecoveryKey(oldPhoto);
+        const newId = createPhotoId();
+        let newPreview = null;
+        try {
+            const context = { assignedTo: oldPhoto.assignedTo, roomId: oldPhoto.roomId, roomName: oldPhoto.roomName, description: oldPhoto.description, includeInReport: oldPhoto.includeInReport };
+            newPreview = await savePhotoLocally(newId, formData.id || 'temp', replacement, context);
+            const contentHash = await calculatePhotoContentHash(replacement);
+            await updatePhotoSyncStatus(newId, { contentHash, meta: { ...context, contentHash } });
+            trackObjectURL(newPreview);
+            const replacementEntry = {
+                ...oldPhoto, id: newId, name: replacement.name, preview: newPreview,
+                fileType: replacement.name?.split('.').pop()?.toLowerCase() || '',
+                contentHash, recoveryKey: newId, uploading: true, error: false,
+                errorMessage: null, terminalFailure: false, syncStatus: 'local_only',
+                supabasePath: null, storagePath: null, oneDriveItemId: null, oneDrivePath: null
+            };
+            setFormData(previous => ({
+                ...previous,
+                images: (previous.images || []).map(item => getPhotoRecoveryKey(item) === oldKey ? replacementEntry : item),
+                photos: (previous.photos || []).map(item => getPhotoRecoveryKey(item) === oldKey ? replacementEntry : item)
+            }));
+            if (oldPhoto.id) await deletePhotoLocally(oldPhoto.id).catch(error => console.warn('[Foto ersetzen] Altes lokales Objekt blieb als sichere Reserve erhalten:', error.message));
+            await syncPendingPhotos();
+        } catch (error) {
+            await deletePhotoLocally(newId).catch(() => {});
+            if (newPreview) URL.revokeObjectURL(newPreview);
+            throw error;
         }
     };
 
@@ -5697,7 +5796,8 @@ END:VCARD`;
                                             <button type="button" onClick={async () => {
                                                 if (img.id) await deletePhotoLocally(img.id).catch(error => console.warn('[Foto löschen] IndexedDB:', error.message));
                                                 revokeImageBlob(img);
-                                                setFormData(prev => ({ ...prev, images: prev.images.filter(i => i.id ? i.id !== img.id : i !== img) }));
+                                                const deleteKey = getPhotoRecoveryKey(img);
+                                                setFormData(prev => ({ ...prev, images: prev.images.filter(i => getPhotoRecoveryKey(i) !== deleteKey) }));
                                             }} style={{ color: '#EF4444', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '6px', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}><Trash size={16} /></button>
                                         </div>
                                     </div>
@@ -6541,7 +6641,7 @@ END:VCARD`;
                                                                 if (window.confirm('Bild wirklich löschen?')) {
                                                                     setFormData(prev => ({
                                                                         ...prev,
-                                                                        images: prev.images.filter(i => { if (i === img) revokeImageBlob(i); return i !== img; }),
+                                                                        images: prev.images.filter(i => { const matches = getPhotoRecoveryKey(i) === getPhotoRecoveryKey(img); if (matches) revokeImageBlob(i); return !matches; }),
                                                                         damageTypeImage: prev.damageTypeImage === img.preview ? null : prev.damageTypeImage
                                                                     }));
                                                                 }
@@ -7192,7 +7292,7 @@ END:VCARD`;
                                                                                     setFormData(prev => ({
                                                                                         ...prev,
                                                                                         images: prev.images.filter(i =>
-                                                                                            !deleteTargets.some(target => target.id ? i.id === target.id : i === target)
+                                                                                            !deleteTargets.some(target => getPhotoRecoveryKey(i) === getPhotoRecoveryKey(target))
                                                                                         )
                                                                                     }));
                                                                                 }

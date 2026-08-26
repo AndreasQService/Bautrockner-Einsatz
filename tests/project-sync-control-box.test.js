@@ -415,7 +415,7 @@ test('save footer requires both cloud readbacks and OneDrive backfill retries mi
   assert.match(form, /Cloud-Synchronisierung ausstehend/);
   assert.match(form, /Math\.min\(3, queue\.length\)/);
   assert.match(form, /const oneDriveBackfillSignature = getProjectPhotoCandidates\(formData\)/);
-  assert.match(form, /filter\(img => getCaseFileStoragePath\(img\)/);
+  assert.match(form, /filter\(img => hasFreshSupabaseEvidence\(img\) && getCaseFileStoragePath\(img\)/);
   assert.match(form, /const supabaseStoragePath = getCaseFileStoragePath\(img\)/);
   assert.match(form, /exteriorPhotoOneDriveItemId: oneDriveUpdate\.oneDriveItemId/);
   assert.match(form, /oneDriveBackfillRetryTick/);
