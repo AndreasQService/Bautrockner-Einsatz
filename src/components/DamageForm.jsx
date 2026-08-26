@@ -50,6 +50,25 @@ import { saveProjectDraftWithReadback } from '../lib/safeProjectCreation';
 import { getProjectPhotoCandidates, getProjectPhotoEvidenceKey } from '../lib/projectSyncSummary.js';
 import { getCaseFileStoragePath, getDurablePhotoUrl } from '../lib/caseFilePhotoAccess';
 import { hasSupplierInvoice } from '../features/projects/invoiceEvidence.js';
+import { isHeicHeifPhoto } from '../lib/photoFormat.js';
+
+const HeicFormatBadge = ({ photo, compact = false, style = {} }) => {
+    if (!isHeicHeifPhoto(photo)) return null;
+    return (
+        <span
+            title="HEIC/HEIF kann je nach Browser nicht als Vorschau, im Bildeditor oder im PDF dargestellt werden. Das Original bleibt gespeichert."
+            style={{
+                display: 'inline-flex', alignItems: 'center', width: 'fit-content',
+                fontSize: compact ? '0.58rem' : '0.7rem', fontWeight: 800,
+                padding: compact ? '2px 4px' : '2px 6px', borderRadius: '4px',
+                backgroundColor: 'rgba(180,83,9,0.94)', color: '#FFF',
+                border: '1px solid #F59E0B', whiteSpace: 'nowrap', ...style
+            }}
+        >
+            {compact ? '⚠ HEIC' : '⚠ HEIC – eingeschränkt unterstützt'}
+        </span>
+    );
+};
 
 /* Custom PDF Icon */
 const PdfIcon = ({ size = 24, style = {} }) => (
@@ -843,6 +862,7 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
                     : '❌ Nicht in Supabase bestätigt';
         const verified = supabaseVerified;
         return (
+            <>
             <button
                 type="button"
                 onClick={verified ? undefined : () => syncPendingPhotos()}
@@ -857,6 +877,8 @@ export default function DamageForm({ onCancel, initialData, onSave, mode = 'desk
             >
                 {verified ? label : (isSyncing ? '↻ Supabase wird geprüft …' : '↻ Supabase erneut prüfen')}
             </button>
+            <HeicFormatBadge photo={photo} />
+            </>
         );
     };
     const [linkingImageId, setLinkingImageId] = useState(null);
@@ -6479,6 +6501,7 @@ END:VCARD`;
                                                         border: img.includeInReport !== false ? '2px solid #0F6EA3' : '1px solid var(--border)'
                                                     }}>
                                                         <img src={img.preview} style={{ width: '100%', height: '100%', objectFit: 'contain', cursor: 'pointer' }} onClick={() => setEditingImage(img)} />
+                                                        <HeicFormatBadge photo={img} compact style={{ position: 'absolute', right: '2px', bottom: '2px', zIndex: 3 }} />
 
                                                         {/* Include in Report Toggle (Centered/Unified) */}
                                                         <div
@@ -7002,6 +7025,7 @@ END:VCARD`;
                                                                                     setLinkingImageId(null);
                                                                                 }
                                                                             }} />
+                                                                            <HeicFormatBadge photo={img} compact style={{ position: 'absolute', top: '4px', right: '4px', zIndex: 3 }} />
                                                                         </div>
                                                                         {linkingImageId === img.id && (
                                                                             <div style={{ fontSize: '0.65rem', color: '#1E6DB7', fontWeight: 'bold', textAlign: 'center' }}>Bitte Ziel wählen...</div>
@@ -7100,6 +7124,7 @@ END:VCARD`;
                                                                         <div style={{ flex: '0 0 160px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', opacity: linkingImageId ? 0.5 : 1 }}>
                                                                             <div style={{ width: '160px', height: '160px', borderRadius: '6px', overflow: 'hidden', backgroundColor: '#E5E7EB', border: '2px solid #1E6DB7', position: 'relative' }}>
                                                                                 <img src={thermalImg.preview} alt="Thermobild" style={{ width: '100%', height: '100%', objectFit: 'contain' }} onClick={() => window.open(thermalImg.preview, '_blank')} />
+                                                                                <HeicFormatBadge photo={thermalImg} compact style={{ position: 'absolute', top: '4px', right: '4px', zIndex: 3 }} />
                                                                                 <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(30, 109, 183, 0.9)', color: 'white', fontSize: '0.65rem', textAlign: 'center', padding: '3px 0', fontWeight: 'bold', textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>THERMO</div>
                                                                             </div>
                                                                         </div>
@@ -8328,8 +8353,9 @@ END:VCARD`;
                                                 <div style={{ fontSize: '1rem', color: 'white', fontWeight: 500, textDecoration: 'underline' }}>{item.name}</div>
                                             </div>
                                         ) : (
-                                            <div style={{ width: '80px', height: '80px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: '4px' }}>
+                                            <div style={{ position: 'relative', width: '80px', height: '80px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: '4px' }}>
                                                 <img src={item.preview} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '4px' }} />
+                                                <HeicFormatBadge photo={item} compact style={{ position: 'absolute', right: '2px', bottom: '2px' }} />
                                             </div>
                                         )}
                                         {!((item.file && item.file.type === 'application/pdf') || (item.name && item.name.toLowerCase().endsWith('.pdf'))) && <div style={{ flex: 1, fontWeight: 500, color: 'white' }}>{item.name}</div>}
@@ -9035,6 +9061,7 @@ END:VCARD`;
                                     ) : (
                                         <>
                                             <img src={item.preview} alt="Vorschau" className="hover-zoom" style={{ width: '44px', height: '44px', objectFit: 'contain', borderRadius: '8px' }} />
+                                            <HeicFormatBadge photo={item} compact />
                                             <div style={{ flex: 1, overflow: 'hidden' }}>
                                                 <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'white' }}>{item.name || item.assignedTo}</div>
                                                 {item.description && (
@@ -9174,6 +9201,7 @@ END:VCARD`;
                                                         setEditingImageIndex(i);
                                                     }}
                                                 />
+                                                <HeicFormatBadge photo={img} style={{ position: 'absolute', top: '5px', left: '5px', zIndex: 3 }} />
                                                 <button
                                                     type="button"
                                                     onClick={() => {
@@ -10522,6 +10550,7 @@ END:VCARD`;
                                                         setEditingImageIndex(i);
                                                     }}
                                                 />
+                                                <HeicFormatBadge photo={img} style={{ position: 'absolute', top: '6px', right: '6px', zIndex: 3 }} />
                                                 {/* DB Sync Status Badge */}
                                                 {(() => {
                                                     const evidenceKey = getProjectPhotoEvidenceKey(formData, img);
